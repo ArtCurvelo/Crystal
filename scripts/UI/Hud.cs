@@ -337,7 +337,8 @@ public partial class Hud : CanvasLayer
         _root.AddChild(_saveIcon);
 
         _fps = UiTheme.Shadowed(UiTheme.Label("", 14, UiTheme.Success));
-        UiTheme.Place(_fps, Control.LayoutPreset.BottomRight, new Vector2(-90, -164));
+        UiTheme.Place(_fps, Control.LayoutPreset.BottomRight, new Vector2(-170, -164), new Vector2(150, 0));
+        _fps.HorizontalAlignment = HorizontalAlignment.Right;
         _root.AddChild(_fps);
     }
 
@@ -559,7 +560,7 @@ public partial class Hud : CanvasLayer
 
         UpdateEventPanel();
         _fps.Visible = Settings.Data.ShowFps;
-        if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS";
+        if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS · 3D {GetViewport().Scaling3DScale * 100:0}%";
 
         if (Player == null || !IsInstanceValid(Player)) return;
         // ressonância

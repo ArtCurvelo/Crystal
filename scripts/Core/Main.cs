@@ -126,6 +126,50 @@ public partial class Main : Node
     /// </summary>
     bool _booting = true;
 
+    /// <summary>Na qualidade Baixa desliga todas as luzes dinâmicas (maior custo no renderizador Compatibility).</summary>
+    void ApplyLightQuality()
+    {
+        bool on = Settings.Quality != GraphicsQuality.Low;
+        foreach (var l in FindAll<OmniLight3D>(World.GetParent())) l.Visible = on;
+    }
+
+    static System.Collections.Generic.IEnumerable<T> FindAll<T>(Node n) where T : Node
+    {
+        foreach (Node c in n.GetChildren())
+        {
+            if (c is T t) yield return t;
+            foreach (var x in FindAll<T>(c)) yield return x;
+        }
+    }
+
+    // ---------- resolução dinâmica ----------
+    float _dynTimer;
+    float _dynScale = -1f;
+
+    void UpdateDynamicResolution(float dt)
+    {
+        var vp = GetViewport();
+        float max = Settings.Data.RenderScale;
+        if (!Settings.Data.DynamicResolution || CurrentMode != Mode.Playing)
+        {
+            if (!Mathf.IsEqualApprox(vp.Scaling3DScale, max)) vp.Scaling3DScale = max;
+            _dynScale = -1f;
+            return;
+        }
+        if (_dynScale < 0) _dynScale = max;
+        _dynTimer += dt;
+        if (_dynTimer < 2f) return;
+        _dynTimer = 0;
+        double fps = Engine.GetFramesPerSecond();
+        int cap = Settings.Data.MaxFps > 0 ? Settings.Data.MaxFps : 1000;
+        double target = Mathf.Min(30, cap - 2);
+        if (fps < target - 2 && _dynScale > 0.5f) _dynScale = Mathf.Max(0.5f, _dynScale - 0.05f);
+        else if (fps > target + 14 && _dynScale < max) _dynScale = Mathf.Min(max, _dynScale + 0.05f);
+        if (!Mathf.IsEqualApprox(vp.Scaling3DScale, _dynScale)) vp.Scaling3DScale = _dynScale;
+    }
+
+    public float CurrentRenderScale => GetViewport().Scaling3DScale;
+
     async void Boot(string[] args)
     {
         var loading = BuildLoadingOverlay();
@@ -137,6 +181,8 @@ public partial class Main : Node
         Effects.Instance?.Burst(new Vector3(0, 2, 10), Colors.White, 1f); // compila partículas
         for (int i = 0; i < 5; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         _menuCam.Far = 120f;
+        ApplyLightQuality();
+        Settings.Changed += ApplyLightQuality;
         loading.QueueFree();
         _booting = false;
         ShowMenu();
@@ -145,6 +191,11 @@ public partial class Main : Node
         if (args.Contains("--autostart")) StartGame(false);
         var shots = args.FirstOrDefault(a => a.StartsWith("--shots="));
         if (shots != null) AddChild(new Tests.ScreenshotTour { Main = this, Dir = shots.Substring("--shots=".Length) });
+        if (args.Contains("--bench"))
+        {
+            var q = args.FirstOrDefault(a => a.StartsWith("--bench-quality="));
+            AddChild(new Tests.Benchmark { Main = this, Quality = q != null ? int.Parse(q.Split('=')[1]) : 0 });
+        }
         var bot = args.FirstOrDefault(a => a.StartsWith("--bot"));
         if (bot != null)
         {
@@ -179,6 +230,7 @@ public partial class Main : Node
     {
         UiBus.OpenShop -= OpenShop;
         UiBus.PrestigeRequested -= AskPrestige;
+        Settings.Changed -= ApplyLightQuality;
         UiBus.OpenSell -= OpenSell;
         if (GameState.Instance != null)
         {
@@ -400,6 +452,7 @@ public partial class Main : Node
             return;
         }
         UpdateRegion(false);
+        UpdateDynamicResolution((float)delta);
         _cullTimer -= (float)delta;
         if (_cullTimer <= 0) { _cullTimer = 0.5f; UpdateRegionCulling(); }
     }

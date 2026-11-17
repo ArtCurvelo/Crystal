@@ -144,6 +144,7 @@ public partial class SettingsScreen : ModalScreen
         AddCheck(grid, "Sincronização vertical (VSync)", d.VSync, v => d.VSync = v);
         AddCheck(grid, "Inverter eixo Y", d.InvertY, v => d.InvertY = v);
         AddCheck(grid, "Mostrar FPS (F3)", d.ShowFps, v => d.ShowFps = v);
+        AddCheck(grid, "Resolução dinâmica (mantém ~30 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);

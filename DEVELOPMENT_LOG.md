@@ -166,3 +166,19 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - `project.godot` regravado pelo próprio Godot (`ProjectSettings.save()`) no formato oficial: cabeçalho, ordem das chaves e remoção de valores iguais ao padrão. Isso evita que o editor do diretor altere o arquivo ao abrir/salvar, o que causou o conflito no `git pull`.
 - **Renascimento (prestígio):** após concluir a jornada, recomeça a partida (dinheiro, melhorias, mochila e regiões) e concede **Essência Ancestral** = ⌊√(ganhos da partida / 250 mil)⌋. Cada ponto dá **+10% permanente em dano e em valor de venda**. Mantém Coleção, estatísticas e Essência. Disponível no Terminal (seção Renascimento) e na tela de conclusão, sempre com confirmação. Saves antigos migram usando o total ganho. HUD mostra ✦Essência ao lado da ferramenta.
 - Bot renasce **pela interface** (Terminal → Renascer → Confirmar) e joga a 2ª jornada: +6 Essência (x1,6) → **Região 2 em 3,6 min** (1ª jornada: 10,3 min). Testes: 192/192.
+
+## Desempenho real (diretor): 13–15 FPS no Windows
+- **Benchmark** novo (`tests/Benchmark.cs`, `tools/run_bench.sh`): 5 vistas fixas (R1 acampamento/mineração, R2, R3, R4), média de 3 s cada, com experimentos isolados por argumento.
+- **Medição por fator** (renderização por software, qualidade Baixa, 720p; linha de base 19,6 FPS):
+  | Experimento | FPS | Ganho |
+  |---|---|---|
+  | sem luzes dinâmicas | 28,3 | +44% |
+  | escala 3D 60% | 26,4 | +35% |
+  | shader simples nos cristais | 18,9 | 0 |
+  | sem névoa | 19,9 | ~2% |
+  | sem partículas | 19,5 | 0 |
+  | sem luzes + escala 75% | 30,9 | +58% |
+  | sem luzes + escala 60% | 35,1 | +79% |
+- Causa: no Compatibility, cada OmniLight redesenha os objetos que alcança, e as malhas de parede mescladas recebem todas as luzes da região. Scripts e física medidos com Stopwatch: <0,25 ms por passo (não são o gargalo).
+- **Aplicado:** qualidade Baixa **sem luzes dinâmicas** (luz ambiente x1,9 compensa; emissivos mantêm o brilho), escala 3D padrão 75% na autodetecção, e **resolução dinâmica** (nova opção, ligada por padrão): abaixo de ~28 FPS reduz a escala 3D em passos de 5% até 50%; acima de ~44 FPS volta ao valor configurado. O FPS na tela (F3) mostra a escala 3D atual.
+- Resultado no benchmark (Baixa, escala fixa 75%): **19,6 → 29,8 FPS (+52%)**, antes da resolução dinâmica.

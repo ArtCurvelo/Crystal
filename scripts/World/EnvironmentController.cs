@@ -79,7 +79,8 @@ public partial class EnvironmentController : WorldEnvironment
     {
         var e = Environment;
         e.AmbientLightColor = _ambient.Lerp(OverlayAmbient, _overlay * 0.6f);
-        e.AmbientLightEnergy = _energy * (Settings.Quality == GraphicsQuality.Low ? 1.25f : 1f);
+        // na Baixa não há luzes dinâmicas: a luz ambiente compensa
+        e.AmbientLightEnergy = _energy * (Settings.Quality == GraphicsQuality.Low ? 1.9f : 1f);
         e.FogLightColor = _fog.Lerp(OverlayFog, _overlay);
         e.FogDensity = Mathf.Lerp(_density, OverlayFogDensity, _overlay);
         e.BackgroundColor = _fog.Darkened(0.5f);

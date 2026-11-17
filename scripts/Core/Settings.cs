@@ -19,6 +19,8 @@ public sealed class SettingsData
     public bool VSync { get; set; } = true;
     public float RenderScale { get; set; } = 1f;
     public bool ShowFps { get; set; }
+    /// <summary>Ajusta a resolução 3D automaticamente para manter ~30 FPS.</summary>
+    public bool DynamicResolution { get; set; } = true;
     public int MaxFps { get; set; } = 60;
     public int WindowSize { get; set; } = 0; // índice em Settings.WindowSizes
 
@@ -85,7 +87,7 @@ public static class Settings
         if (weak)
         {
             Data.Quality = (int)GraphicsQuality.Low;
-            Data.RenderScale = 0.85f;
+            Data.RenderScale = 0.75f;
         }
         GD.Print($"[Configurações] GPU: '{gpu}' → qualidade {(GraphicsQuality)Data.Quality}");
     }
