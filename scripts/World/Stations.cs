@@ -113,19 +113,59 @@ public partial class SellStation : StationBase
 /// <summary>Terminal de upgrades e desbloqueios.</summary>
 public partial class ShopTerminal : StationBase
 {
-    MeshInstance3D _screen;
+
 
     public override void _Ready()
     {
-        SetupBody(new Vector3(1.4f, 1.8f, 0.9f));
-        var accent = new Color(1f, 0.75f, 0.3f);
-        AddMesh(new BoxMesh { Size = new Vector3(1.3f, 1.1f, 0.8f) }, MeshFactory.Metal(new Color(0.25f, 0.22f, 0.3f), 0.5f), new Vector3(0, 0.55f, 0));
-        AddMesh(new BoxMesh { Size = new Vector3(1.2f, 0.8f, 0.12f) }, MeshFactory.Metal(new Color(0.18f, 0.16f, 0.22f), 0.5f), new Vector3(0, 1.45f, -0.25f));
-        _screen = AddMesh(new BoxMesh { Size = new Vector3(1.0f, 0.62f, 0.02f) }, MeshFactory.Emissive(new Color(0.2f, 0.12f, 0.05f), accent, 1.8f), new Vector3(0, 1.45f, -0.18f));
-        AddMesh(new BoxMesh { Size = new Vector3(1.0f, 0.06f, 0.5f) }, MeshFactory.Emissive(accent, accent, 1.2f), new Vector3(0, 1.12f, 0.05f));
-        var light = new OmniLight3D { LightColor = accent, LightEnergy = 1.2f, OmniRange = 5.5f, Position = new Vector3(0, 1.8f, 0.8f) };
+        SetupBody(new Vector3(2.4f, 2.2f, 1.1f));
+        var cyan = new Color(0.35f, 0.9f, 1f);
+        var orange = new Color(1f, 0.55f, 0.18f);
+        var body = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.37f, 0.42f), Roughness = 0.6f, Metallic = 0.2f };
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.19f), Roughness = 0.7f };
+        var trim = MeshFactory.Emissive(orange, orange, 1.6f);
+        var glow = MeshFactory.Emissive(new Color(0.05f, 0.2f, 0.25f), cyan, 1.4f);
+        // mesa/console
+        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.95f, 1.0f) }, body, new Vector3(0, 0.475f, 0.05f));
+        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.08f, 1.1f) }, dark, new Vector3(0, 0.99f, 0.05f));
+        for (int i = -1; i <= 1; i += 2)
+            AddMesh(new BoxMesh { Size = new Vector3(0.06f, 0.5f, 0.04f) }, trim, new Vector3(i * 1.0f, 0.5f, 0.56f));
+        AddMesh(new BoxMesh { Size = new Vector3(1.6f, 0.05f, 0.04f) }, trim, new Vector3(0, 0.82f, 0.56f));
+        // tela inclinada com moldura
+        var screenRoot = new Node3D { Position = new Vector3(0, 1.65f, -0.25f), Rotation = new Vector3(-0.25f, 0, 0) };
+        AddChild(screenRoot);
+        void S(Mesh m, Material mat, Vector3 pos)
+        {
+            screenRoot.AddChild(new MeshInstance3D { Mesh = m, MaterialOverride = mat, Position = pos, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        }
+        S(new BoxMesh { Size = new Vector3(2.0f, 1.15f, 0.12f) }, dark, Vector3.Zero);
+        S(new BoxMesh { Size = new Vector3(1.86f, 1.0f, 0.02f) }, MeshFactory.Emissive(new Color(0.02f, 0.08f, 0.12f), new Color(0.03f, 0.18f, 0.25f), 1f), new Vector3(0, 0, 0.065f));
+        // "interface" desenhada com barras luminosas
+        S(new BoxMesh { Size = new Vector3(0.42f, 0.16f, 0.01f) }, glow, new Vector3(-0.62f, 0.3f, 0.08f));
+        S(new BoxMesh { Size = new Vector3(0.42f, 0.16f, 0.01f) }, MeshFactory.Emissive(new Color(0.05f, 0.1f, 0.15f), new Color(0.2f, 0.45f, 0.55f), 1f), new Vector3(-0.62f, 0.08f, 0.08f));
+        for (int i = 0; i < 4; i++)
+        {
+            float y = 0.32f - i * 0.2f;
+            S(new BoxMesh { Size = new Vector3(0.7f, 0.035f, 0.01f) }, glow, new Vector3(0.12f, y, 0.08f));
+            S(new BoxMesh { Size = new Vector3(0.28f, 0.11f, 0.01f) }, MeshFactory.Emissive(new Color(0.2f, 0.15f, 0.05f), new Color(1f, 0.75f, 0.3f), 1.5f), new Vector3(0.7f, y, 0.08f));
+        }
+        S(new BoxMesh { Size = new Vector3(2.05f, 0.05f, 0.14f) }, trim, new Vector3(0, 0.6f, 0));
+        // cristais em exibição sobre pedestais
+        var colors = new[] { new Color(0.35f, 0.9f, 1f), new Color(0.7f, 0.4f, 1f), new Color(1f, 0.8f, 0.3f) };
+        for (int i = 0; i < 3; i++)
+        {
+            var p = new Vector3(-0.8f + i * 0.32f, 1.03f, 0.35f);
+            AddMesh(new CylinderMesh { TopRadius = 0.1f, BottomRadius = 0.12f, Height = 0.08f, RadialSegments = 8, Rings = 1 }, dark, p + new Vector3(0, 0.04f, 0));
+            AddMesh(new CylinderMesh { TopRadius = 0.105f, BottomRadius = 0.105f, Height = 0.015f, RadialSegments = 8, Rings = 1 }, trim, p + new Vector3(0, 0.085f, 0));
+            AddMesh(MeshFactory.CrystalPrism(6, 1, 1, 0.35f), MeshFactory.Emissive(colors[i], colors[i], 1.8f), p + new Vector3(0, 0.09f, 0), new Vector3(0.07f, 0.24f - i * 0.03f, 0.07f));
+        }
+        // tablet sobre a mesa
+        var tab = AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.02f, 0.34f) }, dark, new Vector3(0.55f, 1.05f, 0.3f));
+        tab.Rotation = new Vector3(0, 0.3f, 0);
+        var tabScreen = AddMesh(new BoxMesh { Size = new Vector3(0.44f, 0.005f, 0.28f) }, glow, new Vector3(0.55f, 1.063f, 0.3f));
+        tabScreen.Rotation = new Vector3(0, 0.3f, 0);
+        var light = new OmniLight3D { LightColor = new Color(0.5f, 0.85f, 1f), LightEnergy = 1.3f, OmniRange = 6f, Position = new Vector3(0, 2f, 1.2f) };
         AddChild(light);
-        Label = MakeLabel("MELHORIAS", accent, 2.3f);
+        Label = MakeLabel("MELHORIAS", new Color(1f, 0.75f, 0.3f), 2.75f);
     }
 
     public override string GetPrompt() => "[E] Terminal de Melhorias";

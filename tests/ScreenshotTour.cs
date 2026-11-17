@@ -39,6 +39,11 @@ public partial class ScreenshotTour : Node
         p.SetLook(1.35f, 0.02f);
         await Wait(0.4f);
         await Shot("02b_outpost");
+        p.GlobalPosition = new Vector3(2.4f, 0.1f, 15.6f);
+        p.SetLook(-1.05f, -0.12f);
+        await Wait(0.4f);
+        await Shot("02c_terminal");
+        p.GlobalPosition = Main.World.SpawnPoint;
         p.SetLook(0, 0);
 
         // mira em um cristal e minera

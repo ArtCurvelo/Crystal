@@ -117,3 +117,4 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - **Tema global chanfrado** (menus, pausa, configurações) com paleta azul-marinho e ciano.
 - **Formações gigantes de cristal** decorativas (MultiMesh com o shader de cristal) nas três regiões; Profundezas mais claras.
 - Testes: 150/150. Bot: SUCESSO.
+- **Terminal 3D** remodelado no estilo do conceito: console com tela inclinada (interface em barras luminosas), cristais em pedestais, tablet e acabamento laranja.
