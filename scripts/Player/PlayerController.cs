@@ -108,6 +108,22 @@ public partial class PlayerController : CharacterBody3D
         var gs = GameState.Instance;
         bool active = InputEnabled && MouseCaptured;
 
+        // ---------- Olhar com o controle (analógico direito) ----------
+        if (active)
+        {
+            var look = Input.GetVector("look_left", "look_right", "look_up", "look_down");
+            if (look.LengthSquared() > 0.0001f)
+            {
+                // curva quadrática: precisão perto do centro, rapidez nas bordas
+                look *= look.Length();
+                float lookSpeed = 3.2f * (Settings.Data.MouseSensitivity / 0.22f);
+                RotateY(-look.X * lookSpeed * dt);
+                float dy = look.Y * lookSpeed * 0.75f * dt * (Settings.Data.InvertY ? -1 : 1);
+                _pitch = Mathf.Clamp(_pitch - dy, Mathf.DegToRad(-88), Mathf.DegToRad(88));
+                _head.Rotation = new Vector3(_pitch, 0, 0);
+            }
+        }
+
         // ---------- Movimento ----------
         var vel = Velocity;
         if (!IsOnFloor()) vel.Y -= Gravity * dt;

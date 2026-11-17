@@ -197,7 +197,7 @@ public partial class ShopScreen : TerminalScreen
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);
-        var hint = UiTheme.Label("[Esc] ou [E] Fechar", 14, UiTheme.Muted);
+        var hint = UiTheme.Label("[Esc] / [B] ou [E] / [X] Fechar", 14, UiTheme.Muted);
         hint.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         footer.AddChild(hint);
         footer.AddChild(UiTheme.Button("Fechar", Close, 160));

@@ -56,6 +56,28 @@ public abstract partial class ModalScreen : CanvasLayer
         Visible = true;
         Refresh();
         UiTheme.PopIn(Panel);
+        Callable.From(FocusFirst).CallDeferred();
+    }
+
+    /// <summary>Garante um controle focado para navegação por controle/teclado.</summary>
+    protected void FocusFirst()
+    {
+        if (!Visible) return;
+        var current = Root.GetViewport().GuiGetFocusOwner();
+        if (current != null && current.IsVisibleInTree() && IsAncestorOf(current)) return;
+        var b = FindFocusable(Panel);
+        b?.GrabFocus();
+    }
+
+    static Control FindFocusable(Node n)
+    {
+        foreach (Node c in n.GetChildren())
+        {
+            if (c is BaseButton bb && !bb.Disabled && bb.IsVisibleInTree() && bb.FocusMode != Control.FocusModeEnum.None) return bb;
+            var r = FindFocusable(c);
+            if (r != null) return r;
+        }
+        return null;
     }
 
     public virtual void Close()
@@ -336,6 +358,11 @@ public partial class HelpScreen : ModalScreen
             row.AddChild(UiTheme.Label(a, 16, UiTheme.Text));
             left.AddChild(row);
         }
+
+        left.AddChild(UiTheme.Spacer(6));
+        left.AddChild(UiTheme.Label("CONTROLE", 20, UiTheme.Gold, true));
+        var pad = UiTheme.Label("Analógico esq.: mover · Analógico dir.: olhar\nRT: minerar · X: interagir · A: pular\nLB: correr · Start: pausa · B: voltar", 15, UiTheme.Text);
+        left.AddChild(pad);
 
         var right = new VBoxContainer { CustomMinimumSize = new Vector2(440, 0) };
         right.AddThemeConstantOverride("separation", 8);

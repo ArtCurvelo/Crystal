@@ -21,6 +21,10 @@ Feito em **Godot 4.5.1 (.NET) com C#**. Todo o conteúdo visual e sonoro é gera
 | Salvar rapidamente | F5 |
 | Mostrar FPS | F3 |
 
+**Controle (layout Xbox):** analógico esquerdo move, analógico direito olha, **RT** minera, **X** interage,
+**A** pula, **LB** corre, **Start** pausa, **B** volta nos menus (D-pad ou analógico navegam). As dicas na tela
+mudam automaticamente para os botões do controle.
+
 **Ciclo de jogo:** minere cristais → os fragmentos são atraídos até você → venda na **Estação de Venda** (verde)
 → compre melhorias no **Terminal** (dourado) → desbloqueie novas regiões nos **portões** de energia.
 

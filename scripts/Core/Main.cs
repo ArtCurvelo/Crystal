@@ -328,6 +328,8 @@ public partial class Main : Node
 
     bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen;
 
+    public override void _Input(InputEvent e) => InputHints.Observe(e);
+
     public override void _UnhandledInput(InputEvent e)
     {
         if (e.IsActionPressed("pause"))
@@ -342,6 +344,19 @@ public partial class Main : Node
             if (_shop.IsOpen) { _shop.Close(); return; }
             if (_sell.IsOpen) { _sell.Close(); return; }
             if (_pause.IsOpen) Resume(); else Pause();
+            return;
+        }
+        if (e is InputEventJoypadButton jb && jb.Pressed && jb.ButtonIndex == JoyButton.B && AnyModal())
+        {
+            GetViewport().SetInputAsHandled();
+            if (_confirm.IsOpen) _confirm.Close();
+            else if (_settings.IsOpen) _settings.Close();
+            else if (_codex.IsOpen) _codex.Close();
+            else if (_help.IsOpen) _help.Close();
+            else if (_completion.IsOpen) _completion.Close();
+            else if (_shop.IsOpen) _shop.Close();
+            else if (_sell.IsOpen) _sell.Close();
+            else if (_pause.IsOpen) Resume();
             return;
         }
         if (e.IsActionPressed("toggle_fps"))

@@ -149,3 +149,5 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - **Tempo de carga medido:** mundo construído em ~235 ms (92 cristais; 369 malhas mescladas).
 - **Pré-aquecimento de shaders:** tela "Carregando cavernas…" por 5 quadros enquanto a câmera enxerga as 4 regiões, para o driver compilar os shaders antes do jogo (evita travadas na 1ª entrada em cada região no renderizador Compatibility).
 - **Correção:** com save existente, o menu tinha 5 botões e o "Sair" era cortado na base da tela a 720p; layout compactado.
+- **Suporte a controle (gamepad, layout Xbox/XInput):** analógico esquerdo move, analógico direito olha (curva quadrática e sensibilidade da configuração), RT/RB minera, X interage, A pula, LB/L3 corre, Start pausa, B volta nos menus; D-pad e analógico navegam nas telas, que focam o primeiro botão ao abrir. As dicas do HUD e das estações trocam entre teclado e controle conforme o último dispositivo usado (`InputHints`). Tela Como jogar e README atualizados.
+- Teste de integração com eventos de controle simulados (girar câmera, minerar com RT, mover, troca de dicas): 178/178.

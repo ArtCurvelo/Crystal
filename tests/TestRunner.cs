@@ -48,6 +48,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
+            await RunAsync("Integração: controle (gamepad)", TestGamepad);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -465,6 +466,63 @@ public partial class TestRunner : Node
         Check(pulses >= 1, "segurar o ritmo deve disparar um pulso");
         Check(hitCount >= 2, $"pulso deve atingir o alvo e vizinhos (atingiu {hitCount})");
         Check(neighbors.Any(n => n.Hp < n.MaxHp), "vizinho deve receber dano do pulso");
+        root.QueueFree();
+        await Frames(2);
+    }
+
+    async Task TestGamepad()
+    {
+        Fresh();
+        foreach (var a in new[] { "move_forward", "look_left", "mine", "interact", "jump", "sprint", "pause" })
+            Check(InputMap.ActionGetEvents(a).Any(e => e is InputEventJoypadButton || e is InputEventJoypadMotion), $"ação '{a}' deve ter mapeamento de controle");
+
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        var shards = new ShardManager();
+        root.AddChild(shards);
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        player.SimulateCapturedMouse = true;
+        await Frames(3);
+
+        // analógico direito gira a câmera
+        var crystal = world.Crystals.First(c => c.Material.Id == "quartz");
+        player.GlobalPosition = crystal.GlobalPosition + new Vector3(0, 0, 1.6f);
+        player.SetLook(0.6f, -0.35f);
+        float yaw0 = player.Yaw;
+        Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.RightX, AxisValue = -1f });
+        await Frames(20);
+        Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.RightX, AxisValue = 0f });
+        await Frames(2);
+        Check(player.Yaw > yaw0 + 0.3f, $"analógico direito deve girar a câmera (yaw {yaw0:0.00} → {player.Yaw:0.00})");
+        Check(InputHints.UsingPad && InputHints.Interact == "[X]", "dicas devem mudar para o controle");
+
+        // gatilho direito minera
+        player.SetLook(0, -0.35f);
+        await Frames(3);
+        float hp0 = crystal.Hp;
+        Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.TriggerRight, AxisValue = 1f });
+        await Frames(60);
+        Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.TriggerRight, AxisValue = 0f });
+        Check(crystal.Hp < hp0 || !crystal.IsMineable, "gatilho direito (RT) deve minerar");
+
+        // analógico esquerdo move
+        var p0 = player.GlobalPosition;
+        player.SetLook(Mathf.Pi, 0);
+        Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.LeftY, AxisValue = -1f });
+        await Frames(30);
+        Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.LeftY, AxisValue = 0f });
+        Check(player.GlobalPosition.DistanceTo(p0) > 1f, "analógico esquerdo deve mover o jogador");
+
+        // volta ao teclado
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Godot.Key.Shift, Keycode = Godot.Key.Shift, Pressed = true });
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Godot.Key.Shift, Keycode = Godot.Key.Shift, Pressed = false });
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        Check(!InputHints.UsingPad && InputHints.Interact == "[E]", "dicas voltam ao teclado");
         root.QueueFree();
         await Frames(2);
     }

@@ -134,8 +134,8 @@ public partial class SellStation : StationBase
     {
         var gs = GameState.Instance;
         return gs.InventoryCount > 0
-            ? $"[E] Vender {gs.InventoryCount} fragmentos  ({GameState.FormatMoney(gs.InventoryValue())})"
-            : "[E] Estação de Venda";
+            ? $"{InputHints.Interact} Vender {gs.InventoryCount} fragmentos  ({GameState.FormatMoney(gs.InventoryValue())})"
+            : $"{InputHints.Interact} Estação de Venda";
     }
 
     public override void Interact(PlayerController player) => UiBus.RequestSell();
@@ -200,7 +200,7 @@ public partial class ShopTerminal : StationBase
         StaticBatcher.Batch(this);
     }
 
-    public override string GetPrompt() => "[E] Terminal de Melhorias";
+    public override string GetPrompt() => $"{InputHints.Interact} Terminal de Melhorias";
     public override void Interact(PlayerController player) => UiBus.RequestShop();
 }
 
@@ -412,7 +412,7 @@ public partial class RegionGate : StationBase
     {
         if (_open) return null;
         var gs = GameState.Instance;
-        if (gs.CanUnlock(Region)) return $"[E] Desbloquear {Region.Name}  ({GameState.FormatMoney(Region.UnlockCost)})";
+        if (gs.CanUnlock(Region)) return $"{InputHints.Interact} Desbloquear {Region.Name}  ({GameState.FormatMoney(Region.UnlockCost)})";
         long missing = Region.UnlockCost - gs.Data.Money;
         return $"Bloqueado: {Region.Name} — faltam {GameState.FormatMoney(missing)}";
     }

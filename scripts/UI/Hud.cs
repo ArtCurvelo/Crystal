@@ -88,7 +88,10 @@ public partial class Hud : CanvasLayer
         gs.Notified -= OnNotified;
         gs.BigMessage -= OnBigMessage;
         gs.Saved -= OnSaved;
+        InputHints.Changed -= OnHintsChanged;
     }
+
+    void OnHintsChanged() => _keys.Text = InputHints.Footer;
 
     void OnSaved(bool auto)
     {
@@ -323,7 +326,8 @@ public partial class Hud : CanvasLayer
         _toolStats = UiTheme.Label("", 14, UiTheme.Text);
         th.AddChild(_toolStats);
 
-        _keys = UiTheme.Shadowed(UiTheme.Label("[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [Esc] Pausa", 14, UiTheme.Muted, false, HorizontalAlignment.Center));
+        _keys = UiTheme.Shadowed(UiTheme.Label(InputHints.Footer, 14, UiTheme.Muted, false, HorizontalAlignment.Center));
+        InputHints.Changed += OnHintsChanged;
         UiTheme.Place(_keys, Control.LayoutPreset.CenterBottom, new Vector2(-300, -30), new Vector2(600, 0));
         _root.AddChild(_keys);
 
