@@ -259,7 +259,7 @@ public partial class WorldBuilder : Node3D
             if ((side == 2 || side == 3) && MathF.Abs(p.X) < TunnelHalfWidth + 2.5f) continue;
             float s = 1.6f + (float)rng.NextDouble() * 2.8f;
             p.Y = (float)rng.NextDouble() * h * 0.7f;
-            var basis = new Basis(new Vector3(0, 1, 0), (float)rng.NextDouble() * Mathf.Tau).Scaled(new Vector3(s, s * (0.8f + (float)rng.NextDouble() * 0.6f), s));
+            var basis = new Basis(new Vector3(0, 1, 0), (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(s, s * (0.8f + (float)rng.NextDouble() * 0.6f), s));
             wallRocks.Add(new Transform3D(basis, p));
         }
         AddMulti(root, MeshFactory.Rock(11, 0.4f), rockMat, wallRocks);
@@ -274,11 +274,11 @@ public partial class WorldBuilder : Node3D
             float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 1);
             float len = 0.8f + (float)rng.NextDouble() * (h * 0.35f);
             float rad = 0.25f + (float)rng.NextDouble() * 0.5f;
-            var b = new Basis(new Vector3(1, 0, 0), Mathf.Pi).Scaled(new Vector3(rad, len, rad));
+            var b = new Basis(new Vector3(1, 0, 0), Mathf.Pi).ScaleLocal(new Vector3(rad, len, rad));
             spikesDown.Add(new Transform3D(b, new Vector3(x, h, z)));
             if (i % 3 == 0 && MathF.Abs(x) > hx * 0.75f)
             {
-                var b2 = Basis.Identity.Scaled(new Vector3(rad * 1.2f, len * 0.5f, rad * 1.2f));
+                var b2 = Basis.Identity.ScaleLocal(new Vector3(rad * 1.2f, len * 0.5f, rad * 1.2f));
                 spikesUp.Add(new Transform3D(b2, new Vector3(x, 0, z)));
             }
         }
@@ -293,7 +293,7 @@ public partial class WorldBuilder : Node3D
             float x = (float)(rng.NextDouble() * 2 - 1) * (hx - 1);
             float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 1);
             float s = 0.12f + (float)rng.NextDouble() * 0.35f;
-            pebbles.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).Scaled(Vector3.One * s), new Vector3(x, s * 0.2f, z)));
+            pebbles.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).ScaleLocal(Vector3.One * s), new Vector3(x, s * 0.2f, z)));
         }
         AddMulti(root, MeshFactory.Rock(3, 0.3f), rockMat, pebbles);
 
@@ -308,7 +308,7 @@ public partial class WorldBuilder : Node3D
             else if (side == 1) { p = new Vector3(hx - 0.2f, (float)rng.NextDouble() * h, cz + t * hz); up = Vector3.Left; }
             else { p = new Vector3(t * hx, h - 0.1f, cz + (float)(rng.NextDouble() * 2 - 1) * hz); up = Vector3.Down; }
             up = (up + new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f) * 0.9f).Normalized();
-            var basis = BasisFromUp(up).Scaled(new Vector3(0.12f, 0.4f + (float)rng.NextDouble() * 0.9f, 0.12f) * (1f + (float)rng.NextDouble()));
+            var basis = BasisFromUp(up).ScaleLocal(new Vector3(0.12f, 0.4f + (float)rng.NextDouble() * 0.9f, 0.12f) * (1f + (float)rng.NextDouble()));
             deco.Add(new Transform3D(basis, p));
         }
         var decoMat = MeshFactory.Emissive(r.AccentColor, r.AccentColor, 1.6f);
@@ -343,7 +343,7 @@ public partial class WorldBuilder : Node3D
             {
                 float x = (float)(rng.NextDouble() * 2 - 1) * (hx - 1);
                 float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 1);
-                var b = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).Scaled(new Vector3(0.12f + (float)rng.NextDouble() * 0.2f, 1, 1.5f + (float)rng.NextDouble() * 4f));
+                var b = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(0.12f + (float)rng.NextDouble() * 0.2f, 1, 1.5f + (float)rng.NextDouble() * 4f));
                 cracks.Add(new Transform3D(b, new Vector3(x, 0.015f, z)));
             }
             AddMulti(root, new BoxMesh { Size = new Vector3(1, 0.02f, 1) }, crack, cracks);

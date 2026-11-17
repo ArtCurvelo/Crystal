@@ -223,3 +223,10 @@ public static class MeshFactory
         return mat;
     }
 }
+
+/// <summary>Utilitários de Basis.</summary>
+public static class BasisExt
+{
+    /// <summary>Escala nos eixos locais (Basis.Scaled do Godot escala nos eixos globais).</summary>
+    public static Basis ScaleLocal(this Basis b, Vector3 s) => b * Basis.FromScale(s);
+}

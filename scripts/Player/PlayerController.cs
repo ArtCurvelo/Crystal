@@ -149,6 +149,7 @@ public partial class PlayerController : CharacterBody3D
             AudioManager.Instance?.Play("swing", -16f, 1f, 0.1f);
             _pendingHit = Mathf.Min(_swingInterval * 0.45f, 0.12f);
         }
+        UpdateBeam(gs, active && Input.IsActionPressed("mine") && TargetInteractable == null);
         if (_pendingHit >= 0)
         {
             _pendingHit -= dt;
@@ -249,6 +250,25 @@ public partial class PlayerController : CharacterBody3D
         _shakeAmount = Mathf.Min(2f, _shakeAmount + 1.4f);
         _fovKick = 5f;
         ResonancePulse?.Invoke(count);
+    }
+
+    /// <summary>Alimenta o feixe visual da ferramenta: ponto atingido e cor do alvo.</summary>
+    void UpdateBeam(GameState gs, bool firing)
+    {
+        Tool.Firing = firing;
+        if (!firing) return;
+        float reach = gs.MiningReach + 0.6f;
+        var hit = RayCast(reach, WorldLayer | CrystalLayer);
+        if (hit.Count > 0)
+        {
+            Tool.BeamEnd = hit["position"].AsVector3();
+            Tool.BeamColor = hit["collider"].AsGodotObject() is Crystal c ? c.Material.Glow : ToolView.TierColors[gs.ToolTier];
+        }
+        else
+        {
+            Tool.BeamEnd = Camera.GlobalPosition - Camera.GlobalTransform.Basis.Z * reach;
+            Tool.BeamColor = ToolView.TierColors[gs.ToolTier];
+        }
     }
 
     public void AddShake(float amount) => _shakeAmount = Mathf.Min(2f, _shakeAmount + amount);

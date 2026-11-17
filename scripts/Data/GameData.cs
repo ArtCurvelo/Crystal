@@ -218,15 +218,15 @@ public static class GameData
         // ---------------- Upgrades ----------------
         AddUp(new UpgradeDef
         {
-            Id = UpgradeIds.Damage, Name = "Força da Picareta", Icon = "⚒",
-            Description = "Aumenta o dano de cada golpe.",
+            Id = UpgradeIds.Damage, Name = "Potência do Feixe", Icon = "⚡",
+            Description = "Aumenta o dano de cada pulso do feixe.",
             BaseCost = 20, CostGrowth = 1.55, MaxLevel = 30,
             ValueAt = l => 4f * MathF.Pow(1.32f, l) + l * 2f,
             Format = v => $"{v:0} dano"
         });
         AddUp(new UpgradeDef
         {
-            Id = UpgradeIds.Speed, Name = "Ritmo de Extração", Icon = "⚡",
+            Id = UpgradeIds.Speed, Name = "Ritmo de Extração", Icon = "»",
             Description = "Golpes mais rápidos por segundo.",
             BaseCost = 35, CostGrowth = 1.62, MaxLevel = 15,
             ValueAt = l => 1f / MathF.Max(0.11f, 0.5f * MathF.Pow(0.9f, l)),
@@ -242,7 +242,7 @@ public static class GameData
         });
         AddUp(new UpgradeDef
         {
-            Id = UpgradeIds.Move, Name = "Botas de Escavador", Icon = "»",
+            Id = UpgradeIds.Move, Name = "Botas de Escavador", Icon = "➤",
             Description = "Movimenta-se mais rápido pelas cavernas.",
             BaseCost = 45, CostGrowth = 1.7, MaxLevel = 10,
             ValueAt = l => 4.6f + l * 0.42f,

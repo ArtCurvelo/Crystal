@@ -85,7 +85,7 @@ public partial class GameState : Node
     }
 
     public static readonly string[] ToolTierNames =
-        { "Picareta de Ferro", "Picareta de Aço Azul", "Martelo Prismático", "Perfurador Solar", "Ressonador Ancestral" };
+        { "Escavadeira de Feixe", "Escavadeira Pulsar", "Feixe Prismático", "Perfurador Solar", "Ressonador Ancestral" };
 
     // ================= Inventário =================
     public int InventoryCount => Data.Inventory.Values.Sum();

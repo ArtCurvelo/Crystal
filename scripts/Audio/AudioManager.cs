@@ -161,7 +161,7 @@ public partial class AudioManager : Node
         _sounds["click"] = Synth(0.05f, (t, i) => MathF.Sin(Tau * 1800 * t) * MathF.Exp(-t * 90f) * 0.35f);
         _sounds["hover"] = Synth(0.04f, (t, i) => MathF.Sin(Tau * 2400 * t) * MathF.Exp(-t * 120f) * 0.15f);
         _sounds["respawn"] = Synth(0.5f, (t, i) => MathF.Sin(Tau * (400 + t * 900) * t) * MathF.Sin(MathF.PI * t / 0.5f) * 0.18f);
-        _sounds["swing"] = Synth(0.12f, (t, i) => Noise() * MathF.Sin(MathF.PI * t / 0.12f) * 0.12f);
+        _sounds["swing"] = Synth(0.12f, (t, i) => (MathF.Sin(Tau * 220 * t) * 0.5f + Square(440 * t) * 0.15f + Noise() * 0.2f) * MathF.Sin(MathF.PI * t / 0.12f) * 0.14f);
         _sounds["full"] = Arp(new[] { 440f, 349f }, 0.09f, 0.3f);
         // pulso de ressonância: sub-grave + varredura cristalina
         _sounds["pulse"] = Synth(1.1f, (t, i) =>
