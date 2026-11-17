@@ -81,6 +81,85 @@ public static class Decor
     }
 
     // ------------------------------------------------------------------
+    /// <summary>Caixote de armazenamento: painéis cinza, cantos laranja e faixa luminosa.</summary>
+    public static void Crate(Node3D root, Vector3 pos, float yaw, float scale = 1f, bool collide = false)
+    {
+        var node = new Node3D { Position = pos, Rotation = new Vector3(0, yaw, 0), Scale = Vector3.One * scale };
+        root.AddChild(node);
+        var grey = Lit(new Color(0.45f, 0.46f, 0.52f), 0.6f);
+        var dark = Lit(new Color(0.18f, 0.19f, 0.23f), 0.7f);
+        var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.5f);
+        Mesh(node, new BoxMesh { Size = new Vector3(1.1f, 0.7f, 0.75f) }, grey, new Vector3(0, 0.35f, 0));
+        Mesh(node, new BoxMesh { Size = new Vector3(1.14f, 0.12f, 0.79f) }, dark, new Vector3(0, 0.7f, 0));
+        for (int sx = -1; sx <= 1; sx += 2)
+            Mesh(node, new BoxMesh { Size = new Vector3(0.1f, 0.74f, 0.8f) }, orange, new Vector3(sx * 0.5f, 0.37f, 0));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.6f, 0.07f, 0.02f) }, Glow(new Color(1f, 0.6f, 0.2f), 2f), new Vector3(0, 0.5f, 0.38f));
+        if (collide) Collider(node, new Vector3(0, 0.35f, 0), new Vector3(1.1f, 0.7f, 0.75f));
+    }
+
+    /// <summary>Cápsula de refino: tanque de vidro com brilho dourado, canos e painel.</summary>
+    public static void RefineryPod(Node3D root, Vector3 pos, float yaw)
+    {
+        var node = new Node3D { Position = pos, Rotation = new Vector3(0, yaw, 0) };
+        root.AddChild(node);
+        var grey = Lit(new Color(0.45f, 0.46f, 0.52f), 0.55f);
+        var dark = Lit(new Color(0.18f, 0.19f, 0.23f), 0.7f);
+        var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.5f);
+        Mesh(node, new CylinderMesh { TopRadius = 1.0f, BottomRadius = 1.1f, Height = 0.4f, RadialSegments = 12, Rings = 1 }, dark, new Vector3(0, 0.2f, 0));
+        Mesh(node, new CylinderMesh { TopRadius = 0.7f, BottomRadius = 0.7f, Height = 1.5f, RadialSegments = 14, Rings = 1 }, Glow(new Color(1f, 0.7f, 0.2f), 1.8f), new Vector3(0, 1.15f, 0));
+        for (int i = 0; i < 2; i++)
+            Mesh(node, new CylinderMesh { TopRadius = 0.82f, BottomRadius = 0.82f, Height = 0.2f, RadialSegments = 12, Rings = 1 }, grey, new Vector3(0, 0.45f + i * 1.45f, 0));
+        for (int i = 0; i < 4; i++)
+        {
+            float a = Mathf.Tau * i / 4 + 0.4f;
+            Mesh(node, new BoxMesh { Size = new Vector3(0.12f, 1.5f, 0.12f) }, orange, new Vector3(Mathf.Cos(a) * 0.76f, 1.15f, Mathf.Sin(a) * 0.76f));
+        }
+        Mesh(node, new CylinderMesh { TopRadius = 0.5f, BottomRadius = 0.75f, Height = 0.35f, RadialSegments = 12, Rings = 1 }, grey, new Vector3(0, 2.15f, 0));
+        // cano em arco
+        Mesh(node, new TorusMesh { InnerRadius = 0.55f, OuterRadius = 0.7f, Rings = 16, RingSegments = 6 }, dark, new Vector3(0.9f, 1.9f, 0), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.7f, 0.5f, 0.12f) }, dark, new Vector3(0, 0.75f, 0.85f));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.6f, 0.38f, 0.02f) }, Glow(new Color(0.35f, 0.9f, 1f), 1.4f), new Vector3(0, 0.75f, 0.92f));
+        node.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.7f, 0.3f), LightEnergy = 1.2f, OmniRange = 5f, Position = new Vector3(0, 1.2f, 1.2f) });
+        Collider(node, new Vector3(0, 1.1f, 0), new Vector3(1.8f, 2.2f, 1.8f));
+    }
+
+    /// <summary>Scanner de minério em tripé com cone de varredura holográfico.</summary>
+    public static void OreScanner(Node3D root, Vector3 pos, float yaw)
+    {
+        var node = new ScannerNode { Position = pos, Rotation = new Vector3(0, yaw, 0) };
+        root.AddChild(node);
+        var dark = Lit(new Color(0.18f, 0.19f, 0.23f), 0.7f);
+        var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.5f);
+        for (int i = 0; i < 3; i++)
+        {
+            float a = Mathf.Tau * i / 3;
+            Mesh(node, new BoxMesh { Size = new Vector3(0.06f, 1.2f, 0.06f) }, dark, new Vector3(Mathf.Cos(a) * 0.3f, 0.55f, Mathf.Sin(a) * 0.3f), new Vector3(Mathf.Sin(a) * 0.3f, 0, -Mathf.Cos(a) * 0.3f));
+            Mesh(node, new BoxMesh { Size = new Vector3(0.12f, 0.1f, 0.12f) }, orange, new Vector3(Mathf.Cos(a) * 0.48f, 0.05f, Mathf.Sin(a) * 0.48f));
+        }
+        var head = new Node3D { Position = new Vector3(0, 1.2f, 0) };
+        node.AddChild(head);
+        node.Head = head;
+        Mesh(head, new BoxMesh { Size = new Vector3(0.45f, 0.3f, 0.4f) }, orange, Vector3.Zero);
+        Mesh(head, new CylinderMesh { TopRadius = 0.12f, BottomRadius = 0.12f, Height = 0.12f, RadialSegments = 10, Rings = 1 }, dark, new Vector3(0, 0, -0.24f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(head, new CylinderMesh { TopRadius = 0.08f, BottomRadius = 0.08f, Height = 0.02f, RadialSegments = 10, Rings = 1 }, Glow(new Color(0.35f, 0.9f, 1f), 3f), new Vector3(0, 0, -0.3f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(head, new BoxMesh { Size = new Vector3(0.02f, 0.3f, 0.02f) }, dark, new Vector3(0.15f, 0.3f, 0.1f));
+        var cone = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, CullMode = BaseMaterial3D.CullModeEnum.Disabled, AlbedoColor = new Color(0.3f, 0.85f, 1f, 0.18f) };
+        Mesh(head, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 1.1f, Height = 3f, RadialSegments = 4, Rings = 1, CapTop = false, CapBottom = false }, cone, new Vector3(0, 0, -1.8f), new Vector3(-Mathf.Pi / 2, 0, 0));
+    }
+
+    /// <summary>Grade de piso (decal metálico) com faixa luminosa.</summary>
+    public static void FloorGrate(Node3D root, Vector3 pos, Vector2 size, float yaw)
+    {
+        var node = new Node3D { Position = pos, Rotation = new Vector3(0, yaw, 0) };
+        root.AddChild(node);
+        Mesh(node, new BoxMesh { Size = new Vector3(size.X, 0.03f, size.Y) }, Lit(new Color(0.2f, 0.21f, 0.25f), 0.5f), new Vector3(0, 0.015f, 0));
+        int bars = Mathf.Max(3, (int)(size.X / 0.25f));
+        for (int i = 0; i < bars; i++)
+            Mesh(node, new BoxMesh { Size = new Vector3(0.05f, 0.035f, size.Y * 0.9f) }, Lit(new Color(0.35f, 0.36f, 0.4f), 0.4f), new Vector3(-size.X / 2 + 0.15f + i * (size.X - 0.3f) / (bars - 1), 0.02f, 0));
+        Mesh(node, new BoxMesh { Size = new Vector3(size.X, 0.04f, 0.06f) }, Glow(new Color(1f, 0.6f, 0.2f), 1.6f), new Vector3(0, 0.02f, size.Y / 2));
+    }
+
+    // ------------------------------------------------------------------
     /// <summary>Cachoeira animada encostada numa parede, com poça e névoa.</summary>
     public static void Waterfall(Node3D root, Vector3 basePos, float height, float width, float yaw, Color color)
     {
@@ -275,6 +354,18 @@ public static class Decor
         var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = xforms.Count };
         for (int i = 0; i < xforms.Count; i++) mm.SetInstanceTransform(i, xforms[i]);
         root.AddChild(new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+    }
+}
+
+/// <summary>Cabeça do scanner que varre de um lado para o outro.</summary>
+public partial class ScannerNode : Node3D
+{
+    public Node3D Head;
+    float _t;
+    public override void _Process(double delta)
+    {
+        _t += (float)delta;
+        if (Head != null) Head.Rotation = new Vector3(-0.15f, Mathf.Sin(_t * 0.6f) * 0.6f, 0);
     }
 }
 

@@ -43,6 +43,14 @@ public partial class ScreenshotTour : Node
         p.SetLook(-1.05f, -0.12f);
         await Wait(0.4f);
         await Shot("02c_terminal");
+        p.GlobalPosition = new Vector3(-1.5f, 0.1f, 16.2f);
+        p.SetLook(1.0f, -0.12f);
+        await Wait(0.4f);
+        await Shot("02d_sell");
+        p.GlobalPosition = new Vector3(-9f, 0.1f, 1.5f);
+        p.SetLook(1.9f, -0.05f);
+        await Wait(0.4f);
+        await Shot("02e_props");
         p.GlobalPosition = Main.World.SpawnPoint;
         p.SetLook(0, 0);
 
@@ -105,6 +113,8 @@ public partial class ScreenshotTour : Node
         p.GlobalPosition = new Vector3(0, 0.1f, -17);
         p.SetLook(0, 0.05f);
         await Wait(1f);
+        p.GlobalPosition = new Vector3(0, 0.1f, -15f);
+        await Wait(0.5f);
         await Shot("08_gate");
 
         // região 2

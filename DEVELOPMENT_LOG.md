@@ -124,3 +124,5 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - **Depósitos**: base de duas rochas mescladas + lascas de cristal ao redor.
 - **Otimização**: todos os prismas de um cristal mesclados em uma única malha (UV codifica ângulo/altura para o shader). Draw calls na qualidade Baixa: R1 ~340 → 246, R2 ~308 → 245, R3 ~300 → 210.
 - **6 ferramentas** com modelos distintos (Broca Inicial, Cortador de Pulso, Perfurador de Arco, Ressonador Cristalino, Lança Prismática, Quebra-Núcleo), trocando por nível de Potência (0/3/7/12/18/24). Tour gera folha comparativa `tools_sheet.png`.
+- **Estruturas** (folha de conceito): estação de venda remodelada (balcão, holograma cristal → moedas, cristais em pedestais, estandarte laranja com picareta, caixotes); **farol de passagem** nos portões (plataforma com luzes, cristal holográfico girando, feixe de luz ao desbloquear); caixotes, **cápsula de refino**, **scanner de minério** com varredura animada e grades de piso. Posto avançado e refinaria também nas Profundezas.
+- Pendência de otimização: R1 subiu para ~364 draw calls (Baixa). Planejado: agrupar malhas estáticas por material em cada região.

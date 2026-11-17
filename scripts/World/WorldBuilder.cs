@@ -75,6 +75,8 @@ public partial class WorldBuilder : Node3D
         var sell = new SellStation { Name = "SellStation" };
         root.AddChild(sell);
         sell.Position = new Vector3(-5.5f, 0, entranceZ);
+        sell.LookAt(new Vector3(0, 0, entranceZ - 4f), Vector3.Up);
+        sell.RotateY(Mathf.Pi);
         var shop = new ShopTerminal { Name = "ShopTerminal" };
         root.AddChild(shop);
         shop.Position = new Vector3(5.5f, 0, entranceZ);
@@ -99,6 +101,12 @@ public partial class WorldBuilder : Node3D
         {
             case "caves":
                 Decor.Outpost(root, new Vector3(-17.5f, 0, r.CenterZ + r.HalfZ - 3.5f), Mathf.Pi / 2);
+                Decor.RefineryPod(root, new Vector3(-18.2f, 0, r.CenterZ + 5.5f), 0.6f);
+                Decor.Crate(root, new Vector3(-14.5f, 0, r.CenterZ + 6.5f), 0.4f, 1f, true);
+                Decor.Crate(root, new Vector3(-13.6f, 0, r.CenterZ + 7.8f), -0.2f, 0.8f, true);
+                Decor.OreScanner(root, new Vector3(-6.2f, 0, r.CenterZ + 7.2f), 0.9f);
+                Decor.FloorGrate(root, new Vector3(-5.5f, 0, r.CenterZ + r.HalfZ - 4.4f), new Vector2(2.6f, 1.2f), 0);
+                Decor.FloorGrate(root, new Vector3(5.5f, 0, r.CenterZ + r.HalfZ - 4.4f), new Vector2(2.6f, 1.2f), 0);
                 Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ - 6f), r.Height, 2.6f, -Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
                 Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 2f), r.Height * 0.9f, 2f, Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
                 Decor.Mushrooms(root, r, rng, low ? 5 : 9, new Color(0.3f, 1f, 0.9f));
@@ -106,6 +114,9 @@ public partial class WorldBuilder : Node3D
                 Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) });
                 break;
             case "depths":
+                Decor.Outpost(root, new Vector3(r.HalfX - 3f, 0, r.CenterZ + r.HalfZ - 9f), -Mathf.Pi / 2);
+                Decor.Crate(root, new Vector3(r.HalfX - 6f, 0, r.CenterZ + r.HalfZ - 11f), 0.3f, 1f, true);
+                Decor.RefineryPod(root, new Vector3(r.HalfX - 3.2f, 0, r.CenterZ + r.HalfZ - 13.5f), -0.5f);
                 Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 8f), r.Height, 3.2f, Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
                 Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ + 6f), r.Height, 2.4f, -Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
                 Decor.Mushrooms(root, r, rng, low ? 4 : 8, new Color(0.4f, 0.6f, 1f));
@@ -201,7 +212,9 @@ public partial class WorldBuilder : Node3D
             float z = r.CenterZ + (float)(rng.NextDouble() * 2 - 1) * (r.HalfZ - 2.5f);
             var p = new Vector2(x, z);
             if (MathF.Abs(x) < 2.2f) continue; // corredor central livre
-            if (r.Index == 0 && x < -8.5f && z > r.CenterZ + r.HalfZ - 9f) continue; // posto avançado
+            if (r.Index == 0 && x < -8.5f && z > r.CenterZ + 2.5f) continue; // posto avançado e refinaria
+            if (r.Index == 0 && new Vector2(-6.2f, r.CenterZ + 7.2f).DistanceTo(p) < 2f) continue; // scanner
+            if (r.Index == 1 && x > r.HalfX - 9f && z > r.CenterZ + r.HalfZ - 16f) continue; // posto das Profundezas
             if (r.Index == 2 && MathF.Abs(MathF.Abs(x) - (r.HalfX - 4f)) < 2.5f) continue; // pilares das ruínas
             if (r.Index == 0 && new Vector2(0, entranceZ).DistanceTo(p) < 8.5f) continue; // acampamento livre
             bool ok = true;

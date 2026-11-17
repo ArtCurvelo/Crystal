@@ -74,29 +74,59 @@ public partial class SellStation : StationBase
 {
     public override void _Ready()
     {
-        SetupBody(new Vector3(1.6f, 1.2f, 1.6f));
+        SetupBody(new Vector3(2.4f, 2.2f, 1.1f));
         var accent = new Color(0.3f, 1f, 0.75f);
-        AddMesh(new CylinderMesh { TopRadius = 0.7f, BottomRadius = 0.85f, Height = 0.9f, RadialSegments = 10, Rings = 1 },
-            MeshFactory.Metal(new Color(0.22f, 0.24f, 0.3f), 0.5f), new Vector3(0, 0.45f, 0));
-        AddMesh(new CylinderMesh { TopRadius = 0.6f, BottomRadius = 0.4f, Height = 0.3f, RadialSegments = 10, Rings = 1 },
-            MeshFactory.Emissive(new Color(0.1f, 0.3f, 0.25f), accent, 2.2f), new Vector3(0, 1.05f, 0));
-        Ring = new Node3D { Position = new Vector3(0, 1.7f, 0) };
-        AddChild(Ring);
+        var cyan = new Color(0.35f, 0.9f, 1f);
+        var orange = new Color(1f, 0.55f, 0.18f);
+        var body = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.37f, 0.42f), Roughness = 0.6f, Metallic = 0.2f };
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.19f), Roughness = 0.7f };
+        var trim = MeshFactory.Emissive(orange, orange, 1.6f);
+        // balcão
+        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.95f, 1.0f) }, body, new Vector3(0, 0.475f, 0.05f));
+        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.08f, 1.1f) }, dark, new Vector3(0, 0.99f, 0.05f));
+        for (int i = 0; i < 2; i++)
+            AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.05f, 0.04f) }, trim, new Vector3(-0.55f + i * 1.1f, 0.3f, 0.56f));
+        // estandarte laranja com picareta
+        AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.62f, 0.015f) }, new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.42f, 0.12f), Roughness = 0.9f }, new Vector3(0.05f, 0.62f, 0.565f));
+        var pickMat = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.85f, 0.7f), Roughness = 0.8f };
+        AddMesh(new BoxMesh { Size = new Vector3(0.04f, 0.38f, 0.01f) }, pickMat, new Vector3(0.05f, 0.58f, 0.575f)).Rotation = new Vector3(0, 0, 0.6f);
+        AddMesh(new BoxMesh { Size = new Vector3(0.3f, 0.04f, 0.01f) }, pickMat, new Vector3(0.12f, 0.69f, 0.575f)).Rotation = new Vector3(0, 0, -0.35f);
+        // painel holográfico "cristal → moeda"
+        var screenRoot = new Node3D { Position = new Vector3(0, 1.65f, -0.25f), Rotation = new Vector3(-0.2f, 0, 0) };
+        AddChild(screenRoot);
+        void S(Mesh m, Material mat, Vector3 pos, Vector3? rot = null, Vector3? scale = null)
+        {
+            screenRoot.AddChild(new MeshInstance3D { Mesh = m, MaterialOverride = mat, Position = pos, Rotation = rot ?? Vector3.Zero, Scale = scale ?? Vector3.One, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        }
+        S(new BoxMesh { Size = new Vector3(1.9f, 1.0f, 0.12f) }, dark, Vector3.Zero);
+        S(new BoxMesh { Size = new Vector3(1.76f, 0.86f, 0.02f) }, MeshFactory.Emissive(new Color(0.02f, 0.08f, 0.12f), new Color(0.03f, 0.18f, 0.25f), 1f), new Vector3(0, 0, 0.065f));
+        S(new BoxMesh { Size = new Vector3(1.95f, 0.05f, 0.14f) }, trim, new Vector3(0, 0.52f, 0));
+        var holo = MeshFactory.Emissive(cyan, cyan, 2f);
+        S(MeshFactory.CrystalPrism(6, 1, 1, 0.4f), holo, new Vector3(-0.45f, -0.22f, 0.09f), null, new Vector3(0.12f, 0.45f, 0.04f));
+        S(new BoxMesh { Size = new Vector3(0.3f, 0.05f, 0.01f) }, holo, new Vector3(0.02f, 0, 0.09f));
+        S(MeshFactory.Spike(3, 0.08f, 0.12f), holo, new Vector3(0.2f, 0, 0.09f), new Vector3(0, 0, -Mathf.Pi / 2));
+        var coin = MeshFactory.Emissive(new Color(1f, 0.8f, 0.3f), new Color(1f, 0.75f, 0.25f), 2f);
+        for (int i = 0; i < 3; i++)
+            S(new CylinderMesh { TopRadius = 0.16f, BottomRadius = 0.16f, Height = 0.05f, RadialSegments = 12, Rings = 1 }, coin, new Vector3(0.5f, -0.1f + i * 0.08f, 0.1f), new Vector3(0.25f, 0, 0));
+        // cristais em pedestais
+        var colors = new[] { cyan, new Color(0.7f, 0.4f, 1f), new Color(1f, 0.8f, 0.3f) };
         for (int i = 0; i < 3; i++)
         {
-            var gem = new MeshInstance3D
-            {
-                Mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.35f),
-                MaterialOverride = MeshFactory.Emissive(accent, accent, 2.5f),
-                Scale = new Vector3(0.08f, 0.22f, 0.08f),
-                Position = new Vector3(Mathf.Cos(i * Mathf.Tau / 3) * 0.45f, 0, Mathf.Sin(i * Mathf.Tau / 3) * 0.45f),
-                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-            };
-            Ring.AddChild(gem);
+            var p = new Vector3(-0.9f + i * 0.34f, 1.03f, 0.3f);
+            AddMesh(new CylinderMesh { TopRadius = 0.12f, BottomRadius = 0.14f, Height = 0.1f, RadialSegments = 8, Rings = 1 }, dark, p + new Vector3(0, 0.05f, 0));
+            AddMesh(new CylinderMesh { TopRadius = 0.125f, BottomRadius = 0.125f, Height = 0.015f, RadialSegments = 8, Rings = 1 }, trim, p + new Vector3(0, 0.1f, 0));
+            AddMesh(MeshFactory.CrystalPrism(6, 1, 1, 0.35f), MeshFactory.Emissive(colors[i], colors[i], 2f), p + new Vector3(0, 0.1f, 0), new Vector3(0.08f, 0.3f - i * 0.04f, 0.08f));
         }
-        var light = new OmniLight3D { LightColor = accent, LightEnergy = 1.4f, OmniRange = 6f, Position = new Vector3(0, 2, 0) };
+        // tablet com carrinho e caixotes ao lado
+        var tab = AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.02f, 0.34f) }, dark, new Vector3(0.6f, 1.05f, 0.25f));
+        tab.Rotation = new Vector3(0, -0.25f, 0);
+        AddMesh(new BoxMesh { Size = new Vector3(0.44f, 0.005f, 0.28f) }, MeshFactory.Emissive(new Color(0.05f, 0.2f, 0.25f), cyan, 1.4f), new Vector3(0.6f, 1.063f, 0.25f)).Rotation = new Vector3(0, -0.25f, 0);
+        Decor.Crate(this, new Vector3(-1.75f, 0, 0.2f), 0.2f, 0.85f);
+        Decor.Crate(this, new Vector3(-1.75f, 0.68f, 0.25f), -0.15f, 0.65f);
+        Ring = null;
+        var light = new OmniLight3D { LightColor = accent, LightEnergy = 1.3f, OmniRange = 6f, Position = new Vector3(0, 2.2f, 1.2f) };
         AddChild(light);
-        Label = MakeLabel("VENDA", accent, 2.45f);
+        Label = MakeLabel("VENDA", accent, 2.75f);
     }
 
     public override string GetPrompt()
@@ -228,12 +258,72 @@ public partial class RegionGate : StationBase
         back.Position = new Vector3(0, _height - 0.9f, -0.3f);
         back.RotationDegrees = new Vector3(0, 180, 0);
         _backLabel = back;
+        BuildBeacon();
         GameState.Instance.RegionsChanged += Refresh;
         GameState.Instance.MoneyChanged += RefreshText;
         Refresh();
     }
 
     Label3D _backLabel;
+    Node3D _beacon, _holo;
+    MeshInstance3D _beam;
+    StandardMaterial3D _padMat, _holoMat, _beamMat;
+
+    /// <summary>Farol de passagem: plataforma com luzes, cristal holográfico e feixe ao desbloquear.</summary>
+    void BuildBeacon()
+    {
+        _beacon = new Node3D { Name = "Beacon", Position = new Vector3(0, 0, 2.2f) };
+        AddChild(_beacon);
+        void M(Node3D parent, Mesh mesh, Material mat, Vector3 pos, Vector3? rot = null)
+            => parent.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = mat, Position = pos, Rotation = rot ?? Vector3.Zero, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.2f, 0.21f, 0.26f), Roughness = 0.6f };
+        var orange = MeshFactory.Emissive(new Color(1f, 0.55f, 0.18f), new Color(1f, 0.55f, 0.18f), 1.6f);
+        _padMat = new StandardMaterial3D { AlbedoColor = Region.AccentColor, EmissionEnabled = true, Emission = Region.AccentColor, EmissionEnergyMultiplier = 0.6f };
+        M(_beacon, new CylinderMesh { TopRadius = 2.1f, BottomRadius = 2.3f, Height = 0.12f, RadialSegments = 20, Rings = 1 }, dark, new Vector3(0, 0.06f, 0));
+        M(_beacon, new TorusMesh { InnerRadius = 1.5f, OuterRadius = 1.62f, Rings = 28, RingSegments = 4 }, _padMat, new Vector3(0, 0.13f, 0));
+        M(_beacon, new CylinderMesh { TopRadius = 0.9f, BottomRadius = 0.9f, Height = 0.02f, RadialSegments = 20, Rings = 1 }, _padMat, new Vector3(0, 0.13f, 0));
+        for (int i = 0; i < 10; i++)
+        {
+            float a = Mathf.Tau * i / 10;
+            M(_beacon, new BoxMesh { Size = new Vector3(0.36f, 0.04f, 0.14f) }, orange, new Vector3(Mathf.Cos(a) * 1.95f, 0.13f, Mathf.Sin(a) * 1.95f), new Vector3(0, -a, 0));
+        }
+        // faixas laranja nos pilares e antena
+        foreach (float sx in new[] { -_width / 2, _width / 2 })
+            for (int k = 0; k < 3; k++)
+                M(this, new BoxMesh { Size = new Vector3(0.52f, 0.08f, 0.62f) }, orange, new Vector3(sx, 0.8f + k * 1.4f, 0));
+        M(this, new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.05f, Height = 0.6f, RadialSegments = 6, Rings = 1 }, dark, new Vector3(_width / 2, _height + 0.3f, 0));
+        M(this, new SphereMesh { Radius = 0.4f, Height = 0.32f, IsHemisphere = true, RadialSegments = 12, Rings = 3 }, dark, new Vector3(_width / 2, _height + 0.65f, 0), new Vector3(-2.2f, 0.4f, 0));
+        // cristal holográfico flutuante
+        _holo = new Node3D { Position = new Vector3(0, 3.4f, 0) };
+        _beacon.AddChild(_holo);
+        _holoMat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add, AlbedoColor = new Color(Region.AccentColor, 0.5f),
+        };
+        _holo.AddChild(new MeshInstance3D { Mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.45f), MaterialOverride = _holoMat, Scale = new Vector3(0.35f, 1.0f, 0.35f), Position = new Vector3(0, -0.5f, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        var flip = new MeshInstance3D { Mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.6f), MaterialOverride = _holoMat, Scale = new Vector3(0.35f, 0.5f, 0.35f), Position = new Vector3(0, -0.5f, 0), Rotation = new Vector3(Mathf.Pi, 0, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _holo.AddChild(flip);
+        for (int i = 0; i < 2; i++)
+            _holo.AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.7f, OuterRadius = 0.76f, Rings = 24, RingSegments = 4 }, MaterialOverride = _holoMat, Position = new Vector3(0, -0.2f - i * 0.8f, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        _beamMat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            AlbedoColor = new Color(Region.AccentColor, 0.16f),
+        };
+        _beam = new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.85f, BottomRadius = 0.85f, Height = _height, RadialSegments = 16, Rings = 1, CapTop = false, CapBottom = false }, MaterialOverride = _beamMat, Position = new Vector3(0, _height / 2, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _beacon.AddChild(_beam);
+    }
+
+    void UpdateBeacon()
+    {
+        if (_beacon == null) return;
+        bool open = _open;
+        _beam.Visible = open;
+        _padMat.EmissionEnergyMultiplier = open ? 2.2f : 0.5f;
+        _holoMat.AlbedoColor = new Color(Region.AccentColor, open ? 0.65f : 0.22f);
+    }
 
     public override void _ExitTree()
     {
@@ -271,6 +361,7 @@ public partial class RegionGate : StationBase
             _barrierMat.AlbedoColor = new Color(Region.AccentColor, 0.35f);
         }
         RefreshText();
+        UpdateBeacon();
     }
 
     void HideBarrier()
@@ -303,6 +394,11 @@ public partial class RegionGate : StationBase
     public override void _Process(double delta)
     {
         base._Process(delta);
+        if (_holo != null)
+        {
+            _holo.RotateY((float)delta * (_open ? 1.2f : 0.3f));
+            _holo.Position = new Vector3(0, 3.4f + Mathf.Sin(Time * 1.5f) * 0.12f, 0);
+        }
         if (!_open && _barrierMat != null)
         {
             float a = 0.28f + 0.1f * Mathf.Sin(Time * 2.2f);
