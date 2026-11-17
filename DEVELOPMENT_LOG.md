@@ -38,9 +38,11 @@ Além do escopo da Sessão 1, o loop completo já funciona:
 
 ### Bugs e pendências conhecidos
 - O FPS medido aqui (16–21) é renderização por **software** (llvmpipe) e não representa a GPU real. O FPS na HD 4400 precisa ser medido pelo diretor no Windows.
-- O modelo da picareta em primeira pessoa está simples e pouco legível.
-- Números de dano se sobrepõem quando os golpes são rápidos.
-- O pedestal do Coração Ancestral está claro demais.
+- ~~Picareta escura e pouco legível~~ corrigido (materiais metálicos ficavam pretos sem reflexos no Compatibility).
+- ~~Números de dano sobrepostos~~ corrigido (deslocamento aleatório).
+- ~~Rótulos do portão espelhados através da barreira~~ corrigido.
+- O ícone do `.exe` não é aplicado (exigiria rcedit e Wine).
+- Repositório remoto ainda não configurado: o container é temporário, então o código existe só aqui.
 
 ### Próxima tarefa prioritária
 Polimento visual (ferramenta, números de dano, iluminação da região 3), revisão da experiência inicial e o diretor validar o `.exe` no Windows.
