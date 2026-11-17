@@ -46,7 +46,8 @@ public partial class Crystal : StaticBody3D
     /// <summary>Onde o jogador fica para minerar este depósito (usado por testes e pelo bot).</summary>
     public Vector3 StandPoint;
     /// <summary>Centro visual do depósito (respeita depósitos inclinados nas paredes).</summary>
-    public Vector3 Center => GlobalPosition + GlobalTransform.Basis.Y.Normalized() * 0.7f * (Material.Special ? 2.6f : SizeScale);
+    public Vector3 Center => GlobalPosition + GlobalTransform.Basis.Y.Normalized() * Mathf.Min(0.7f * (Material.Special ? 2.6f : SizeScale), _colliderHeight * 0.55f);
+    float _colliderHeight = 1f;
     public const float ViewDistance = 55f;
 
     public void Init(MaterialDef mat, int seed, float sizeScale = 1f)
@@ -126,6 +127,7 @@ public partial class Crystal : StaticBody3D
             }
         }
 
+        _colliderHeight = vh;
         var shape = new CylinderShape3D { Radius = built.Radius, Height = vh };
         _shape.Shape = shape;
         _shape.Position = new Vector3(0, vh / 2, 0);

@@ -18,7 +18,8 @@ grep RESULTADO /tmp/ce_publish_tests.log
 echo "== Versão"
 OLD=$(grep -oP 'config/version="\K[^"]+' project.godot)
 IFS=. read -r MA MI PA <<< "$OLD"
-NEW="$MA.$MI.$((PA + 1))"
+# BUMP=minor ./tools/publish_update.sh "notas"  → 0.2.8 vira 0.3.0 (atualizações grandes)
+if [ "${BUMP:-patch}" = "minor" ]; then NEW="$MA.$((MI + 1)).0"; else NEW="$MA.$MI.$((PA + 1))"; fi
 sed -i "s/^config\/version=\"$OLD\"/config\/version=\"$NEW\"/" project.godot
 echo "$OLD -> $NEW"
 

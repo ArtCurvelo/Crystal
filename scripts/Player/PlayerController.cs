@@ -203,14 +203,20 @@ public partial class PlayerController : CharacterBody3D
         Tool.UpdateView(dt, Mathf.Clamp(hs / Mathf.Max(1, gs.MoveSpeed), 0, 1.5f), IsOnFloor());
     }
 
+    PhysicsRayQueryParameters3D _rayQuery;
+    PhysicsShapeQueryParameters3D _standQuery;
+
     Godot.Collections.Dictionary RayCast(float distance, uint mask)
     {
         var space = GetWorld3D().DirectSpaceState;
         var from = Camera.GlobalPosition;
         var to = from - Camera.GlobalTransform.Basis.Z * distance;
-        var q = PhysicsRayQueryParameters3D.Create(from, to, mask, new Godot.Collections.Array<Rid> { GetRid() });
-        q.CollideWithAreas = true;
-        return space.IntersectRay(q);
+        // consulta reaproveitada: evita criar objetos nativos a cada quadro
+        _rayQuery ??= new PhysicsRayQueryParameters3D { CollideWithAreas = true, Exclude = new Godot.Collections.Array<Rid> { GetRid() } };
+        _rayQuery.From = from;
+        _rayQuery.To = to;
+        _rayQuery.CollisionMask = mask;
+        return space.IntersectRay(_rayQuery);
     }
 
     void UpdateTarget(GameState gs)
@@ -332,14 +338,14 @@ public partial class PlayerController : CharacterBody3D
     bool CanStand()
     {
         var space = GetWorld3D().DirectSpaceState;
-        var q = new PhysicsShapeQueryParameters3D
+        _standQuery ??= new PhysicsShapeQueryParameters3D
         {
             Shape = new CapsuleShape3D { Radius = 0.33f, Height = StandHeight - 0.1f },
-            Transform = new Transform3D(Basis.Identity, GlobalPosition + Vector3.Up * (StandHeight / 2 + 0.06f)),
             CollisionMask = WorldLayer,
             Exclude = new Godot.Collections.Array<Rid> { GetRid() },
         };
-        return space.IntersectShape(q, 1).Count == 0;
+        _standQuery.Transform = new Transform3D(Basis.Identity, GlobalPosition + Vector3.Up * (StandHeight / 2 + 0.06f));
+        return space.IntersectShape(_standQuery, 1).Count == 0;
     }
 
     public void AddShake(float amount) => _shakeAmount = Mathf.Min(2f, _shakeAmount + amount);

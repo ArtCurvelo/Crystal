@@ -824,6 +824,31 @@ public partial class TestRunner : Node
             Check(blocked <= crystals.Count / 50, $"{r.Id}: depósitos miráveis do ponto de mineração ({blocked} bloqueados de {crystals.Count})");
         }
 
+        // depósitos que renascem como outro formato (ex.: pérolas, mais baixas) continuam miráveis
+        {
+            var space2 = world.GetWorld3D().DirectSpaceState;
+            var sample = world.Crystals.Where(c => !c.Material.Special).Where((c, i) => i % 7 == 0).Take(36).ToList();
+            var forms = new[] { "voidpearl", "blackpearl", "opal", "coralprism", "obsidian", "magmite" };
+            int k = 0;
+            foreach (var c in sample)
+            {
+                var m = GameData.Mat(forms[k++ % forms.Length]);
+                c.PickMaterial = _ => m;
+                c.Hit(1e9f, c.GlobalPosition, Vector3.Up, true);
+                c.DebugRespawnNow();
+            }
+            await Frames(120);
+            int miss = 0;
+            foreach (var c in sample)
+            {
+                var eye = c.StandPoint + Vector3.Up * 1.45f;
+                var q = PhysicsRayQueryParameters3D.Create(eye, eye + (c.Center - eye).Normalized() * reach, PlayerController.WorldLayer | PlayerController.CrystalLayer);
+                var hit = space2.IntersectRay(q);
+                if (hit.Count == 0 || hit["collider"].AsGodotObject() != c) { miss++; if (miss <= 3) GD.Print($"      sem mira após renascer: {c.Material.Id} em {c.GlobalPosition}"); }
+            }
+            Check(miss <= 1, $"depósitos renascidos com outro formato continuam miráveis ({miss} de {sample.Count} sem mira)");
+        }
+
         // túnel secreto: em pé não passa, agachado passa
         var L1 = world.Layouts[1];
         var crawl = L1.Crawls[0];

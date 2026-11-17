@@ -30,6 +30,7 @@ public partial class PlaythroughBot : Node
     int _errors;
     double _r2 = -1, _r3 = -1, _r4 = -1, _heart = -1;
     int _sells, _buys, _pulses, _missedAims;
+    readonly HashSet<Crystal> _unaimable = new();
 
     public override async void _Ready()
     {
@@ -140,7 +141,7 @@ public partial class PlaythroughBot : Node
         var heart = Main.World.Crystals.FirstOrDefault(c => c.Material.Special && c.IsMineable);
         if (heart != null && GS.IsUnlocked("core") && heart.Hp / GS.DamagePerSecond < 45) target = heart;
         target ??= Main.World.Crystals
-            .Where(c => c.IsMineable && !c.Material.Special && c.GetParent() == root)
+            .Where(c => c.IsMineable && !c.Material.Special && c.GetParent() == root && !_unaimable.Contains(c))
             .OrderBy(c => c.GlobalPosition.DistanceTo(P.GlobalPosition))
             .FirstOrDefault();
         if (target == null) { await Frames(30); return; }
@@ -155,7 +156,7 @@ public partial class PlaythroughBot : Node
             // tenta mirar mais baixo (perto da base)
             AimAt(target.GlobalPosition + target.GlobalTransform.Basis.Y.Normalized() * 0.35f);
             await Frames(2);
-            if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); _missedAims++; await Frames(5); return; }
+            if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); _missedAims++; _unaimable.Add(target); await Frames(5); return; }
         }
         bool wasHeart = target.Material.Special;
         Input.ActionPress("mine");

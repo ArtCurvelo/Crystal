@@ -72,7 +72,7 @@ docs/screenshots/   Capturas do jogo real.
 ### Regras técnicas
 - A região é detectada pela coordenada Z (`WorldBuilder.RegionAt`). Os portões ficam nos túneis.
 - Turno de trabalho em `GameState` (`TickDay`, `EndDay`, `StartNewDay`, `CanWork`/`RequireWork`; `DayLengthOverride` para testes). Fora do turno só vender e ir para casa. Única `SellStation` e `MineElevator` no acampamento (`WorldBuilder.SellStation/Elevator`); `HomeScreen` (UI/HomeScreen.cs) aberta pelo elevador via `UiBus.RequestHome`: maquete `World/HouseDiorama.cs`, melhorias da casa e árvore de habilidades (`Data/HomeData.cs`; efeitos aplicados nos atributos de `GameState`).
-- Cada região tem galerias laterais (`RegionDef.Wings`): sala extra a leste/oeste ligada por túnel curto, montada num nó deslocado em X. `WorldBuilder._Process` oculta galerias distantes (sem oclusão no Compatibility).
+- Cavernas orgânicas: `CaveLayout` (planejamento + grid de 1 m: chão F, teto C, distância D, alcançável a pé) e `CaveTerrain` (malhas em blocos de 32 m, HeightMapShape3D, caixas nos túneis baixos). `RegionDef.Wings` viraram câmaras com minério em destaque. Depósitos têm `StandPoint` (onde o jogador fica) e `Center` (alvo de mira). Agachar no `PlayerController`. Sons/efeitos/fragmentos por `OreArchetype` (AudioManager.PlayOre, Effects.BreakFx/HitFx, ShardManager.DropMesh).
 - Camadas de física: 1 mundo, 2 jogador, 3 (valor 4) cristais, 4 (valor 8) interagíveis.
 - `Basis.Scaled()` escala nos eixos **globais**; usar `ScaleLocal()` para transformações compostas.
 - Malhas estáticas sob Node3D "puros" são mescladas na carga (`StaticBatcher`); nós com script não são tocados.

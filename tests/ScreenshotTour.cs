@@ -243,7 +243,7 @@ public partial class ScreenshotTour : Node
         GD.Print($"[Tour] FPS (software, Xvfb): R1={fps1:0} R2={fps2:0} R3={fps3:0}");
         GD.Print($"[Tour] Qualidade {Settings.Quality} | R1: {dc1} | R2: {dc2} | R3: {dc3}");
         SaveSystem.Delete();
-        GetTree().Quit();
+        GameState.Instance.QuitClean();
     }
 
     static string DrawStats()

@@ -272,7 +272,7 @@ public partial class AudioManager : Node
             float crash = Noise() * MathF.Exp(-t * 7f) * 0.35f;
             float ring = 0;
             foreach (var f in new[] { 410f, 987f, 1873f, 3021f }) ring += MathF.Sin(Tau * f * t) * 0.13f;
-            return crash + ring * MathF.Exp(-t * 3.5f) + MathF.Sin(Tau * 80 * t) * MathF.Exp(-t * 12f) * 0.35f;
+            return (crash + ring * MathF.Exp(-t * 3.5f) + MathF.Sin(Tau * 80 * t) * MathF.Exp(-t * 12f) * 0.35f) * 0.62f;
         }),
         // geodo: "pop" + cascata de brilhos rápidos
         Data.OreArchetype.Geode => Synth(1.0f, (t, i) =>
@@ -298,8 +298,8 @@ public partial class AudioManager : Node
             (Noise() > 0.7f ? 0.5f : 0f) * MathF.Exp(-t * 6f) + Noise() * 0.15f * MathF.Sin(MathF.PI * t) + MathF.Sin(Tau * 1760 * t) * MathF.Exp(-t * 6f) * 0.2f),
         // magma: explosão abafada + crepitar de brasas
         Data.OreArchetype.Magma => Synth(1.2f, (t, i) =>
-            MathF.Sin(Tau * (60 + 30 * MathF.Exp(-t * 5f)) * t) * MathF.Exp(-t * 3.5f) * 0.6f + Noise() * MathF.Exp(-t * 5f) * 0.25f
-            + (Noise() > 0.93f ? 0.35f : 0f) * MathF.Exp(-t * 2f)),
+            (MathF.Sin(Tau * (60 + 30 * MathF.Exp(-t * 5f)) * t) * MathF.Exp(-t * 3.5f) * 0.6f + Noise() * MathF.Exp(-t * 5f) * 0.25f
+            + (Noise() > 0.93f ? 0.35f : 0f) * MathF.Exp(-t * 2f)) * 0.65f),
         // coral: galhos estalando em sequência
         Data.OreArchetype.Coral => Synth(0.8f, (t, i) =>
         {

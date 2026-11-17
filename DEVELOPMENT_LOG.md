@@ -254,3 +254,33 @@ Decisões do diretor:
 - Dentro de casa: **Painel da casa** (melhorias e habilidades; Esc fecha), **Cama** (dormir → próximo dia; o jogador acorda em casa) e **Elevador · Mina** (só desce depois de dormir). Objetivo do HUD, marcador e faixa do topo ("Casa do Escavador") acompanham. Dentro de casa as regiões da mina não são desenhadas.
 - **Renascimento dinâmico dos minérios:** a cada 0,5 s calcula a fração de depósitos quebrados em cada região (sala + galerias) e acelera o renascimento: taxa = 1 + 5·f² (região esgotada → até 6x mais rápido). Resolve o caso relatado em todas as regiões, não só nas Profundezas.
 - Testes 324/324 (renascimento acelerado só na região esgotada; paredes da casa seguram o jogador). Bot: sobe, anda na casa, confere que o elevador não desce de noite, compra pelo painel, dorme na cama, desce pelo elevador → SUCESSO.
+- Publicado como **v0.2.8**.
+
+## Atualização grande (v0.3.0): mapa de verdade + minérios com personalidade
+Pedido do diretor: regiões grandes e não quadradas, formações rochosas naturais, relevo, minérios nas paredes (alguns só alcançáveis subindo), caminhos secretos e agachar; mais minérios, cada um com som, efeito e fragmento próprios.
+
+### Fase 1 — cavernas orgânicas
+- `World/CaveLayout.cs`: caverna de cada região gerada num grid de 1 m (determinístico): caminho principal sinuoso (nós em alturas diferentes), câmaras laterais em níveis de −1,5 a +5 m ligadas por rampas (máx. ~25°), câmaras com nome e minério em destaque (as antigas galerias), câmara do Coração e lago do Reservatório, e **2 câmaras secretas por região** ligadas por túneis de 1,45 m de altura. Bordas irregulares por ruído; paredes sobem até o teto; estalactites.
+- Produz chão (F), teto (C), distância às paredes (D) e uma **busca em largura** a partir da entrada que marca o que é alcançável a pé (inclinação e altura livre agachado). Todo depósito só é criado se tiver um ponto de mineração alcançável.
+- `World/CaveTerrain.cs`: malhas em blocos de 32 m (recorte por visão; luzes só afetam blocos próximos), colisão por `HeightMapShape3D` e caixas sob o teto dos túneis baixos. `shaders/cave.gdshader`: rocha procedural com projeção pelo eixo dominante (3 leituras de textura; a versão triplanar com 7 custava ~10% de FPS).
+- Regiões 4–5x maiores (R1 92×84 m … R4 120×108 m), ~250 depósitos, **~30% nas paredes** (orientados pela normal da rocha). Túneis entre regiões com escoramento de madeira e molduras que fecham as bocas.
+- **Agachar** (C/Ctrl, B ou R3 no controle; alterna): cápsula 1,75 → 1,0 m, câmera baixa, metade da velocidade; só levanta se houver espaço (consulta de forma).
+- Câmara secreta encontrada: "PASSAGEM SECRETA!", contagem no save (`Secrets`), depósitos raros garantidos.
+- Posições salvas do mapa antigo que caem dentro da rocha voltam ao elevador (`IsSafeSpot`). Casa movida para z=110. Câmera do menu sobre o acampamento.
+
+### Fase 2 — minérios com personalidade
+- **32 minérios** (+10: Pirita, Jaspe Rubro, Água-marinha, Cobalto Glacial, Fluorita Dupla, Enxofre Vivo, Granada Profunda, Ferro Meteórico, Lápis-lazúli, Pérola Negra); tabelas de cada região refeitas.
+- **Som próprio:** golpe e quebra sintetizados por formato (sino, metal, pedra, vidro, gelo, magma, madeira, bolha) com tom derivado do id → cada minério soa diferente.
+- **Efeitos próprios:** faíscas e pepitas (metal), poeira e pedaços (pedra), estilhaços (vidro), névoa e flocos (gelo), brasas e fumaça (magma), bolhas (coral), orbes (pérola), brilho (geodo); golpes em metal/magma/pedra também soltam faíscas/brasas/poeira.
+- **Fragmento próprio:** pepita metálica, lasca, cubo de gelo, brasa, galho, pérola, placa de pedra, pedaço de geodo ou prisma.
+
+### Bugs encontrados e corrigidos na validação
+- Depósitos de parede com o "olho" do jogador colado neles (mira começava dentro do colisor) → distância olho–centro exigida entre 1,4 e 3,3 m; teste novo faz a mira real (raio) de todos os depósitos.
+- Pérola do Vazio impossível de mirar: o centro de mira ficava acima do colisor baixo das pérolas (o bot insistiu 2 h de jogo no mesmo depósito) → centro limitado pela altura real do colisor; teste força renascimentos em formatos baixos; o bot desiste de alvos impossíveis.
+- Dois sons novos saturavam (metal e magma ao quebrar) → amplitude reduzida (teste de áudio).
+- Consultas de física criadas a cada quadro → reaproveitadas.
+
+### Resultados
+- Testes **356/356** (cavernas: área, relevo, saída alcançável, câmaras, túneis secretos bloqueiam em pé e deixam passar agachado, não dá para levantar dentro deles, mira real de todos os depósitos, renascimento em outro formato).
+- Bot: **SUCESSO** — caminhada física elevador → Reservatório (rampas, túneis, contorno do Coração) em 39 s; 5 dias, compras na casa, Coração em 49,7 min, renascimento.
+- Benchmark Baixa/75%: 18,5–21,0 FPS (antes 21–23 no mapa antigo; o ambiente varia ±3 FPS e nenhum experimento isolou a diferença — partículas e shader dos minérios não são a causa). A resolução dinâmica compensa em PCs fracos; acompanhar no PC do diretor.

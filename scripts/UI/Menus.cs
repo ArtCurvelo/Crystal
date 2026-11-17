@@ -395,8 +395,8 @@ public partial class HelpScreen : ModalScreen
         var right = new VBoxContainer { CustomMinimumSize = new Vector2(440, 0) };
         right.AddThemeConstantOverride("separation", 8);
         cols.AddChild(right);
-        Section(right, "CICLO", "Minere (no chão e nas paredes) → os fragmentos voam até você → leve-os à única Estação de Venda, no acampamento → compre melhorias → abra portões para regiões mais ricas. Suba o relevo, explore câmaras com placas e procure túneis baixos: agachado (C) você acha câmaras secretas.");
-        Section(right, "O TURNO", "Cada dia vai das 06:00 às 18:00 (10 min). No fim do turno você só pode vender e pegar o Elevador do acampamento. Em casa: melhorias da casa (permanentes), árvore de habilidades e dormir para o próximo dia.");
+        Section(right, "CICLO", "Minere no chão e nas paredes → venda na Estação do acampamento → compre melhorias → abra portões. Explore o relevo e os túneis baixos: agachado (C) você acha câmaras secretas.");
+        Section(right, "O TURNO", "Dia de 06:00 às 18:00 (10 min). No fim, só vender e pegar o Elevador. Em casa: melhorias, habilidades e dormir.");
         Section(right, "RESSONÂNCIA", "Golpes em ritmo constante enchem o arco violeta da mira. Quando ficar dourado, o próximo golpe libera um pulso que atinge todos os cristais próximos.");
         Section(right, "EVENTOS", "Cada região tem condições próprias: Eco Luminoso (cristais renascem), Maré Gélida (fragmentos x2) e Surto do Núcleo (dano +50%).");
         Section(right, "RENASCIMENTO", "Depois de concluir a jornada, renasça no Terminal: recomece com Essência Ancestral (+10% de dano e venda por ponto, para sempre).");
