@@ -204,9 +204,15 @@ public partial class PlaythroughBot : Node
         long gained = GS.Data.Money - before;
         if (gained <= 0) { _errors++; Log("ERRO: venda não rendeu"); }
         _sells++;
+        // troca de aba Vender → Melhorias e volta
+        var shopTab = FindButtons(sell).First(b => b.Text.Contains("Melhorias"));
+        shopTab.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(2);
+        var shopScr = Main.GetChildren().OfType<ShopScreen>().First();
+        if (!shopScr.IsOpen || sell.IsOpen) { _errors++; Log("ERRO: troca de aba para Melhorias falhou"); }
         PressAction("pause"); // fecha
         await Frames(3);
-        if (sell.IsOpen) { _errors++; Log("ERRO: Esc não fechou a venda"); }
+        if (sell.IsOpen || shopScr.IsOpen) { _errors++; Log("ERRO: Esc não fechou o terminal"); }
         if (_sells % 5 == 1) Log($"Venda #{_sells}: +{gained} (saldo {GS.Data.Money})");
     }
 

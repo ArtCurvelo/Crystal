@@ -78,7 +78,7 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 ---
 
 ## Sessão 2 — condições ambientais e qualidade
-- **Tempo:** _aguardando atualização do diretor_ (último informado: 29 min consumidos às 01:20).
+- **Tempo (informado):** 01:20 → 02:36 (+1h16). Total consumido: **1h45min**. Restante: **~28h15min**.
 - **Repositório:** https://github.com/ArtCurvelo/Crystal, com clone do diretor em `C:\Users\silvi\Documents\Crystal`.
 
 ### Concluído (e testado)

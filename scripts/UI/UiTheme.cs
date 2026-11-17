@@ -6,10 +6,10 @@ namespace CrystalExcavator.UI;
 /// <summary>Identidade visual da interface: paleta, estilos e fábricas de controles.</summary>
 public static class UiTheme
 {
-    public static readonly Color Bg = new(0.05f, 0.035f, 0.09f, 0.94f);
-    public static readonly Color BgSoft = new(0.09f, 0.07f, 0.15f, 0.9f);
-    public static readonly Color Card = new(0.12f, 0.1f, 0.2f, 0.95f);
-    public static readonly Color CardHover = new(0.17f, 0.14f, 0.28f, 0.98f);
+    public static readonly Color Bg = new(0.03f, 0.05f, 0.1f, 0.95f);
+    public static readonly Color BgSoft = new(0.05f, 0.08f, 0.14f, 0.9f);
+    public static readonly Color Card = new(0.06f, 0.1f, 0.17f, 0.95f);
+    public static readonly Color CardHover = new(0.09f, 0.15f, 0.24f, 0.98f);
     public static readonly Color Border = new(0.37f, 0.9f, 1f, 0.55f);
     public static readonly Color Cyan = new(0.37f, 0.91f, 1f);
     public static readonly Color Violet = new(0.62f, 0.45f, 1f);
@@ -43,6 +43,7 @@ public static class UiTheme
             ShadowColor = new Color(0, 0, 0, 0.35f),
             ShadowSize = 6,
             AntiAliasing = true,
+            CornerDetail = 1, // cantos chanfrados (estilo sci-fi)
         };
         s.SetCornerRadiusAll(radius);
         s.SetBorderWidthAll(borderW);
@@ -60,8 +61,8 @@ public static class UiTheme
         t.SetConstant("outline_size", "Label", 0);
 
         // botões
-        var normal = Box(new Color(0.14f, 0.11f, 0.24f, 0.95f), new Color(Cyan, 0.45f), 8, 2, 16);
-        var hover = Box(new Color(0.2f, 0.16f, 0.34f, 1f), Cyan, 8, 2, 16);
+        var normal = Box(new Color(0.06f, 0.12f, 0.2f, 0.95f), new Color(Cyan, 0.5f), 8, 2, 16);
+        var hover = Box(new Color(0.09f, 0.2f, 0.3f, 1f), Cyan, 8, 2, 16);
         var pressed = Box(new Color(0.1f, 0.3f, 0.38f, 1f), Cyan, 8, 2, 16);
         var disabled = Box(new Color(0.1f, 0.09f, 0.14f, 0.8f), new Color(0.4f, 0.4f, 0.5f, 0.3f), 8, 2, 16);
         var focus = Box(new Color(0, 0, 0, 0), Gold, 8, 2, 16);

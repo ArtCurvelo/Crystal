@@ -79,6 +79,8 @@ public partial class Main : Node
         _sell = new SellScreen();
         _sell.Closed += ReturnToGameplay;
         AddChild(_sell);
+        _shop.SwitchToSell = () => { _shop.CloseSilently(); _sell.Open(); };
+        _sell.SwitchToShop = () => { _sell.CloseSilently(); _shop.Open(); };
         _pause = new PauseScreen
         {
             OnResume = Resume,
