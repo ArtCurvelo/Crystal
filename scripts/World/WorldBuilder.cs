@@ -128,6 +128,18 @@ public partial class WorldBuilder : Node3D
                 Decor.Mushrooms(root, r, rng, low ? 4 : 8, new Color(0.4f, 0.6f, 1f));
                 Decor.Ferns(root, r, rng, low ? 4 : 8, new Color(0.2f, 0.7f, 0.6f));
                 Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) });
+                Decor.Bridge(root, new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ - 14f), new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ + 10f), 1.6f);
+                Decor.Bridge(root, new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ - 14f), new Vector3(r.HalfX - 10f, 4.5f, r.CenterZ - 20f), 1.6f);
+                break;
+            case "abyss":
+                Decor.Lake(root, r);
+                Decor.Jellyfish(root, r, rng, low ? 6 : 12);
+                Decor.Outpost(root, new Vector3(-r.HalfX + 3f, 0, r.CenterZ + r.HalfZ - 9f), Mathf.Pi / 2);
+                Decor.Bridge(root, new Vector3(-r.HalfX + 6f, 3.2f, r.CenterZ - 4f), new Vector3(r.HalfX - 6f, 3.2f, r.CenterZ - 4f), 1.8f);
+                Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 14f), r.Height, 3.4f, Mathf.Pi / 2, new Color(0.4f, 0.9f, 1f));
+                Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ - 10f), r.Height, 3f, -Mathf.Pi / 2, new Color(0.4f, 0.9f, 1f));
+                Decor.Waterfall(root, new Vector3(8f, 0, r.CenterZ - r.HalfZ + 0.4f), r.Height, 4f, 0f, new Color(0.5f, 0.85f, 1f));
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) });
                 break;
             case "core":
                 Decor.AncientRuins(root, r, rng);
@@ -221,6 +233,7 @@ public partial class WorldBuilder : Node3D
             if (r.Index == 0 && x < -8.5f && z > r.CenterZ + 2.5f) continue; // posto avançado e refinaria
             if (r.Index == 0 && new Vector2(-6.2f, r.CenterZ + 7.2f).DistanceTo(p) < 2f) continue; // scanner
             if (r.Index == 1 && x > r.HalfX - 9f && z > r.CenterZ + r.HalfZ - 16f) continue; // posto das Profundezas
+            if (r.Index == 3 && x < -r.HalfX + 9f && z > r.CenterZ + r.HalfZ - 16f) continue; // posto do Reservatório
             if (r.Index == 2 && MathF.Abs(MathF.Abs(x) - (r.HalfX - 4f)) < 2.5f) continue; // pilares das ruínas
             if (r.Index == 0 && new Vector2(0, entranceZ).DistanceTo(p) < 8.5f) continue; // acampamento livre
             bool ok = true;
@@ -477,6 +490,13 @@ public partial class WorldBuilder : Node3D
             p.Direction = Vector3.Down;
             p.Spread = 5;
             p.Mesh = new QuadMesh { Size = new Vector2(0.03f, 0.16f) };
+        }
+        else if (r.Id == "abyss")
+        {
+            // bolhas e partículas luminosas subindo
+            p.Gravity = new Vector3(0, 0.5f, 0);
+            p.Color = new Color(0.5f, 0.95f, 1f);
+            p.Mesh = new SphereMesh { Radius = 0.04f, Height = 0.08f, RadialSegments = 6, Rings = 3 };
         }
         else if (r.Id == "core")
         {

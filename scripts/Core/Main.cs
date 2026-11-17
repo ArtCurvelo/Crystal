@@ -145,8 +145,7 @@ public partial class Main : Node
         Hud.Visible = false;
         _menuCam.Current = true;
         _env.SetRegion(GameData.Regions[0], true);
-        foreach (var r in World.RegionRoots) r.Visible = true;
-        World.RegionRoots[2].Visible = false;
+        for (int i = 0; i < World.RegionRoots.Count; i++) World.RegionRoots[i].Visible = i < 2;
         _menu.Show(SaveSystem.HasSave());
         AudioManager.Instance?.PlayMusic(-1);
     }

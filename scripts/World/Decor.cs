@@ -160,6 +160,87 @@ public static class Decor
     }
 
     // ------------------------------------------------------------------
+    /// <summary>Passarela suspensa de madeira com corrimãos e lanternas (decorativa).</summary>
+    public static void Bridge(Node3D root, Vector3 from, Vector3 to, float width = 1.6f)
+    {
+        var node = new Node3D { Position = (from + to) / 2 };
+        root.AddChild(node);
+        var dir = to - from;
+        float len = dir.Length();
+        node.Rotation = new Vector3(0, Mathf.Atan2(dir.X, dir.Z), 0);
+        var wood = Lit(new Color(0.42f, 0.28f, 0.18f), 0.9f);
+        var dark = Lit(new Color(0.2f, 0.18f, 0.18f), 0.8f);
+        var lantern = Glow(new Color(1f, 0.7f, 0.35f), 2.4f);
+        Mesh(node, new BoxMesh { Size = new Vector3(width, 0.12f, len) }, wood, Vector3.Zero);
+        for (int sx = -1; sx <= 1; sx += 2)
+        {
+            Mesh(node, new BoxMesh { Size = new Vector3(0.06f, 0.06f, len) }, dark, new Vector3(sx * width / 2, 0.75f, 0));
+            int posts = Mathf.Max(2, (int)(len / 2.5f));
+            for (int i = 0; i <= posts; i++)
+            {
+                float z = -len / 2 + i * len / posts;
+                Mesh(node, new BoxMesh { Size = new Vector3(0.08f, 0.85f, 0.08f) }, dark, new Vector3(sx * width / 2, 0.38f, z));
+                if (i % 2 == 0)
+                {
+                    Mesh(node, new BoxMesh { Size = new Vector3(0.05f, 0.5f, 0.05f) }, dark, new Vector3(sx * width / 2, 1.05f, z));
+                    Mesh(node, new BoxMesh { Size = new Vector3(0.16f, 0.2f, 0.16f) }, lantern, new Vector3(sx * width / 2, 1.38f, z));
+                }
+            }
+        }
+        // pilares de sustentação até o chão
+        for (int i = 0; i < 2; i++)
+        {
+            float z = (i == 0 ? -1 : 1) * len * 0.3f;
+            Mesh(node, new BoxMesh { Size = new Vector3(0.25f, from.Y, 0.25f) }, dark, new Vector3(0, -from.Y / 2, z));
+        }
+        node.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.7f, 0.4f), LightEnergy = 1f, OmniRange = Mathf.Min(10f, len), Position = new Vector3(0, 1.4f, 0) });
+    }
+
+    /// <summary>Lago luminoso cobrindo o piso (o jogador caminha pela água rasa).</summary>
+    public static void Lake(Node3D root, RegionDef r)
+    {
+        var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/lake.gdshader") };
+        mat.SetShaderParameter("glow_color", r.AccentColor);
+        Mesh(root, new PlaneMesh { Size = new Vector2(r.HalfX * 2 - 4, r.HalfZ * 2 - 12) }, mat, new Vector3(0, 0.06f, r.CenterZ - 3f));
+    }
+
+    /// <summary>Águas-vivas luminosas flutuando no ar úmido do reservatório.</summary>
+    public static void Jellyfish(Node3D root, RegionDef r, Random rng, int count)
+    {
+        var colors = new[] { new Color(0.4f, 0.9f, 1f), new Color(1f, 0.5f, 0.85f), new Color(0.6f, 0.6f, 1f) };
+        for (int i = 0; i < count; i++)
+        {
+            var c = colors[i % colors.Length];
+            var j = new JellyNode
+            {
+                Position = new Vector3(((float)rng.NextDouble() * 2 - 1) * (r.HalfX - 6), 4f + (float)rng.NextDouble() * (r.Height - 7), r.CenterZ + ((float)rng.NextDouble() * 2 - 1) * (r.HalfZ - 6)),
+                Phase = (float)rng.NextDouble() * 6f,
+                Scale = Vector3.One * (0.6f + (float)rng.NextDouble() * 0.7f),
+            };
+            root.AddChild(j);
+            var bellMat = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(c, 0.55f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                EmissionEnabled = true, Emission = c, EmissionEnergyMultiplier = 1.4f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+                RimEnabled = true, Rim = 1f,
+            };
+            j.AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.7f, Height = 0.9f, IsHemisphere = true, RadialSegments = 12, Rings = 4 }, MaterialOverride = bellMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+            // tentáculos mesclados numa malha
+            var st = new SurfaceTool();
+            st.Begin(Godot.Mesh.PrimitiveType.Triangles);
+            var strand = new BoxMesh { Size = new Vector3(0.03f, 1f, 0.03f) };
+            for (int k = 0; k < 7; k++)
+            {
+                float a = Mathf.Tau * k / 7;
+                float len = 1.0f + (float)rng.NextDouble() * 1.2f;
+                var b = new Basis(Vector3.Forward, ((float)rng.NextDouble() - 0.5f) * 0.3f).ScaleLocal(new Vector3(1, len, 1));
+                st.AppendFrom(strand, 0, new Transform3D(b, new Vector3(Mathf.Cos(a) * 0.4f, -len / 2, Mathf.Sin(a) * 0.4f)));
+            }
+            j.AddChild(new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = Glow(c, 1.6f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        }
+    }
+
+    // ------------------------------------------------------------------
     /// <summary>Cachoeira animada encostada numa parede, com poça e névoa.</summary>
     public static void Waterfall(Node3D root, Vector3 basePos, float height, float width, float yaw, Color color)
     {
@@ -354,6 +435,23 @@ public static class Decor
         var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = xforms.Count };
         for (int i = 0; i < xforms.Count; i++) mm.SetInstanceTransform(i, xforms[i]);
         root.AddChild(new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+    }
+}
+
+/// <summary>Água-viva: flutua, pulsa e deriva lentamente.</summary>
+public partial class JellyNode : Node3D
+{
+    public float Phase;
+    Vector3 _base;
+    Vector3 _scale0;
+    bool _init;
+    public override void _Process(double delta)
+    {
+        if (!_init) { _base = Position; _scale0 = Scale; _init = true; }
+        Phase += (float)delta;
+        float pulse = Mathf.Sin(Phase * 2.2f);
+        Position = _base + new Vector3(Mathf.Sin(Phase * 0.3f) * 1.2f, Mathf.Sin(Phase * 0.7f) * 0.6f + pulse * 0.08f, Mathf.Cos(Phase * 0.25f) * 1.2f);
+        Scale = _scale0 * new Vector3(1f + pulse * 0.08f, 1f - pulse * 0.1f, 1f + pulse * 0.08f);
     }
 }
 

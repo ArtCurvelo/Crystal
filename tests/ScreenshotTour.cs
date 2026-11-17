@@ -140,6 +140,16 @@ public partial class ScreenshotTour : Node
         p.SetLook(0, 0.08f);
         await Wait(3f);
         await Shot("10_region3");
+        gs.AddMoney(GameData.Regions[3].UnlockCost);
+        gs.TryUnlockRegion("abyss");
+        p.GlobalPosition = new Vector3(0, 0.1f, -168f);
+        p.SetLook(0, 0.05f);
+        await Wait(3f);
+        await Shot("10b_region4");
+        p.GlobalPosition = new Vector3(6f, 0.1f, -178f);
+        p.SetLook(0.6f, 0.25f);
+        await Wait(0.6f);
+        await Shot("10c_region4b");
         float fps3 = (float)Engine.GetFramesPerSecond();
         string dc3 = DrawStats();
 

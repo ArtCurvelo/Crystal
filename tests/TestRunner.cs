@@ -197,6 +197,11 @@ public partial class TestRunner : Node
         Check(GS.TryUnlockRegion(r2.Id), "deve desbloquear a região 2");
         Check(GS.TryUnlockRegion(r3.Id), "deve desbloquear a região 3 depois da 2");
         Check(!GS.TryUnlockRegion(r3.Id), "não deve desbloquear duas vezes");
+        foreach (var extra in GameData.Regions.Skip(3))
+        {
+            GS.AddMoney(extra.UnlockCost);
+            Check(GS.TryUnlockRegion(extra.Id), $"deve desbloquear {extra.Name}");
+        }
         Check(GS.NextLockedRegion() == null, "não deve haver regiões bloqueadas");
     }
 
@@ -313,7 +318,7 @@ public partial class TestRunner : Node
         await Frames(5);
 
         Check(world.Crystals.Count >= 60, $"mundo deve ter cristais suficientes ({world.Crystals.Count})");
-        Check(world.Gates.Count == 2, "devem existir 2 portões");
+        Check(world.Gates.Count == GameData.Regions.Count - 1, "deve existir um portão por região desbloqueável");
         Check(world.Crystals.Any(c => c.Material.Special), "deve existir a formação especial");
 
         var crystal = world.Crystals.Where(c => c.Material.Id == "quartz").OrderBy(c => c.GlobalPosition.DistanceTo(world.SpawnPoint)).First();
@@ -393,7 +398,8 @@ public partial class TestRunner : Node
         Check(gate.IsOpen, "carregar save com região liberada deve abrir o portão");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, -60)).Id == "depths", "detecção de região por posição");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, 10)).Id == "caves", "detecção da região inicial");
-        Check(WorldBuilder.RegionAt(new Vector3(0, 0, -130)).Id == "core", "detecção da região final");
+        Check(WorldBuilder.RegionAt(new Vector3(0, 0, -130)).Id == "core", "detecção do Núcleo");
+        Check(WorldBuilder.RegionAt(new Vector3(0, 0, -200)).Id == "abyss", "detecção do Reservatório");
         root.QueueFree();
         await Frames(2);
     }

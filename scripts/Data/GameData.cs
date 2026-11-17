@@ -191,6 +191,28 @@ public static class GameData
             Color = new Color(1.0f, 0.95f, 0.75f), Glow = new Color(1.0f, 0.55f, 0.2f),
             ShardsMin = 18, ShardsMax = 24, RespawnSeconds = 120
         });
+        // Reservatório Abissal (região bônus)
+        Add(new MaterialDef
+        {
+            Id = "tidecrystal", Rarity = Rarity.Raro, Name = "Cristal de Maré", Value = 700, Hp = 9000,
+            Description = "Cresce sob a água e pulsa com as correntes.",
+            Color = new Color(0.35f, 1.0f, 0.95f), Glow = new Color(0.1f, 0.85f, 0.9f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 28
+        });
+        Add(new MaterialDef
+        {
+            Id = "coralprism", Rarity = Rarity.Epico, Name = "Coral Prismático", Value = 1300, Hp = 16000,
+            Description = "Mistura de cristal e vida; muda de cor com a luz.",
+            Color = new Color(1.0f, 0.45f, 0.8f), Glow = new Color(0.95f, 0.25f, 0.75f),
+            ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 32
+        });
+        Add(new MaterialDef
+        {
+            Id = "abyssaltear", Rarity = Rarity.Lendario, Name = "Lágrima Abissal", Value = 9000, Hp = 30000, Rare = true,
+            Description = "Dizem que guarda o brilho de um oceano esquecido.",
+            Color = new Color(0.7f, 0.85f, 1.0f), Glow = new Color(0.4f, 0.55f, 1.0f),
+            ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 60
+        });
 
         // ---------------- Regiões ----------------
         var r1 = new RegionDef
@@ -237,6 +259,21 @@ public static class GameData
         r3.Spawns.Add(new SpawnEntry("ruby", 0.6f));
         r3.Spawns.Add(new SpawnEntry("ancestralite", 0.4f));
         Regions.Add(r3);
+
+        var r4 = new RegionDef
+        {
+            Id = "abyss", Index = 3, Name = "Reservatório Abissal",
+            Subtitle = "Região bônus: um lago sereno e luminoso.", UnlockCost = 1500000,
+            AmbientColor = new Color(0.3f, 0.55f, 0.85f), AmbientEnergy = 0.75f,
+            FogColor = new Color(0.03f, 0.12f, 0.2f), FogDensity = 0.022f,
+            RockColor = new Color(0.22f, 0.26f, 0.38f), AccentColor = new Color(0.3f, 0.95f, 1.0f),
+            LightColor = new Color(0.5f, 0.8f, 1.0f),
+            RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 24,
+            CenterZ = -194, HalfX = 32, HalfZ = 30, Height = 16
+        };
+        r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.62f));
+        r4.Spawns.Add(new SpawnEntry("coralprism", 0.38f));
+        Regions.Add(r4);
 
         // ---------------- Upgrades ----------------
         AddUp(new UpgradeDef
