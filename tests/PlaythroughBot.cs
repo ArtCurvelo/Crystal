@@ -42,6 +42,10 @@ public partial class PlaythroughBot : Node
         P.ResonancePulse += _ => _pulses++;
         await Frames(10);
         Log("Início do jogo");
+        await Frames(60);
+        double nodes0 = Performance.GetMonitor(Performance.Monitor.ObjectNodeCount);
+        double objs0 = Performance.GetMonitor(Performance.Monitor.ObjectCount);
+        double mem0 = Performance.GetMonitor(Performance.Monitor.MemoryStatic) / 1048576.0;
 
         try
         {
@@ -62,6 +66,20 @@ public partial class PlaythroughBot : Node
             _errors++;
             Log("EXCEÇÃO: " + e);
         }
+
+        // coleta o lixo gerenciado antes de medir (separa vazamento real de coleta atrasada)
+        System.GC.Collect();
+        System.GC.WaitForPendingFinalizers();
+        await Frames(5);
+        System.GC.Collect();
+        await Frames(5);
+        double nodes1 = Performance.GetMonitor(Performance.Monitor.ObjectNodeCount);
+        double objs1 = Performance.GetMonitor(Performance.Monitor.ObjectCount);
+        double mem1 = Performance.GetMonitor(Performance.Monitor.MemoryStatic) / 1048576.0;
+        double orphans = Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount);
+        Log($"Estabilidade: nós {nodes0:0} → {nodes1:0}, objetos {objs0:0} → {objs1:0}, memória {mem0:0.0} → {mem1:0.0} MB, nós órfãos {orphans:0}");
+        if (nodes1 > nodes0 * 1.25 + 200) { _errors++; Log("ERRO: crescimento anormal de nós (possível vazamento)"); }
+        if (objs1 > objs0 * 2 + 3000) { _errors++; Log("ERRO: crescimento anormal de objetos após GC (possível vazamento)"); }
 
         // caminhada real do acampamento até o Núcleo (colisões, túneis e portões abertos)
         if (_r3 > 0) await WalkTest();

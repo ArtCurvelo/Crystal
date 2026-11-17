@@ -389,14 +389,14 @@ public partial class Hud : CanvasLayer
                 gem.Color = m.Glow.Lightened(0.15f);
                 gem.QueueRedraw();
                 count.Text = items[i].Value.ToString();
-                panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.8f), new Color(m.Glow, 0.6f), 10, 2, 4, 4));
+                panel.AddThemeStyleboxOverride("panel", UiTheme.ChamferCached(new Color(0.03f, 0.05f, 0.1f, 0.8f), new Color(m.Glow, 0.6f), 10, 2, 4, 4));
                 panel.TooltipText = m.Name;
             }
             else
             {
                 gem.Visible = false;
                 count.Text = "";
-                panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.55f), new Color(UiTheme.Cyan, 0.2f), 10, 2, 4, 4));
+                panel.AddThemeStyleboxOverride("panel", UiTheme.ChamferCached(new Color(0.03f, 0.05f, 0.1f, 0.55f), new Color(UiTheme.Cyan, 0.2f), 10, 2, 4, 4));
             }
         }
         RefreshObjective();

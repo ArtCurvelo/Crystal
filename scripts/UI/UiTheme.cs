@@ -214,5 +214,22 @@ public static class UiTheme
         return b;
     }
 
-    public static void SetBarColor(ProgressBar b, Color fill) => b.AddThemeStyleboxOverride("fill", Flat(fill, (int)(b.CustomMinimumSize.Y / 2)));
+    static readonly System.Collections.Generic.Dictionary<(Color, int), StyleBoxFlat> FlatCache = new();
+    static readonly System.Collections.Generic.Dictionary<(Color, Color, int, int, int, int), StyleBoxFlat> ChamferCache = new();
+
+    /// <summary>Troca a cor de preenchimento reutilizando estilos em cache (sem alocar a cada quadro).</summary>
+    public static void SetBarColor(ProgressBar b, Color fill)
+    {
+        int r = (int)(b.CustomMinimumSize.Y / 2);
+        if (!FlatCache.TryGetValue((fill, r), out var sb)) FlatCache[(fill, r)] = sb = Flat(fill, r);
+        if (b.GetThemeStylebox("fill") != sb) b.AddThemeStyleboxOverride("fill", sb);
+    }
+
+    /// <summary>Versão em cache de Chamfer para estilos trocados com frequência.</summary>
+    public static StyleBoxFlat ChamferCached(Color bg, Color border, int cut, int borderW, int padX, int padY)
+    {
+        var key = (bg, border, cut, borderW, padX, padY);
+        if (!ChamferCache.TryGetValue(key, out var sb)) ChamferCache[key] = sb = Chamfer(bg, border, cut, borderW, padX, padY);
+        return sb;
+    }
 }
