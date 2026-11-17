@@ -63,6 +63,9 @@ public partial class PlaythroughBot : Node
             Log("EXCEÇÃO: " + e);
         }
 
+        // caminhada real do acampamento até o Núcleo (colisões, túneis e portões abertos)
+        if (_r3 > 0) await WalkTest();
+
         // verificação final de salvamento/carregamento do estado real
         GS.SaveGame(true);
         long money = GS.Data.Money;
@@ -143,6 +146,32 @@ public partial class PlaythroughBot : Node
         float yaw = Mathf.Atan2(-d.X, -d.Z);
         float pitch = Mathf.Asin(Mathf.Clamp(d.Y, -1, 1));
         P.SetLook(yaw, pitch);
+    }
+
+    async Task WalkTest()
+    {
+        P.GlobalPosition = Main.World.SpawnPoint;
+        P.Velocity = Vector3.Zero;
+        P.SetLook(0, 0);
+        await Frames(5);
+        double t0 = GS.Data.PlayTimeSeconds;
+        float targetZ = GameData.Regions[2].CenterZ + 12f; // antes do pedestal central
+        Input.ActionPress("move_forward");
+        Input.ActionPress("sprint");
+        int guard = 0;
+        float lastZ = P.GlobalPosition.Z; int stuck = 0;
+        while (P.GlobalPosition.Z > targetZ && guard++ < 60 * 120)
+        {
+            await Frames(10);
+            if (lastZ - P.GlobalPosition.Z < 0.05f) { if (++stuck > 12) break; } else stuck = 0;
+            lastZ = P.GlobalPosition.Z;
+        }
+        Input.ActionRelease("move_forward");
+        Input.ActionRelease("sprint");
+        double secs = GS.Data.PlayTimeSeconds - t0;
+        bool ok = P.GlobalPosition.Z <= targetZ;
+        if (!ok) { _errors++; Log($"ERRO: caminhada travou em {P.GlobalPosition}"); }
+        else Log($"Caminhada acampamento → Núcleo: {secs:0.0} s, sem travar (pos {P.GlobalPosition.Z:0.0})");
     }
 
     // ---------------- Estações ----------------
