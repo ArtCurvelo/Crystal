@@ -146,3 +146,6 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - Prioridades para o tempo restante: balanceamento fino, polimento, regressão, validação no Windows real (pendente com o diretor), documentação final e candidato 1.0.
 - **Conclusão da jornada:** com as 4 regiões liberadas e o Coração Ancestral destruído, aparece uma única vez a tela **Mestre Escavador** com estatísticas (tempo, cristais, fragmentos, ganhos, materiais e melhorias no máximo). Persistida no save (`GameCompleted`). O jogo continua depois. O bot exige a tela de conclusão para passar (concluiu aos 45 min de jogo). Testes: 166/166.
 - **Ícone do jogo** (cristal facetado na paleta do jogo): `icon_512.png` (janela) e `icon.ico` (6 tamanhos) embutido no `.exe` pelo próprio Godot (`modify_resources=true`, sem rcedit). Verificado: as 6 imagens estão presentes no executável.
+- **Tempo de carga medido:** mundo construído em ~235 ms (92 cristais; 369 malhas mescladas).
+- **Pré-aquecimento de shaders:** tela "Carregando cavernas…" por 5 quadros enquanto a câmera enxerga as 4 regiões, para o driver compilar os shaders antes do jogo (evita travadas na 1ª entrada em cada região no renderizador Compatibility).
+- **Correção:** com save existente, o menu tinha 5 botões e o "Sair" era cortado na base da tela a 720p; layout compactado.

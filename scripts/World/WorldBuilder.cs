@@ -29,6 +29,7 @@ public partial class WorldBuilder : Node3D
 
     void Build()
     {
+        ulong t0 = Time.GetTicksMsec();
         var regions = GameData.Regions;
         for (int i = 0; i < regions.Count; i++)
         {
@@ -49,6 +50,7 @@ public partial class WorldBuilder : Node3D
         foreach (Node c in GetChildren())
             if (c.GetType() == typeof(Node3D)) saved += StaticBatcher.Batch((Node3D)c);
         GD.Print($"[World] Agrupamento estático: {saved} instâncias de malha a menos");
+        GD.Print($"[World] Mundo construído em {Time.GetTicksMsec() - t0} ms ({Crystals.Count} cristais)");
     }
 
     // =================== Salas ===================

@@ -116,7 +116,30 @@ public partial class Main : Node
         GameState.Instance.RegionsChanged += () => GameState.Instance.CheckCompletion();
         GameState.Instance.MaterialDiscovered += _ => GameState.Instance.CheckCompletion();
 
+        Boot(args);
+    }
+
+    /// <summary>
+    /// Inicialização: tela "Carregando…" enquanto todas as regiões são desenhadas por alguns quadros
+    /// (pré-compila shaders na GPU e evita travadas ao entrar em regiões novas), depois o menu.
+    /// </summary>
+    bool _booting = true;
+
+    async void Boot(string[] args)
+    {
+        var loading = BuildLoadingOverlay();
+        foreach (var r in World.RegionRoots) r.Visible = true;
+        _menuCam.Current = true;
+        _menuCam.Far = 420f;
+        _menuCam.GlobalPosition = new Vector3(0, 9f, 34f);
+        _menuCam.LookAt(new Vector3(0, 2f, -150f), Vector3.Up);
+        Effects.Instance?.Burst(new Vector3(0, 2, 10), Colors.White, 1f); // compila partículas
+        for (int i = 0; i < 5; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        _menuCam.Far = 120f;
+        loading.QueueFree();
+        _booting = false;
         ShowMenu();
+
 
         if (args.Contains("--autostart")) StartGame(false);
         var shots = args.FirstOrDefault(a => a.StartsWith("--shots="));
@@ -128,6 +151,27 @@ public partial class Main : Node
             if (bot.Contains('=') && float.TryParse(bot.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture, out float mins)) b.MaxGameMinutes = mins;
             AddChild(b);
         }
+    }
+
+    CanvasLayer BuildLoadingOverlay()
+    {
+        var layer = new CanvasLayer { Layer = 50 };
+        AddChild(layer);
+        var bg = new ColorRect { Color = new Color(0.02f, 0.03f, 0.06f, 1f) };
+        bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        layer.AddChild(bg);
+        var center = new CenterContainer();
+        center.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        layer.AddChild(center);
+        var v = new VBoxContainer();
+        v.AddThemeConstantOverride("separation", 12);
+        center.AddChild(v);
+        var icon = HudIcon.Make(HudIcon.Kind.Gem, UiTheme.Cyan, 64);
+        icon.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        v.AddChild(icon);
+        v.AddChild(UiTheme.Label("CRYSTAL EXCAVATOR", 34, UiTheme.Cyan, true, HorizontalAlignment.Center));
+        v.AddChild(UiTheme.Label("Carregando cavernas…", 18, UiTheme.Muted, false, HorizontalAlignment.Center));
+        return layer;
     }
 
     public override void _ExitTree()
@@ -329,6 +373,7 @@ public partial class Main : Node
     public override void _Process(double delta)
     {
         if (World == null) return;
+        if (_booting) return;
         if (CurrentMode == Mode.Menu)
         {
             _menuT += (float)delta * 0.08f;

@@ -32,19 +32,19 @@ public partial class MainMenu : CanvasLayer
         _root.AddChild(shade);
 
         var left = new VBoxContainer();
-        UiTheme.Place(left, Control.LayoutPreset.CenterLeft, new Vector2(90, -230));
-        left.AddThemeConstantOverride("separation", 10);
+        UiTheme.Place(left, Control.LayoutPreset.CenterLeft, new Vector2(90, -305));
+        left.AddThemeConstantOverride("separation", 6);
         _root.AddChild(left);
 
-        _title = UiTheme.Shadowed(UiTheme.Label("CRYSTAL", 86, UiTheme.Cyan, true), 14);
+        _title = UiTheme.Shadowed(UiTheme.Label("CRYSTAL", 76, UiTheme.Cyan, true), 14);
         left.AddChild(_title);
-        var t2 = UiTheme.Shadowed(UiTheme.Label("EXCAVATOR", 58, UiTheme.Violet, true), 12);
+        var t2 = UiTheme.Shadowed(UiTheme.Label("EXCAVATOR", 52, UiTheme.Violet, true), 12);
         left.AddChild(t2);
         left.AddChild(UiTheme.Shadowed(UiTheme.Label("Minere. Venda. Evolua. Desça mais fundo.", 20, UiTheme.Muted), 6));
-        left.AddChild(UiTheme.Spacer(26));
+        left.AddChild(UiTheme.Spacer(14));
 
         _buttons = new VBoxContainer();
-        _buttons.AddThemeConstantOverride("separation", 10);
+        _buttons.AddThemeConstantOverride("separation", 8);
         left.AddChild(_buttons);
         _continue = Make("Continuar", () => OnContinue?.Invoke());
         Make("Novo jogo", () => OnNewGame?.Invoke());
@@ -63,7 +63,7 @@ public partial class MainMenu : CanvasLayer
     Button Make(string text, Action a)
     {
         var b = UiTheme.Button(text, a, 320, 24);
-        b.CustomMinimumSize = new Vector2(320, 56);
+        b.CustomMinimumSize = new Vector2(340, 50);
         b.Alignment = HorizontalAlignment.Left;
         _buttons.AddChild(b);
         return b;
