@@ -139,6 +139,7 @@ public partial class Main : Node
     {
         CurrentMode = Mode.Menu;
         GameState.Instance.IsPlaying = false;
+        AudioManager.Instance?.SetBeam(false);
         Events?.ResetAll();
         GetTree().Paused = false;
         Input.MouseMode = Input.MouseModeEnum.Visible;
@@ -222,6 +223,7 @@ public partial class Main : Node
     {
         if (CurrentMode != Mode.Playing || _pause.IsOpen) return;
         GetTree().Paused = true;
+        AudioManager.Instance?.SetBeam(false);
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _pause.Open();
     }

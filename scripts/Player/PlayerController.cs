@@ -256,6 +256,7 @@ public partial class PlayerController : CharacterBody3D
     void UpdateBeam(GameState gs, bool firing)
     {
         Tool.Firing = firing;
+        AudioManager.Instance?.SetBeam(firing, TargetCrystal != null ? 1f - TargetCrystal.HpRatio : 0f);
         if (!firing) return;
         float reach = gs.MiningReach + 0.6f;
         var hit = RayCast(reach, WorldLayer | CrystalLayer);

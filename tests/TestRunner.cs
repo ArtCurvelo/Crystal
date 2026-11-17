@@ -290,6 +290,9 @@ public partial class TestRunner : Node
 
     void TestAudio()
     {
+        // feixe: liga e desliga sem erro
+        Audio.AudioManager.Instance.SetBeam(true, 0.5f);
+        Audio.AudioManager.Instance.SetBeam(false);
         var peaks = Audio.AudioManager.Instance.PeakLevels();
         Check(peaks.Count >= 15, "efeitos sonoros sintetizados");
         foreach (var kv in peaks)

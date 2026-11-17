@@ -154,6 +154,31 @@ public partial class Effects : Node3D
         Burst(pos + Vector3.Up * 0.5f, color.Lightened(0.4f), 1.6f);
     }
 
+    readonly List<OmniLight3D> _flashes = new();
+    int _flashIdx;
+
+    /// <summary>Clarão breve de luz na quebra de um cristal (pool de 3 luzes; desligado na qualidade Baixa).</summary>
+    public void Flash(Vector3 pos, Color color, float strength = 1f)
+    {
+        if (Settings.Quality == GraphicsQuality.Low) return;
+        if (_flashes.Count == 0)
+            for (int i = 0; i < 3; i++)
+            {
+                var l = new OmniLight3D { Visible = false, ShadowEnabled = false, OmniRange = 6f };
+                AddChild(l);
+                _flashes.Add(l);
+            }
+        var f = _flashes[_flashIdx++ % _flashes.Count];
+        f.GlobalPosition = pos;
+        f.LightColor = color;
+        f.OmniRange = 5f * strength;
+        f.LightEnergy = 4f * strength;
+        f.Visible = true;
+        var tw = f.CreateTween();
+        tw.TweenProperty(f, "light_energy", 0f, 0.35f).SetEase(Tween.EaseType.Out);
+        tw.TweenCallback(Callable.From(() => f.Visible = false));
+    }
+
     public void FloatText(Vector3 pos, string text, Color color, float size = 1f)
     {
         var l = _textPool[_textIdx++ % _textPool.Count];

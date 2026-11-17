@@ -38,6 +38,9 @@ public partial class AudioManager : Node
             AddChild(p);
             _pool.Add(p);
         }
+        var beam = BuildBeamLoop();
+        _beam = new AudioStreamPlayer { Bus = "SFX", Stream = beam, VolumeDb = -80 };
+        AddChild(_beam);
         _musicA = new AudioStreamPlayer { Bus = "Music", VolumeDb = -80 };
         _musicB = new AudioStreamPlayer { Bus = "Music", VolumeDb = -80 };
         AddChild(_musicA);
@@ -76,6 +79,28 @@ public partial class AudioManager : Node
     }
 
     /// <summary>Troca a trilha ambiente com crossfade (uma por região, -1 = menu).</summary>
+    AudioStreamPlayer _beam;
+    float _beamTarget = -80f;
+
+    /// <summary>Zumbido contínuo do feixe (loop). intensity 0..1 eleva o tom conforme o cristal racha.</summary>
+    public void SetBeam(bool on, float intensity = 0f)
+    {
+        if (_beam == null) return;
+        _beamTarget = on ? -15f : -80f;
+        if (on)
+        {
+            if (!_beam.Playing) _beam.Play();
+            _beam.PitchScale = 0.9f + intensity * 0.5f;
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_beam == null) return;
+        _beam.VolumeDb = Mathf.MoveToward(_beam.VolumeDb, _beamTarget, (float)delta * 240f);
+        if (_beamTarget < -70f && _beam.VolumeDb <= -79f && _beam.Playing) _beam.Stop();
+    }
+
     public void PlayMusic(int track)
     {
         if (track == _currentTrack) return;
@@ -220,6 +245,33 @@ public partial class AudioManager : Node
             MixRate = MixRate,
             Stereo = false,
             Data = data,
+        };
+    }
+
+    /// <summary>Zumbido de feixe em loop perfeito (frequências múltiplas do período).</summary>
+    AudioStreamWav BuildBeamLoop()
+    {
+        const float len = 0.5f;
+        int n = (int)(len * MixRate);
+        var data = new byte[n * 2];
+        uint seed = 4242;
+        float lp = 0;
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)MixRate;
+            // 110/220/330 Hz completam ciclos inteiros em 0,5 s → loop sem estalo
+            float s = MathF.Sin(Tau * 110 * t) * 0.35f + MathF.Sin(Tau * 220 * t) * 0.22f + MathF.Sin(Tau * 330 * t + MathF.Sin(Tau * 6 * t)) * 0.12f;
+            seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+            lp += (((seed / (float)uint.MaxValue) * 2 - 1) - lp) * 0.3f;
+            s = (s + lp * 0.12f) * (0.85f + 0.15f * MathF.Sin(Tau * 8 * t));
+            short v = (short)(Math.Clamp(s * 0.8f, -1f, 1f) * 30000);
+            data[i * 2] = (byte)(v & 0xFF);
+            data[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
+        }
+        return new AudioStreamWav
+        {
+            Format = AudioStreamWav.FormatEnum.Format16Bits, MixRate = MixRate, Stereo = false, Data = data,
+            LoopMode = AudioStreamWav.LoopModeEnum.Forward, LoopBegin = 0, LoopEnd = n,
         };
     }
 

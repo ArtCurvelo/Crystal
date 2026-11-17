@@ -243,6 +243,7 @@ public partial class Crystal : StaticBody3D
         Hp = 0;
         var center = GlobalPosition + Vector3.Up * 0.7f * (Material.Special ? 2.6f : SizeScale);
         Effects.Instance?.Burst(center, Material.Glow.Lightened(0.2f), Material.Special ? 2.5f : 1f);
+        Effects.Instance?.Flash(center, Material.Glow, Material.Special ? 3f : 1f);
         AudioManager.Instance?.Play("break", -2f, Material.Special ? 0.7f : 1f, 0.08f);
         if (Material.Rare || Material.Special) AudioManager.Instance?.Play("rare", -4f);
 
@@ -260,6 +261,9 @@ public partial class Crystal : StaticBody3D
     void BeginRegrow()
     {
         State = CrystalState.Growing;
+        var cam = GetViewport()?.GetCamera3D();
+        if (cam != null && IsVisibleInTree() && cam.GlobalPosition.DistanceTo(GlobalPosition) < 12f)
+            AudioManager.Instance?.Play("respawn", -10f, 1f, 0.1f);
         var next = PickMaterial?.Invoke(_rng) ?? Material;
         SetMaterial(next);
         _visual.Visible = true;

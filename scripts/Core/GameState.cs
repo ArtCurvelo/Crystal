@@ -26,6 +26,7 @@ public partial class GameState : Node
     public event Action<string, string, NotifyKind> Notified;
     public event Action<MaterialDef> MaterialDiscovered;
     public event Action<long> Sold;
+    public event Action<bool> Saved; // (automático)
     public event Action<string> BigMessage; // anúncios de destaque no centro da tela
 
     public const float AutosaveInterval = 45f;
@@ -217,7 +218,7 @@ public partial class GameState : Node
     {
         BeforeSave?.Invoke(Data);
         bool ok = SaveSystem.Save(Data);
-        if (ok) LastSaveTime = Time.GetTicksMsec() / 1000.0;
+        if (ok) { LastSaveTime = Time.GetTicksMsec() / 1000.0; Saved?.Invoke(auto); }
         if (!auto || !ok)
             Notify(ok ? "Jogo salvo" : "Erro ao salvar", ok ? "Progresso gravado com sucesso." : "Verifique o espaço em disco.",
                 ok ? NotifyKind.Success : NotifyKind.Warning);

@@ -44,6 +44,7 @@ public partial class Hud : CanvasLayer
     ProgressBar _eventBar;
     World.RegionEvents.EventDef _shownEvent;
 
+    Label _saveIcon;
     long _displayMoney, _shownMoney, _gainAccum;
     float _gainTimer, _fullFlash;
     double _lastFullWarn = -100;
@@ -71,6 +72,7 @@ public partial class Hud : CanvasLayer
         gs.RegionsChanged += RefreshObjective;
         gs.Notified += OnNotified;
         gs.BigMessage += OnBigMessage;
+        gs.Saved += OnSaved;
         ResetMoneyDisplay();
     }
 
@@ -85,6 +87,16 @@ public partial class Hud : CanvasLayer
         gs.RegionsChanged -= RefreshObjective;
         gs.Notified -= OnNotified;
         gs.BigMessage -= OnBigMessage;
+        gs.Saved -= OnSaved;
+    }
+
+    void OnSaved(bool auto)
+    {
+        if (!IsInsideTree()) return;
+        var tw = _saveIcon.CreateTween();
+        tw.TweenProperty(_saveIcon, "modulate:a", 1f, 0.2f);
+        tw.TweenInterval(1.2f);
+        tw.TweenProperty(_saveIcon, "modulate:a", 0f, 0.5f);
     }
 
     // ============================ Construção ============================
@@ -314,6 +326,11 @@ public partial class Hud : CanvasLayer
         _keys = UiTheme.Shadowed(UiTheme.Label("[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [Esc] Pausa", 14, UiTheme.Muted, false, HorizontalAlignment.Center));
         UiTheme.Place(_keys, Control.LayoutPreset.CenterBottom, new Vector2(-300, -30), new Vector2(600, 0));
         _root.AddChild(_keys);
+
+        _saveIcon = UiTheme.Shadowed(UiTheme.Label("◆ Salvando…", 14, UiTheme.Cyan));
+        _saveIcon.Modulate = new Color(1, 1, 1, 0);
+        UiTheme.Place(_saveIcon, Control.LayoutPreset.BottomLeft, new Vector2(24, -112));
+        _root.AddChild(_saveIcon);
 
         _fps = UiTheme.Shadowed(UiTheme.Label("", 14, UiTheme.Success));
         UiTheme.Place(_fps, Control.LayoutPreset.BottomRight, new Vector2(-90, -164));
