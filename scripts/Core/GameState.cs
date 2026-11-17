@@ -104,7 +104,7 @@ public partial class GameState : Node
         {
             Data.Discovered.Add(materialId);
             MaterialDiscovered?.Invoke(def);
-            Notify(def.Rare || def.Special ? "Material raro descoberto!" : "Novo material descoberto",
+            Notify(def.Rarity >= Rarity.Epico ? $"Material {RarityInfo.Name(def.Rarity)} descoberto!" : "Novo material descoberto",
                 $"{def.Name} — {FormatMoney(SellPrice(def))} por fragmento",
                 def.Rare || def.Special ? NotifyKind.Rare : NotifyKind.Info);
         }

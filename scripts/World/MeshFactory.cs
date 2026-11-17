@@ -28,13 +28,25 @@ public static class MeshFactory
             top[i] = new Vector3(MathF.Cos(a) * radius, body, MathF.Sin(a) * radius);
         }
         var tip = new Vector3(0, height, 0);
+        // UV.x = ângulo (0..1), UV.y = altura relativa (0..1): usados pelo shader mesmo após mesclar prismas
+        void V(Vector3 p, Color c, float u)
+        {
+            st.SetColor(c);
+            st.SetUV(new Vector2(u, p.Y / height));
+            st.AddVertex(p);
+        }
+        var low = new Color(0.55f, 0.55f, 0.55f);
+        var high = new Color(1, 1, 1);
+        var tipC = new Color(1.25f, 1.25f, 1.25f);
         for (int i = 0; i < sides; i++)
         {
             int j = (i + 1) % sides;
-            // laterais (cor de vértice escurece na base para dar profundidade)
-            Quad(st, bottom[i], bottom[j], top[j], top[i], new Color(0.55f, 0.55f, 0.55f), new Color(1, 1, 1));
+            float ui = (float)i / sides, uj = (float)(i + 1) / sides;
+            // laterais (ordem igual a Tri/Quad: a, c, b)
+            V(bottom[i], low, ui); V(top[j], high, uj); V(bottom[j], low, uj);
+            V(bottom[i], low, ui); V(top[i], high, ui); V(top[j], high, uj);
             // ponta
-            Tri(st, top[i], top[j], tip, new Color(1, 1, 1), new Color(1, 1, 1), new Color(1.25f, 1.25f, 1.25f));
+            V(top[i], high, ui); V(tip, tipC, (ui + uj) * 0.5f); V(top[j], high, uj);
         }
         st.GenerateNormals();
         var mesh = st.Commit();

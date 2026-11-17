@@ -559,8 +559,8 @@ public partial class Hud : CanvasLayer
         {
             var m = c.Material;
             _targetName.Text = m.Name;
-            _targetRarity.Text = m.Special ? "✦ Formação Especial" : m.Rare ? "★ Raro" : "Comum";
-            _targetRarity.AddThemeColorOverride("font_color", m.Special || m.Rare ? UiTheme.Gold : UiTheme.Muted);
+            _targetRarity.Text = RarityInfo.Badge(m.Rarity) + (m.Special ? " · Formação Especial" : m.Rare ? " · Veio raro" : "");
+            _targetRarity.AddThemeColorOverride("font_color", RarityInfo.Color(m.Rarity));
             _brackets.Color = m.Glow.Lightened(0.3f);
             _brackets.QueueRedraw();
             float pct = 1f - c.HpRatio;

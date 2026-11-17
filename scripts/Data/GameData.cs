@@ -4,6 +4,28 @@ using Godot;
 
 namespace CrystalExcavator.Data;
 
+/// <summary>Raridade de jogo (valor/frequência), exibida com cor e selo.</summary>
+public enum Rarity { Comum, Incomum, Raro, Epico, Lendario }
+
+public static class RarityInfo
+{
+    public static string Name(Rarity r) => r switch
+    {
+        Rarity.Comum => "Comum", Rarity.Incomum => "Incomum", Rarity.Raro => "Raro", Rarity.Epico => "Épico", _ => "Lendário",
+    };
+
+    public static Color Color(Rarity r) => r switch
+    {
+        Rarity.Comum => new Color(0.85f, 0.88f, 0.95f),
+        Rarity.Incomum => new Color(0.35f, 1f, 0.45f),
+        Rarity.Raro => new Color(0.3f, 0.8f, 1f),
+        Rarity.Epico => new Color(0.75f, 0.45f, 1f),
+        _ => new Color(1f, 0.8f, 0.25f),
+    };
+
+    public static string Badge(Rarity r) => (r == Rarity.Lendario ? "★ " : "◆ ") + Name(r);
+}
+
 /// <summary>Definição imutável de um material minerável.</summary>
 public sealed class MaterialDef
 {
@@ -19,6 +41,7 @@ public sealed class MaterialDef
     public bool Rare;
     public bool Special;       // formação especial (ex.: Coração Ancestral)
     public float RespawnSeconds = 25f;
+    public Rarity Rarity = Rarity.Comum;
 }
 
 public sealed class SpawnEntry
@@ -100,70 +123,70 @@ public static class GameData
         // ---------------- Materiais ----------------
         Add(new MaterialDef
         {
-            Id = "quartz", Name = "Quartzo Lúmen", Value = 3, Hp = 24,
+            Id = "quartz", Rarity = Rarity.Comum, Name = "Quartzo Lúmen", Value = 3, Hp = 24,
             Description = "Cristal comum que brilha com luz suave.",
             Color = new Color(0.55f, 0.95f, 1.0f), Glow = new Color(0.25f, 0.85f, 1.0f),
             ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 18
         });
         Add(new MaterialDef
         {
-            Id = "amethyst", Name = "Ametista Cintilante", Value = 8, Hp = 60,
+            Id = "amethyst", Rarity = Rarity.Incomum, Name = "Ametista Cintilante", Value = 8, Hp = 60,
             Description = "Mais densa, vibra quando atingida.",
             Color = new Color(0.72f, 0.45f, 1.0f), Glow = new Color(0.6f, 0.25f, 1.0f),
             ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 24
         });
         Add(new MaterialDef
         {
-            Id = "sunstone", Name = "Lágrima Solar", Value = 60, Hp = 110, Rare = true,
+            Id = "sunstone", Rarity = Rarity.Epico, Name = "Lágrima Solar", Value = 60, Hp = 110, Rare = true,
             Description = "Raríssima. Aquece a palma da mão.",
             Color = new Color(1.0f, 0.85f, 0.35f), Glow = new Color(1.0f, 0.65f, 0.1f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 40
         });
         Add(new MaterialDef
         {
-            Id = "sapphire", Name = "Safira Prismática", Value = 26, Hp = 240,
+            Id = "sapphire", Rarity = Rarity.Incomum, Name = "Safira Prismática", Value = 26, Hp = 240,
             Description = "Refrata a luz em feixes azuis.",
             Color = new Color(0.3f, 0.55f, 1.0f), Glow = new Color(0.15f, 0.35f, 1.0f),
             ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 24
         });
         Add(new MaterialDef
         {
-            Id = "emerald", Name = "Esmeralda Refrativa", Value = 55, Hp = 480,
+            Id = "emerald", Rarity = Rarity.Raro, Name = "Esmeralda Refrativa", Value = 55, Hp = 480,
             Description = "Cresce em veios sob a névoa fria.",
             Color = new Color(0.3f, 1.0f, 0.6f), Glow = new Color(0.1f, 0.9f, 0.45f),
             ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 28
         });
         Add(new MaterialDef
         {
-            Id = "starprism", Name = "Prisma Estelar", Value = 420, Hp = 900, Rare = true,
+            Id = "starprism", Rarity = Rarity.Epico, Name = "Prisma Estelar", Value = 420, Hp = 900, Rare = true,
             Description = "Contém pontos de luz como um céu noturno.",
             Color = new Color(1.0f, 0.55f, 0.95f), Glow = new Color(1.0f, 0.35f, 0.9f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 45
         });
         Add(new MaterialDef
         {
-            Id = "ruby", Name = "Rubi Nuclear", Value = 160, Hp = 2200,
+            Id = "ruby", Rarity = Rarity.Raro, Name = "Rubi Nuclear", Value = 160, Hp = 2200,
             Description = "Pulsa no ritmo do núcleo do planeta.",
             Color = new Color(1.0f, 0.3f, 0.3f), Glow = new Color(1.0f, 0.12f, 0.1f),
             ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 26
         });
         Add(new MaterialDef
         {
-            Id = "ancestralite", Name = "Ancestralita", Value = 340, Hp = 4500,
+            Id = "ancestralite", Rarity = Rarity.Epico, Name = "Ancestralita", Value = 340, Hp = 4500,
             Description = "Mineral antigo com runas naturais.",
             Color = new Color(1.0f, 0.62f, 0.25f), Glow = new Color(1.0f, 0.45f, 0.05f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 30
         });
         Add(new MaterialDef
         {
-            Id = "voidpearl", Name = "Pérola do Vazio", Value = 2600, Hp = 8000, Rare = true,
+            Id = "voidpearl", Rarity = Rarity.Lendario, Name = "Pérola do Vazio", Value = 2600, Hp = 8000, Rare = true,
             Description = "Absorve a luz ao redor. Valor incalculável.",
             Color = new Color(0.85f, 0.95f, 1.0f), Glow = new Color(0.55f, 0.4f, 1.0f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 55
         });
         Add(new MaterialDef
         {
-            Id = "heart", Name = "Coração Ancestral", Value = 2200, Hp = 600000, Special = true,
+            Id = "heart", Rarity = Rarity.Lendario, Name = "Coração Ancestral", Value = 2200, Hp = 600000, Special = true,
             Description = "Formação especial colossal. Libera uma chuva de fragmentos.",
             Color = new Color(1.0f, 0.95f, 0.75f), Glow = new Color(1.0f, 0.55f, 0.2f),
             ShardsMin = 18, ShardsMax = 24, RespawnSeconds = 120

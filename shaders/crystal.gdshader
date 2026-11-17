@@ -50,12 +50,12 @@ vec2 voronoi(vec2 x) {
 void fragment() {
 	vec3 n = normalize(NORMAL);
 	float fres = pow(1.0 - clamp(dot(n, normalize(VIEW)), 0.0, 1.0), 2.2);
-	float h = clamp(lpos.y, 0.0, 1.0);
+	float h = clamp(UV.y, 0.0, 1.0);
 	vec3 facet = base_color.rgb * COLOR.rgb;
 	ALBEDO = facet * (0.45 + 0.55 * h);
 
 	// rachaduras: projeção lateral (xz/y) para cobrir o prisma
-	vec2 uv = vec2(atan(lpos.z, lpos.x) * 0.9, lpos.y * 2.2) * 2.4 + seed;
+	vec2 uv = vec2(UV.x * 5.6, UV.y * 2.2) * 2.4 + seed;
 	vec2 v = voronoi(uv);
 	float reveal = step(v.y, damage * 1.15);
 	float width = 0.025 + 0.06 * damage;

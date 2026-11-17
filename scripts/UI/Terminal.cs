@@ -389,9 +389,12 @@ public partial class SellScreen : TerminalScreen
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 10);
             row.AddChild(HudIcon.Make(HudIcon.Kind.Gem, m.Glow.Lightened(0.15f), 24));
-            var n = UiTheme.Label(m.Name + (m.Rare ? " ★" : m.Special ? " ✦" : ""), 18, m.Glow.Lightened(0.4f), true);
-            n.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            var n = UiTheme.Label(m.Name, 18, m.Glow.Lightened(0.4f), true);
             row.AddChild(n);
+            var rb = UiTheme.Label(RarityInfo.Badge(m.Rarity), 13, RarityInfo.Color(m.Rarity), true);
+            rb.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            rb.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+            row.AddChild(rb);
             row.AddChild(UiTheme.Label($"{kv.Value} × {GameState.FormatMoney(gs.SellPrice(m))}", 16, UiTheme.Muted));
             var sub = UiTheme.Label(GameState.FormatMoney(gs.SellPrice(m) * kv.Value), 18, UiTheme.Gold, true, HorizontalAlignment.Right);
             sub.CustomMinimumSize = new Vector2(130, 0);

@@ -265,7 +265,7 @@ public partial class CodexScreen : ModalScreen
     {
         var gs = GameState.Instance;
         var card = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(410, 0) };
-        var border = known ? new Color(m.Glow, 0.7f) : new Color(1, 1, 1, 0.1f);
+        var border = known ? new Color(RarityInfo.Color(m.Rarity), 0.8f) : new Color(1, 1, 1, 0.1f);
         card.AddThemeStyleboxOverride("panel", UiTheme.Box(UiTheme.Card, border, 12, 2, 12));
         var h = new HBoxContainer();
         h.AddThemeConstantOverride("separation", 12);
@@ -277,8 +277,15 @@ public partial class CodexScreen : ModalScreen
         var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         v.AddThemeConstantOverride("separation", 1);
         h.AddChild(v);
-        string tag = m.Special ? "  ESPECIAL" : m.Rare ? "  RARO" : "";
-        v.AddChild(UiTheme.Label(known ? m.Name + tag : "???" + tag, 18, known ? m.Glow.Lightened(0.35f) : UiTheme.Muted, true));
+        var titleRow = new HBoxContainer();
+        titleRow.AddThemeConstantOverride("separation", 10);
+        v.AddChild(titleRow);
+        titleRow.AddChild(UiTheme.Label(known ? m.Name : "???", 18, known ? m.Glow.Lightened(0.35f) : UiTheme.Muted, true));
+        var badge = new PanelContainer();
+        badge.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.02f, 0.03f, 0.06f, 0.9f), RarityInfo.Color(m.Rarity), 6, 1, 8, 1));
+        badge.AddChild(UiTheme.Label(RarityInfo.Badge(m.Rarity), 12, RarityInfo.Color(m.Rarity), true));
+        badge.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        titleRow.AddChild(badge);
         var desc = UiTheme.Label(known ? m.Description : $"Encontrado em: {r.Name}", 14, UiTheme.Muted);
         desc.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         desc.CustomMinimumSize = new Vector2(320, 0);
