@@ -189,8 +189,8 @@ public static class GameData
         {
             Id = "depths", Index = 1, Name = "Profundezas Prismáticas",
             Subtitle = "Névoa gelada e cristais resistentes.", UnlockCost = 6000,
-            AmbientColor = new Color(0.2f, 0.45f, 0.6f), AmbientEnergy = 0.5f,
-            FogColor = new Color(0.05f, 0.14f, 0.2f), FogDensity = 0.035f,
+            AmbientColor = new Color(0.3f, 0.55f, 0.75f), AmbientEnergy = 0.7f,
+            FogColor = new Color(0.06f, 0.16f, 0.24f), FogDensity = 0.028f,
             RockColor = new Color(0.16f, 0.25f, 0.33f), AccentColor = new Color(0.3f, 1.0f, 0.7f),
             LightColor = new Color(0.4f, 1.0f, 0.85f),
             RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 22,

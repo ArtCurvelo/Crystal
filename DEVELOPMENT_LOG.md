@@ -113,3 +113,7 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - Correção técnica: `Basis.Scaled()` escala nos eixos globais; criado `ScaleLocal()` para transformações corretas.
 - Custo (qualidade Baixa, 720p): 298–344 draw calls, 16–26 mil primitivas (antes 200–270).
 - Testes: 150/150. Bot: SUCESSO (Região 2 em 7,3 min, Região 3 em 28,8 min, Coração em 34,5 min).
+- **Terminal no estilo do conceito**: abas Melhorias/Vender, painel de inventário com gemas e valores, botão de venda rápida, linhas de upgrade com barra segmentada, "Nv X ▶ Nv Y" e preços em destaque dourado. A troca de abas está coberta pelo bot.
+- **Tema global chanfrado** (menus, pausa, configurações) com paleta azul-marinho e ciano.
+- **Formações gigantes de cristal** decorativas (MultiMesh com o shader de cristal) nas três regiões; Profundezas mais claras.
+- Testes: 150/150. Bot: SUCESSO.

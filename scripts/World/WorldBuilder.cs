@@ -103,15 +103,18 @@ public partial class WorldBuilder : Node3D
                 Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 2f), r.Height * 0.9f, 2f, Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
                 Decor.Mushrooms(root, r, rng, low ? 5 : 9, new Color(0.3f, 1f, 0.9f));
                 Decor.Ferns(root, r, rng, low ? 6 : 12, new Color(0.95f, 0.42f, 0.15f));
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) });
                 break;
             case "depths":
                 Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 8f), r.Height, 3.2f, Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
                 Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ + 6f), r.Height, 2.4f, -Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
                 Decor.Mushrooms(root, r, rng, low ? 4 : 8, new Color(0.4f, 0.6f, 1f));
                 Decor.Ferns(root, r, rng, low ? 4 : 8, new Color(0.2f, 0.7f, 0.6f));
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) });
                 break;
             case "core":
                 Decor.AncientRuins(root, r, rng);
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) });
                 break;
         }
     }

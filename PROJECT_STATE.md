@@ -29,10 +29,16 @@ scripts/
     UiBus.cs       Eventos mundo → UI (abrir loja/venda).
     Main.cs        Fluxo Menu/Jogo/Pausa, região atual, culling de regiões.
   Data/GameData.cs Definições: materiais, regiões, upgrades (balanceamento centralizado aqui).
-  Player/          PlayerController (FPS, mineração, interação), ToolView (picareta procedural), IInteractable.
+  Player/          PlayerController (FPS, mineração, ressonância, interação), ToolView (escavadeira de feixe procedural + feixe), IInteractable.
+shaders/
+  crystal.gdshader   Cristal facetado + fresnel + rachaduras Voronoi controladas por `damage`.
+  waterfall.gdshader Cachoeira aditiva com faixas animadas.
   Mining/          Crystal (vida, reações, quebra, renascimento), ShardManager (fragmentos + ímã), Effects (pool de partículas e textos).
-  World/           WorldBuilder (mundo procedural), Stations (Venda, Terminal, Portão), EnvironmentController (névoa/ambiente por região), MeshFactory.
-  UI/              UiTheme (estilo), Hud, Menus (Loja, Venda, Configurações, Pausa, Confirmação), MainMenu.
+  World/           WorldBuilder (mundo procedural), Decor (posto, cachoeiras, flora, ruínas, formações gigantes),
+                   RegionEvents (eventos ambientais), Stations (Venda, Terminal, Portão),
+                   EnvironmentController (névoa/ambiente por região + sobreposição de evento), MeshFactory (+ BasisExt.ScaleLocal).
+  UI/              UiTheme (estilo chanfrado sci-fi), Hud (HUD completo + Crosshair), HudIcon (ícones vetoriais + BracketFrame),
+                   Terminal (ShopScreen/SellScreen com abas, SegmentBar), Menus (Configurações, Pausa, Confirmação, Coleção, Como jogar), MainMenu.
   Audio/AudioManager.cs  Autoload. Síntese de efeitos e trilhas em loop.
 tests/
   TestRunner.cs    Suíte automatizada (--run-tests).

@@ -222,6 +222,53 @@ public static class Decor
         }
     }
 
+    /// <summary>Formações gigantes de cristal (decorativas) junto às paredes, com o shader de cristal.</summary>
+    public static void GiantClusters(Node3D root, RegionDef r, Random rng, int count, Color[] palette)
+    {
+        var shader = GD.Load<Shader>("res://shaders/crystal.gdshader");
+        var mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.3f);
+        foreach (var col in palette)
+        {
+            var mat = new ShaderMaterial { Shader = shader };
+            mat.SetShaderParameter("base_color", col.Lightened(0.15f));
+            mat.SetShaderParameter("glow_color", col);
+            mat.SetShaderParameter("glow_energy", 1.1f);
+            mat.SetShaderParameter("seed", (float)rng.NextDouble() * 40f);
+            var xf = new List<Transform3D>();
+            for (int c = 0; c < count; c++)
+            {
+                // ponto junto a uma parede lateral ou ao fundo, longe dos túneis
+                Vector3 basePos;
+                int side = rng.Next(3);
+                float t = (float)(rng.NextDouble() * 2 - 1);
+                if (side == 0) basePos = new Vector3(-r.HalfX + 1.2f, 0, r.CenterZ + t * (r.HalfZ - 4));
+                else if (side == 1) basePos = new Vector3(r.HalfX - 1.2f, 0, r.CenterZ + t * (r.HalfZ - 4));
+                else
+                {
+                    float x = (5f + (float)rng.NextDouble() * (r.HalfX - 7f)) * (rng.Next(2) == 0 ? -1 : 1);
+                    basePos = new Vector3(x, 0, r.CenterZ - r.HalfZ + 1.2f);
+                }
+                Vector3 inward = side == 0 ? Vector3.Right : side == 1 ? Vector3.Left : Vector3.Back;
+                int prisms = rng.Next(4, 7);
+                for (int i = 0; i < prisms; i++)
+                {
+                    float h = 2.2f + (float)rng.NextDouble() * (r.Height * 0.45f);
+                    float rad = 0.35f + (float)rng.NextDouble() * 0.45f;
+                    if (i == 0) { h *= 1.3f; rad *= 1.3f; }
+                    var dir = (Vector3.Up * 1.4f + inward * (0.3f + (float)rng.NextDouble() * 0.6f)
+                               + new Vector3((float)rng.NextDouble() - 0.5f, 0, (float)rng.NextDouble() - 0.5f) * 0.9f).Normalized();
+                    var x = dir.Cross(Vector3.Forward).Normalized();
+                    if (x.LengthSquared() < 0.01f) x = Vector3.Right;
+                    var z = x.Cross(dir).Normalized();
+                    var b = new Basis(x, dir, z).ScaleLocal(new Vector3(rad, h, rad));
+                    var off = new Vector3((float)rng.NextDouble() - 0.5f, -0.2f, (float)rng.NextDouble() - 0.5f) * 1.4f;
+                    xf.Add(new Transform3D(b, basePos + off));
+                }
+            }
+            AddMulti(root, mesh, mat, xf);
+        }
+    }
+
     static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms)
     {
         if (xforms.Count == 0) return;
