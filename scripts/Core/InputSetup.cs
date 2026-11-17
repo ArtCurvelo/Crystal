@@ -16,6 +16,7 @@ public static class InputSetup
         Key("move_right", Godot.Key.D, Godot.Key.Right);
         Key("jump", Godot.Key.Space);
         Key("sprint", Godot.Key.Shift);
+        Key("crouch", Godot.Key.C, Godot.Key.Ctrl);
         Key("interact", Godot.Key.E);
         Key("pause", Godot.Key.Escape);
         Key("quick_save", Godot.Key.F5);
@@ -37,6 +38,7 @@ public static class InputSetup
         Pad("interact", JoyButton.X);
         Pad("sprint", JoyButton.LeftShoulder, JoyButton.LeftStick);
         Pad("pause", JoyButton.Start);
+        Pad("crouch", JoyButton.B, JoyButton.RightStick);
         // navegação de menus com o analógico esquerdo, além do D-pad padrão
         Axis("ui_up", JoyAxis.LeftY, -1, false);
         Axis("ui_down", JoyAxis.LeftY, 1, false);
@@ -98,6 +100,6 @@ public static class InputHints
     public static string Interact => UsingPad ? "[X]" : "[E]";
     public static string Back => UsingPad ? "[B]" : "[Esc]";
     public static string Footer => UsingPad
-        ? "[RT] Minerar   [X] Interagir   [LB] Correr   [A] Pular   [Start] Pausa"
-        : "[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [Esc] Pausa";
+        ? "[RT] Minerar   [X] Interagir   [LB] Correr   [A] Pular   [B] Agachar   [Start] Pausa"
+        : "[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [C] Agachar   [Esc] Pausa";
 }

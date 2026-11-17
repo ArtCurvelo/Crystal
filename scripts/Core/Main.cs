@@ -347,11 +347,13 @@ public partial class Main : Node
         {
             var saved = new Vector3(d.PlayerX, Mathf.Max(0.1f, d.PlayerY), d.PlayerZ);
             var region = WorldBuilder.RegionAt(saved);
-            if (gs.IsUnlocked(region.Id) && Mathf.Abs(saved.X) < 40) { pos = saved; yaw = d.PlayerYaw; }
+            // posições de versões antigas (mapa retangular) podem estar dentro da rocha: volta ao elevador
+            if (gs.IsUnlocked(region.Id) && World.IsSafeSpot(saved)) { pos = saved; yaw = d.PlayerYaw; }
         }
         Player.GlobalPosition = pos;
         Player.Velocity = Vector3.Zero;
         Player.SetLook(yaw);
+        PlayerController.SafePoint = World.SpawnPoint + Vector3.Up * 0.5f;
         Player.Camera.Current = true;
         Player.InputEnabled = true;
 
@@ -618,18 +620,37 @@ public partial class Main : Node
         if (CurrentMode == Mode.Menu)
         {
             _menuT += (float)delta * 0.08f;
-            var c = new Vector3(Mathf.Sin(_menuT) * 11f, 3.2f + Mathf.Sin(_menuT * 2.3f) * 0.6f, -2f + Mathf.Cos(_menuT) * 11f);
+            // câmera do menu gira devagar sobre o acampamento
+            var L0 = World.Layouts[0];
+            var cc = L0.OnGround(L0.Camp.A.X, L0.Camp.A.Y);
+            var c = cc + new Vector3(Mathf.Sin(_menuT) * 8f, 3.4f + Mathf.Sin(_menuT * 2.3f) * 0.5f, Mathf.Cos(_menuT) * 8f);
             _menuCam.GlobalPosition = c;
-            _menuCam.LookAt(new Vector3(0, 1.4f, -2f), Vector3.Up);
+            _menuCam.LookAt(cc + new Vector3(0, 1.6f, -3f), Vector3.Up);
             return;
         }
         UpdateRegion(false);
         UpdateDynamicResolution((float)delta);
         _cullTimer -= (float)delta;
-        if (_cullTimer <= 0) { _cullTimer = 0.5f; UpdateRegionCulling(); }
+        if (_cullTimer <= 0) { _cullTimer = 0.5f; UpdateRegionCulling(); CheckSecrets(); }
     }
 
     bool _bannerHouse;
+
+    /// <summary>Descoberta de câmaras secretas (uma vez por save).</summary>
+    void CheckSecrets()
+    {
+        if (Player == null || CurrentMode != Mode.Playing) return;
+        var gs = GameState.Instance;
+        var secret = World.LayoutAt(Player.GlobalPosition).SecretAt(Player.GlobalPosition);
+        if (secret == null || gs.Data.Secrets.Contains(secret.Id)) return;
+        gs.Data.Secrets.Add(secret.Id);
+        int total = 0;
+        foreach (var L in World.Layouts) total += L.Secrets.Count;
+        Hud.ShowBigMessage("PASSAGEM SECRETA!");
+        gs.Notify("Câmara secreta encontrada", $"Depósitos raros escondidos aqui. Câmaras secretas: {gs.Data.Secrets.Count}/{total}", NotifyKind.Rare);
+        AudioManager.Instance?.Play("rare", -2f);
+        gs.SaveGame(true);
+    }
 
     void UpdateRegion(bool instant)
     {

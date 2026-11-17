@@ -29,7 +29,7 @@ public partial class PlaythroughBot : Node
     readonly List<string> _log = new();
     int _errors;
     double _r2 = -1, _r3 = -1, _r4 = -1, _heart = -1;
-    int _sells, _buys, _pulses;
+    int _sells, _buys, _pulses, _missedAims;
 
     public override async void _Ready()
     {
@@ -113,6 +113,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Renascimento: {(_prestiged ? "sim" : "não")} | Região 2 na 2ª jornada: {(_secondR2 > 0 ? $"{_secondR2:0.0} min" : "não alcançada")}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
+        GD.Print($"Miras perdidas: {_missedAims}");
+        if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
         GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
         bool ok = _days >= 2 && _houseBuys > 0 && _skillBuys > 0 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
@@ -143,21 +145,17 @@ public partial class PlaythroughBot : Node
             .FirstOrDefault();
         if (target == null) { await Frames(30); return; }
 
-        float back = target.Material.Special ? 4.2f : 1.7f;
-        var tp = target.GlobalPosition;
-        var dirFlat = new Vector3(P.GlobalPosition.X - tp.X, 0, P.GlobalPosition.Z - tp.Z);
-        if (dirFlat.LengthSquared() < 0.01f) dirFlat = Vector3.Back;
-        P.GlobalPosition = tp + dirFlat.Normalized() * back + Vector3.Up * 0.05f;
+        P.GlobalPosition = target.StandPoint + Vector3.Up * 0.05f;
         P.Velocity = Vector3.Zero;
         await Frames(2);
-        AimAt(tp + Vector3.Up * (target.Material.Special ? 2.0f : 0.6f * target.SizeScale));
+        AimAt(target.Center);
         await Frames(2);
         if (P.TargetCrystal != target)
         {
-            // tenta mirar mais baixo
-            AimAt(tp + Vector3.Up * 0.35f);
+            // tenta mirar mais baixo (perto da base)
+            AimAt(target.GlobalPosition + target.GlobalTransform.Basis.Y.Normalized() * 0.35f);
             await Frames(2);
-            if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); await Frames(5); return; }
+            if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); _missedAims++; await Frames(5); return; }
         }
         bool wasHeart = target.Material.Special;
         Input.ActionPress("mine");
@@ -232,61 +230,73 @@ public partial class PlaythroughBot : Node
         P.SetLook(yaw, pitch);
     }
 
+    /// <summary>
+    /// Caminhada real (física) do elevador até o Reservatório seguindo o caminho principal das cavernas:
+    /// rampas, relevo, túneis com portões e o contorno da Câmara do Coração.
+    /// </summary>
     async Task WalkTest()
     {
-        P.GlobalPosition = Main.World.SpawnPoint;
+        var W = Main.World;
+        var pts = new List<Vector3>();
+        int last = GS.IsUnlocked("abyss") ? 3 : 2;
+        for (int r = 0; r <= last; r++)
+        {
+            var L = W.Layouts[r];
+            var path = L.PathPoints;
+            int n = r == last ? Math.Min(3, path.Count) : path.Count;
+            for (int i = 0; i < n; i++)
+            {
+                var q = path[i];
+                if (L.Heart != null && new Vector2(q.X - L.Heart.A.X, q.Z - L.Heart.A.Y).Length() < 2f)
+                {
+                    // contorna o pedestal do Coração pela esquerda
+                    foreach (float ang in new[] { 90f, 135f, 180f, 225f, 270f })
+                    {
+                        float a = Mathf.DegToRad(ang);
+                        pts.Add(L.OnGround(L.Heart.A.X + Mathf.Cos(a) * 9.5f, L.Heart.A.Y + Mathf.Sin(a) * 9.5f));
+                    }
+                    continue;
+                }
+                pts.Add(L.OnGround(q.X, q.Z));
+            }
+        }
+        P.GlobalPosition = W.SpawnPoint;
         P.Velocity = Vector3.Zero;
-        P.SetLook(0, 0);
         await Frames(5);
         double t0 = GS.Data.PlayTimeSeconds;
-        // pelo corredor central até o Núcleo; se o Reservatório estiver aberto, desvia do pedestal e segue até ele
-        float targetZ = GameData.Regions[2].CenterZ + 12f;
-        Input.ActionPress("move_forward");
+        int idx = 0, stuck = 0, sidesteps = 0;
+        float best = float.MaxValue;
         Input.ActionPress("sprint");
-        int guard = 0;
-        float lastZ = P.GlobalPosition.Z; int stuck = 0;
-        while (P.GlobalPosition.Z > targetZ && guard++ < 60 * 120)
+        for (int guard = 0; idx < pts.Count && guard < 60 * 240; guard++)
         {
-            await Frames(10);
-            if (lastZ - P.GlobalPosition.Z < 0.05f) { if (++stuck > 12) break; } else stuck = 0;
-            lastZ = P.GlobalPosition.Z;
+            var target = pts[idx];
+            var d = new Vector3(target.X - P.GlobalPosition.X, 0, target.Z - P.GlobalPosition.Z);
+            float dist = d.Length();
+            if (dist < 2.5f) { idx++; best = float.MaxValue; stuck = 0; continue; }
+            P.SetLook(Mathf.Atan2(-d.X, -d.Z), 0);
+            Input.ActionPress("move_forward");
+            await Frames(1);
+            if (dist < best - 0.02f) { best = dist; stuck = 0; }
+            else if (++stuck > 90)
+            {
+                // obstáculo (depósito, pedra): desvia para o lado e pula
+                sidesteps++;
+                string side = sidesteps % 2 == 0 ? "move_left" : "move_right";
+                Input.ActionPress(side);
+                Input.ActionPress("jump");
+                await Frames(25);
+                Input.ActionRelease("jump");
+                await Frames(15);
+                Input.ActionRelease(side);
+                stuck = 0; best = float.MaxValue;
+                if (sidesteps > 40) break;
+            }
         }
         Input.ActionRelease("move_forward");
         Input.ActionRelease("sprint");
-        if (P.GlobalPosition.Z <= targetZ && GS.IsUnlocked("abyss"))
-        {
-            // contorna o anel de pilares do Coração (raio ~6 m) pela lateral esquerda
-            float heartZ = GameData.Regions[2].CenterZ - 4f;
-            async Task WalkUntil(float yaw, Func<bool> done)
-            {
-                P.SetLook(yaw, 0);
-                Input.ActionPress("move_forward");
-                for (int i = 0; i < 600 && !done(); i++) await Frames(1);
-                Input.ActionRelease("move_forward");
-            }
-            await WalkUntil(Mathf.Pi / 2, () => P.GlobalPosition.X < -8.5f);          // esquerda (-X)
-            float sideX = P.GlobalPosition.X;
-            await WalkUntil(0, () => P.GlobalPosition.Z < heartZ - 8.5f);             // frente (-Z)
-            await WalkUntil(-Mathf.Pi / 2, () => P.GlobalPosition.X > -0.3f);         // volta ao centro (+X)
-            P.SetLook(0, 0);
-            targetZ = GameData.Regions[3].CenterZ + 10f;
-            Input.ActionPress("move_forward");
-            Input.ActionPress("sprint");
-            guard = 0; stuck = 0; lastZ = P.GlobalPosition.Z;
-            while (P.GlobalPosition.Z > targetZ && guard++ < 60 * 120)
-            {
-                await Frames(10);
-                if (lastZ - P.GlobalPosition.Z < 0.05f) { if (++stuck > 12) break; } else stuck = 0;
-                lastZ = P.GlobalPosition.Z;
-            }
-            Input.ActionRelease("move_forward");
-            Input.ActionRelease("sprint");
-            Log($"Desvio do pedestal (x={sideX:0.0}) e caminhada até o Reservatório");
-        }
         double secs = GS.Data.PlayTimeSeconds - t0;
-        bool ok = P.GlobalPosition.Z <= targetZ;
-        if (!ok) { _errors++; Log($"ERRO: caminhada travou em {P.GlobalPosition}"); }
-        else Log($"Caminhada acampamento → destino: {secs:0.0} s, sem travar (z final {P.GlobalPosition.Z:0.0})");
+        if (idx < pts.Count) { _errors++; Log($"ERRO: caminhada travou no ponto {idx}/{pts.Count} em {P.GlobalPosition}"); }
+        else Log($"Caminhada real elevador → {GameData.Regions[last].Name}: {secs:0.0} s, {pts.Count} pontos, {sidesteps} desvios");
     }
 
     // ---------------- Estações ----------------
@@ -294,7 +304,6 @@ public partial class PlaythroughBot : Node
     {
         var station = RegionRoot(region).GetChildren().OfType<T>().First();
         var front = station.GlobalTransform.Basis.Z.Normalized();
-        if (station is SellStation) front = (new Vector3(0, 0, region.CenterZ) - station.GlobalPosition).Normalized();
         P.GlobalPosition = station.GlobalPosition + new Vector3(front.X, 0, front.Z).Normalized() * 2.2f + Vector3.Up * 0.05f;
         P.Velocity = Vector3.Zero;
         await Frames(2);

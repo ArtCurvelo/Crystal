@@ -387,6 +387,8 @@ public partial class GameState : Node
     public async void QuitClean(int exitCode = 0)
     {
         World.MeshFactory.ClearCaches();
+        World.CaveTerrain.ClearCaches();
+        Mining.ShardManager.ClearCaches();
         GC.Collect();
         GC.WaitForPendingFinalizers();
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);

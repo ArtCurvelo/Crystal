@@ -10,7 +10,8 @@ namespace CrystalExcavator.World;
 
 /// <summary>
 /// Constrói todo o mundo proceduralmente (determinístico por semente):
-/// salas das regiões, túneis, portões, estações, cristais e decoração.
+/// cavernas orgânicas com relevo (CaveLayout + CaveTerrain), túneis com portões,
+/// estações, depósitos no chão e nas paredes, câmaras secretas e decoração.
 /// Decoração usa MultiMesh para manter poucas chamadas de desenho.
 /// </summary>
 public partial class WorldBuilder : Node3D
@@ -18,38 +19,27 @@ public partial class WorldBuilder : Node3D
     public const float TunnelHalfWidth = 3.5f;
     public const float TunnelHeight = 5f;
     public readonly List<Node3D> RegionRoots = new();
+    public readonly List<CaveLayout> Layouts = new();
     public readonly List<Crystal> Crystals = new();
     public readonly List<RegionGate> Gates = new();
     public Vector3 SpawnPoint = new(0, 0.1f, 15f);
     public MineElevator Elevator;
     public PlayerHouse House;
     public SellStation SellStation;
+    int _tick;
 
     public override void _Ready()
     {
         Build();
     }
 
-    /// <summary>Galerias montadas: nó, ponto da abertura (na parede da sala principal) e meia-extensão em X/Z.</summary>
-    readonly List<(Node3D node, Vector3 opening, float cx, float oz, float hx, float hz)> _wings = new();
-    public const float WingViewDistance = 34f;
-    int _cullTick;
-
-    /// <summary>
-    /// Sem oclusão no renderizador Compatibility: o que está atrás das paredes ainda é desenhado.
-    /// Cada galeria só fica visível com a câmera dentro dela ou a até ~34 m da entrada.
-    /// </summary>
     public override void _Process(double delta)
     {
-        if (++_cullTick % 30 == 0) UpdateRespawnRates();
-        if (_wings.Count == 0 || _cullTick % 6 != 0) return;
-        var cam = GetViewport()?.GetCamera3D();
-        if (cam == null) return;
-        UpdateWingVisibility(cam.GlobalPosition);
+        if (++_tick % 30 == 0) UpdateRespawnRates();
     }
 
     /// <summary>
-    /// Renascimento dinâmico: quanto mais depósitos quebrados numa região (sala + galerias),
+    /// Renascimento dinâmico: quanto mais depósitos quebrados numa região,
     /// mais rápido eles voltam. Com a região toda minerada, renascem até 6x mais rápido.
     /// </summary>
     public void UpdateRespawnRates()
@@ -80,14 +70,22 @@ public partial class WorldBuilder : Node3D
     int[] _crystalRegion;
     public static float RespawnRateFor(float brokenFraction) => 1f + 5f * brokenFraction * brokenFraction;
 
-    public void UpdateWingVisibility(Vector3 eye)
+    /// <summary>Caverna da região em que um ponto está.</summary>
+    public CaveLayout LayoutAt(Vector3 p) => Layouts[RegionAt(p).Index];
+
+    /// <summary>Altura do chão da caverna num ponto (0 fora das cavernas, ex.: túneis).</summary>
+    public float GroundAt(float x, float z)
     {
-        foreach (var w in _wings)
-        {
-            bool inside = MathF.Abs(eye.X - w.cx) < w.hx + 2 && MathF.Abs(eye.Z - w.oz) < w.hz + 2;
-            bool vis = inside || eye.DistanceTo(w.opening) < WingViewDistance;
-            if (w.node.Visible != vis) w.node.Visible = vis;
-        }
+        var L = Layouts[RegionAt(new Vector3(x, 0, z)).Index];
+        return L.InGrid(x, z) ? L.Ground(x, z) : 0f;
+    }
+
+    /// <summary>Um ponto salvo ainda é válido (dentro de uma caverna, alcançável, ou na casa)?</summary>
+    public bool IsSafeSpot(Vector3 p)
+    {
+        if (PlayerHouse.Contains(p)) return true;
+        var L = LayoutAt(p);
+        return L.InGrid(p.X, p.Z) && L.Reachable(p.X, p.Z) && Mathf.Abs(p.Y - L.Ground(p.X, p.Z)) < 2.5f;
     }
 
     void Build()
@@ -97,24 +95,22 @@ public partial class WorldBuilder : Node3D
         for (int i = 0; i < regions.Count; i++)
         {
             var r = regions[i];
+            var L = new CaveLayout(r, 4242 + i * 101);
+            Layouts.Add(L);
             var root = new Node3D { Name = "Region_" + r.Id };
             AddChild(root);
             RegionRoots.Add(root);
-            BuildRoom(root, r, i);
+            var terrain = new CaveTerrain { Name = "Terrain" };
+            root.AddChild(terrain);
+            terrain.Build(L, r);
+            BuildRegion(root, r, L, i);
             if (i + 1 < regions.Count) BuildTunnel(r, regions[i + 1]);
         }
-        // chão contínuo de colisão sob todo o mapa
-        float minZ = regions[^1].CenterZ - regions[^1].HalfZ - 2;
-        float maxZ = regions[0].CenterZ + regions[0].HalfZ + 2;
-        float maxX = 40;
-        foreach (var r in regions)
-            foreach (var w in r.Wings) maxX = MathF.Max(maxX, WingCenterX(r, w) * w.Side + w.HalfX + 2);
-        AddCollider(this, new Vector3(0, -0.5f, (minZ + maxZ) / 2), new Vector3(maxX * 2 + 4, 1, maxZ - minZ));
 
         House = new PlayerHouse { Name = "PlayerHouse" };
         AddChild(House);
 
-        // agrupa malhas estáticas por material em cada região e túnel
+        // agrupa malhas estáticas por material em cada região e túnel (o terreno fica de fora)
         int saved = 0;
         foreach (Node c in GetChildren())
             if (c.GetType() == typeof(Node3D)) saved += StaticBatcher.Batch((Node3D)c);
@@ -122,249 +118,173 @@ public partial class WorldBuilder : Node3D
         GD.Print($"[World] Mundo construído em {Time.GetTicksMsec() - t0} ms ({Crystals.Count} cristais)");
     }
 
-    // =================== Salas ===================
-    void BuildRoom(Node3D root, RegionDef r, int index)
+    // =================== Regiões ===================
+    void BuildRegion(Node3D root, RegionDef r, CaveLayout L, int index)
     {
         var rng = new Random(1000 + index * 77);
-        float cz = r.CenterZ, hx = r.HalfX, hz = r.HalfZ, h = r.Height;
-        var wallMat = new StandardMaterial3D { AlbedoColor = r.RockColor, Roughness = 1f };
-        var floorMat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.35f), Roughness = 1f };
-        var ceilMat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.5f), Roughness = 1f };
+        var reserved = new List<Vector3>();
 
-        // chão e teto
-        AddBox(root, new Vector3(0, -0.25f, cz), new Vector3(hx * 2 + 2, 0.5f, hz * 2 + 2), floorMat, false);
-        AddBox(root, new Vector3(0, h + 0.5f, cz), new Vector3(hx * 2 + 2, 1f, hz * 2 + 2), ceilMat, true);
-
-        bool hasNorth = index + 1 < GameData.Regions.Count;
-        bool hasSouth = index > 0;
-        // paredes leste/oeste (com aberturas para as galerias laterais)
-        var openings = new List<(int side, float z)>();
-        foreach (var w in r.Wings) openings.Add((w.Side, cz + w.ZOffset));
-        BuildSideWall(root, -hx - 0.5f, cz, hz, h, OpeningZ(openings, -1), wallMat);
-        BuildSideWall(root, hx + 0.5f, cz, hz, h, OpeningZ(openings, 1), wallMat);
-        BuildWallWithOpening(root, cz - hz - 0.5f, hx, h, hasNorth, wallMat);
-        BuildWallWithOpening(root, cz + hz + 0.5f, hx, h, hasSouth, wallMat);
-
-        BuildDecoration(root, r, rng, openings);
-        BuildLights(root, r, r.Index == 0 ? 4 : 5);
-        BuildAmbientParticles(root, r);
-
-        // estações próximas da entrada da região
-        float entranceZ = index == 0 ? cz + hz - 6f : cz + hz - 5f;
         if (index == 0)
         {
-            // única Estação de Venda do mapa: no acampamento, ao lado do elevador
+            // acampamento: única Estação de Venda do mapa, terminal e elevador para casa
+            var cc = L.OnGround(L.Camp.A.X, L.Camp.A.Y);
             var sell = new SellStation { Name = "SellStation" };
             root.AddChild(sell);
-            sell.Position = new Vector3(-5.5f, 0, entranceZ);
-            sell.LookAt(new Vector3(0, 0, entranceZ - 4f), Vector3.Up);
+            sell.Position = L.OnGround(cc.X - 6.5f, cc.Z + 4f);
+            sell.LookAt(cc + new Vector3(0, sell.Position.Y - cc.Y, -1f), Vector3.Up);
             sell.RotateY(Mathf.Pi);
+            SellStation = sell;
+            var shop = new ShopTerminal { Name = "ShopTerminal" };
+            root.AddChild(shop);
+            shop.Position = L.OnGround(cc.X + 6.5f, cc.Z + 4f);
+            shop.LookAt(cc + new Vector3(0, shop.Position.Y - cc.Y, -1f), Vector3.Up);
+            shop.RotateY(Mathf.Pi);
             Elevator = new MineElevator { Name = "MineElevator" };
             root.AddChild(Elevator);
-            Elevator.Position = new Vector3(0, 0, cz + hz - 0.95f);
+            Elevator.Position = L.OnGround(cc.X, cc.Z + 11.3f, -0.05f);
             Elevator.Rotation = new Vector3(0, Mathf.Pi, 0); // frente (+Z local) voltada para dentro da caverna
-            SellStation = sell;
+            SpawnPoint = L.OnGround(cc.X, cc.Z + 8.6f, 0.1f);
+            AddPlatform(root, cc, r);
+            reserved.Add(sell.Position); reserved.Add(shop.Position); reserved.Add(Elevator.Position); reserved.Add(cc);
         }
-        var shop = new ShopTerminal { Name = "ShopTerminal" };
-        root.AddChild(shop);
-        shop.Position = new Vector3(5.5f, 0, entranceZ);
-        // tela (+Z local) voltada para o centro da sala
-        shop.LookAt(new Vector3(0, 0, entranceZ - 4f), Vector3.Up);
-        shop.RotateY(Mathf.Pi);
-        if (index == 0)
+        else
         {
-            SpawnPoint = new Vector3(0, 0.1f, cz + hz - 3f);
-            AddPlatform(root, new Vector3(0, 0, entranceZ), r);
+            var shop = new ShopTerminal { Name = "ShopTerminal" };
+            root.AddChild(shop);
+            float tz = r.CenterZ + r.HalfZ - 9f;
+            shop.Position = L.OnGround(4.6f, tz);
+            shop.LookAt(L.OnGround(0, tz - 4f) + new Vector3(0, shop.Position.Y - L.Ground(0, tz - 4f), 0), Vector3.Up);
+            shop.RotateY(Mathf.Pi);
+            reserved.Add(shop.Position);
         }
 
-        _blockedWall = (side, z) => NearOpening(openings, side, z);
-        BuildSetPieces(root, r, new Random(500 + index));
-        var blocked = new List<Vector2>();
-        foreach (var (side, z) in openings)
-            for (float d = 2.5f; d < 9f; d += 3f) blocked.Add(new Vector2(side * (hx - d), z));
-        BuildCrystals(root, r, rng, entranceZ, blocked);
-        foreach (var w in r.Wings) BuildWing(root, r, w, index);
+        BuildDecoration(root, r, L, rng);
+        BuildLights(root, r, L);
+        BuildAmbientParticles(root, r);
+        BuildSetPieces(root, r, L, new Random(500 + index), reserved);
+        BuildChamberSigns(root, r, L);
+        BuildCrystals(root, r, L, rng, reserved);
     }
 
-    static float? OpeningZ(List<(int side, float z)> openings, int side)
+    /// <summary>Cenografia por região (posto avançado, cachoeiras, flora, ruínas, lago).</summary>
+    void BuildSetPieces(Node3D root, RegionDef r, CaveLayout L, Random rng, List<Vector3> reserved)
     {
-        foreach (var o in openings) if (o.side == side) return o.z;
-        return null;
-    }
-
-    /// <summary>Centro X de uma galeria lateral (fora da sala principal, depois de um túnel curto).</summary>
-    public const float WingTunnelLength = 5f;
-    public static float WingCenterX(RegionDef r, WingDef w) => w.Side * (r.HalfX + 2 + WingTunnelLength + w.HalfX);
-
-    /// <summary>Parede leste/oeste, opcionalmente com uma abertura do tamanho de um túnel.</summary>
-    void BuildSideWall(Node3D root, float x, float cz, float hz, float h, float? openZ, Material mat)
-    {
-        if (openZ == null)
+        // posto avançado: na primeira câmara grande (ou no acampamento)
+        CaveFeature host = L.Camp;
+        if (host == null)
+            foreach (var c in L.Chambers)
+                if (c.Wing == null && c != L.Heart && c != L.Lake && c.Radius >= 9f && Mathf.Abs(c.Level) < 0.1f) { host = c; break; }
+        if (host != null && r.Id != "core")
         {
-            AddBox(root, new Vector3(x, h / 2, cz), new Vector3(1, h, hz * 2 + 2), mat, true);
-            return;
+            var hc = host.A;
+            var o = L.OnGround(hc.X - (host == L.Camp ? 9.5f : 4f), hc.Y + 3f);
+            Decor.Outpost(root, o, Mathf.Pi / 2);
+            Decor.RefineryPod(root, L.OnGround(hc.X - 9.8f, hc.Y + (host == L.Camp ? 6.5f : -4f)), 0.6f);
+            Decor.Crate(root, L.OnGround(hc.X - 6.2f, hc.Y - 3.5f), 0.4f, 1f, true);
+            Decor.Crate(root, L.OnGround(hc.X - 5.4f, hc.Y - 2.3f), -0.2f, 0.8f, true);
+            reserved.Add(o); reserved.Add(L.OnGround(hc.X - 9.8f, hc.Y + 6.5f));
+            reserved.Add(L.OnGround(hc.X - 6f, hc.Y - 3f));
+            if (host == L.Camp)
+            {
+                Decor.OreScanner(root, L.OnGround(hc.X - 4.5f, hc.Y - 5.5f), 0.9f);
+                Decor.FloorGrate(root, L.OnGround(hc.X - 6.5f, hc.Y + 2.8f, 0.01f), new Vector2(2.6f, 1.2f), 0);
+                Decor.FloorGrate(root, L.OnGround(hc.X + 6.5f, hc.Y + 2.8f, 0.01f), new Vector2(2.6f, 1.2f), 0);
+                reserved.Add(L.OnGround(hc.X - 4.5f, hc.Y - 5.5f));
+            }
         }
-        float w = TunnelHalfWidth, oz = openZ.Value;
-        float z0 = cz - hz - 1, z1 = cz + hz + 1;
-        float aLen = oz - w - z0, bLen = z1 - (oz + w);
-        if (aLen > 0.01f) AddBox(root, new Vector3(x, h / 2, z0 + aLen / 2), new Vector3(1, h, aLen), mat, true);
-        if (bLen > 0.01f) AddBox(root, new Vector3(x, h / 2, oz + w + bLen / 2), new Vector3(1, h, bLen), mat, true);
-        AddBox(root, new Vector3(x, (h + TunnelHeight) / 2, oz), new Vector3(1, h - TunnelHeight, w * 2), mat, true);
-    }
-
-    /// <summary>
-    /// Galeria lateral: túnel curto + sala menor com minério em destaque.
-    /// O conteúdo é montado num nó deslocado em X, então os construtores de sala (centrados em x=0) servem sem mudança.
-    /// </summary>
-    void BuildWing(Node3D regionRoot, RegionDef r, WingDef w, int index)
-    {
-        var rng = new Random(3000 + index * 31 + (w.Side > 0 ? 7 : 0));
-        float oz = r.CenterZ + w.ZOffset;
-        float cx = WingCenterX(r, w);
-        float h = MathF.Min(r.Height, 11f);
-        var featured = GameData.Mat(w.FeaturedMaterialId);
-        var fake = new RegionDef
-        {
-            Id = r.Id + "_" + w.Id, Index = -1, Name = w.Name,
-            RockColor = r.RockColor, AccentColor = featured.Glow, LightColor = r.LightColor,
-            RareMaterialId = r.RareMaterialId, RareChance = r.RareChance * 1.6f, CrystalSlots = w.Slots,
-            CenterZ = oz, HalfX = w.HalfX, HalfZ = w.HalfZ, Height = h,
-        };
-        // minério em destaque domina; os demais da região continuam aparecendo
-        fake.Spawns.Add(new SpawnEntry(w.FeaturedMaterialId, 0.55f));
-        foreach (var s in r.Spawns) if (s.MaterialId != w.FeaturedMaterialId) fake.Spawns.Add(new SpawnEntry(s.MaterialId, s.Weight * 0.45f));
-
-        var node = new Node3D { Name = "Wing_" + w.Id, Position = new Vector3(cx, 0, 0) };
-        regionRoot.AddChild(node);
-        var wallMat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.05f), Roughness = 1f };
-        var floorMat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.4f), Roughness = 1f };
-        float hx = w.HalfX, hz = w.HalfZ;
-        AddBox(node, new Vector3(0, -0.25f, oz), new Vector3(hx * 2 + 2, 0.5f, hz * 2 + 2), floorMat, false);
-        AddBox(node, new Vector3(0, h + 0.5f, oz), new Vector3(hx * 2 + 2, 1f, hz * 2 + 2), wallMat, true);
-        // parede voltada para a sala principal tem a abertura; a oposta é fechada
-        int inner = -w.Side;
-        BuildSideWall(node, inner * (hx + 0.5f), oz, hz, h, oz, wallMat);
-        BuildSideWall(node, -inner * (hx + 0.5f), oz, hz, h, null, wallMat);
-        AddBox(node, new Vector3(0, h / 2, oz - hz - 0.5f), new Vector3(hx * 2 + 2, h, 1), wallMat, true);
-        AddBox(node, new Vector3(0, h / 2, oz + hz + 0.5f), new Vector3(hx * 2 + 2, h, 1), wallMat, true);
-
-        var openings = new List<(int side, float z)> { (inner, oz) };
-        BuildDecoration(node, fake, rng, openings);
-        BuildLights(node, fake, 2);
-        Decor.GiantClusters(node, fake, rng, 2, new[] { featured.Glow, r.AccentColor }, (side, z) => side == inner);
-
-        var blocked = new List<Vector2>();
-        for (float d = 2.5f; d < 9f; d += 3f) blocked.Add(new Vector2(inner * (hx - d), oz));
-        BuildCrystals(node, fake, rng, 99999f, blocked);
-
-        BuildWingTunnel(regionRoot, r, w, oz, featured);
-        _wings.Add((node, new Vector3(w.Side * (r.HalfX + 0.5f), 1.5f, oz), cx, oz, hx, hz));
-    }
-
-    void BuildWingTunnel(Node3D root, RegionDef r, WingDef w, float oz, MaterialDef featured)
-    {
-        float xa = w.Side * (r.HalfX + 1), xb = w.Side * (r.HalfX + 1 + WingTunnelLength);
-        float cx = (xa + xb) / 2, len = WingTunnelLength + 0.2f;
-        var mat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.2f), Roughness = 1 };
-        AddBox(root, new Vector3(cx, TunnelHeight / 2, oz - TunnelHalfWidth - 0.5f), new Vector3(len, TunnelHeight, 1), mat, true);
-        AddBox(root, new Vector3(cx, TunnelHeight / 2, oz + TunnelHalfWidth + 0.5f), new Vector3(len, TunnelHeight, 1), mat, true);
-        AddBox(root, new Vector3(cx, TunnelHeight + 0.5f, oz), new Vector3(len, 1, TunnelHalfWidth * 2 + 2), mat, true);
-        AddBox(root, new Vector3(cx, -0.25f, oz), new Vector3(len, 0.5f, TunnelHalfWidth * 2), mat.Duplicate() as Material, false);
-        var strip = MeshFactory.Emissive(featured.Glow.Darkened(0.4f), featured.Glow, 1.5f);
-        for (float t = 0.6f; t < WingTunnelLength; t += 2.2f)
-            AddMeshOnly(root, new BoxMesh { Size = new Vector3(1.0f, 0.03f, 0.6f) }, strip, new Vector3(xa + w.Side * t, 0.02f, oz));
-        // placa com o nome da galeria, acima da abertura, voltada para a sala principal
-        var sign = new Label3D
-        {
-            Name = "WingSign_" + w.Id,
-            Text = w.Name.ToUpperInvariant(),
-            FontSize = 64, PixelSize = 0.01f, OutlineSize = 12,
-            Modulate = featured.Glow.Lightened(0.35f), OutlineModulate = new Color(0, 0, 0, 0.85f),
-            Shaded = false, DoubleSided = false,
-            Position = new Vector3(w.Side * (r.HalfX - 0.05f), TunnelHeight + 0.7f, oz),
-            Rotation = new Vector3(0, -w.Side * Mathf.Pi / 2, 0),
-        };
-        root.AddChild(sign);
-    }
-
-    Func<int, float, bool> _blockedWall;
-
-    /// <summary>Cenografia por região (posto avançado, cachoeiras, flora, ruínas).</summary>
-    void BuildSetPieces(Node3D root, RegionDef r, Random rng)
-    {
-        const bool low = false; // o mundo é sempre montado completo; a qualidade é aplicada em tempo real
+        var water = r.Id switch { "depths" => new Color(0.4f, 1f, 0.85f), "abyss" => new Color(0.4f, 0.9f, 1f), _ => new Color(0.45f, 0.85f, 1f) };
+        int falls = r.Id switch { "caves" => 2, "depths" => 3, "abyss" => 4, _ => 0 };
+        for (int i = 0; i < falls; i++) Waterfall(root, L, rng, water);
         switch (r.Id)
         {
             case "caves":
-                Decor.Outpost(root, new Vector3(-17.5f, 0, r.CenterZ + r.HalfZ - 3.5f), Mathf.Pi / 2);
-                Decor.RefineryPod(root, new Vector3(-18.2f, 0, r.CenterZ + 5.5f), 0.6f);
-                Decor.Crate(root, new Vector3(-14.5f, 0, r.CenterZ + 6.5f), 0.4f, 1f, true);
-                Decor.Crate(root, new Vector3(-13.6f, 0, r.CenterZ + 7.8f), -0.2f, 0.8f, true);
-                Decor.OreScanner(root, new Vector3(-6.2f, 0, r.CenterZ + 7.2f), 0.9f);
-                Decor.FloorGrate(root, new Vector3(-5.5f, 0, r.CenterZ + r.HalfZ - 4.4f), new Vector2(2.6f, 1.2f), 0);
-                Decor.FloorGrate(root, new Vector3(5.5f, 0, r.CenterZ + r.HalfZ - 4.4f), new Vector2(2.6f, 1.2f), 0);
-                Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ - 6f), r.Height, 2.6f, -Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
-                Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 2f), r.Height * 0.9f, 2f, Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
-                Decor.Mushrooms(root, r, rng, low ? 5 : 9, new Color(0.3f, 1f, 0.9f));
-                Decor.Ferns(root, r, rng, low ? 6 : 12, new Color(0.95f, 0.42f, 0.15f));
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, _blockedWall);
+                Decor.Mushrooms(root, L, rng, 16, new Color(0.3f, 1f, 0.9f));
+                Decor.Ferns(root, L, rng, 22, new Color(0.95f, 0.42f, 0.15f));
+                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, r.Height);
                 break;
             case "depths":
-                Decor.Outpost(root, new Vector3(r.HalfX - 3f, 0, r.CenterZ + r.HalfZ - 9f), -Mathf.Pi / 2);
-                Decor.Crate(root, new Vector3(r.HalfX - 6f, 0, r.CenterZ + r.HalfZ - 11f), 0.3f, 1f, true);
-                Decor.RefineryPod(root, new Vector3(r.HalfX - 3.2f, 0, r.CenterZ + r.HalfZ - 13.5f), -0.5f);
-                Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 8f), r.Height, 3.2f, Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
-                Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ + 6f), r.Height, 2.4f, -Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
-                Decor.Mushrooms(root, r, rng, low ? 4 : 8, new Color(0.4f, 0.6f, 1f));
-                Decor.Ferns(root, r, rng, low ? 4 : 8, new Color(0.2f, 0.7f, 0.6f));
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, _blockedWall);
-                Decor.Bridge(root, new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ - 14f), new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ + 10f), 1.6f);
-                Decor.Bridge(root, new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ - 14f), new Vector3(r.HalfX - 10f, 4.5f, r.CenterZ - 20f), 1.6f);
+                Decor.Mushrooms(root, L, rng, 14, new Color(0.4f, 0.6f, 1f));
+                Decor.Ferns(root, L, rng, 14, new Color(0.2f, 0.7f, 0.6f));
+                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, r.Height);
                 break;
             case "abyss":
-                Decor.Lake(root, r);
-                Decor.Jellyfish(root, r, rng, low ? 6 : 12);
-                Decor.Outpost(root, new Vector3(-r.HalfX + 3f, 0, r.CenterZ + r.HalfZ - 9f), Mathf.Pi / 2);
-                Decor.Bridge(root, new Vector3(-r.HalfX + 6f, 3.2f, r.CenterZ - 4f), new Vector3(r.HalfX - 6f, 3.2f, r.CenterZ - 4f), 1.8f);
-                Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 14f), r.Height, 3.4f, Mathf.Pi / 2, new Color(0.4f, 0.9f, 1f));
-                Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ - 10f), r.Height, 3f, -Mathf.Pi / 2, new Color(0.4f, 0.9f, 1f));
-                Decor.Waterfall(root, new Vector3(8f, 0, r.CenterZ - r.HalfZ + 0.4f), r.Height, 4f, 0f, new Color(0.5f, 0.85f, 1f));
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, _blockedWall);
+                if (L.Lake != null)
+                {
+                    var lc = L.Lake;
+                    var center = new Vector3(lc.A.X, lc.Level + 0.22f, lc.A.Y);
+                    Decor.Lake(root, center, lc.Radius + 3f, r.AccentColor);
+                    Decor.Jellyfish(root, center, lc.Radius, lc.HA, rng, 12);
+                }
+                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, r.Height);
                 break;
             case "core":
-                Decor.AncientRuins(root, r, rng);
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, _blockedWall);
+                if (L.Heart != null) Decor.AncientRuins(root, L, L.OnGround(L.Heart.A.X, L.Heart.A.Y), rng);
+                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, r.Height);
                 break;
         }
     }
 
-    void BuildWallWithOpening(Node3D root, float z, float hx, float h, bool opening, Material mat)
+    static void Waterfall(Node3D root, CaveLayout L, Random rng, Color color)
     {
-        if (!opening)
-        {
-            AddBox(root, new Vector3(0, h / 2, z), new Vector3(hx * 2 + 2, h, 1), mat, true);
-            return;
-        }
-        float w = TunnelHalfWidth;
-        float sideW = hx + 1 - w;
-        AddBox(root, new Vector3(-(w + sideW / 2), h / 2, z), new Vector3(sideW, h, 1), mat, true);
-        AddBox(root, new Vector3(w + sideW / 2, h / 2, z), new Vector3(sideW, h, 1), mat, true);
-        AddBox(root, new Vector3(0, (h + TunnelHeight) / 2, z), new Vector3(w * 2, h - TunnelHeight, 1), mat, true);
+        if (!L.RandomNearWall(rng, out var p, -1.1f, -0.5f)) return;
+        var inward = L.Inward(p.X, p.Z);
+        float h = L.Ceiling(p.X, p.Z) - p.Y;
+        if (h < 5f) return;
+        var foot = p - inward * 0.6f;
+        foot.Y = p.Y;
+        Decor.Waterfall(root, foot, h + 0.5f, 2f + (float)rng.NextDouble() * 1.5f, Mathf.Atan2(inward.X, inward.Z), color);
     }
 
+    /// <summary>Placas com o nome das câmaras de minério em destaque.</summary>
+    void BuildChamberSigns(Node3D root, RegionDef r, CaveLayout L)
+    {
+        foreach (var c in L.Chambers)
+        {
+            if (c.Wing == null) continue;
+            var featured = GameData.Mat(c.Wing.FeaturedMaterialId);
+            root.AddChild(new Label3D
+            {
+                Name = "Sign_" + c.Id,
+                Text = c.Wing.Name.ToUpperInvariant(),
+                FontSize = 64, PixelSize = 0.0065f, OutlineSize = 12,
+                Modulate = featured.Glow.Lightened(0.35f), OutlineModulate = new Color(0, 0, 0, 0.85f),
+                Billboard = BaseMaterial3D.BillboardModeEnum.FixedY, Shaded = false,
+                Position = new Vector3(c.A.X, c.Level + Mathf.Min(4.2f, c.HA - 1.5f), c.A.Y),
+                VisibilityRangeEnd = 35f,
+            });
+        }
+    }
+
+    // =================== Túneis entre regiões ===================
     void BuildTunnel(RegionDef from, RegionDef to)
     {
         var root = new Node3D { Name = $"Tunnel_{from.Id}_{to.Id}" };
         AddChild(root);
-        float z0 = from.CenterZ - from.HalfZ - 1;
-        float z1 = to.CenterZ + to.HalfZ + 1;
+        float z0 = from.CenterZ - from.HalfZ;   // borda norte da região de origem
+        float z1 = to.CenterZ + to.HalfZ;       // borda sul da região seguinte
         float len = z0 - z1;
         float cz = (z0 + z1) / 2;
         var mat = new StandardMaterial3D { AlbedoColor = from.RockColor.Lerp(to.RockColor, 0.5f).Darkened(0.2f), Roughness = 1 };
+        var beam = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.22f, 0.14f), Roughness = 0.9f };
         AddBox(root, new Vector3(-TunnelHalfWidth - 0.5f, TunnelHeight / 2, cz), new Vector3(1, TunnelHeight, len + 0.2f), mat, true);
         AddBox(root, new Vector3(TunnelHalfWidth + 0.5f, TunnelHeight / 2, cz), new Vector3(1, TunnelHeight, len + 0.2f), mat, true);
         AddBox(root, new Vector3(0, TunnelHeight + 0.5f, cz), new Vector3(TunnelHalfWidth * 2 + 2, 1, len + 0.2f), mat, true);
-        AddBox(root, new Vector3(0, -0.25f, cz), new Vector3(TunnelHalfWidth * 2, 0.5f, len + 0.2f), mat.Duplicate() as Material, false);
+        AddBox(root, new Vector3(0, -0.25f, cz), new Vector3(TunnelHalfWidth * 2, 0.5f, len + 0.2f), mat.Duplicate() as Material, true);
+        // escoramento de madeira (galeria de mina)
+        for (float z = z1 + 2f; z < z0 - 1f; z += 3.5f)
+        {
+            AddMeshOnly(root, new BoxMesh { Size = new Vector3(0.3f, TunnelHeight, 0.3f) }, beam, new Vector3(-TunnelHalfWidth + 0.15f, TunnelHeight / 2, z));
+            AddMeshOnly(root, new BoxMesh { Size = new Vector3(0.3f, TunnelHeight, 0.3f) }, beam, new Vector3(TunnelHalfWidth - 0.15f, TunnelHeight / 2, z));
+            AddMeshOnly(root, new BoxMesh { Size = new Vector3(TunnelHalfWidth * 2, 0.3f, 0.35f) }, beam, new Vector3(0, TunnelHeight - 0.15f, z));
+        }
+        // molduras nas duas bocas: fecham o vão entre o túnel e a rocha da caverna
+        foreach (float zb in new[] { z0, z1 })
+        {
+            float off = zb == z0 ? -0.5f : 0.5f;
+            AddBox(root, new Vector3(-TunnelHalfWidth - 5f, 6f, zb + off), new Vector3(10f, 22f, 1f), mat, true);
+            AddBox(root, new Vector3(TunnelHalfWidth + 5f, 6f, zb + off), new Vector3(10f, 22f, 1f), mat, true);
+            AddBox(root, new Vector3(0, TunnelHeight + 8.5f, zb + off), new Vector3(TunnelHalfWidth * 2 + 0.2f, 17f, 1f), mat, true);
+        }
 
         // faixa luminosa no chão guiando o caminho
         var strip = MeshFactory.Emissive(to.AccentColor.Darkened(0.4f), to.AccentColor, 1.5f);
@@ -398,54 +318,133 @@ public partial class WorldBuilder : Node3D
     }
 
     // =================== Cristais ===================
-    void BuildCrystals(Node3D root, RegionDef r, Random rng, float entranceZ, List<Vector2> blocked)
+
+
+    // =================== Depósitos (chão e paredes) ===================
+    void BuildCrystals(Node3D root, RegionDef r, CaveLayout L, Random rng, List<Vector3> reserved)
     {
-        var placed = new List<Vector2>();
-        // reserva áreas de estações, caminho central e túneis
-        placed.Add(new Vector2(-5.5f, entranceZ)); placed.Add(new Vector2(5.5f, entranceZ));
-        int attempts = 0;
-        int slots = r.CrystalSlots;
-        if (r.Id == "core")
+        var placed = new List<Vector3>(reserved);
+        if (L.Heart != null)
         {
-            // formação especial central
-            var heart = MakeCrystal(root, r, GameData.Mat("heart"), new Vector3(0, 0, r.CenterZ - 4f), rng, 1f);
+            // formação especial no centro da Câmara do Coração
+            var hp = L.OnGround(L.Heart.A.X, L.Heart.A.Y);
+            var heart = MakeCrystal(root, GameData.Mat("heart"), hp, rng, 1f, null);
             heart.PickMaterial = _ => GameData.Mat("heart");
-            placed.Add(new Vector2(0, r.CenterZ - 4f));
-            BuildHeartPedestal(root, new Vector3(0, 0, r.CenterZ - 4f), r);
+            heart.StandPoint = hp + new Vector3(0, 0, 4.2f);
+            placed.Add(hp);
+            BuildHeartPedestal(root, hp, r);
         }
-        while (placed.Count < slots + 2 && attempts < 2000)
+        bool NearPlaced(Vector3 p, float min)
         {
-            attempts++;
-            float x = (float)(rng.NextDouble() * 2 - 1) * (r.HalfX - 2.5f);
-            float z = r.CenterZ + (float)(rng.NextDouble() * 2 - 1) * (r.HalfZ - 2.5f);
-            var p = new Vector2(x, z);
-            if (MathF.Abs(x) < 2.2f) continue; // corredor central livre
-            bool nearOpening = false;
-            foreach (var b in blocked) if (b.DistanceTo(p) < 3.5f) { nearOpening = true; break; }
-            if (nearOpening) continue; // passagem para as galerias
-            if (r.Index == 0 && x < -8.5f && z > r.CenterZ + 2.5f) continue; // posto avançado e refinaria
-            if (r.Index == 0 && new Vector2(-6.2f, r.CenterZ + 7.2f).DistanceTo(p) < 2f) continue; // scanner
-            if (r.Index == 1 && x > r.HalfX - 9f && z > r.CenterZ + r.HalfZ - 16f) continue; // posto das Profundezas
-            if (r.Index == 3 && x < -r.HalfX + 9f && z > r.CenterZ + r.HalfZ - 16f) continue; // posto do Reservatório
-            if (r.Index == 2 && MathF.Abs(MathF.Abs(x) - (r.HalfX - 4f)) < 2.5f) continue; // pilares das ruínas
-            if (r.Index == 0 && new Vector2(0, entranceZ).DistanceTo(p) < 8.5f) continue; // acampamento livre
-            bool ok = true;
-            float minD = r.Index == 2 && new Vector2(0, r.CenterZ - 4f).DistanceTo(p) < 9 ? 9 : 3.2f;
-            foreach (var q in placed) if (q.DistanceTo(p) < minD) { ok = false; break; }
-            if (!ok) continue;
-            placed.Add(p);
-            float size = 0.8f + (float)rng.NextDouble() * 0.55f;
-            var mat = PickFor(r, rng);
-            var c = MakeCrystal(root, r, mat, new Vector3(x, 0, z), rng, size);
-            c.PickMaterial = rr => PickFor(r, rr);
+            foreach (var q in placed) if (q.DistanceTo(p) < min) return true;
+            return false;
         }
-        // na região inicial, garante cristais fáceis bem perto do jogador
-        if (r.Index == 0)
+        float minHeart = 9f;
+        bool NearHeart(Vector3 p) => L.Heart != null && new Vector2(p.X - L.Heart.A.X, p.Z - L.Heart.A.Y).Length() < minHeart;
+        bool InCamp(Vector3 p) => L.Camp != null && new Vector2(p.X - L.Camp.A.X, p.Z - L.Camp.A.Y).Length() < 9.5f;
+
+        int wallSlots = (int)(r.CrystalSlots * 0.32f);
+        int floorSlots = r.CrystalSlots - wallSlots;
+        int made = 0;
+        for (int tries = 0; made < floorSlots && tries < 4000; tries++)
+        {
+            if (!L.RandomFloor(rng, 1.3f, 0.22f, out var p)) continue;
+            if (NearPlaced(p, 3.2f) || NearHeart(p) || InCamp(p)) continue;
+            if (!FindStand(L, p, rng, out var stand)) continue;
+            var c = MakeCrystal(root, MaterialFor(r, L, p, rng), p, rng, 0.8f + (float)rng.NextDouble() * 0.55f, null);
+            c.StandPoint = stand;
+            var pr = r; var pl = L; var pp = p;
+            c.PickMaterial = rr => MaterialFor(pr, pl, pp, rr);
+            placed.Add(p);
+            made++;
+        }
+        int wall = 0;
+        for (int tries = 0; wall < wallSlots && tries < 3000; tries++)
+        {
+            if (!L.RandomWallSpot(rng, 0.7f, 2.5f, out var spot, out var n, out var stand)) continue;
+            if (NearPlaced(spot, 3f) || NearHeart(spot) || InCamp(stand)) continue;
+            var up = n.Lerp(Vector3.Up, 0.15f).Normalized();
+            float size = 0.7f + (float)rng.NextDouble() * 0.35f;
+            // o olho do jogador não pode ficar colado nem longe demais do centro do depósito
+            var eye = stand + Vector3.Up * 1.55f;
+            float ed = eye.DistanceTo(spot - n * 0.12f + up * 0.7f * size);
+            if (ed < 1.4f || ed > 3.3f) continue;
+            var basis = BasisFromUp(up) * new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
+            var c = MakeCrystal(root, MaterialFor(r, L, stand, rng), spot - n * 0.12f, rng, size, basis);
+            c.StandPoint = stand + Vector3.Up * 0.1f;
+            var pr = r; var pl = L; var ps = stand;
+            c.PickMaterial = rr => MaterialFor(pr, pl, ps, rr);
+            placed.Add(spot);
+            wall++;
+        }
+        // câmaras secretas: tesouro garantido (raro da região + minério mais valioso)
+        foreach (var s in L.Secrets)
+        {
+            var best = r.Spawns[^1].MaterialId;
+            for (int k = 0; k < 4; k++)
+            {
+                float a = Mathf.Tau * k / 4 + 0.4f;
+                var p = L.OnGround(s.A.X + Mathf.Cos(a) * s.RA * 0.5f, s.A.Y + Mathf.Sin(a) * s.RA * 0.5f);
+                if (NearPlaced(p, 2.4f)) continue;
+                var mat = GameData.Mat(k % 2 == 0 ? r.RareMaterialId : best);
+                var c = MakeCrystal(root, mat, p, rng, 1.0f, null);
+                c.StandPoint = L.OnGround(s.A.X, s.A.Y, 0.1f);
+                var pr = r; var pl = L; var pp = p;
+                c.PickMaterial = rr => MaterialFor(pr, pl, pp, rr);
+                placed.Add(p);
+            }
+        }
+        // na região inicial, garante depósitos fáceis perto do elevador
+        if (L.Camp != null)
         {
             var q = GameData.Mat("quartz");
-            MakeCrystal(root, r, q, new Vector3(-3.2f, 0, entranceZ - 9.5f), rng, 0.9f).PickMaterial = rr => PickFor(r, rr);
-            MakeCrystal(root, r, q, new Vector3(3.4f, 0, entranceZ - 10.5f), rng, 0.9f).PickMaterial = rr => PickFor(r, rr);
+            foreach (var off in new[] { new Vector2(-3.4f, -6.5f), new Vector2(3.6f, -7.5f) })
+            {
+                var p = L.OnGround(L.Camp.A.X + off.X, L.Camp.A.Y + off.Y);
+                var c = MakeCrystal(root, q, p, rng, 0.9f, null);
+                c.StandPoint = p + new Vector3(0, 0.1f, 1.7f);
+                var pr = r; var pl = L; var pp = p;
+                c.PickMaterial = rr => MaterialFor(pr, pl, pp, rr);
+            }
         }
+    }
+
+    /// <summary>Ponto onde o jogador fica para minerar um depósito no chão (alcançável e no mesmo nível).</summary>
+    static bool FindStand(CaveLayout L, Vector3 p, Random rng, out Vector3 stand)
+    {
+        float a0 = (float)rng.NextDouble() * Mathf.Tau;
+        for (int k = 0; k < 8; k++)
+        {
+            float a = a0 + Mathf.Tau * k / 8;
+            var q = p + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 1.7f;
+            if (!L.Reachable(q.X, q.Z) || L.WallDist(q.X, q.Z) > -0.6f) continue;
+            float g = L.Ground(q.X, q.Z);
+            if (Mathf.Abs(g - p.Y) > 0.7f) continue;
+            stand = new Vector3(q.X, g + 0.1f, q.Z);
+            return true;
+        }
+        stand = default;
+        return false;
+    }
+
+    /// <summary>Material conforme o lugar: câmaras com minério em destaque e câmaras secretas mudam a tabela.</summary>
+    static MaterialDef MaterialFor(RegionDef r, CaveLayout L, Vector3 p, Random rng)
+    {
+        var f = L.FeatureAt(p.X, p.Z);
+        if (f?.Wing != null && rng.NextDouble() < 0.55) return GameData.Mat(f.Wing.FeaturedMaterialId);
+        if (f?.Kind == CaveKind.Secret && rng.NextDouble() < r.RareChance * 4f) return GameData.Mat(r.RareMaterialId);
+        return PickFor(r, rng);
+    }
+
+    Crystal MakeCrystal(Node3D root, MaterialDef mat, Vector3 pos, Random rng, float size, Basis? basis)
+    {
+        var c = new Crystal { Name = $"Crystal_{Crystals.Count}" };
+        c.Init(mat, rng.Next(), size);
+        root.AddChild(c);
+        c.Position = pos;
+        c.Basis = basis ?? new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
+        Crystals.Add(c);
+        return c;
     }
 
     public static MaterialDef PickFor(RegionDef r, Random rng)
@@ -460,17 +459,6 @@ public partial class WorldBuilder : Node3D
             if (roll <= 0) return GameData.Mat(s.MaterialId);
         }
         return GameData.Mat(r.Spawns[0].MaterialId);
-    }
-
-    Crystal MakeCrystal(Node3D root, RegionDef r, MaterialDef mat, Vector3 pos, Random rng, float size)
-    {
-        var c = new Crystal { Name = $"Crystal_{Crystals.Count}" };
-        c.Init(mat, rng.Next(), size);
-        root.AddChild(c);
-        c.Position = pos;
-        c.Rotation = new Vector3(0, (float)rng.NextDouble() * Mathf.Tau, 0);
-        Crystals.Add(c);
-        return c;
     }
 
     void BuildHeartPedestal(Node3D root, Vector3 pos, RegionDef r)
@@ -490,54 +478,51 @@ public partial class WorldBuilder : Node3D
     }
 
     // =================== Decoração ===================
-    void BuildDecoration(Node3D root, RegionDef r, Random rng, List<(int side, float z)> openings)
-    {
-        float cz = r.CenterZ, hx = r.HalfX, hz = r.HalfZ, h = r.Height;
-        var rockMat = MeshFactory.RockMaterial(r.RockColor.Lightened(0.15f));
-        const float density = 1f; // decoração por MultiMesh: custo baixo em qualquer qualidade
 
-        // rochas grandes ao longo das paredes (quebram o formato de caixa)
+
+    // =================== Decoração ===================
+    void BuildDecoration(Node3D root, RegionDef r, CaveLayout L, Random rng)
+    {
+        var rockMat = MeshFactory.RockMaterial(r.RockColor.Lightened(0.15f));
+        float area = L.Nx * L.Nz;
+
+        // rochas grandes no pé das paredes (quebram o contorno)
         var wallRocks = new List<Transform3D>();
-        int perimeter = (int)((hx + hz) * 2 / 2.2f * density);
-        for (int i = 0; i < perimeter; i++)
+        for (int i = 0; i < (int)(area / 55); i++)
         {
-            Vector3 p;
-            int side = rng.Next(4);
-            float t = (float)(rng.NextDouble() * 2 - 1);
-            p = side switch
-            {
-                0 => new Vector3(-hx, 0, cz + t * hz),
-                1 => new Vector3(hx, 0, cz + t * hz),
-                2 => new Vector3(t * hx, 0, cz - hz),
-                _ => new Vector3(t * hx, 0, cz + hz),
-            };
-            // mantém aberturas dos túneis livres
-            if ((side == 2 || side == 3) && MathF.Abs(p.X) < TunnelHalfWidth + 2.5f) continue;
-            if (side < 2 && NearOpening(openings, side == 0 ? -1 : 1, p.Z)) continue;
-            float s = 1.6f + (float)rng.NextDouble() * 2.8f;
-            p.Y = (float)rng.NextDouble() * h * 0.7f;
-            var basis = new Basis(new Vector3(0, 1, 0), (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(s, s * (0.8f + (float)rng.NextDouble() * 0.6f), s));
+            if (!L.RandomNearWall(rng, out var p, -0.9f, 0.9f)) continue;
+            float s = 1.2f + (float)rng.NextDouble() * 2.4f;
+            p.Y -= s * 0.35f;
+            var basis = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(s, s * (0.7f + (float)rng.NextDouble() * 0.6f), s));
             wallRocks.Add(new Transform3D(basis, p));
         }
         AddMulti(root, MeshFactory.Rock(11, 0.4f), rockMat, wallRocks);
 
-        // estalactites e estalagmites
+        // pedregulhos soltos no chão (alguns grandes, viram obstáculos/esconderijos visuais)
+        var boulders = new List<Transform3D>();
+        for (int i = 0; i < (int)(area / 260); i++)
+        {
+            if (!L.RandomFloor(rng, 3f, 0.3f, out var p)) continue;
+            float s = 0.6f + (float)rng.NextDouble() * 1.1f;
+            boulders.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).ScaleLocal(new Vector3(s, s * 0.8f, s)), p + Vector3.Down * s * 0.25f));
+        }
+        AddMulti(root, MeshFactory.Rock(5, 0.35f), rockMat, boulders);
+
+        // estalactites (teto) e estalagmites (chão, perto das paredes)
         var spikesDown = new List<Transform3D>();
         var spikesUp = new List<Transform3D>();
-        int spikeCount = (int)(hx * hz / 14f * density);
-        for (int i = 0; i < spikeCount; i++)
+        for (int i = 0; i < (int)(area / 38); i++)
         {
-            float x = (float)(rng.NextDouble() * 2 - 1) * (hx - 1);
-            float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 1);
-            float len = 0.8f + (float)rng.NextDouble() * (h * 0.35f);
+            float x = L.X0 + 2 + (float)rng.NextDouble() * (L.Nx - 4);
+            float z = L.Z0 + 2 + (float)rng.NextDouble() * (L.Nz - 4);
+            if (L.WallDist(x, z) > -1f) continue;
+            float g = L.Ground(x, z), c = L.Ceiling(x, z);
+            if (c - g < 4.5f) continue;
+            float len = 0.8f + (float)rng.NextDouble() * Mathf.Min(3.2f, (c - g) * 0.3f);
             float rad = 0.25f + (float)rng.NextDouble() * 0.5f;
-            var b = new Basis(new Vector3(1, 0, 0), Mathf.Pi).ScaleLocal(new Vector3(rad, len, rad));
-            spikesDown.Add(new Transform3D(b, new Vector3(x, h, z)));
-            if (i % 3 == 0 && MathF.Abs(x) > hx * 0.75f)
-            {
-                var b2 = Basis.Identity.ScaleLocal(new Vector3(rad * 1.2f, len * 0.5f, rad * 1.2f));
-                spikesUp.Add(new Transform3D(b2, new Vector3(x, 0, z)));
-            }
+            spikesDown.Add(new Transform3D(new Basis(new Vector3(1, 0, 0), Mathf.Pi).ScaleLocal(new Vector3(rad, len, rad)), new Vector3(x, c + 0.2f, z)));
+            if (i % 3 == 0 && L.WallDist(x, z) > -3.5f)
+                spikesUp.Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(rad * 1.2f, len * 0.6f, rad * 1.2f)), new Vector3(x, g - 0.1f, z)));
         }
         var spikeMesh = MeshFactory.Spike(5, 1f, 1f);
         AddMulti(root, spikeMesh, rockMat, spikesDown);
@@ -545,29 +530,32 @@ public partial class WorldBuilder : Node3D
 
         // pedras pequenas no chão
         var pebbles = new List<Transform3D>();
-        for (int i = 0; i < (int)(70 * density); i++)
+        for (int i = 0; i < (int)(area / 70); i++)
         {
-            float x = (float)(rng.NextDouble() * 2 - 1) * (hx - 1);
-            float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 1);
+            if (!L.RandomFloor(rng, 0.8f, 0.5f, out var p)) continue;
             float s = 0.12f + (float)rng.NextDouble() * 0.35f;
-            pebbles.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).ScaleLocal(Vector3.One * s), new Vector3(x, s * 0.2f, z)));
+            pebbles.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).ScaleLocal(Vector3.One * s), p + Vector3.Up * s * 0.1f));
         }
         AddMulti(root, MeshFactory.Rock(3, 0.3f), rockMat, pebbles);
 
-        // cristais decorativos (não mineráveis) incrustados nas paredes e teto
+        // cristais decorativos (não mineráveis) incrustados nas paredes, em várias alturas
         var deco = new List<Transform3D>();
-        for (int i = 0; i < (int)(60 * density); i++)
+        for (int i = 0; i < (int)(area / 70); i++)
         {
-            int side = rng.Next(3);
-            float t = (float)(rng.NextDouble() * 2 - 1);
-            Vector3 p; Vector3 up;
-            if (side == 0) { p = new Vector3(-hx + 0.2f, (float)rng.NextDouble() * h, cz + t * hz); up = Vector3.Right; }
-            else if (side == 1) { p = new Vector3(hx - 0.2f, (float)rng.NextDouble() * h, cz + t * hz); up = Vector3.Left; }
-            else { p = new Vector3(t * hx, h - 0.1f, cz + (float)(rng.NextDouble() * 2 - 1) * hz); up = Vector3.Down; }
-            if (side < 2 && NearOpening(openings, side == 0 ? -1 : 1, p.Z) && p.Y < TunnelHeight + 0.5f) continue;
-            up = (up + new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f) * 0.9f).Normalized();
-            var basis = BasisFromUp(up).ScaleLocal(new Vector3(0.12f, 0.4f + (float)rng.NextDouble() * 0.9f, 0.12f) * (1f + (float)rng.NextDouble()));
-            deco.Add(new Transform3D(basis, p));
+            if (!L.RandomNearWall(rng, out var foot, -1.5f, -0.3f)) continue;
+            var outDir = -L.Inward(foot.X, foot.Z);
+            float y = foot.Y + 0.6f + (float)rng.NextDouble() * 7f;
+            if (y > L.Ceiling(foot.X, foot.Z) - 0.5f && L.WallDist(foot.X, foot.Z) < 0) continue;
+            for (float s = 0.3f; s < 4f; s += 0.25f)
+            {
+                var q = foot + outDir * s;
+                if (L.Ground(q.X, q.Z) < y) continue;
+                var n = L.Normal(q.X, q.Z);
+                var up = (n + new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f) * 0.8f).Normalized();
+                var b = BasisFromUp(up).ScaleLocal(new Vector3(0.12f, 0.4f + (float)rng.NextDouble() * 0.9f, 0.12f) * (1f + (float)rng.NextDouble()));
+                deco.Add(new Transform3D(b, new Vector3(q.X, y, q.Z)));
+                break;
+            }
         }
         var decoMat = MeshFactory.Emissive(r.AccentColor, r.AccentColor, 1.6f);
         AddMulti(root, MeshFactory.CrystalPrism(6, 1, 1, 0.3f), decoMat, deco);
@@ -575,7 +563,6 @@ public partial class WorldBuilder : Node3D
         // marcas especiais por região
         if (r.Id == "depths")
         {
-            // poças de água luminescente
             var pool = new StandardMaterial3D
             {
                 AlbedoColor = new Color(0.1f, 0.5f, 0.6f, 0.6f),
@@ -583,13 +570,11 @@ public partial class WorldBuilder : Node3D
                 EmissionEnabled = true, Emission = new Color(0.1f, 0.6f, 0.7f), EmissionEnergyMultiplier = 0.8f,
                 Metallic = 0.6f, Roughness = 0.05f,
             };
-            for (int i = 0; i < 7; i++)
+            for (int i = 0; i < 12; i++)
             {
-                float x = (float)(rng.NextDouble() * 2 - 1) * (hx - 4);
-                float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 4);
-                if (MathF.Abs(x) < 3) x += MathF.Sign(x == 0 ? 1 : x) * 4;
-                float rad = 1.5f + (float)rng.NextDouble() * 2.5f;
-                AddMeshOnly(root, new CylinderMesh { TopRadius = rad, BottomRadius = rad, Height = 0.02f, RadialSegments = 14, Rings = 1 }, pool, new Vector3(x, 0.02f, z));
+                if (!L.RandomFloor(rng, 4f, 0.08f, out var p)) continue;
+                float rad = 1.2f + (float)rng.NextDouble() * 2f;
+                AddMeshOnly(root, new CylinderMesh { TopRadius = rad, BottomRadius = rad, Height = 0.02f, RadialSegments = 14, Rings = 1 }, pool, p + Vector3.Up * 0.04f);
             }
         }
         else if (r.Id == "core")
@@ -597,37 +582,57 @@ public partial class WorldBuilder : Node3D
             // fissuras de lava/energia no chão
             var crack = MeshFactory.Emissive(new Color(1f, 0.7f, 0.25f), new Color(1f, 0.6f, 0.15f), 2.2f);
             var cracks = new List<Transform3D>();
-            for (int i = 0; i < 40; i++)
+            for (int i = 0; i < 90; i++)
             {
-                float x = (float)(rng.NextDouble() * 2 - 1) * (hx - 1);
-                float z = cz + (float)(rng.NextDouble() * 2 - 1) * (hz - 1);
+                if (!L.RandomFloor(rng, 1f, 0.15f, out var p)) continue;
                 var b = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(0.12f + (float)rng.NextDouble() * 0.2f, 1, 1.5f + (float)rng.NextDouble() * 4f));
-                cracks.Add(new Transform3D(b, new Vector3(x, 0.015f, z)));
+                cracks.Add(new Transform3D(b, p + Vector3.Up * 0.03f));
             }
             AddMulti(root, new BoxMesh { Size = new Vector3(1, 0.02f, 1) }, crack, cracks, 1f);
-            // rochas flutuantes animadas
-            for (int i = 0; i < 9; i++)
-            {
-                float a = Mathf.Tau * i / 9f;
-                float rad = 10f + (float)rng.NextDouble() * 10f;
-                var fr = new FloatingRock
+            // rochas flutuantes animadas sobre a Câmara do Coração
+            if (L.Heart != null)
+                for (int i = 0; i < 9; i++)
                 {
-                    Mesh = MeshFactory.Rock(20 + i, 0.4f),
-                    MaterialOverride = MeshFactory.RockMaterial(r.RockColor.Lightened(0.2f)),
-                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-                    Scale = Vector3.One * (0.6f + (float)rng.NextDouble() * 1.2f),
-                };
-                root.AddChild(fr);
-                fr.Position = new Vector3(Mathf.Cos(a) * rad, 6f + (float)rng.NextDouble() * 6f, cz + Mathf.Sin(a) * rad * 0.9f);
-                fr.Phase = (float)rng.NextDouble() * 10f;
-            }
+                    float a = Mathf.Tau * i / 9f;
+                    float rad = 8f + (float)rng.NextDouble() * 7f;
+                    var fr = new FloatingRock
+                    {
+                        Mesh = MeshFactory.Rock(20 + i, 0.4f),
+                        MaterialOverride = MeshFactory.RockMaterial(r.RockColor.Lightened(0.2f)),
+                        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                        Scale = Vector3.One * (0.6f + (float)rng.NextDouble() * 1.2f),
+                    };
+                    root.AddChild(fr);
+                    fr.Position = new Vector3(L.Heart.A.X + Mathf.Cos(a) * rad, 7f + (float)rng.NextDouble() * 6f, L.Heart.A.Y + Mathf.Sin(a) * rad * 0.9f);
+                    fr.Phase = (float)rng.NextDouble() * 10f;
+                }
         }
     }
 
-    static bool NearOpening(List<(int side, float z)> openings, int side, float z)
+    void BuildLights(Node3D root, RegionDef r, CaveLayout L)
     {
-        foreach (var o in openings) if (o.side == side && MathF.Abs(o.z - z) < TunnelHalfWidth + 2f) return true;
-        return false;
+        // na Baixa as luzes são ocultadas em tempo real; nas outras, uma por câmara principal e pelo caminho
+        int n = 0;
+        foreach (var c in L.Chambers)
+        {
+            if (n >= 6) break;
+            root.AddChild(new OmniLight3D
+            {
+                LightColor = n % 2 == 0 ? r.LightColor : r.AccentColor,
+                LightEnergy = 1.5f, OmniRange = c.Radius * 1.7f, OmniAttenuation = 1.2f, ShadowEnabled = false,
+                Position = new Vector3(c.A.X, c.Level + c.HA * 0.65f, c.A.Y),
+            });
+            n++;
+        }
+        for (int i = 1; i < L.PathPoints.Count - 1; i += 2)
+        {
+            var p = L.PathPoints[i];
+            root.AddChild(new OmniLight3D
+            {
+                LightColor = r.LightColor, LightEnergy = 1.3f, OmniRange = 16f, OmniAttenuation = 1.2f, ShadowEnabled = false,
+                Position = new Vector3(p.X, p.Y + r.Height * 0.6f, p.Z),
+            });
+        }
     }
 
     static Basis BasisFromUp(Vector3 up)
@@ -637,24 +642,6 @@ public partial class WorldBuilder : Node3D
         return new Basis(x, up, z);
     }
 
-    void BuildLights(Node3D root, RegionDef r, int count)
-    {
-        // na Baixa as luzes são ocultadas em tempo real
-        for (int i = 0; i < count; i++)
-        {
-            float a = Mathf.Tau * i / count + 0.4f;
-            var light = new OmniLight3D
-            {
-                LightColor = i % 2 == 0 ? r.LightColor : r.AccentColor,
-                LightEnergy = 1.6f,
-                OmniRange = Mathf.Max(r.HalfX, r.HalfZ) * 0.85f,
-                OmniAttenuation = 1.2f,
-                ShadowEnabled = false,
-                Position = new Vector3(Mathf.Cos(a) * r.HalfX * 0.55f, r.Height * 0.7f, r.CenterZ + Mathf.Sin(a) * r.HalfZ * 0.55f),
-            };
-            root.AddChild(light);
-        }
-    }
 
     void BuildAmbientParticles(Node3D root, RegionDef r)
     {

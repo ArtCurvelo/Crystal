@@ -43,6 +43,12 @@ public partial class Crystal : StaticBody3D
     CpuParticles3D _sparkle;
     OmniLight3D _light;
 
+    /// <summary>Onde o jogador fica para minerar este depósito (usado por testes e pelo bot).</summary>
+    public Vector3 StandPoint;
+    /// <summary>Centro visual do depósito (respeita depósitos inclinados nas paredes).</summary>
+    public Vector3 Center => GlobalPosition + GlobalTransform.Basis.Y.Normalized() * 0.7f * (Material.Special ? 2.6f : SizeScale);
+    public const float ViewDistance = 55f;
+
     public void Init(MaterialDef mat, int seed, float sizeScale = 1f)
     {
         _rng = new Random(seed);
@@ -79,6 +85,10 @@ public partial class Crystal : StaticBody3D
 
         // formato e textura próprios do tipo de minério
         var built = OreVisuals.Build(_visual, mat, _rng, s);
+        // depósitos distantes não são desenhados (a névoa já os esconderia)
+        if (!special)
+            foreach (Node n in _visual.GetChildren())
+                if (n is GeometryInstance3D gi) gi.VisibilityRangeEnd = ViewDistance;
         _mats.AddRange(built.Materials);
         SetGlow(_baseEnergy, 0f, 0f);
         float vh = built.Height;
@@ -178,9 +188,9 @@ public partial class Crystal : StaticBody3D
         _shakeDir = new Vector3(-toCam.X, 0, -toCam.Z).Normalized();
         if (_shakeDir.LengthSquared() < 0.01f) _shakeDir = Vector3.Right;
 
-        Effects.Instance?.Hit(point, normal, Material.Glow.Lightened(0.3f));
+        Effects.Instance?.HitFx(Material, point, normal);
         float pitch = 0.85f + (1f - HpRatio) * 0.5f;
-        if (!quiet) AudioManager.Instance?.Play("hit", -4f, pitch, 0.06f);
+        if (!quiet) AudioManager.Instance?.PlayOre(Material, false, -4f, pitch);
         var jitter = new Vector3((float)_rng.NextDouble() - 0.5f, (float)_rng.NextDouble() * 0.6f, (float)_rng.NextDouble() - 0.5f) * 0.5f;
         Effects.Instance?.FloatText(point + normal * 0.25f + jitter, GameState.FormatNumber(Math.Min(damage, Hp + damage)),
             new Color(1, 1, 1).Lerp(Material.Glow, 0.4f), 0.8f);
@@ -197,10 +207,10 @@ public partial class Crystal : StaticBody3D
     {
         State = CrystalState.Broken;
         Hp = 0;
-        var center = GlobalPosition + Vector3.Up * 0.7f * (Material.Special ? 2.6f : SizeScale);
-        Effects.Instance?.Burst(center, Material.Glow.Lightened(0.2f), Material.Special ? 2.5f : 1f);
+        var center = Center;
+        Effects.Instance?.BreakFx(Material, center, Material.Special ? 2.5f : 1f);
         Effects.Instance?.Flash(center, Material.Glow, Material.Special ? 3f : 1f);
-        AudioManager.Instance?.Play("break", -2f, Material.Special ? 0.7f : 1f, 0.08f);
+        AudioManager.Instance?.PlayOre(Material, true, -2f);
         if (Material.Rare || Material.Special) AudioManager.Instance?.Play("rare", -4f);
 
         int shards = _rng.Next(Material.ShardsMin, Material.ShardsMax + 1);

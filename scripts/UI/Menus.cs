@@ -376,7 +376,7 @@ public partial class HelpScreen : ModalScreen
                  {
                      ("W A S D", "Mover"), ("Mouse", "Olhar"), ("Botão esquerdo", "Minerar (segure)"),
                      ("E", "Interagir"), ("Shift", "Correr"), ("Espaço", "Pular"),
-                     ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
+                     ("C / Ctrl", "Agachar"), ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
                  })
         {
             var row = new HBoxContainer();
@@ -389,13 +389,13 @@ public partial class HelpScreen : ModalScreen
 
         left.AddChild(UiTheme.Spacer(6));
         left.AddChild(UiTheme.Label("CONTROLE", 20, UiTheme.Gold, true));
-        var pad = UiTheme.Label("Analógico esq.: mover · Analógico dir.: olhar\nRT: minerar · X: interagir · A: pular\nLB: correr · Start: pausa · B: voltar", 15, UiTheme.Text);
+        var pad = UiTheme.Label("Analógico esq.: mover · Analógico dir.: olhar\nRT: minerar · X: interagir · A: pular · B: agachar\nLB: correr · Start: pausa · B: voltar (menus)", 15, UiTheme.Text);
         left.AddChild(pad);
 
         var right = new VBoxContainer { CustomMinimumSize = new Vector2(440, 0) };
         right.AddThemeConstantOverride("separation", 8);
         cols.AddChild(right);
-        Section(right, "CICLO", "Minere → os fragmentos voam até você → leve-os à única Estação de Venda (verde), no acampamento → compre melhorias no Terminal (dourado) → abra portões para regiões mais ricas. Galerias laterais guardam minérios em destaque.");
+        Section(right, "CICLO", "Minere (no chão e nas paredes) → os fragmentos voam até você → leve-os à única Estação de Venda, no acampamento → compre melhorias → abra portões para regiões mais ricas. Suba o relevo, explore câmaras com placas e procure túneis baixos: agachado (C) você acha câmaras secretas.");
         Section(right, "O TURNO", "Cada dia vai das 06:00 às 18:00 (10 min). No fim do turno você só pode vender e pegar o Elevador do acampamento. Em casa: melhorias da casa (permanentes), árvore de habilidades e dormir para o próximo dia.");
         Section(right, "RESSONÂNCIA", "Golpes em ritmo constante enchem o arco violeta da mira. Quando ficar dourado, o próximo golpe libera um pulso que atinge todos os cristais próximos.");
         Section(right, "EVENTOS", "Cada região tem condições próprias: Eco Luminoso (cristais renascem), Maré Gélida (fragmentos x2) e Surto do Núcleo (dano +50%).");

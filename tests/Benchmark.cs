@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -38,16 +39,27 @@ public partial class Benchmark : Node
         p.SimulateCapturedMouse = true;
         ApplyExperiments();
 
+        // vistas fixas no mapa de cavernas: ao longo do caminho principal de cada região
+        var W = Main.World;
+        (string, Vector3, float, float) Along(string name, int region, int node)
+        {
+            var L = W.Layouts[region];
+            var a = L.PathPoints[Math.Min(node, L.PathPoints.Count - 1)];
+            var b = L.PathPoints[Math.Min(node + 1, L.PathPoints.Count - 1)];
+            var pos = L.OnGround(a.X, a.Z, 0.1f);
+            var d = new Vector3(b.X - a.X, 0, b.Z - a.Z);
+            return (name, pos, Mathf.Atan2(-d.X, -d.Z), 0f);
+        }
+        var crystal = W.Crystals.First(c => c.Material.Id == "quartz" && c.GlobalTransform.Basis.Y.Normalized().Y > 0.95f);
+        var L2 = W.Layouts[2];
         var views = new List<(string name, Vector3 pos, float yaw, float pitch)>
         {
-            ("R1 acampamento", new Vector3(0, 0.1f, 16f), 0f, -0.05f),
-            ("R1 mineração", Vector3.Zero, 0f, -0.3f),
-            ("R2 visão geral", new Vector3(0, 0.1f, -36f), 0f, 0f),
-            ("R3 coração", new Vector3(0, 0.1f, -100f), 0f, 0.08f),
-            ("R4 lago", new Vector3(0, 0.1f, -168f), 0f, 0.05f),
+            ("R1 acampamento", W.SpawnPoint, 0f, -0.05f),
+            ("R1 mineração", crystal.StandPoint, Mathf.Atan2(-(crystal.Center.X - crystal.StandPoint.X), -(crystal.Center.Z - crystal.StandPoint.Z)), -0.35f),
+            Along("R2 caminho", 1, 1),
+            ("R3 coração", L2.OnGround(L2.Heart.A.X, L2.Heart.A.Y + 15f, 0.1f), 0f, 0.08f),
+            Along("R4 caminho", 3, 1),
         };
-        var crystal = Main.World.Crystals.First(c => c.Material.Id == "quartz");
-        views[1] = ("R1 mineração", crystal.GlobalPosition + new Vector3(0, 0, 1.8f), 0f, -0.35f);
 
         var results = new List<double>();
         foreach (var (name, pos, yaw, pitch) in views)

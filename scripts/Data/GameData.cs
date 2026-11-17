@@ -81,8 +81,10 @@ public sealed class RegionDef
     public float HalfX;
     public float HalfZ;
     public float Height;
-    /// <summary>Galerias laterais (salas extras ligadas às paredes leste/oeste).</summary>
+    /// <summary>Câmaras com nome e minério em destaque dentro da caverna da região.</summary>
     public List<WingDef> Wings = new();
+    /// <summary>Distância entre regiões (comprimento do túnel com o portão).</summary>
+    public const float TunnelLength = 14f;
 }
 
 /// <summary>Galeria lateral de uma região: sala menor com um minério em destaque.</summary>
@@ -302,6 +304,78 @@ public static class GameData
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 40
         });
 
+        // ---------------- Atualização das cavernas: mais variedade ----------------
+        Add(new MaterialDef
+        {
+            Id = "pyrite", Rarity = Rarity.Comum, Archetype = OreArchetype.Vein, Name = "Pirita", Value = 4, Hp = 32,
+            Description = "O \"ouro dos tolos\": cubos dourados que enganam escavadores novatos, mas ainda valem algo.",
+            Color = new Color(0.85f, 0.75f, 0.35f), Glow = new Color(1.0f, 0.85f, 0.3f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 20
+        });
+        Add(new MaterialDef
+        {
+            Id = "jasper", Rarity = Rarity.Incomum, Archetype = OreArchetype.Banded, Name = "Jaspe Rubro", Value = 10, Hp = 75,
+            Description = "Pedra em faixas vermelhas e alaranjadas, formada por camadas de lama antiga.",
+            Color = new Color(0.75f, 0.25f, 0.18f), Glow = new Color(1.0f, 0.45f, 0.25f),
+            ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 24
+        });
+        Add(new MaterialDef
+        {
+            Id = "aquamarine", Rarity = Rarity.Incomum, Archetype = OreArchetype.Crystal, Name = "Água-marinha", Value = 34, Hp = 300,
+            Description = "Cristal verde-azulado, translúcido como a água das poças das Profundezas.",
+            Color = new Color(0.45f, 0.95f, 0.9f), Glow = new Color(0.3f, 1.0f, 0.85f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 26
+        });
+        Add(new MaterialDef
+        {
+            Id = "cobalt", Rarity = Rarity.Raro, Archetype = OreArchetype.Vein, Name = "Cobalto Glacial", Value = 62, Hp = 520,
+            Description = "Metal azul-profundo; os veios brilham como gelo quando atingidos.",
+            Color = new Color(0.2f, 0.35f, 0.85f), Glow = new Color(0.3f, 0.55f, 1.0f),
+            ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 28
+        });
+        Add(new MaterialDef
+        {
+            Id = "fluorite", Rarity = Rarity.Raro, Archetype = OreArchetype.Geode, Name = "Fluorita Dupla", Value = 90, Hp = 700,
+            Description = "Geodo com cristais roxos e verdes que trocam de cor sob a luz da ferramenta.",
+            Color = new Color(0.6f, 0.4f, 0.95f), Glow = new Color(0.4f, 1.0f, 0.6f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "sulfur", Rarity = Rarity.Incomum, Archetype = OreArchetype.Shards, Name = "Enxofre Vivo", Value = 140, Hp = 2000,
+            Description = "Lascas amarelas que chiam no calor do Núcleo. Cheiro inconfundível.",
+            Color = new Color(0.95f, 0.85f, 0.2f), Glow = new Color(1.0f, 0.9f, 0.25f),
+            ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 28
+        });
+        Add(new MaterialDef
+        {
+            Id = "garnet", Rarity = Rarity.Raro, Archetype = OreArchetype.Crystal, Name = "Granada Profunda", Value = 190, Hp = 2500,
+            Description = "Cristais vinho-escuros, densos, que soam graves ao serem atingidos.",
+            Color = new Color(0.55f, 0.08f, 0.2f), Glow = new Color(0.9f, 0.15f, 0.35f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 32
+        });
+        Add(new MaterialDef
+        {
+            Id = "meteorite", Rarity = Rarity.Epico, Archetype = OreArchetype.Vein, Name = "Ferro Meteórico", Value = 420, Hp = 5200,
+            Description = "Metal que caiu do céu há eras e afundou até o Núcleo. Veios com brilho azul-estelar.",
+            Color = new Color(0.3f, 0.3f, 0.36f), Glow = new Color(0.45f, 0.65f, 1.0f),
+            ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 34
+        });
+        Add(new MaterialDef
+        {
+            Id = "lapis", Rarity = Rarity.Raro, Archetype = OreArchetype.Banded, Name = "Lápis-lazúli", Value = 850, Hp = 10500,
+            Description = "Rocha azul-real salpicada de pontos dourados, em camadas do fundo do lago.",
+            Color = new Color(0.12f, 0.2f, 0.7f), Glow = new Color(1.0f, 0.82f, 0.3f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "blackpearl", Rarity = Rarity.Epico, Archetype = OreArchetype.Pearl, Name = "Pérola Negra", Value = 2200, Hp = 24000,
+            Description = "Pérolas escuras com reflexos de arco-íris, crescidas em ostras fossilizadas.",
+            Color = new Color(0.12f, 0.1f, 0.16f), Glow = new Color(0.75f, 0.5f, 1.0f),
+            ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 36
+        });
+
         // ---------------- Regiões ----------------
         var r1 = new RegionDef
         {
@@ -311,12 +385,14 @@ public static class GameData
             FogColor = new Color(0.09f, 0.07f, 0.15f), FogDensity = 0.016f,
             RockColor = new Color(0.46f, 0.3f, 0.22f), AccentColor = new Color(0.35f, 0.9f, 1.0f),
             LightColor = new Color(1.0f, 0.7f, 0.45f),
-            RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 20,
-            CenterZ = 0, HalfX = 21, HalfZ = 20, Height = 9
+            RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 48,
+            CenterZ = 0, HalfX = 46, HalfZ = 42, Height = 10
         };
-        r1.Spawns.Add(new SpawnEntry("quartz", 0.5f));
-        r1.Spawns.Add(new SpawnEntry("copper", 0.3f));
-        r1.Spawns.Add(new SpawnEntry("amethyst", 0.2f));
+r1.Spawns.Add(new SpawnEntry("quartz", 0.4f));
+        r1.Spawns.Add(new SpawnEntry("copper", 0.25f));
+        r1.Spawns.Add(new SpawnEntry("pyrite", 0.15f));
+        r1.Spawns.Add(new SpawnEntry("amethyst", 0.12f));
+        r1.Spawns.Add(new SpawnEntry("jasper", 0.08f));
         r1.Wings.Add(new WingDef { Id = "copper_vein", Name = "Veio de Cobre", Side = -1, ZOffset = -12, FeaturedMaterialId = "copper", Slots = 8, HalfX = 11, HalfZ = 10 });
         r1.Wings.Add(new WingDef { Id = "amethyst_grotto", Name = "Gruta das Ametistas", Side = 1, ZOffset = 6, FeaturedMaterialId = "amethyst", Slots = 8, HalfX = 11, HalfZ = 10 });
         Regions.Add(r1);
@@ -329,14 +405,17 @@ public static class GameData
             FogColor = new Color(0.06f, 0.16f, 0.24f), FogDensity = 0.028f,
             RockColor = new Color(0.16f, 0.25f, 0.33f), AccentColor = new Color(0.3f, 1.0f, 0.7f),
             LightColor = new Color(0.4f, 1.0f, 0.85f),
-            RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 22,
-            CenterZ = -58, HalfX = 26, HalfZ = 26, Height = 12
+            RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 58,
+            CenterZ = -106, HalfX = 56, HalfZ = 50, Height = 12
         };
-        r2.Spawns.Add(new SpawnEntry("sapphire", 0.35f));
-        r2.Spawns.Add(new SpawnEntry("frostice", 0.25f));
-        r2.Spawns.Add(new SpawnEntry("silver", 0.2f));
-        r2.Spawns.Add(new SpawnEntry("emerald", 0.12f));
-        r2.Spawns.Add(new SpawnEntry("malachite", 0.08f));
+r2.Spawns.Add(new SpawnEntry("sapphire", 0.26f));
+        r2.Spawns.Add(new SpawnEntry("frostice", 0.2f));
+        r2.Spawns.Add(new SpawnEntry("aquamarine", 0.14f));
+        r2.Spawns.Add(new SpawnEntry("silver", 0.14f));
+        r2.Spawns.Add(new SpawnEntry("emerald", 0.1f));
+        r2.Spawns.Add(new SpawnEntry("cobalt", 0.08f));
+        r2.Spawns.Add(new SpawnEntry("malachite", 0.05f));
+        r2.Spawns.Add(new SpawnEntry("fluorite", 0.03f));
         r2.Wings.Add(new WingDef { Id = "frozen_grotto", Name = "Gruta Congelada", Side = -1, ZOffset = 2, FeaturedMaterialId = "frostice" });
         r2.Wings.Add(new WingDef { Id = "silver_vein", Name = "Veio de Prata", Side = 1, ZOffset = -8, FeaturedMaterialId = "silver" });
         Regions.Add(r2);
@@ -349,14 +428,17 @@ public static class GameData
             FogColor = new Color(0.13f, 0.05f, 0.2f), FogDensity = 0.02f,
             RockColor = new Color(0.36f, 0.24f, 0.3f), AccentColor = new Color(1.0f, 0.75f, 0.3f),
             LightColor = new Color(0.8f, 0.45f, 1.0f),
-            RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 24,
-            CenterZ = -124, HalfX = 30, HalfZ = 30, Height = 16
+            RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 62,
+            CenterZ = -224, HalfX = 60, HalfZ = 54, Height = 15
         };
-        r3.Spawns.Add(new SpawnEntry("ruby", 0.35f));
-        r3.Spawns.Add(new SpawnEntry("obsidian", 0.25f));
-        r3.Spawns.Add(new SpawnEntry("magmite", 0.2f));
-        r3.Spawns.Add(new SpawnEntry("gold", 0.12f));
-        r3.Spawns.Add(new SpawnEntry("ancestralite", 0.08f));
+r3.Spawns.Add(new SpawnEntry("ruby", 0.26f));
+        r3.Spawns.Add(new SpawnEntry("obsidian", 0.2f));
+        r3.Spawns.Add(new SpawnEntry("sulfur", 0.14f));
+        r3.Spawns.Add(new SpawnEntry("magmite", 0.14f));
+        r3.Spawns.Add(new SpawnEntry("garnet", 0.1f));
+        r3.Spawns.Add(new SpawnEntry("gold", 0.08f));
+        r3.Spawns.Add(new SpawnEntry("ancestralite", 0.05f));
+        r3.Spawns.Add(new SpawnEntry("meteorite", 0.03f));
         r3.Wings.Add(new WingDef { Id = "old_forge", Name = "Forja Antiga", Side = -1, ZOffset = -0.5f, FeaturedMaterialId = "magmite", Slots = 10, HalfX = 14, HalfZ = 13 });
         r3.Wings.Add(new WingDef { Id = "obsidian_hall", Name = "Câmara de Obsidiana", Side = 1, ZOffset = -0.5f, FeaturedMaterialId = "obsidian", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r3);
@@ -369,13 +451,15 @@ public static class GameData
             FogColor = new Color(0.03f, 0.12f, 0.2f), FogDensity = 0.022f,
             RockColor = new Color(0.22f, 0.26f, 0.38f), AccentColor = new Color(0.3f, 0.95f, 1.0f),
             LightColor = new Color(0.5f, 0.8f, 1.0f),
-            RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 24,
-            CenterZ = -194, HalfX = 32, HalfZ = 30, Height = 16
+            RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 62,
+            CenterZ = -346, HalfX = 60, HalfZ = 54, Height = 15
         };
-        r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.4f));
-        r4.Spawns.Add(new SpawnEntry("coralprism", 0.25f));
-        r4.Spawns.Add(new SpawnEntry("titanium", 0.2f));
-        r4.Spawns.Add(new SpawnEntry("opal", 0.15f));
+r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
+        r4.Spawns.Add(new SpawnEntry("lapis", 0.2f));
+        r4.Spawns.Add(new SpawnEntry("coralprism", 0.18f));
+        r4.Spawns.Add(new SpawnEntry("titanium", 0.15f));
+        r4.Spawns.Add(new SpawnEntry("opal", 0.1f));
+        r4.Spawns.Add(new SpawnEntry("blackpearl", 0.05f));
         r4.Wings.Add(new WingDef { Id = "coral_garden", Name = "Jardim de Coral", Side = -1, ZOffset = 4, FeaturedMaterialId = "coralprism", Slots = 10, HalfX = 14, HalfZ = 13 });
         r4.Wings.Add(new WingDef { Id = "opal_well", Name = "Poço de Opalas", Side = 1, ZOffset = 6, FeaturedMaterialId = "opal", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r4);

@@ -54,7 +54,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: eventos de região", TestRegionEvents);
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
-            await RunAsync("Integração: galerias laterais", TestWings);
+            await RunAsync("Integração: cavernas, relevo e túneis secretos", TestWings);
             await RunAsync("Integração: coleta direta", TestDirectCollect);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
@@ -91,6 +91,17 @@ public partial class TestRunner : Node
     static GameState GS => GameState.Instance;
 
     void Fresh() { GS.NewGame(); }
+
+    /// <summary>Põe o jogador no ponto de mineração do depósito, olhando para o centro dele.</summary>
+    static void Face(PlayerController p, Crystal c, float yawOffset = 0f)
+    {
+        p.GlobalPosition = c.StandPoint;
+        p.Velocity = Vector3.Zero;
+        var dir = c.Center - (c.StandPoint + Vector3.Up * 1.55f);
+        float yaw = Mathf.Atan2(-dir.X, -dir.Z);
+        float pitch = Mathf.Atan2(dir.Y, new Vector2(dir.X, dir.Z).Length());
+        p.SetLook(yaw + yawOffset, pitch);
+    }
 
     // ---------------------------------------------------------------
     void TestHomeAndSkills()
@@ -580,11 +591,10 @@ public partial class TestRunner : Node
         Check(world.Gates.Count == GameData.Regions.Count - 1, "deve existir um portão por região desbloqueável");
         Check(world.Crystals.Any(c => c.Material.Special), "deve existir a formação especial");
 
-        var crystal = world.Crystals.Where(c => c.Material.Id == "quartz").OrderBy(c => c.GlobalPosition.DistanceTo(world.SpawnPoint)).First();
+        var crystal = world.Crystals.Where(c => c.Material.Id == "quartz" && c.GlobalTransform.Basis.Y.Normalized().Y > 0.95f).OrderBy(c => c.GlobalPosition.DistanceTo(world.SpawnPoint)).First();
         // posiciona o jogador ao lado e olhando para o cristal
         var cpos = crystal.GlobalPosition;
-        player.GlobalPosition = cpos + new Vector3(0, 0, 1.6f);
-        player.SetLook(0, -0.35f);
+        Face(player, crystal);
         await Frames(4);
         Check(player.TargetCrystal == crystal, "raycast do jogador deve mirar o cristal à frente");
 
@@ -616,8 +626,7 @@ public partial class TestRunner : Node
         // mineração real via entrada simulada
         GS.Data.Inventory.Clear();
         var c2 = crystal;
-        player.GlobalPosition = c2.GlobalPosition + new Vector3(0, 0, 1.6f);
-        player.SetLook(0, -0.35f);
+        Face(player, c2);
         player.SimulateCapturedMouse = true;
         Input.ActionPress("mine");
         float hpBefore = c2.Hp;
@@ -655,10 +664,11 @@ public partial class TestRunner : Node
         GS.RaiseAll();
         await Frames(3);
         Check(gate.IsOpen, "carregar save com região liberada deve abrir o portão");
-        Check(WorldBuilder.RegionAt(new Vector3(0, 0, -60)).Id == "depths", "detecção de região por posição");
-        Check(WorldBuilder.RegionAt(new Vector3(0, 0, 10)).Id == "caves", "detecção da região inicial");
-        Check(WorldBuilder.RegionAt(new Vector3(0, 0, -130)).Id == "core", "detecção do Núcleo");
-        Check(WorldBuilder.RegionAt(new Vector3(0, 0, -200)).Id == "abyss", "detecção do Reservatório");
+        foreach (var rr in GameData.Regions)
+        {
+            Check(WorldBuilder.RegionAt(new Vector3(0, 0, rr.CenterZ)).Id == rr.Id, $"detecção da região {rr.Name} pelo centro");
+            Check(WorldBuilder.RegionAt(new Vector3(0, 0, rr.CenterZ + rr.HalfZ - 1f)).Id == rr.Id, $"detecção da região {rr.Name} na entrada");
+        }
         root.QueueFree();
         await Frames(2);
     }
@@ -684,8 +694,7 @@ public partial class TestRunner : Node
         Check(target != null, "deve existir safira com vizinho no raio");
         if (target == null) { root.QueueFree(); return; }
         var neighbors = world.Crystals.Where(o => o != target && o.GlobalPosition.DistanceTo(target.GlobalPosition) < radius - 0.5f).ToList();
-        player.GlobalPosition = target.GlobalPosition + new Vector3(0, 0, 1.6f);
-        player.SetLook(0, -0.35f);
+        Face(player, target);
         player.SimulateCapturedMouse = true;
         int pulses = 0, hitCount = 0;
         player.ResonancePulse += n => { pulses++; hitCount = n; };
@@ -720,9 +729,8 @@ public partial class TestRunner : Node
         await Frames(3);
 
         // analógico direito gira a câmera
-        var crystal = world.Crystals.First(c => c.Material.Id == "quartz");
-        player.GlobalPosition = crystal.GlobalPosition + new Vector3(0, 0, 1.6f);
-        player.SetLook(0.6f, -0.35f);
+        var crystal = world.Crystals.First(c => c.Material.Id == "quartz" && c.GlobalTransform.Basis.Y.Normalized().Y > 0.95f);
+        Face(player, crystal, 0.6f);
         float yaw0 = player.Yaw;
         Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.RightX, AxisValue = -1f });
         await Frames(20);
@@ -732,7 +740,7 @@ public partial class TestRunner : Node
         Check(InputHints.UsingPad && InputHints.Interact == "[X]", "dicas devem mudar para o controle");
 
         // gatilho direito minera
-        player.SetLook(0, -0.35f);
+        Face(player, crystal);
         await Frames(3);
         float hp0 = crystal.Hp;
         Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.TriggerRight, AxisValue = 1f });
@@ -760,7 +768,7 @@ public partial class TestRunner : Node
         await Frames(2);
     }
 
-    /// <summary>Galerias laterais: existem, têm cristais do minério em destaque e são alcançáveis andando.</summary>
+    /// <summary>Cavernas: tamanho, relevo, caminhos, depósitos alcançáveis (chão e parede), túneis secretos e casa.</summary>
     async Task TestWings()
     {
         Fresh();
@@ -774,35 +782,94 @@ public partial class TestRunner : Node
         root.AddChild(player);
         player.SimulateCapturedMouse = true;
         await Frames(3);
-        int total = 0;
+        float reach = GS.MiningReach + 0.6f;
         foreach (var r in GameData.Regions)
         {
-            Check(r.Wings.Count >= 2, $"região {r.Id} deve ter ao menos 2 galerias laterais");
-            foreach (var w in r.Wings)
+            var L = world.Layouts[r.Index];
+            float area = L.ReachableArea();
+            Check(area > 2500, $"{r.Id}: área caminhável grande ({area:0} m²)");
+            float lo = 99, hi = -99;
+            for (int k = 0; k < L.Reach.Length; k++) if (L.Reach[k]) { lo = Mathf.Min(lo, L.F[k]); hi = Mathf.Max(hi, L.F[k]); }
+            Check(hi - lo >= 3.5f, $"{r.Id}: o chão tem relevo ({lo:0.0} → {hi:0.0} m)");
+            if (r.Index + 1 < GameData.Regions.Count) Check(L.Reachable(L.Exit.X, L.Exit.Z), $"{r.Id}: a saída para a próxima região é alcançável");
+            Check(L.Chambers.Count(c => c.Wing != null) == r.Wings.Count, $"{r.Id}: câmaras de minério em destaque criadas");
+            Check(L.Secrets.Count >= 1 && L.Crawls.Count == L.Secrets.Count, $"{r.Id}: há câmara secreta com túnel baixo");
+            foreach (var s2 in L.Secrets) Check(L.Reachable(s2.A.X, s2.A.Y), $"{r.Id}: câmara secreta alcançável (agachado)");
+            var crystals = world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == r.Index && !c.Material.Special).ToList();
+            int onWall = crystals.Count(c => c.GlobalTransform.Basis.Y.Normalized().Y < 0.9f);
+            Check(crystals.Count >= r.CrystalSlots, $"{r.Id}: depósitos suficientes ({crystals.Count})");
+            Check(onWall >= crystals.Count / 6, $"{r.Id}: depósitos nas paredes ({onWall}/{crystals.Count})");
+            int bad = 0;
+            foreach (var c in crystals)
             {
-                total++;
-                Check(GameData.Mat(w.FeaturedMaterialId) != null, $"galeria {w.Id}: minério em destaque inexistente");
-                var wing = world.RegionRoots[r.Index].GetNodeOrNull<Node3D>("Wing_" + w.Id);
-                Check(wing != null, $"galeria {w.Id} não foi construída");
-                if (wing == null) continue;
-                var crystals = world.Crystals.Where(c => wing.IsAncestorOf(c)).ToList();
-                Check(crystals.Count >= w.Slots - 2, $"galeria {w.Id}: poucos cristais ({crystals.Count})");
-                Check(crystals.Count(c => c.Material.Id == w.FeaturedMaterialId) >= 2, $"galeria {w.Id}: minério em destaque quase ausente");
-                // anda da sala principal até dentro da galeria
-                float oz = r.CenterZ + w.ZOffset;
-                player.GlobalPosition = new Vector3(w.Side * (r.HalfX - 6f), 0.1f, oz);
-                player.Velocity = Vector3.Zero;
-                player.SetLook(-w.Side * Mathf.Pi / 2, 0);
-                await Frames(2);
-                Input.ActionPress("move_forward");
-                float goal = r.HalfX + 2 + WorldBuilder.WingTunnelLength + 2f;
-                for (int i = 0; i < 600 && player.GlobalPosition.X * w.Side < goal; i++) await Frames(1);
-                Input.ActionRelease("move_forward");
-                Check(player.GlobalPosition.X * w.Side >= goal, $"galeria {w.Id}: jogador não conseguiu entrar andando (x={player.GlobalPosition.X:0.0})");
-                Check(player.GlobalPosition.Y > -1f, $"galeria {w.Id}: jogador caiu do mapa");
+                var eye = c.StandPoint + Vector3.Up * 1.45f;
+                if (!L.Reachable(c.StandPoint.X, c.StandPoint.Z) || eye.DistanceTo(c.Center) > reach + 0.8f) bad++;
             }
+            Check(bad == 0, $"{r.Id}: todo depósito tem um ponto alcançável para minerar ({bad} sem)");
+            // mira real: raio do olho (no ponto de mineração) até o centro precisa acertar o próprio depósito
+            var space = world.GetWorld3D().DirectSpaceState;
+            int blocked = 0;
+            foreach (var c in crystals)
+            {
+                var eye = c.StandPoint + Vector3.Up * 1.45f;
+                var dirc = (c.Center - eye).Normalized();
+                var q = PhysicsRayQueryParameters3D.Create(eye, eye + dirc * reach, PlayerController.WorldLayer | PlayerController.CrystalLayer);
+                var hit = space.IntersectRay(q);
+                if (hit.Count == 0 || hit["collider"].AsGodotObject() != c)
+                {
+                    blocked++;
+                    if (blocked <= 3) GD.Print($"      sem mira: {c.Material.Id} em {c.GlobalPosition} parede={c.GlobalTransform.Basis.Y.Normalized().Y < 0.9f} dist={eye.DistanceTo(c.Center):0.00} acertou={(hit.Count == 0 ? "nada" : hit["collider"].AsGodotObject())}");
+                }
+            }
+            Check(blocked <= crystals.Count / 50, $"{r.Id}: depósitos miráveis do ponto de mineração ({blocked} bloqueados de {crystals.Count})");
         }
-        Check(total >= 8, $"devem existir ao menos 8 galerias (há {total})");
+
+        // túnel secreto: em pé não passa, agachado passa
+        var L1 = world.Layouts[1];
+        var crawl = L1.Crawls[0];
+        var a = new Vector3(crawl.A.X, 0, crawl.A.Y);
+        var b = new Vector3(crawl.B.X, 0, crawl.B.Y);
+        var dir = (b - a).Normalized();
+        var start = a - dir * 2.5f;
+        start.Y = L1.Ground(start.X, start.Z) + 0.1f;
+        float yaw = Mathf.Atan2(-dir.X, -dir.Z);
+        async Task<float> Walk(bool crouch)
+        {
+            player.GlobalPosition = start;
+            player.Velocity = Vector3.Zero;
+            player.SetLook(yaw, 0);
+            player.SetCrouch(crouch);
+            await Frames(10);
+            Input.ActionPress("move_forward");
+            await Frames(crouch ? 900 : 400);
+            Input.ActionRelease("move_forward");
+            return (player.GlobalPosition - start).Dot(dir);
+        }
+        // trecho de teto baixo ao longo do túnel (medido a partir do ponto de partida)
+        float lowStart = -1, lowEnd = -1, total = a.DistanceTo(b);
+        for (float t = 0; t <= total; t += 0.25f)
+        {
+            var q = a + dir * t;
+            if (L1.Ceiling(q.X, q.Z) - L1.Ground(q.X, q.Z) < 2.0f) { if (lowStart < 0) lowStart = t; lowEnd = t; }
+        }
+        Check(lowStart >= 0, "túnel secreto tem teto baixo");
+        float standing = await Walk(false);
+        Check(standing < lowStart + 2.5f + 0.6f, $"túnel secreto bloqueia quem está em pé (avançou {standing:0.0} m; teto baixo a partir de {lowStart + 2.5f:0.0} m)");
+        float crouched = await Walk(true);
+        float need = lowEnd + 2.5f + 1f;
+        Check(crouched > need, $"agachado atravessa o túnel secreto (avançou {crouched:0.0} de {need:0.0} m)");
+        var mid = a + dir * ((lowStart + lowEnd) * 0.5f);
+        mid.Y = L1.Ground(mid.X, mid.Z) + 0.1f;
+        player.GlobalPosition = mid;
+        player.SetCrouch(true);
+        await Frames(10);
+        player.SetCrouch(false);
+        await Frames(30);
+        Check(player.Crouched, "dentro do túnel baixo o jogador não consegue levantar");
+        player.GlobalPosition = world.SpawnPoint;
+        await Frames(30);
+        Check(!player.Crouched, "fora do túnel ele levanta");
+
         // renascimento dinâmico: região esgotada → minérios voltam bem mais rápido
         Check(Mathf.IsEqualApprox(WorldBuilder.RespawnRateFor(0), 1f) && WorldBuilder.RespawnRateFor(1) >= 5.9f, "taxa de renascimento: 1x cheia, ~6x esgotada");
         var depths = world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 1).ToList();
@@ -822,15 +889,7 @@ public partial class TestRunner : Node
         await Frames(240);
         Input.ActionRelease("move_forward");
         Check(PlayerHouse.Contains(player.GlobalPosition), "paredes da casa seguram o jogador");
-        // oclusão por distância: longe da entrada some, dentro aparece
-        var r1 = GameData.Regions[1]; var w1 = r1.Wings[0];
-        var wn = world.RegionRoots[1].GetNode<Node3D>("Wing_" + w1.Id);
-        world.UpdateWingVisibility(new Vector3(0, 1.5f, GameData.Regions[0].CenterZ));
-        Check(!wn.Visible, "galeria distante deve ficar oculta");
-        world.UpdateWingVisibility(new Vector3(WorldBuilder.WingCenterX(r1, w1), 1.5f, r1.CenterZ + w1.ZOffset));
-        Check(wn.Visible, "galeria deve aparecer com a câmera dentro dela");
-        world.UpdateWingVisibility(new Vector3(w1.Side * (r1.HalfX - 8f), 1.5f, r1.CenterZ + w1.ZOffset));
-        Check(wn.Visible, "galeria deve aparecer perto da entrada");
+        Check(world.IsSafeSpot(world.SpawnPoint) && !world.IsSafeSpot(new Vector3(world.Layouts[0].X0 + 1, 0, 0)), "validação de posição salva (dentro da rocha é inválida)");
         root.QueueFree();
         await Frames(2);
     }

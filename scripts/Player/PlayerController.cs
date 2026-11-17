@@ -35,6 +35,15 @@ public partial class PlayerController : CharacterBody3D
     const float Gravity = 20f;
     const float JumpVelocity = 6.2f;
     const float EyeHeight = 1.55f;
+    const float CrouchEye = 0.85f;
+    public const float StandHeight = 1.75f, CrouchHeight = 1.0f;
+    /// <summary>Ponto seguro para onde o jogador volta se cair para fora do mapa.</summary>
+    public static Vector3 SafePoint = new(0, 1, 14);
+    CapsuleShape3D _capsule;
+    CollisionShape3D _bodyShape;
+    bool _crouched, _wantCrouch;
+    float _eye = EyeHeight;
+    public bool Crouched => _crouched;
 
     public event Action<Crystal, bool> CrystalHit; // (cristal, quebrou)
     public event Action<int> ResonancePulse;
@@ -51,12 +60,9 @@ public partial class PlayerController : CharacterBody3D
         CollisionLayer = PlayerLayer;
         CollisionMask = WorldLayer | CrystalLayer | InteractLayer;
         FloorMaxAngle = Mathf.DegToRad(50);
-        var shape = new CollisionShape3D
-        {
-            Shape = new CapsuleShape3D { Radius = 0.35f, Height = 1.75f },
-            Position = new Vector3(0, 0.875f, 0),
-        };
-        AddChild(shape);
+        _capsule = new CapsuleShape3D { Radius = 0.35f, Height = StandHeight };
+        _bodyShape = new CollisionShape3D { Shape = _capsule, Position = new Vector3(0, StandHeight / 2, 0) };
+        AddChild(_bodyShape);
         _head = new Node3D { Position = new Vector3(0, EyeHeight, 0) };
         AddChild(_head);
         Camera = new Camera3D { Current = true, Near = 0.05f, Far = 140f };
@@ -132,11 +138,17 @@ public partial class PlayerController : CharacterBody3D
         var wish = (Transform.Basis * new Vector3(input.X, 0, input.Y));
         wish.Y = 0;
         if (wish.LengthSquared() > 1) wish = wish.Normalized();
-        float speed = gs.MoveSpeed * (active && Input.IsActionPressed("sprint") ? 1.45f : 1f);
+        // agachar (alterna): passa por túneis baixos; só levanta se houver espaço
+        if (active && Input.IsActionJustPressed("crouch")) _wantCrouch = !_wantCrouch;
+        if (active && Input.IsActionJustPressed("jump") && _crouched) _wantCrouch = false;
+        SetCrouchedInternal(_wantCrouch || (_crouched && !CanStand()));
+        _eye = Mathf.MoveToward(_eye, _crouched ? CrouchEye : EyeHeight, dt * 4f);
+        _head.Position = new Vector3(0, _eye, 0);
+        float speed = gs.MoveSpeed * (_crouched ? 0.5f : active && Input.IsActionPressed("sprint") ? 1.45f : 1f);
         float accel = IsOnFloor() ? 14f : 4f;
         var horiz = new Vector3(vel.X, 0, vel.Z).Lerp(wish * speed, Mathf.Min(1, accel * dt));
         vel.X = horiz.X; vel.Z = horiz.Z;
-        if (active && Input.IsActionJustPressed("jump") && IsOnFloor()) vel.Y = JumpVelocity;
+        if (active && Input.IsActionJustPressed("jump") && IsOnFloor() && !_crouched) vel.Y = JumpVelocity;
         Velocity = vel;
         MoveAndSlide();
 
@@ -148,7 +160,7 @@ public partial class PlayerController : CharacterBody3D
             if (_stepAccum > 2.1f) { _stepAccum = 0; AudioManager.Instance?.Play("step", -14f, 1f, 0.15f); }
         }
         // segurança: se cair fora do mapa, volta ao ponto seguro
-        if (GlobalPosition.Y < -20) { GlobalPosition = new Vector3(0, 1, 14); Velocity = Vector3.Zero; }
+        if (GlobalPosition.Y < -20) { GlobalPosition = SafePoint; Velocity = Vector3.Zero; }
 
         // ---------- Mira ----------
         UpdateTarget(gs);
@@ -302,6 +314,32 @@ public partial class PlayerController : CharacterBody3D
             Tool.BeamEnd = Camera.GlobalPosition - Camera.GlobalTransform.Basis.Z * reach;
             Tool.BeamColor = ToolView.TierColors[gs.ToolTier];
         }
+    }
+
+    /// <summary>Pede para agachar/levantar (testes e bot). Levantar só acontece com espaço livre.</summary>
+    public void SetCrouch(bool crouch) => _wantCrouch = crouch;
+
+    void SetCrouchedInternal(bool c)
+    {
+        if (c == _crouched) return;
+        _crouched = c;
+        float h = c ? CrouchHeight : StandHeight;
+        _capsule.Height = h;
+        _bodyShape.Position = new Vector3(0, h / 2, 0);
+    }
+
+    /// <summary>Há espaço acima para ficar de pé?</summary>
+    bool CanStand()
+    {
+        var space = GetWorld3D().DirectSpaceState;
+        var q = new PhysicsShapeQueryParameters3D
+        {
+            Shape = new CapsuleShape3D { Radius = 0.33f, Height = StandHeight - 0.1f },
+            Transform = new Transform3D(Basis.Identity, GlobalPosition + Vector3.Up * (StandHeight / 2 + 0.06f)),
+            CollisionMask = WorldLayer,
+            Exclude = new Godot.Collections.Array<Rid> { GetRid() },
+        };
+        return space.IntersectShape(q, 1).Count == 0;
     }
 
     public void AddShake(float amount) => _shakeAmount = Mathf.Min(2f, _shakeAmount + amount);

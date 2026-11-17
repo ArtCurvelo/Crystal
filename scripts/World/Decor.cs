@@ -197,15 +197,16 @@ public static class Decor
     }
 
     /// <summary>Lago luminoso cobrindo o piso (o jogador caminha pela água rasa).</summary>
-    public static void Lake(Node3D root, RegionDef r)
+    public static void Lake(Node3D root, Vector3 center, float radius, Color glow)
     {
         var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/lake.gdshader") };
-        mat.SetShaderParameter("glow_color", r.AccentColor);
-        Mesh(root, new PlaneMesh { Size = new Vector2(r.HalfX * 2 - 4, r.HalfZ * 2 - 12) }, mat, new Vector3(0, 0.06f, r.CenterZ - 3f));
+        mat.SetShaderParameter("glow_color", glow);
+        // disco de água: a borda fica escondida sob as paredes e o relevo
+        Mesh(root, new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.02f, RadialSegments = 40, Rings = 1 }, mat, center);
     }
 
     /// <summary>Águas-vivas luminosas flutuando no ar úmido do reservatório.</summary>
-    public static void Jellyfish(Node3D root, RegionDef r, Random rng, int count)
+    public static void Jellyfish(Node3D root, Vector3 center, float radius, float height, Random rng, int count)
     {
         var colors = new[] { new Color(0.4f, 0.9f, 1f), new Color(1f, 0.5f, 0.85f), new Color(0.6f, 0.6f, 1f) };
         for (int i = 0; i < count; i++)
@@ -213,7 +214,7 @@ public static class Decor
             var c = colors[i % colors.Length];
             var j = new JellyNode
             {
-                Position = new Vector3(((float)rng.NextDouble() * 2 - 1) * (r.HalfX - 6), 4f + (float)rng.NextDouble() * (r.Height - 7), r.CenterZ + ((float)rng.NextDouble() * 2 - 1) * (r.HalfZ - 6)),
+                Position = center + new Vector3(((float)rng.NextDouble() * 2 - 1) * radius * 0.7f, 3f + (float)rng.NextDouble() * Mathf.Max(1f, height - 6f), ((float)rng.NextDouble() * 2 - 1) * radius * 0.7f),
                 Phase = (float)rng.NextDouble() * 6f,
                 Scale = Vector3.One * (0.6f + (float)rng.NextDouble() * 0.7f),
             };
@@ -281,19 +282,19 @@ public static class Decor
 
     // ------------------------------------------------------------------
     /// <summary>Aglomerados de cogumelos luminosos (MultiMesh: caules + chapéus).</summary>
-    public static void Mushrooms(Node3D root, RegionDef r, Random rng, int clusters, Color capColor)
+    public static void Mushrooms(Node3D root, CaveLayout L, Random rng, int clusters, Color capColor)
     {
         var stems = new List<Transform3D>();
         var caps = new List<Transform3D>();
         for (int c = 0; c < clusters; c++)
         {
-            // perto das paredes laterais
-            float side = rng.Next(2) == 0 ? -1 : 1;
-            var center = new Vector3(side * (r.HalfX - 1.5f - (float)rng.NextDouble() * 3f), 0, r.CenterZ + ((float)rng.NextDouble() * 2 - 1) * (r.HalfZ - 3));
+            // perto das paredes
+            if (!L.RandomNearWall(rng, out var center, -3f, -0.8f)) continue;
             int n = rng.Next(3, 7);
             for (int i = 0; i < n; i++)
             {
                 var p = center + new Vector3(((float)rng.NextDouble() - 0.5f) * 1.6f, 0, ((float)rng.NextDouble() - 0.5f) * 1.6f);
+                p.Y = L.Ground(p.X, p.Z) - 0.05f;
                 float h = 0.25f + (float)rng.NextDouble() * 0.6f;
                 float capR = 0.15f + (float)rng.NextDouble() * 0.25f;
                 var tilt = new Basis(new Vector3(1, 0, 0), ((float)rng.NextDouble() - 0.5f) * 0.4f);
@@ -306,13 +307,12 @@ public static class Decor
     }
 
     /// <summary>Samambaias estilizadas (folhas em leque) em tons quentes.</summary>
-    public static void Ferns(Node3D root, RegionDef r, Random rng, int count, Color color)
+    public static void Ferns(Node3D root, CaveLayout L, Random rng, int count, Color color)
     {
         var leaves = new List<Transform3D>();
         for (int i = 0; i < count; i++)
         {
-            float side = rng.Next(2) == 0 ? -1 : 1;
-            var p = new Vector3(side * (r.HalfX - 1f - (float)rng.NextDouble() * 4f), 0, r.CenterZ + ((float)rng.NextDouble() * 2 - 1) * (r.HalfZ - 2));
+            if (!L.RandomNearWall(rng, out var p, -4f, -0.5f)) continue;
             int fronds = rng.Next(5, 8);
             float size = 0.6f + (float)rng.NextDouble() * 0.6f;
             for (int f = 0; f < fronds; f++)
@@ -328,7 +328,7 @@ public static class Decor
 
     // ------------------------------------------------------------------
     /// <summary>Ruínas ancestrais: pilares com runas e um grande anel rúnico flutuante.</summary>
-    public static void AncientRuins(Node3D root, RegionDef r, Random rng)
+    public static void AncientRuins(Node3D root, CaveLayout L, Vector3 heart, Random rng)
     {
         var stone = Lit(new Color(0.62f, 0.52f, 0.56f), 0.85f);
         stone.EmissionEnabled = true; stone.Emission = new Color(0.25f, 0.12f, 0.3f); stone.EmissionEnergyMultiplier = 0.6f;
@@ -336,8 +336,10 @@ public static class Decor
         // pilares ao longo das laterais
         for (int i = 0; i < 6; i++)
         {
-            float side = i % 2 == 0 ? -1 : 1;
-            var p = new Vector3(side * (r.HalfX - 4f), 0, r.CenterZ + r.HalfZ - 8 - (i / 2) * 15f);
+            float side = 0;
+            float pa = Mathf.Tau * i / 6 + 0.26f;
+            var p = heart + new Vector3(Mathf.Cos(pa) * 12.5f, 0, Mathf.Sin(pa) * 12.5f);
+            p.Y = L.Ground(p.X, p.Z) - 0.2f;
             float h = 5.5f + (float)rng.NextDouble() * 2.5f;
             Mesh(root, new BoxMesh { Size = new Vector3(1.4f, h, 1.4f) }, stone, p + Vector3.Up * h / 2);
             Mesh(root, new BoxMesh { Size = new Vector3(1.9f, 0.5f, 1.9f) }, stone, p + Vector3.Up * (h + 0.25f));
@@ -347,9 +349,9 @@ public static class Decor
             Collider(root, p + Vector3.Up * h / 2, new Vector3(1.4f, h, 1.4f));
         }
         // anel rúnico vertical acima do Coração
-        var ring = new RuneRing { Position = new Vector3(0, 9.5f, r.CenterZ - 4f) };
+        var ring = new RuneRing { Position = heart + new Vector3(0, 9.5f, 0) };
         root.AddChild(ring);
-        root.AddChild(new OmniLight3D { LightColor = new Color(0.85f, 0.5f, 1f), LightEnergy = 2f, OmniRange = 14f, Position = new Vector3(0, 9.5f, r.CenterZ + 2f) });
+        root.AddChild(new OmniLight3D { LightColor = new Color(0.85f, 0.5f, 1f), LightEnergy = 2f, OmniRange = 14f, Position = heart + new Vector3(0, 9.5f, 6f) });
         ring.AddChild(new MeshInstance3D
         {
             Mesh = new TorusMesh { InnerRadius = 4.6f, OuterRadius = 5.2f, Rings = 32, RingSegments = 6 },
@@ -378,12 +380,12 @@ public static class Decor
                 Phase = (float)rng.NextDouble() * 6f,
             };
             root.AddChild(fr);
-            fr.Position = new Vector3(Mathf.Cos(a) * 9f, 8f + (float)rng.NextDouble() * 3f, r.CenterZ - 4f + Mathf.Sin(a) * 9f);
+            fr.Position = heart + new Vector3(Mathf.Cos(a) * 9f, 8f + (float)rng.NextDouble() * 3f, Mathf.Sin(a) * 9f);
         }
     }
 
     /// <summary>Formações gigantes de cristal (decorativas) junto às paredes, com o shader de cristal.</summary>
-    public static void GiantClusters(Node3D root, RegionDef r, Random rng, int count, Color[] palette, Func<int, float, bool> blockedWall = null)
+    public static void GiantClusters(Node3D root, CaveLayout L, Random rng, int count, Color[] palette, float height = 10f)
     {
         var shader = GD.Load<Shader>("res://shaders/crystal.gdshader");
         var mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.3f);
@@ -397,24 +399,13 @@ public static class Decor
             var xf = new List<Transform3D>();
             for (int c = 0; c < count; c++)
             {
-                // ponto junto a uma parede lateral ou ao fundo, longe dos túneis
-                Vector3 basePos;
-                int side = rng.Next(3);
-                float t = (float)(rng.NextDouble() * 2 - 1);
-                // parede lateral bloqueada (abertura de galeria) → usa a parede do fundo
-                if (side < 2 && blockedWall != null && blockedWall(side == 0 ? -1 : 1, r.CenterZ + t * (r.HalfZ - 4))) side = 2;
-                if (side == 0) basePos = new Vector3(-r.HalfX + 1.2f, 0, r.CenterZ + t * (r.HalfZ - 4));
-                else if (side == 1) basePos = new Vector3(r.HalfX - 1.2f, 0, r.CenterZ + t * (r.HalfZ - 4));
-                else
-                {
-                    float x = (5f + (float)rng.NextDouble() * (r.HalfX - 7f)) * (rng.Next(2) == 0 ? -1 : 1);
-                    basePos = new Vector3(x, 0, r.CenterZ - r.HalfZ + 1.2f);
-                }
-                Vector3 inward = side == 0 ? Vector3.Right : side == 1 ? Vector3.Left : Vector3.Back;
+                // junto a uma parede, longe das passagens estreitas
+                if (!L.RandomNearWall(rng, out var basePos, -1.6f, -0.6f)) continue;
+                var inward = L.Inward(basePos.X, basePos.Z);
                 int prisms = rng.Next(4, 7);
                 for (int i = 0; i < prisms; i++)
                 {
-                    float h = 2.2f + (float)rng.NextDouble() * (r.Height * 0.45f);
+                    float h = 2.2f + (float)rng.NextDouble() * (height * 0.45f);
                     float rad = 0.35f + (float)rng.NextDouble() * 0.45f;
                     if (i == 0) { h *= 1.3f; rad *= 1.3f; }
                     var dir = (Vector3.Up * 1.4f + inward * (0.3f + (float)rng.NextDouble() * 0.6f)

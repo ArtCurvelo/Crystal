@@ -49,9 +49,48 @@ public partial class ShardManager : Node3D
     {
         if (_mats.TryGetValue(m.Id, out var mat)) return mat;
         mat = MeshFactory.Emissive(m.Color, m.Glow, 1.6f);
+        switch (m.Archetype)
+        {
+            case OreArchetype.Vein: mat.Metallic = 0.8f; mat.Roughness = 0.3f; mat.EmissionEnergyMultiplier = 0.9f; break;
+            case OreArchetype.Pearl: mat.Roughness = 0.1f; mat.RimEnabled = true; mat.Rim = 0.8f; mat.EmissionEnergyMultiplier = 1.1f; break;
+            case OreArchetype.Banded: mat.EmissionEnergyMultiplier = 0.7f; break;
+            case OreArchetype.Magma: mat.AlbedoColor = new Color(0.15f, 0.08f, 0.06f); mat.EmissionEnergyMultiplier = 2.4f; break;
+        }
         _mats[m.Id] = mat;
         return mat;
     }
+
+    static readonly Dictionary<OreArchetype, Mesh> _meshes = new();
+
+    /// <summary>Formato do fragmento que cai, conforme o tipo de minério.</summary>
+    public static Mesh DropMesh(MaterialDef m)
+    {
+        if (_meshes.TryGetValue(m.Archetype, out var mesh)) return mesh;
+        mesh = m.Archetype switch
+        {
+            OreArchetype.Vein => Bake(MeshFactory.Rock(31, 0.45f), 0.11f),                       // pepita
+            OreArchetype.Geode => new SphereMesh { Radius = 0.1f, Height = 0.14f, RadialSegments = 7, Rings = 3, IsHemisphere = true },
+            OreArchetype.Banded => new BoxMesh { Size = new Vector3(0.24f, 0.06f, 0.15f) },     // placa de pedra
+            OreArchetype.Shards => MeshFactory.CrystalPrism(3, 0.04f, 0.34f, 0.65f),            // lasca afiada
+            OreArchetype.Ice => new BoxMesh { Size = new Vector3(0.14f, 0.14f, 0.14f) },        // cubo de gelo
+            OreArchetype.Magma => Bake(MeshFactory.Rock(17, 0.5f), 0.1f),                       // brasa
+            OreArchetype.Coral => new CylinderMesh { TopRadius = 0.022f, BottomRadius = 0.04f, Height = 0.28f, RadialSegments = 6, Rings = 1 },
+            OreArchetype.Pearl => new SphereMesh { Radius = 0.075f, Height = 0.15f, RadialSegments = 12, Rings = 6 },
+            _ => MeshFactory.CrystalPrism(5, 0.09f, 0.26f, 0.4f),
+        };
+        _meshes[m.Archetype] = mesh;
+        return mesh;
+    }
+
+    static Mesh Bake(Mesh src, float scale)
+    {
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        st.AppendFrom(src, 0, new Transform3D(Basis.Identity.Scaled(Vector3.One * scale), Vector3.Zero));
+        return st.Commit();
+    }
+
+    public static void ClearCaches() => _meshes.Clear();
 
     public void SpawnShards(MaterialDef mat, Vector3 origin, int count)
     {
@@ -67,6 +106,7 @@ public partial class ShardManager : Node3D
             }
             MeshInstance3D node = _free.Count > 0 ? _free.Pop() : CreateNode();
             node.MaterialOverride = MatFor(mat);
+            node.Mesh = DropMesh(mat);
             node.Visible = true;
             node.Scale = Vector3.One * (mat.Rare || mat.Special ? 1.4f : 1f);
             node.GlobalPosition = origin + new Vector3(Rand(-0.2f, 0.2f), Rand(0, 0.3f), Rand(-0.2f, 0.2f));

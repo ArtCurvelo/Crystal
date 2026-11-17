@@ -37,6 +37,7 @@ public sealed class SaveData
     // casa e árvore de habilidades
     public Dictionary<string, int> House { get; set; } = new();
     public List<string> Skills { get; set; } = new();
+    public List<string> Secrets { get; set; } = new();
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
     public float PlayerZ { get; set; } = 14f;
@@ -70,6 +71,8 @@ public sealed class SaveData
         if (DayBonus < 0) DayBonus = 0;
         House ??= new();
         Skills ??= new();
+        Secrets ??= new();
+        Secrets = Secrets.Where(k => !string.IsNullOrEmpty(k)).Distinct().ToList();
         foreach (var key in House.Keys.ToList())
         {
             var hd = HomeData.HouseDef(key);

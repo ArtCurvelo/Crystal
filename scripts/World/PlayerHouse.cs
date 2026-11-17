@@ -12,7 +12,7 @@ namespace CrystalExcavator.World;
 /// </summary>
 public partial class PlayerHouse : Node3D
 {
-    public static readonly Vector3 Origin = new(0, 0, 70f);
+    public static readonly Vector3 Origin = new(0, 0, 110f);
     public HouseDiorama Room;
     public HouseBed Bed;
     public HouseTerminal Panel;

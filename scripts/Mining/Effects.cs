@@ -193,4 +193,132 @@ public partial class Effects : Node3D
         tw.TweenProperty(l, "modulate:a", 0f, 0.9f).SetDelay(0.3f);
         tw.Chain().TweenCallback(Callable.From(() => l.Visible = false));
     }
+
+    // ===================== Efeitos próprios por tipo de minério =====================
+    readonly Dictionary<string, List<CpuParticles3D>> _style = new();
+    readonly Dictionary<string, int> _styleIdx = new();
+
+    static StandardMaterial3D Soft(bool additive) => new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        BlendMode = additive ? BaseMaterial3D.BlendModeEnum.Add : BaseMaterial3D.BlendModeEnum.Mix,
+        VertexColorUseAsAlbedo = true,
+    };
+
+    /// <summary>Cria (uma vez) um emissor de estilo: malha, gravidade, velocidade e vida próprias.</summary>
+    CpuParticles3D StyleEmitter(string style)
+    {
+        CpuParticles3D p;
+        var unshaded = MeshFactory.Unshaded(Colors.White);
+        switch (style)
+        {
+            case "sparks": // faíscas metálicas: riscos rápidos que caem
+                p = MakeEmitter(new BoxMesh { Size = new Vector3(0.02f, 0.02f, 0.22f) }, unshaded, 36, 0.7f, 9f, 1f);
+                p.Gravity = new Vector3(0, -16f, 0); p.Spread = 85f; p.ParticleFlagAlignY = true; break;
+            case "dust": // poeira de pedra: nuvens que se espalham devagar
+                p = MakeEmitter(new QuadMesh { Size = new Vector2(0.5f, 0.5f) }, Soft(false), 18, 1.6f, 1.6f, 1.4f);
+                p.Gravity = new Vector3(0, 0.25f, 0); p.Spread = 180f; p.DampingMin = 2f; p.DampingMax = 3f; break;
+            case "chunks": // pedaços de rocha
+                p = MakeEmitter(MeshFactory.Rock(9, 0.4f), unshaded, 12, 1.1f, 6f, 0.13f);
+                p.Gravity = new Vector3(0, -15f, 0); break;
+            case "splinters": // estilhaços de vidro: finos, longe
+                p = MakeEmitter(MeshFactory.CrystalPrism(3, 0.025f, 0.3f, 0.6f), unshaded, 46, 0.9f, 11f, 1f);
+                p.Gravity = new Vector3(0, -14f, 0); p.Spread = 110f; break;
+            case "frost": // névoa gelada e flocos
+                p = MakeEmitter(new QuadMesh { Size = new Vector2(0.12f, 0.12f) }, Soft(true), 40, 2.2f, 2.2f, 1f);
+                p.Gravity = new Vector3(0, -0.6f, 0); p.Spread = 180f; p.DampingMin = 1.5f; p.DampingMax = 2.5f; break;
+            case "embers": // brasas subindo
+                p = MakeEmitter(new QuadMesh { Size = new Vector2(0.09f, 0.09f) }, Soft(true), 40, 2.0f, 4.5f, 1f);
+                p.Gravity = new Vector3(0, 2.2f, 0); p.Spread = 60f; break;
+            case "smoke": // fumaça escura
+                p = MakeEmitter(new QuadMesh { Size = new Vector2(0.8f, 0.8f) }, Soft(false), 10, 2.4f, 1.2f, 1.5f);
+                p.Gravity = new Vector3(0, 1.2f, 0); p.Spread = 40f; break;
+            case "bubbles": // bolhas que sobem balançando
+                p = MakeEmitter(new SphereMesh { Radius = 0.06f, Height = 0.12f, RadialSegments = 8, Rings = 4 }, Soft(true), 26, 2.4f, 1.8f, 1f);
+                p.Gravity = new Vector3(0, 1.6f, 0); p.Spread = 50f; p.ParticleFlagAlignY = false; break;
+            case "orbs": // orbes luminosos flutuando
+                p = MakeEmitter(new SphereMesh { Radius = 0.08f, Height = 0.16f, RadialSegments = 8, Rings = 4 }, unshaded, 16, 2.6f, 1.4f, 1f);
+                p.Gravity = new Vector3(0, 0.9f, 0); p.Spread = 180f; p.DampingMin = 1f; p.DampingMax = 2f; break;
+            case "glitter": // brilho fino (geodos)
+                p = MakeEmitter(new QuadMesh { Size = new Vector2(0.07f, 0.07f) }, Soft(true), 50, 1.5f, 3.5f, 1f);
+                p.Gravity = new Vector3(0, -2f, 0); p.Spread = 180f; break;
+            default:
+                p = MakeEmitter(MeshFactory.CrystalPrism(4, 0.05f, 0.14f, 0.4f), unshaded, 40, 0.9f, 7f, 1.3f); break;
+        }
+        float f = Settings.Quality switch { GraphicsQuality.Low => 0.5f, GraphicsQuality.Medium => 0.75f, _ => 1f };
+        p.Amount = Mathf.Max(6, (int)(p.Amount * f));
+        return p;
+    }
+
+    void EmitStyle(string style, Vector3 pos, Vector3 dir, Color color, float scale = 1f)
+    {
+        if (!_style.TryGetValue(style, out var list))
+        {
+            list = new List<CpuParticles3D>();
+            for (int i = 0; i < 3; i++) list.Add(StyleEmitter(style));
+            _style[style] = list;
+            _styleIdx[style] = 0;
+        }
+        var p = list[_styleIdx[style]++ % list.Count];
+        p.Scale = Vector3.One * scale;
+        Emit(p, pos, dir, color);
+    }
+
+    /// <summary>Efeito de quebra conforme o formato do minério.</summary>
+    public void BreakFx(Data.MaterialDef m, Vector3 pos, float scale = 1f)
+    {
+        var glow = m.Glow.Lightened(0.2f);
+        switch (m.Archetype)
+        {
+            case Data.OreArchetype.Vein:
+                EmitStyle("sparks", pos, Vector3.Up, new Color(1f, 0.85f, 0.5f).Lerp(glow, 0.4f), scale);
+                EmitStyle("chunks", pos, Vector3.Up, m.Color, scale);
+                break;
+            case Data.OreArchetype.Banded:
+                EmitStyle("dust", pos, Vector3.Up, new Color(m.Color.Lerp(new Color(0.6f, 0.55f, 0.5f), 0.6f), 0.55f), scale);
+                EmitStyle("chunks", pos, Vector3.Up, m.Color, scale);
+                break;
+            case Data.OreArchetype.Shards:
+                EmitStyle("splinters", pos, Vector3.Up, glow, scale);
+                EmitStyle("dust", pos, Vector3.Up, new Color(0.15f, 0.12f, 0.18f, 0.5f), scale * 0.7f);
+                break;
+            case Data.OreArchetype.Ice:
+                EmitStyle("frost", pos, Vector3.Up, new Color(0.85f, 0.95f, 1f, 0.8f), scale);
+                Burst(pos, glow, scale);
+                break;
+            case Data.OreArchetype.Magma:
+                EmitStyle("embers", pos, Vector3.Up, new Color(1f, 0.55f, 0.15f), scale);
+                EmitStyle("smoke", pos, Vector3.Up, new Color(0.12f, 0.1f, 0.1f, 0.6f), scale);
+                break;
+            case Data.OreArchetype.Coral:
+                EmitStyle("bubbles", pos, Vector3.Up, new Color(glow, 0.7f), scale);
+                Burst(pos, glow, scale * 0.8f);
+                break;
+            case Data.OreArchetype.Pearl:
+                EmitStyle("orbs", pos, Vector3.Up, glow, scale);
+                EmitStyle("bubbles", pos, Vector3.Up, new Color(0.8f, 0.9f, 1f, 0.6f), scale * 0.8f);
+                break;
+            case Data.OreArchetype.Geode:
+                EmitStyle("glitter", pos, Vector3.Up, glow, scale);
+                Burst(pos, glow, scale);
+                break;
+            default:
+                Burst(pos, glow, scale);
+                break;
+        }
+    }
+
+    /// <summary>Faísca de golpe conforme o formato (metal solta faíscas, magma brasas, pedra poeira).</summary>
+    public void HitFx(Data.MaterialDef m, Vector3 pos, Vector3 normal)
+    {
+        switch (m.Archetype)
+        {
+            case Data.OreArchetype.Vein: EmitStyle("sparks", pos, normal, new Color(1f, 0.85f, 0.5f), 0.45f); break;
+            case Data.OreArchetype.Magma: EmitStyle("embers", pos, normal, new Color(1f, 0.55f, 0.15f), 0.4f); break;
+            case Data.OreArchetype.Banded: EmitStyle("dust", pos, normal, new Color(0.6f, 0.55f, 0.5f, 0.35f), 0.35f); break;
+        }
+        Hit(pos, normal, m.Glow.Lightened(0.3f));
+    }
 }

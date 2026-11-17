@@ -198,7 +198,132 @@ public partial class AudioManager : Node
         });
         _sounds["charged"] = Synth(0.25f, (t, i) => (MathF.Sin(Tau * 1760 * t) + MathF.Sin(Tau * 2217 * t)) * MathF.Exp(-t * 10f) * 0.18f);
         _sounds["step"] = Synth(0.08f, (t, i) => Noise() * MathF.Exp(-t * 60f) * 0.12f);
+        BuildOreSounds();
     }
+
+    // ===================== Sons por tipo de minério =====================
+    /// <summary>
+    /// Cada formato tem timbre próprio para golpe e quebra; cada minério soa diferente
+    /// pelo tom (derivado do id, estável entre execuções).
+    /// </summary>
+    void BuildOreSounds()
+    {
+        foreach (Data.OreArchetype a in Enum.GetValues(typeof(Data.OreArchetype)))
+        {
+            _sounds["hit_" + a] = OreHit(a);
+            _sounds["brk_" + a] = OreBreak(a);
+        }
+    }
+
+    public static float OrePitch(Data.MaterialDef m)
+    {
+        if (m.Special) return 0.7f;
+        uint h = 2166136261;
+        foreach (char ch in m.Id) { h ^= ch; h *= 16777619; }
+        return 0.82f + (h % 41) / 100f; // 0,82 … 1,22
+    }
+
+    /// <summary>Som do minério sendo atingido (broke=false) ou quebrando (broke=true).</summary>
+    public void PlayOre(Data.MaterialDef m, bool broke, float volumeDb, float pitchMul = 1f)
+    {
+        string id = (broke ? "brk_" : "hit_") + m.Archetype;
+        Play(id, volumeDb, OrePitch(m) * pitchMul, broke ? 0.04f : 0.05f);
+    }
+
+    AudioStreamWav OreHit(Data.OreArchetype a) => a switch
+    {
+        // metal: "clink" com parciais inarmônicas longas
+        Data.OreArchetype.Vein => Synth(0.45f, (t, i) =>
+            (MathF.Sin(Tau * 523 * t) * 0.35f + MathF.Sin(Tau * 1391 * t) * 0.3f + MathF.Sin(Tau * 2761 * t) * 0.2f) * MathF.Exp(-t * 9f) * 0.75f
+            + Noise() * MathF.Exp(-t * 220f) * 0.5f),
+        // geodo: batida oca + brilho pequeno
+        Data.OreArchetype.Geode => Synth(0.3f, (t, i) =>
+            MathF.Sin(Tau * (320 - t * 400) * t) * MathF.Exp(-t * 18f) * 0.6f + MathF.Sin(Tau * 1980 * t) * MathF.Exp(-t * 26f) * 0.18f
+            + Noise() * MathF.Exp(-t * 150f) * 0.35f),
+        // pedra em faixas: estalo seco e grave
+        Data.OreArchetype.Banded => Synth(0.22f, (t, i) =>
+            (Noise() * 0.55f * MathF.Exp(-t * 35f) + MathF.Sin(Tau * 160 * t) * MathF.Exp(-t * 25f) * 0.5f) * 0.9f),
+        // vidro/obsidiana: tique agudo e curtíssimo
+        Data.OreArchetype.Shards => Synth(0.18f, (t, i) =>
+            (MathF.Sin(Tau * 3150 * t) * 0.4f + MathF.Sin(Tau * 4410 * t) * 0.25f) * MathF.Exp(-t * 40f) + Noise() * MathF.Exp(-t * 260f) * 0.45f),
+        // gelo: estalidos + "ping" frio
+        Data.OreArchetype.Ice => Synth(0.3f, (t, i) =>
+            (Noise() > 0.82f ? 0.6f : 0f) * MathF.Exp(-t * 20f) + MathF.Sin(Tau * 2600 * t) * MathF.Exp(-t * 16f) * 0.3f),
+        // magma: chiado + baque grave
+        Data.OreArchetype.Magma => Synth(0.35f, (t, i) =>
+            Noise() * MathF.Exp(-t * 10f) * 0.28f + MathF.Sin(Tau * 90 * t) * MathF.Exp(-t * 20f) * 0.55f),
+        // coral: "toc" de madeira
+        Data.OreArchetype.Coral => Synth(0.16f, (t, i) =>
+            (Square(720 * t) * 0.25f + MathF.Sin(Tau * 1440 * t) * 0.2f) * MathF.Exp(-t * 45f) + Noise() * MathF.Exp(-t * 200f) * 0.3f),
+        // pérola: "blup" suave que desce
+        Data.OreArchetype.Pearl => Synth(0.28f, (t, i) =>
+            MathF.Sin(Tau * (950 - t * 1500) * t) * MathF.Exp(-t * 14f) * 0.5f),
+        // cristal (padrão)
+        _ => Synth(0.28f, (t, i) =>
+            (MathF.Sin(Tau * 1320 * t) * 0.5f + MathF.Sin(Tau * 2110 * t) * 0.3f + MathF.Sin(Tau * 3370 * t) * 0.18f) * MathF.Exp(-t * 22f) * 0.7f
+            + Noise() * MathF.Exp(-t * 180f) * 0.42f),
+    };
+
+    AudioStreamWav OreBreak(Data.OreArchetype a) => a switch
+    {
+        // metal: estrondo metálico com cauda de "ting"
+        Data.OreArchetype.Vein => Synth(1.1f, (t, i) =>
+        {
+            float crash = Noise() * MathF.Exp(-t * 7f) * 0.35f;
+            float ring = 0;
+            foreach (var f in new[] { 410f, 987f, 1873f, 3021f }) ring += MathF.Sin(Tau * f * t) * 0.13f;
+            return crash + ring * MathF.Exp(-t * 3.5f) + MathF.Sin(Tau * 80 * t) * MathF.Exp(-t * 12f) * 0.35f;
+        }),
+        // geodo: "pop" + cascata de brilhos rápidos
+        Data.OreArchetype.Geode => Synth(1.0f, (t, i) =>
+        {
+            float pop = MathF.Sin(Tau * (220 - t * 200) * t) * MathF.Exp(-t * 14f) * 0.55f;
+            float glitter = 0;
+            for (int k = 0; k < 8; k++) { float st = 0.05f + k * 0.035f; if (t > st) glitter += MathF.Sin(Tau * (2200 + k * 310) * (t - st)) * MathF.Exp(-(t - st) * 14f) * 0.12f; }
+            return pop + glitter + Noise() * MathF.Exp(-t * 30f) * 0.2f;
+        }),
+        // pedra: desmoronamento longo e grave
+        Data.OreArchetype.Banded => Synth(1.1f, (t, i) =>
+            Noise() * MathF.Exp(-t * 4f) * 0.4f * (0.6f + 0.4f * MathF.Sin(Tau * 18 * t)) + MathF.Sin(Tau * 55 * t) * MathF.Exp(-t * 5f) * 0.5f),
+        // vidro: estilhaço com muitos "pings" agudos
+        Data.OreArchetype.Shards => Synth(0.9f, (t, i) =>
+        {
+            float shatter = Noise() * MathF.Exp(-t * 12f) * 0.4f;
+            float pings = 0;
+            for (int k = 0; k < 7; k++) { float st = k * 0.045f; if (t > st) pings += MathF.Sin(Tau * (2900 + k * 530) * (t - st)) * MathF.Exp(-(t - st) * 18f) * 0.12f; }
+            return shatter + pings;
+        }),
+        // gelo: rachadura + vento frio
+        Data.OreArchetype.Ice => Synth(1.0f, (t, i) =>
+            (Noise() > 0.7f ? 0.5f : 0f) * MathF.Exp(-t * 6f) + Noise() * 0.15f * MathF.Sin(MathF.PI * t) + MathF.Sin(Tau * 1760 * t) * MathF.Exp(-t * 6f) * 0.2f),
+        // magma: explosão abafada + crepitar de brasas
+        Data.OreArchetype.Magma => Synth(1.2f, (t, i) =>
+            MathF.Sin(Tau * (60 + 30 * MathF.Exp(-t * 5f)) * t) * MathF.Exp(-t * 3.5f) * 0.6f + Noise() * MathF.Exp(-t * 5f) * 0.25f
+            + (Noise() > 0.93f ? 0.35f : 0f) * MathF.Exp(-t * 2f)),
+        // coral: galhos estalando em sequência
+        Data.OreArchetype.Coral => Synth(0.8f, (t, i) =>
+        {
+            float s2 = 0;
+            for (int k = 0; k < 5; k++) { float st = k * 0.09f; if (t > st) s2 += (Square(600 * (t - st)) * 0.18f + Noise() * 0.25f) * MathF.Exp(-(t - st) * 40f); }
+            return s2;
+        }),
+        // pérola: acorde suave e bolhas
+        Data.OreArchetype.Pearl => Synth(1.1f, (t, i) =>
+        {
+            float chord = (MathF.Sin(Tau * 784 * t) + MathF.Sin(Tau * 988 * t) + MathF.Sin(Tau * 1175 * t)) * 0.13f * MathF.Exp(-t * 3f);
+            float bub = 0;
+            for (int k = 0; k < 4; k++) { float st = 0.1f + k * 0.12f; if (t > st) bub += MathF.Sin(Tau * (600 + k * 150 + (t - st) * 2500) * (t - st)) * MathF.Exp(-(t - st) * 30f) * 0.2f; }
+            return chord + bub;
+        }),
+        // cristal: ruído + cascata de sinos
+        _ => Synth(0.9f, (t, i) =>
+        {
+            float n = Noise() * MathF.Exp(-t * 9f) * 0.45f;
+            float bells = 0;
+            for (int k = 0; k < 5; k++) { float st = k * 0.06f; if (t > st) bells += MathF.Sin(Tau * (1500 + k * 380) * (t - st)) * MathF.Exp(-(t - st) * 7f) * 0.18f; }
+            return n + bells;
+        }),
+    };
 
     const float Tau = MathF.PI * 2f;
     uint _seed = 22222;

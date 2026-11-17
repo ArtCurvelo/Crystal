@@ -36,23 +36,21 @@ public partial class ScreenshotTour : Node
         p.SimulateCapturedMouse = true;
         await Wait(1.2f);
         await Shot("02_spawn");
-        p.SetLook(1.35f, 0.02f);
+        var L0 = Main.World.Layouts[0];
+        var cc = L0.OnGround(L0.Camp.A.X, L0.Camp.A.Y);
+        LookAtPoint(p, L0.OnGround(cc.X + 2f, cc.Z + 6f, 0.1f), cc + new Vector3(-9.5f, 1.5f, 0f));
         await Wait(0.4f);
         await Shot("02b_outpost");
-        p.GlobalPosition = new Vector3(2.4f, 0.1f, 15.6f);
-        p.SetLook(-1.05f, -0.12f);
+        LookAtPoint(p, L0.OnGround(cc.X + 3f, cc.Z + 7f, 0.1f), Main.World.Layouts[0].OnGround(cc.X + 6.5f, cc.Z + 4f, 1.2f));
         await Wait(0.4f);
         await Shot("02c_terminal");
-        p.GlobalPosition = new Vector3(-1.5f, 0.1f, 16.2f);
-        p.SetLook(1.0f, -0.12f);
+        LookAtPoint(p, L0.OnGround(cc.X - 2.5f, cc.Z + 7.5f, 0.1f), Main.World.SellStation.GlobalPosition + Vector3.Up * 1.2f);
         await Wait(0.4f);
         await Shot("02d_sell");
-        p.GlobalPosition = new Vector3(-9f, 0.1f, 1.5f);
-        p.SetLook(1.9f, -0.05f);
-        await Wait(0.4f);
-        await Shot("02e_props");
-        p.GlobalPosition = new Vector3(2.5f, 0.1f, 13.2f);
-        p.SetLook(2.72f, 0.12f);
+        LookAtPoint(p, PathAt(0, 0.35f), PathAt(0, 0.55f) + Vector3.Up * 2f);
+        await Wait(0.6f);
+        await Shot("02e_cave");
+        LookAtPoint(p, L0.OnGround(cc.X + 2.5f, cc.Z + 4f, 0.1f), Main.World.Elevator.GlobalPosition + Vector3.Up * 2.5f);
         await Wait(0.4f);
         await Shot("02f_elevator");
         p.GlobalPosition = Main.World.SpawnPoint;
@@ -61,8 +59,7 @@ public partial class ScreenshotTour : Node
         // mira em um cristal e minera
         var c = Main.World.Crystals.Where(x => x.Material.Id == "quartz")
             .OrderBy(x => x.GlobalPosition.DistanceTo(p.GlobalPosition)).First();
-        p.GlobalPosition = c.GlobalPosition + new Vector3(0, 0, 1.8f);
-        p.SetLook(0, -0.38f);
+        LookAtPoint(p, c.StandPoint, c.Center);
         await Wait(0.6f);
         Input.ActionPress("mine");
         await Wait(1.2f);
@@ -75,8 +72,7 @@ public partial class ScreenshotTour : Node
         int[] tierLevels = { 0, 3, 7, 12, 18, 24 };
         var tc = Main.World.Crystals.Where(x => x.IsMineable && x.Material.Id == "amethyst")
             .OrderBy(x => x.GlobalPosition.DistanceTo(p.GlobalPosition)).First();
-        p.GlobalPosition = tc.GlobalPosition + new Vector3(0, 0, 2.4f);
-        p.SetLook(0, -0.3f);
+        LookAtPoint(p, tc.StandPoint, tc.Center);
         for (int t = 0; t < tierLevels.Length; t++)
         {
             gs.Data.Upgrades[UpgradeIds.Damage] = tierLevels[t];
@@ -92,8 +88,7 @@ public partial class ScreenshotTour : Node
 
         // vista geral da região 1 com FPS
         Settings.Data.ShowFps = true;
-        p.GlobalPosition = new Vector3(0, 0.1f, 12);
-        p.SetLook(0, -0.05f);
+        LookAtPoint(p, PathAt(0, 0.12f), PathAt(0, 0.4f) + Vector3.Up * 2f);
         await Wait(2f);
         await Shot("05_region1");
         float fps1 = (float)Engine.GetFramesPerSecond();
@@ -114,10 +109,9 @@ public partial class ScreenshotTour : Node
         await Wait(0.3f);
 
         // portão
-        p.GlobalPosition = new Vector3(0, 0.1f, -17);
-        p.SetLook(0, 0.05f);
+        var g0 = Main.World.Gates[0].GlobalPosition;
+        LookAtPoint(p, PathAt(0, 0.93f), g0 + Vector3.Up * 2.5f);
         await Wait(1f);
-        p.GlobalPosition = new Vector3(0, 0.1f, -15f);
         await Wait(0.5f);
         await Shot("08_gate");
 
@@ -128,8 +122,7 @@ public partial class ScreenshotTour : Node
         foreach (var id in UpgradeIds.All) gs.Data.Upgrades[id] = 10;
         gs.Data.Upgrades[UpgradeIds.Damage] = 18;
         gs.RaiseAll();
-        p.GlobalPosition = new Vector3(0, 0.1f, -36);
-        p.SetLook(0, 0);
+        LookAtPoint(p, PathAt(1, 0.2f), PathAt(1, 0.45f) + Vector3.Up * 2f);
         await Wait(3f);
         await Shot("09_region2");
         Main.Events.Begin("depths");
@@ -140,37 +133,47 @@ public partial class ScreenshotTour : Node
         string dc2 = DrawStats();
 
         // região 3 e o Coração Ancestral
-        p.GlobalPosition = new Vector3(0, 0.1f, -100);
-        p.SetLook(0, 0.08f);
+        var L2 = Main.World.Layouts[2];
+        var hcen = L2.OnGround(L2.Heart.A.X, L2.Heart.A.Y);
+        LookAtPoint(p, L2.OnGround(hcen.X + 3f, hcen.Z + 15f, 0.1f), hcen + Vector3.Up * 4f);
         await Wait(3f);
         await Shot("10_region3");
         gs.AddMoney(GameData.Regions[3].UnlockCost);
         gs.TryUnlockRegion("abyss");
-        p.GlobalPosition = new Vector3(0, 0.1f, -168f);
-        p.SetLook(0, 0.05f);
+        LookAtPoint(p, PathAt(3, 0.15f), PathAt(3, 0.4f) + Vector3.Up * 2f);
         await Wait(3f);
         await Shot("10b_region4");
-        p.GlobalPosition = new Vector3(6f, 0.1f, -178f);
-        p.SetLook(0.6f, 0.25f);
+        var L3 = Main.World.Layouts[3];
+        if (L3.Lake != null) LookAtPoint(p, L3.OnGround(L3.Lake.A.X + L3.Lake.RA * 0.7f, L3.Lake.A.Y, 0.1f), new Vector3(L3.Lake.A.X, L3.Lake.Level + 4f, L3.Lake.A.Y));
         await Wait(0.6f);
         await Shot("10c_region4b");
-        // galerias laterais: entrada vista da sala principal e o interior de cada uma
+        // câmaras com minério em destaque e túneis secretos de cada região
         {
-            var r0 = GameData.Regions[0]; var w0 = r0.Wings[0];
-            p.GlobalPosition = new Vector3(w0.Side * (r0.HalfX - 10f), 0.1f, r0.CenterZ + w0.ZOffset + 3f);
-            p.SetLook(-w0.Side * Mathf.Pi / 2 - 0.2f * w0.Side, 0.12f);
-            await Wait(1f);
-            await Shot("10d_wing_entrance");
             int wi = 0;
             foreach (var r in GameData.Regions)
-                foreach (var w in r.Wings)
+            {
+                var L = Main.World.Layouts[r.Index];
+                foreach (var ch in L.Chambers)
                 {
-                    float wx = w.Side * (r.HalfX + 2 + World.WorldBuilder.WingTunnelLength + 1.2f);
-                    p.GlobalPosition = new Vector3(wx, 0.1f, r.CenterZ + w.ZOffset);
-                    p.SetLook(-w.Side * Mathf.Pi / 2, -0.05f);
+                    if (ch.Wing == null) continue;
+                    var dirc = new Vector3(ch.A.X, 0, ch.A.Y).Normalized();
+                    var pos = L.OnGround(ch.A.X - dirc.X * ch.RA * 0.6f, ch.A.Y - dirc.Z * ch.RA * 0.6f, 0.1f);
+                    p.GlobalPosition = pos;
+                    p.SetLook(Mathf.Atan2(-(ch.A.X - pos.X), -(ch.A.Y - pos.Z)), 0.05f);
                     await Wait(0.8f);
-                    await Shot($"10w_{wi++}_{w.Id}");
+                    await Shot($"10w_{wi++}_{ch.Id}");
                 }
+                if (L.Crawls.Count > 0)
+                {
+                    var cr = L.Crawls[0];
+                    var d = new Vector3(cr.B.X - cr.A.X, 0, cr.B.Y - cr.A.Y).Normalized();
+                    var pos = L.OnGround(cr.A.X - d.X * 4f, cr.A.Y - d.Z * 4f, 0.1f);
+                    p.GlobalPosition = pos;
+                    p.SetLook(Mathf.Atan2(-d.X, -d.Z), -0.1f);
+                    await Wait(0.8f);
+                    await Shot($"10s_{r.Id}_secret");
+                }
+            }
         }
         float fps3 = (float)Engine.GetFramesPerSecond();
         string dc3 = DrawStats();
@@ -204,8 +207,7 @@ public partial class ScreenshotTour : Node
 
         // fim do turno e casa
         Main.CloseAllForTour();
-        p.GlobalPosition = new Vector3(3f, 0.1f, 8f);
-        p.SetLook(2.9f, 0.05f);
+        LookAtPoint(p, L0.OnGround(cc.X + 2f, cc.Z + 1f, 0.1f), Main.World.SellStation.GlobalPosition + Vector3.Up);
         gs.AddItem("quartz", 12);
         gs.Data.DayTimeSeconds = gs.DayLength - 50;
         await Wait(0.8f);
@@ -289,6 +291,31 @@ public partial class ScreenshotTour : Node
             await Shot($"16_ores_{g}");
         }
         root.QueueFree();
+    }
+
+    static void LookAtPoint(Player.PlayerController p, Vector3 from, Vector3 target)
+    {
+        p.GlobalPosition = from;
+        p.Velocity = Vector3.Zero;
+        var dir = target - (from + Vector3.Up * 1.55f);
+        p.SetLook(Mathf.Atan2(-dir.X, -dir.Z), Mathf.Atan2(dir.Y, new Vector2(dir.X, dir.Z).Length()));
+    }
+
+    /// <summary>Ponto (no chão) a uma fração do caminho principal da região.</summary>
+    Vector3 PathAt(int region, float t)
+    {
+        var L = Main.World.Layouts[region];
+        var pts = L.PathPoints;
+        float total = 0;
+        for (int i = 1; i < pts.Count; i++) total += pts[i].DistanceTo(pts[i - 1]);
+        float want = t * total;
+        for (int i = 1; i < pts.Count; i++)
+        {
+            float seg = pts[i].DistanceTo(pts[i - 1]);
+            if (want <= seg) { var q = pts[i - 1].Lerp(pts[i], want / seg); return L.OnGround(q.X, q.Z, 0.1f); }
+            want -= seg;
+        }
+        return L.OnGround(pts[^1].X, pts[^1].Z, 0.1f);
     }
 
     async Task Wait(float s)
