@@ -9,7 +9,7 @@ Godot **4.5.1 .NET**, C# (.NET 8), renderizador **Compatibility**. Todo o conte�
 ## Repositório
 - GitHub: https://github.com/ArtCurvelo/Crystal (branch `main`). **Fonte da verdade.**
 - O desenvolvimento acontece num container Linux na nuvem (`/home/user/crystal-excavator`), e cada etapa é enviada com `git push`.
-- No Windows do diretor: `git clone https://github.com/ArtCurvelo/Crystal.git`, depois `git pull` para atualizar.
+- No Windows do diretor: clone em `C:\Users\silvi\Documents\Crystal`. Atualizar com `git pull` nessa pasta.
 - Ao retomar num container novo: clonar o repositório e reinstalar as ferramentas (ver "Comandos").
 
 ## Arquitetura
