@@ -35,6 +35,7 @@ public partial class Main : Node
     ObjectiveMarker _marker;
     HelpScreen _help;
     CompletionScreen _completion;
+    BackupScreen _backups;
     UpdateManager _updater;
     UpdateScreen _updateScreen;
     RegionDef _currentRegion;
@@ -74,6 +75,7 @@ public partial class Main : Node
             OnNewGame = AskNewGame,
             OnHelp = () => _help.Open(),
             OnSettings = () => _settings.Open(),
+            OnBackups = () => _backups.Open(),
             OnQuit = QuitGame,
         };
         AddChild(_menu);
@@ -111,6 +113,20 @@ public partial class Main : Node
         _updater.UpdateFound += m => { if (CurrentMode == Mode.Menu) _updateScreen.Show(m); };
         _updater.Progress += (p, t) => _updateScreen.OnProgress(p, t);
         _updater.Failed += msg => _updateScreen.OnFailed(msg);
+        _updater.Status += t => _menu.SetUpdateStatus(t);
+        _backups = new BackupScreen();
+        _backups.OnRestore = snap => _confirm.Ask(
+            $"Restaurar o backup de {(snap.When == default ? "data desconhecida" : snap.When.ToString("dd/MM/yyyy HH:mm"))} ({GameState.FormatMoney(snap.Data.Money)})? O progresso atual também é guardado como backup antes.",
+            () =>
+            {
+                if (SaveSystem.Restore(snap.Path))
+                {
+                    _backups.Close();
+                    StartGame(true);
+                    GameState.Instance.Notify("Progresso restaurado", "Backup carregado com sucesso.", NotifyKind.Success);
+                }
+            });
+        AddChild(_backups);
         _completion = new CompletionScreen();
         _completion.Closed += ReturnToGameplay;
         AddChild(_completion);
@@ -139,7 +155,20 @@ public partial class Main : Node
     void ApplyLightQuality()
     {
         bool on = Settings.Quality != GraphicsQuality.Low;
-        foreach (var l in FindAll<OmniLight3D>(World.GetParent())) l.Visible = on;
+        foreach (var l in FindAll<OmniLight3D>(World.GetParent()))
+            if (l.GetParent() is not Mining.Effects) l.Visible = on; // clarões do Effects controlam a si mesmos
+        // decoração por MultiMesh: na Baixa desenha só uma fração (as posições já são aleatórias)
+        foreach (var mm in FindAll<MultiMeshInstance3D>(World))
+        {
+            if (mm.Multimesh == null || !mm.HasMeta(WorldBuilder.LowFractionMeta)) continue;
+            float frac = (float)mm.GetMeta(WorldBuilder.LowFractionMeta);
+            int visible = on ? -1 : Mathf.Max(1, (int)(mm.Multimesh.InstanceCount * frac));
+            if (mm.Multimesh.VisibleInstanceCount != visible) mm.Multimesh.VisibleInstanceCount = visible;
+        }
+        int amount = WorldBuilder.AmbientAmount();
+        foreach (var n in GetTree().GetNodesInGroup(WorldBuilder.AmbientGroup))
+            if (n is CpuParticles3D p && p.Amount != amount) p.Amount = amount;
+        _dynScale = -1f; // nova escala/qualidade vale imediatamente
     }
 
     static System.Collections.Generic.IEnumerable<T> FindAll<T>(Node n) where T : Node
@@ -277,8 +306,8 @@ public partial class Main : Node
     public void StartGame(bool continueSave)
     {
         var gs = GameState.Instance;
-        if (continueSave) gs.LoadGame();
-        else { SaveSystem.Delete(); gs.NewGame(); }
+        if (continueSave) { SaveSystem.Snapshot("ao-iniciar"); gs.LoadGame(); }
+        else { SaveSystem.ArchiveAndDelete(); gs.NewGame(); }
 
         _shards.ClearAll();
         Events.ResetAll();
@@ -390,7 +419,7 @@ public partial class Main : Node
     public void OpenSettingsForTour() => _settings.Open();
     public void OpenCompletionForTour() => _completion.Open();
 
-    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen;
+    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -401,6 +430,7 @@ public partial class Main : Node
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) { _confirm.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
+            if (_backups.IsOpen) { _backups.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
             if (_codex.IsOpen) { _codex.Close(); return; }
             if (_help.IsOpen) { _help.Close(); return; }

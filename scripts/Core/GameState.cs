@@ -201,6 +201,7 @@ public partial class GameState : Node
         Data = new SaveData();
         Data.Sanitize();
         _autosaveTimer = 0;
+        SessionActive = true;
         RaiseAll();
     }
 
@@ -212,14 +213,29 @@ public partial class GameState : Node
         if (loaded == null) { NewGame(); return false; }
         Data = loaded;
         _autosaveTimer = 0;
+        SessionActive = true;
         RaiseAll();
         return true;
     }
 
     public Func<SaveData, bool> BeforeSave; // permite à cena gravar posição do jogador
 
+    /// <summary>
+    /// True somente depois de NewGame()/LoadGame(). Antes disso (menu ao abrir o jogo) os dados em memória
+    /// são um placeholder vazio e NUNCA podem ser gravados por cima do save do jogador.
+    /// </summary>
+    public bool SessionActive { get; private set; }
+
+    /// <summary>Simula o estado logo após abrir o jogo (só para testes).</summary>
+    public void ResetToBootStateForTests() { Data = new SaveData(); SessionActive = false; }
+
     public bool SaveGame(bool auto = false)
     {
+        if (!SessionActive)
+        {
+            GD.Print("[Salvamento] ignorado: nenhuma partida carregada (protege o save existente).");
+            return false;
+        }
         BeforeSave?.Invoke(Data);
         bool ok = SaveSystem.Save(Data);
         if (ok) { LastSaveTime = Time.GetTicksMsec() / 1000.0; Saved?.Invoke(auto); }

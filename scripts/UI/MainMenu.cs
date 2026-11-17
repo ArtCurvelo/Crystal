@@ -7,7 +7,13 @@ namespace CrystalExcavator.UI;
 /// <summary>Menu principal sobre o cenário 3D (câmera orbitando a caverna inicial).</summary>
 public partial class MainMenu : CanvasLayer
 {
-    public Action OnContinue, OnNewGame, OnSettings, OnHelp, OnQuit;
+    public Action OnContinue, OnNewGame, OnSettings, OnHelp, OnBackups, OnQuit;
+    Button _backups;
+    Label _version;
+    string _versionBase;
+
+    /// <summary>Mostra o estado da verificação de atualização ao lado da versão.</summary>
+    public void SetUpdateStatus(string text) => _version.Text = string.IsNullOrEmpty(text) ? _versionBase : $"{_versionBase}   ·   {text}";
     Button _continue;
     VBoxContainer _buttons;
     Control _root;
@@ -49,12 +55,14 @@ public partial class MainMenu : CanvasLayer
         _continue = Make("Continuar", () => OnContinue?.Invoke());
         Make("Novo jogo", () => OnNewGame?.Invoke());
         Make("Como jogar", () => OnHelp?.Invoke());
+        _backups = Make("Restaurar progresso", () => OnBackups?.Invoke());
         Make("Configurações", () => OnSettings?.Invoke());
         Make("Sair", () => OnQuit?.Invoke());
 
-        var version = UiTheme.Shadowed(UiTheme.Label($"v{ProjectSettings.GetSetting("application/config/version")}  ·  Feito com Godot e C#", 14, UiTheme.Muted));
-        UiTheme.Place(version, Control.LayoutPreset.BottomLeft, new Vector2(24, -40));
-        _root.AddChild(version);
+        _version = UiTheme.Shadowed(UiTheme.Label($"v{ProjectSettings.GetSetting("application/config/version")}  ·  Feito com Godot e C#", 14, UiTheme.Muted));
+        UiTheme.Place(_version, Control.LayoutPreset.BottomLeft, new Vector2(24, -40));
+        _root.AddChild(_version);
+        _versionBase = _version.Text;
         var credit = UiTheme.Shadowed(UiTheme.Label("Todos os gráficos e sons são gerados proceduralmente.", 14, UiTheme.Muted, false, HorizontalAlignment.Right));
         UiTheme.Place(credit, Control.LayoutPreset.BottomRight, new Vector2(-520, -40), new Vector2(496, 0));
         _root.AddChild(credit);
@@ -73,6 +81,7 @@ public partial class MainMenu : CanvasLayer
     {
         Visible = true;
         _continue.Visible = hasSave;
+        _backups.Visible = SaveSystem.ListSnapshots().Count > 0;
         _continue.Text = "Continuar";
         if (hasSave)
         {

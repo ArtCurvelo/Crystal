@@ -104,7 +104,7 @@ public partial class WorldBuilder : Node3D
     /// <summary>Cenografia por região (posto avançado, cachoeiras, flora, ruínas).</summary>
     void BuildSetPieces(Node3D root, RegionDef r, Random rng)
     {
-        bool low = Settings.Quality == GraphicsQuality.Low;
+        const bool low = false; // o mundo é sempre montado completo; a qualidade é aplicada em tempo real
         switch (r.Id)
         {
             case "caves":
@@ -303,7 +303,7 @@ public partial class WorldBuilder : Node3D
     {
         float cz = r.CenterZ, hx = r.HalfX, hz = r.HalfZ, h = r.Height;
         var rockMat = MeshFactory.RockMaterial(r.RockColor.Lightened(0.15f));
-        float density = Settings.Quality switch { GraphicsQuality.Low => 0.6f, GraphicsQuality.Medium => 0.85f, _ => 1f };
+        const float density = 1f; // decoração por MultiMesh: custo baixo em qualquer qualidade
 
         // rochas grandes ao longo das paredes (quebram o formato de caixa)
         var wallRocks = new List<Transform3D>();
@@ -411,7 +411,7 @@ public partial class WorldBuilder : Node3D
                 var b = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(0.12f + (float)rng.NextDouble() * 0.2f, 1, 1.5f + (float)rng.NextDouble() * 4f));
                 cracks.Add(new Transform3D(b, new Vector3(x, 0.015f, z)));
             }
-            AddMulti(root, new BoxMesh { Size = new Vector3(1, 0.02f, 1) }, crack, cracks);
+            AddMulti(root, new BoxMesh { Size = new Vector3(1, 0.02f, 1) }, crack, cracks, 1f);
             // rochas flutuantes animadas
             for (int i = 0; i < 9; i++)
             {
@@ -440,15 +440,15 @@ public partial class WorldBuilder : Node3D
 
     void BuildLights(Node3D root, RegionDef r, Random rng)
     {
-        int count = Settings.Quality == GraphicsQuality.Low ? 2 : r.Index == 0 ? 4 : 5;
+        int count = r.Index == 0 ? 4 : 5; // na Baixa as luzes são ocultadas em tempo real
         for (int i = 0; i < count; i++)
         {
             float a = Mathf.Tau * i / count + 0.4f;
             var light = new OmniLight3D
             {
                 LightColor = i % 2 == 0 ? r.LightColor : r.AccentColor,
-                LightEnergy = Settings.Quality == GraphicsQuality.Low ? 2.0f : 1.6f,
-                OmniRange = Mathf.Max(r.HalfX, r.HalfZ) * (Settings.Quality == GraphicsQuality.Low ? 1.1f : 0.85f),
+                LightEnergy = 1.6f,
+                OmniRange = Mathf.Max(r.HalfX, r.HalfZ) * 0.85f,
                 OmniAttenuation = 1.2f,
                 ShadowEnabled = false,
                 Position = new Vector3(Mathf.Cos(a) * r.HalfX * 0.55f, r.Height * 0.7f, r.CenterZ + Mathf.Sin(a) * r.HalfZ * 0.55f),
@@ -459,7 +459,7 @@ public partial class WorldBuilder : Node3D
 
     void BuildAmbientParticles(Node3D root, RegionDef r)
     {
-        int amount = Settings.Quality switch { GraphicsQuality.Low => 20, GraphicsQuality.Medium => 45, _ => 80 };
+        int amount = AmbientAmount();
         var p = new CpuParticles3D
         {
             Amount = amount,
@@ -508,6 +508,7 @@ public partial class WorldBuilder : Node3D
             p.InitialVelocityMax = 0.8f;
         }
         p.MaterialOverride = mat;
+        p.AddToGroup(AmbientGroup);
         var ramp = new Gradient();
         ramp.SetColor(0, new Color(1, 1, 1, 0));
         ramp.SetColor(1, new Color(1, 1, 1, 0));
@@ -516,6 +517,11 @@ public partial class WorldBuilder : Node3D
         p.ColorRamp = ramp;
         root.AddChild(p);
     }
+
+    public const string AmbientGroup = "ambient_particles";
+    /// <summary>Meta nos MultiMesh de decoração: fração de instâncias desenhadas na qualidade Baixa.</summary>
+    public const string LowFractionMeta = "low_fraction";
+    public static int AmbientAmount() => Settings.Quality switch { GraphicsQuality.Low => 20, GraphicsQuality.Medium => 45, _ => 80 };
 
     // =================== Utilidades de construção ===================
     void AddBox(Node3D root, Vector3 pos, Vector3 size, Material mat, bool collide)
@@ -544,7 +550,7 @@ public partial class WorldBuilder : Node3D
         root.AddChild(body);
     }
 
-    static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms)
+    static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms, float lowFraction = 0.6f)
     {
         if (xforms.Count == 0) return;
         var mm = new MultiMesh
@@ -560,6 +566,7 @@ public partial class WorldBuilder : Node3D
             MaterialOverride = mat,
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
+        mmi.SetMeta(LowFractionMeta, lowFraction);
         root.AddChild(mmi);
     }
 

@@ -47,6 +47,7 @@ public partial class UpdateManager : Node
     public event Action<UpdateManifest> UpdateFound;
     public event Action<float, string> Progress;   // (0..1, texto)
     public event Action<string> Failed;
+    public event Action<string> Status;   // mensagens curtas para o menu
 
     HttpRequest _http;
 
@@ -60,10 +61,12 @@ public partial class UpdateManager : Node
     public async void CheckForUpdates()
     {
         if (!Supported || !Settings.Data.CheckUpdates) return;
+        Status?.Invoke("Procurando atualizações…");
         var bytes = await Fetch(ManifestUrl + "?t=" + Time.GetUnixTimeFromSystem());
-        if (bytes == null) return; // sem internet: segue em silêncio
+        if (bytes == null) { Status?.Invoke("Sem conexão para verificar atualizações"); return; }
         var m = ParseManifest(System.Text.Encoding.UTF8.GetString(bytes));
-        if (m == null || !IsNewer(m.Version, CurrentVersion)) return;
+        if (m == null || !IsNewer(m.Version, CurrentVersion)) { Status?.Invoke("✓ Jogo atualizado"); return; }
+        Status?.Invoke($"Nova versão v{m.Version} disponível");
         Available = m;
         NeedsFullInstaller = !string.IsNullOrEmpty(m.Engine) && m.Engine != EngineVersion;
         UpdateFound?.Invoke(m);
@@ -141,7 +144,9 @@ public partial class UpdateManager : Node
             Progress?.Invoke(1f, "Aplicando atualização…");
             string gameDir = System.IO.Path.GetDirectoryName(OS.GetExecutablePath());
             string script = WriteApplyScript(staging, gameDir, OS.GetExecutablePath(), m.Files, OS.GetProcessId());
-            GameState.Instance?.SaveGame(true);
+            // só salva se houver partida em andamento; e guarda um backup antes de atualizar
+            if (GameState.Instance != null && GameState.Instance.IsPlaying) GameState.Instance.SaveGame(true);
+            SaveSystem.Snapshot("antes-da-v" + m.Version);
             OS.CreateProcess("cmd.exe", new[] { "/c", script });
             GameState.Instance?.QuitClean();
         }

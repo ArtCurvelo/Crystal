@@ -44,6 +44,7 @@ public partial class TestRunner : Node
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
+            Run("Proteção do save (regressão do bug da atualização)", TestSaveProtection);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -345,6 +346,48 @@ public partial class TestRunner : Node
         Fresh();
     }
 
+    void TestSaveProtection()
+    {
+        SaveSystem.Delete();
+        foreach (var f in System.IO.Directory.Exists(ProjectSettings.GlobalizePath(SaveSystem.BackupDir)) ? System.IO.Directory.GetFiles(ProjectSettings.GlobalizePath(SaveSystem.BackupDir)) : new string[0]) System.IO.File.Delete(f);
+        Fresh();
+        GS.AddMoney(777_000);
+        GS.Data.PlayTimeSeconds = 3600;
+        Check(GS.SaveGame(true), "partida carregada salva normalmente");
+        // jogo recém-aberto (menu): dados em memória vazios e nenhuma partida carregada
+        GS.ResetToBootStateForTests();
+        Check(!GS.SaveGame(true), "sem partida carregada, salvar deve ser recusado");
+        var onDisk = SaveSystem.Load(out _);
+        Check(onDisk != null && onDisk.Money == 777_000, $"save do jogador intacto (dinheiro {onDisk?.Money})");
+
+        // backups
+        var b1 = SaveSystem.Snapshot("teste");
+        Check(b1 != null && SaveSystem.ListSnapshots().Count == 1, "backup criado");
+        Check(SaveSystem.Snapshot("teste") == b1 && SaveSystem.ListSnapshots().Count == 1, "backup idêntico não é duplicado");
+        GS.LoadGame();
+        GS.AddMoney(1);
+        GS.SaveGame(true);
+        for (int i = 0; i < 14; i++) { GS.AddMoney(1); GS.SaveGame(true); SaveSystem.Snapshot("rot" + i); }
+        Check(SaveSystem.ListSnapshots().Count == SaveSystem.MaxSnapshots, $"mantém só os {SaveSystem.MaxSnapshots} backups mais recentes");
+        // novo jogo arquiva em vez de apagar
+        long before = SaveSystem.Load(out _).Money;
+        SaveSystem.ArchiveAndDelete();
+        Check(!SaveSystem.HasSave(), "novo jogo remove o save ativo");
+        var latest = SaveSystem.ListSnapshots()[0];
+        Check(latest.Data.Money == before, "save anterior ao novo jogo fica nos backups");
+        Check(SaveSystem.Restore(latest.Path) && SaveSystem.Load(out _).Money == before, "restaurar backup recupera o progresso");
+        // saves vazios não viram backup
+        Fresh();
+        SaveSystem.Save(GS.Data);
+        int n = SaveSystem.ListSnapshots().Count;
+        SaveSystem.Snapshot("vazio");
+        Check(SaveSystem.ListSnapshots().Count == n, "save sem progresso não gera backup");
+        Check(SaveSystem.BackupDir != "user://backups", "testes usam pasta de backup separada da do jogador");
+        foreach (var f in System.IO.Directory.GetFiles(ProjectSettings.GlobalizePath(SaveSystem.BackupDir))) System.IO.File.Delete(f);
+        SaveSystem.Delete();
+        Fresh();
+    }
+
     void TestUpdater()
     {
         Check(UpdateManager.IsNewer("0.2.1", "0.2.0") && UpdateManager.IsNewer("0.10.0", "0.9.9") && UpdateManager.IsNewer("1.0.0", "0.99.99"), "versões mais novas detectadas");
@@ -569,8 +612,10 @@ public partial class TestRunner : Node
         Check(crystal.Hp < hp0 || !crystal.IsMineable, "gatilho direito (RT) deve minerar");
 
         // analógico esquerdo move
+        player.GlobalPosition = world.SpawnPoint;
+        await Frames(2);
         var p0 = player.GlobalPosition;
-        player.SetLook(Mathf.Pi, 0);
+        player.SetLook(0, 0); // do acampamento para o centro da caverna (área sempre livre)
         Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.LeftY, AxisValue = -1f });
         await Frames(30);
         Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.LeftY, AxisValue = 0f });

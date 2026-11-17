@@ -102,11 +102,11 @@ public partial class SettingsScreen : ModalScreen
         BuildFrame("CONFIGURAÇÕES", new Vector2(620, 0), UiTheme.Cyan);
         Layer = 20;
         var d = Settings.Data;
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 470), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 520), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         Body.AddChild(scroll);
         var grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 24);
-        grid.AddThemeConstantOverride("v_separation", 6);
+        grid.AddThemeConstantOverride("v_separation", 3);
         scroll.AddChild(grid);
 
         AddSlider(grid, "Sensibilidade do mouse", 0.02f, 1.0f, 0.01f, d.MouseSensitivity, v => d.MouseSensitivity = v, v => $"{v * 100:0}");
@@ -114,26 +114,43 @@ public partial class SettingsScreen : ModalScreen
         AddSlider(grid, "Volume geral", 0, 1, 0.01f, d.MasterVolume, v => d.MasterVolume = v, v => $"{v * 100:0}%");
         AddSlider(grid, "Música", 0, 1, 0.01f, d.MusicVolume, v => d.MusicVolume = v, v => $"{v * 100:0}%");
         AddSlider(grid, "Efeitos", 0, 1, 0.01f, d.SfxVolume, v => d.SfxVolume = v, v => $"{v * 100:0}%");
-        AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v => d.RenderScale = v, v => $"{v * 100:0}%");
+        _scale = AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v =>
+        {
+            d.RenderScale = v;
+            // escolha manual: desliga a resolução dinâmica para respeitar o valor escolhido
+            if (d.DynamicResolution) { d.DynamicResolution = false; _dyn?.SetPressedNoSignal(false); }
+        }, v => $"{v * 100:0}%");
 
         grid.AddChild(UiTheme.Label("Qualidade gráfica", 18));
-        var q = new OptionButton { CustomMinimumSize = new Vector2(260, 34) };
+        var q = new OptionButton { CustomMinimumSize = new Vector2(260, 30) };
         q.AddItem("Baixa (PCs modestos)", 0);
         q.AddItem("Média", 1);
         q.AddItem("Alta", 2);
         q.Selected = d.Quality;
-        q.ItemSelected += i => { d.Quality = (int)i; Changed(); GameState.Instance.Notify("Qualidade alterada", "Alguns efeitos são aplicados ao reiniciar a partida.", NotifyKind.Info); };
+        q.ItemSelected += i =>
+        {
+            // o preset ajusta escala 3D e resolução dinâmica juntos (podem ser alterados depois)
+            d.Quality = (int)i;
+            bool low = i == 0;
+            d.RenderScale = low ? 0.75f : 1f;
+            d.DynamicResolution = low;
+            _scale.SetValueNoSignal(d.RenderScale);
+            _scaleLabel.Text = $"{d.RenderScale * 100:0}%";
+            _dyn.SetPressedNoSignal(d.DynamicResolution);
+            Changed();
+            GameState.Instance.Notify("Qualidade aplicada", $"{q.GetItemText((int)i)} · 3D {d.RenderScale * 100:0}% · resolução dinâmica {(low ? "ligada" : "desligada")}", NotifyKind.Info);
+        };
         grid.AddChild(q);
 
         grid.AddChild(UiTheme.Label("Resolução da janela", 18));
-        var res = new OptionButton { CustomMinimumSize = new Vector2(260, 34) };
-        foreach (var sz in Settings.WindowSizes) res.AddItem($"{sz.X} × {sz.Y}" + (sz.Y == 720 ? " (recomendado p/ PCs modestos)" : ""));
+        var res = new OptionButton { CustomMinimumSize = new Vector2(260, 30) };
+        foreach (var sz in Settings.WindowSizes) res.AddItem($"{sz.X} × {sz.Y}" + (sz.Y == 720 ? " (recomendado)" : ""));
         res.Selected = d.WindowSize;
         res.ItemSelected += i => { d.WindowSize = (int)i; Changed(); };
         grid.AddChild(res);
 
         grid.AddChild(UiTheme.Label("Limite de FPS", 18));
-        var fps = new OptionButton { CustomMinimumSize = new Vector2(260, 34) };
+        var fps = new OptionButton { CustomMinimumSize = new Vector2(260, 30) };
         int[] fpsVals = { 30, 60, 120, 0 };
         foreach (var f in fpsVals) fps.AddItem(f == 0 ? "Ilimitado" : f.ToString());
         fps.Selected = Math.Max(0, Array.IndexOf(fpsVals, d.MaxFps));
@@ -144,13 +161,17 @@ public partial class SettingsScreen : ModalScreen
         AddCheck(grid, "Sincronização vertical (VSync)", d.VSync, v => d.VSync = v);
         AddCheck(grid, "Inverter eixo Y", d.InvertY, v => d.InvertY = v);
         AddCheck(grid, "Mostrar FPS (F3)", d.ShowFps, v => d.ShowFps = v);
-        AddCheck(grid, "Resolução dinâmica (mantém ~30 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
-        AddCheck(grid, "Procurar atualizações ao iniciar", d.CheckUpdates, v => d.CheckUpdates = v);
+        _dyn = AddCheck(grid, "Resolução dinâmica (~30 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
+        AddCheck(grid, "Atualizações automáticas", d.CheckUpdates, v => d.CheckUpdates = v);
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);
         footer.AddChild(UiTheme.Button("Voltar", Close, 180));
     }
+
+    HSlider _scale;
+    Label _scaleLabel;
+    CheckButton _dyn;
 
     void Changed()
     {
@@ -158,7 +179,7 @@ public partial class SettingsScreen : ModalScreen
         Settings.Save();
     }
 
-    void AddSlider(GridContainer g, string label, float min, float max, float step, float value, Action<float> set, Func<float, string> fmt)
+    HSlider AddSlider(GridContainer g, string label, float min, float max, float step, float value, Action<float> set, Func<float, string> fmt)
     {
         g.AddChild(UiTheme.Label(label, 18));
         var h = new HBoxContainer { CustomMinimumSize = new Vector2(260, 0) };
@@ -169,9 +190,11 @@ public partial class SettingsScreen : ModalScreen
         h.AddChild(s);
         h.AddChild(v);
         g.AddChild(h);
+        _scaleLabel = v; // o último criado é o da escala 3D (usado pelo preset)
+        return s;
     }
 
-    void AddCheck(GridContainer g, string label, bool value, Action<bool> set)
+    CheckButton AddCheck(GridContainer g, string label, bool value, Action<bool> set)
     {
         g.AddChild(UiTheme.Label(label, 18));
         var c = new CheckButton { ButtonPressed = value, SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin };
@@ -179,6 +202,7 @@ public partial class SettingsScreen : ModalScreen
             c.AddThemeStyleboxOverride(st, new StyleBoxEmpty());
         c.Toggled += x => { set(x); AudioManager.Instance?.Play("click", -6f); Changed(); };
         g.AddChild(c);
+        return c;
     }
 }
 
@@ -533,5 +557,57 @@ public partial class UpdateScreen : ModalScreen
         _updateBtn.Disabled = false;
         _laterBtn.Disabled = false;
         _updateBtn.Text = "Tentar de novo";
+    }
+}
+
+// =====================================================================
+/// <summary>Lista os backups do save e permite restaurar um deles.</summary>
+public partial class BackupScreen : ModalScreen
+{
+    public Action<SaveSystem.SnapshotInfo> OnRestore;
+    VBoxContainer _list;
+
+    public override void _Ready()
+    {
+        BuildFrame("RESTAURAR PROGRESSO", new Vector2(760, 0), UiTheme.Gold);
+        Layer = 22;
+        var info = UiTheme.Label("Backups são criados ao iniciar cada partida, antes de atualizações e antes de um novo jogo. Os 10 mais recentes ficam guardados.", 14, UiTheme.Muted);
+        info.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        info.CustomMinimumSize = new Vector2(700, 0);
+        Body.AddChild(info);
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 380), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        Body.AddChild(scroll);
+        _list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _list.AddThemeConstantOverride("separation", 8);
+        scroll.AddChild(_list);
+        var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        Body.AddChild(footer);
+        footer.AddChild(UiTheme.Button("Voltar", Close, 160));
+    }
+
+    public override void Refresh()
+    {
+        foreach (Node c in _list.GetChildren()) c.QueueFree();
+        var snaps = SaveSystem.ListSnapshots();
+        if (snaps.Count == 0) _list.AddChild(UiTheme.Label("Nenhum backup ainda.", 16, UiTheme.Muted));
+        foreach (var s in snaps)
+        {
+            var row = new PanelContainer();
+            row.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(UiTheme.Card, new Color(UiTheme.Gold, 0.4f), 10, 2, 14, 8));
+            var h = new HBoxContainer();
+            h.AddThemeConstantOverride("separation", 12);
+            row.AddChild(h);
+            var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+            h.AddChild(v);
+            var t = TimeSpan.FromSeconds(s.Data.PlayTimeSeconds);
+            string when = s.When == default ? "data desconhecida" : s.When.ToString("dd/MM/yyyy HH:mm");
+            v.AddChild(UiTheme.Label($"{when}   ·   {s.Reason.Replace('-', ' ')}", 16, UiTheme.Text, true));
+            v.AddChild(UiTheme.Label($"{GameState.FormatMoney(s.Data.Money)}   ·   {(int)t.TotalHours}h{t.Minutes:00} de jogo   ·   {s.Data.UnlockedRegions.Count}/{GameData.Regions.Count} regiões   ·   ✦{s.Data.Essence}", 14, UiTheme.Muted));
+            var snap = s;
+            var b = UiTheme.Button("Restaurar", () => OnRestore?.Invoke(snap), 150, 17);
+            b.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+            h.AddChild(b);
+            _list.AddChild(row);
+        }
     }
 }

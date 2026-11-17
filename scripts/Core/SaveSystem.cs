@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Godot;
 
@@ -110,6 +112,95 @@ public static class SaveSystem
         // Futuro: if (d.Version < 2) { ... }
         if (d.Version > SaveData.CurrentVersion)
             GD.Print($"[Salvamento] Versão mais nova ({d.Version}); carregando em modo compatível.");
+    }
+
+    // ------------------------------------------------------------ backups com histórico
+    /// <summary>Pasta de backups: "user://backups" para o save do jogador; testes/bot usam pastas próprias.</summary>
+    public static string BackupDir => SavePath == "user://save.json"
+        ? "user://backups"
+        : "user://backups_" + System.IO.Path.GetFileNameWithoutExtension(SavePath);
+    public const int MaxSnapshots = 10;
+
+    public sealed class SnapshotInfo
+    {
+        public string Path;
+        public DateTime When;
+        public string Reason;
+        public SaveData Data;
+    }
+
+    /// <summary>
+    /// Copia o save atual (se válido) para user://backups com data/hora. Ignora se for idêntico ao último backup.
+    /// Mantém os últimos MaxSnapshots arquivos.
+    /// </summary>
+    public static string Snapshot(string reason)
+    {
+        try
+        {
+            string src = ProjectSettings.GlobalizePath(SavePath);
+            if (!System.IO.File.Exists(src)) return null;
+            string text = System.IO.File.ReadAllText(src);
+            if (!TryParse(text, out var data) || IsEmpty(data)) return null; // não guarda saves vazios
+            string dir = ProjectSettings.GlobalizePath(BackupDir);
+            System.IO.Directory.CreateDirectory(dir);
+            var existing = ListSnapshotFiles();
+            if (existing.Count > 0 && System.IO.File.ReadAllText(existing[0]) == text) return existing[0];
+            string safe = new string((reason ?? "backup").Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '.').ToArray());
+            string dst = System.IO.Path.Combine(dir, $"save_{DateTime.Now:yyyyMMdd_HHmmss_fff}_{safe}.json");
+            System.IO.File.WriteAllText(dst, text);
+            var all = ListSnapshotFiles();
+            for (int i = MaxSnapshots; i < all.Count; i++) System.IO.File.Delete(all[i]);
+            return dst;
+        }
+        catch (Exception e)
+        {
+            GD.PushWarning($"Backup falhou: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Save "vazio" = sem nenhum progresso (evita poluir backups com partidas recém-criadas).</summary>
+    public static bool IsEmpty(SaveData d) => d.TotalEarned == 0 && d.CrystalsMined == 0 && d.PlayTimeSeconds < 30;
+
+    static List<string> ListSnapshotFiles()
+    {
+        string dir = ProjectSettings.GlobalizePath(BackupDir);
+        if (!System.IO.Directory.Exists(dir)) return new List<string>();
+        return System.IO.Directory.GetFiles(dir, "save_*.json").OrderByDescending(f => f).ToList();
+    }
+
+    public static List<SnapshotInfo> ListSnapshots()
+    {
+        var r = new List<SnapshotInfo>();
+        foreach (var f in ListSnapshotFiles())
+        {
+            if (!TryParse(System.IO.File.ReadAllText(f), out var d)) continue;
+            var name = System.IO.Path.GetFileNameWithoutExtension(f); // save_yyyyMMdd_HHmmss_fff_motivo
+            var parts = name.Split('_');
+            DateTime.TryParseExact(parts.Length > 3 ? parts[1] + parts[2] : "", "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.None, out var when);
+            r.Add(new SnapshotInfo { Path = f, When = when, Reason = parts.Length > 4 ? string.Join(" ", parts.Skip(4)) : "", Data = d });
+        }
+        return r;
+    }
+
+    /// <summary>Restaura um backup como save atual (o save atual vira backup antes).</summary>
+    public static bool Restore(string snapshotPath)
+    {
+        if (!System.IO.File.Exists(snapshotPath)) return false;
+        string text = System.IO.File.ReadAllText(snapshotPath);
+        if (!TryParse(text, out _)) return false;
+        Snapshot("antes-de-restaurar");
+        string abs = ProjectSettings.GlobalizePath(SavePath);
+        System.IO.File.WriteAllText(abs + ".tmp", text);
+        System.IO.File.Move(abs + ".tmp", abs, true);
+        return true;
+    }
+
+    /// <summary>"Novo jogo": arquiva o save atual nos backups e remove os arquivos ativos.</summary>
+    public static void ArchiveAndDelete()
+    {
+        Snapshot("antes-do-novo-jogo");
+        Delete();
     }
 
     public static void Delete()

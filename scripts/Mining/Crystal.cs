@@ -146,7 +146,6 @@ public partial class Crystal : StaticBody3D
             };
             _sparkle.MaterialOverride = MeshFactory.Unshaded(Colors.White);
             _visual.AddChild(_sparkle);
-            if (Settings.Quality != GraphicsQuality.Low)
             {
                 _light = new OmniLight3D
                 {
@@ -156,6 +155,7 @@ public partial class Crystal : StaticBody3D
                     ShadowEnabled = false,
                     Position = new Vector3(0, 0.8f * s, 0),
                 };
+                _light.Visible = Settings.Quality != GraphicsQuality.Low;
                 _visual.AddChild(_light);
             }
         }
