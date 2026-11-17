@@ -230,3 +230,16 @@ Decisões do diretor:
 - Save: `Day`, `DayTimeSeconds`, `DayOver`, `DayEarned`, `DayCrystals` (saneados; saves antigos começam no Dia 1).
 - Testes: ciclo do dia (relógio, aviso, bloqueios, venda permitida, novo dia, volta antecipada, persistência, saneamento) e marcador/estação única/elevador → **291/291**. Bot: joga **7 dias**, testa que não minera fora do turno, a volta antecipada com confirmação, Esc na casa e dormir → SUCESSO (Região 2 em 9,4 min, Região 3 em 28,3 min, Coração em 49,7 min).
 - Benchmark Baixa: 21,7 FPS (dentro da variação de ±2 FPS do ambiente).
+- Publicado como **v0.2.6**.
+
+### Etapa 4: casa com melhorias e árvore de habilidades (mesmo dinheiro)
+- A tela de casa virou o centro do fim do dia: **maquete 3D da casa** (mundo próprio num SubViewport, desenhada só com a casa aberta), resumo do dia, duas abas e "Dormir".
+- **Melhorias da casa** (permanentes, mantidas ao renascer), cada nível aparece como móvel na maquete:
+  Cama (+1 min de turno/nível, 3), Bancada de ferramentas (+6% dano, 5), Armário de equipamento (+10% mochila, 4), Cozinha (+5% velocidade, 3), Estante de troféus (+4% venda, 5; cristais coloridos na estante).
+- **Árvore de habilidades** (4 ramos × 3 níveis, cada nível exige o anterior; zera ao renascer):
+  - Coleta: Ímã ampliado (+30% raio) → **Coleta direta** (fragmentos voam direto para a mochila de qualquer distância) → Compactador (+25% mochila).
+  - Turno: Madrugador (+2 min) → Hora extra (+2 min) → Bônus do turno (+10% do ganho do dia ao chegar em casa).
+  - Mineração: Golpe firme (+15% dano) → Cadência (+10% golpes/s) → Golpe crítico (12% de dano x3, texto "CRÍTICO!").
+  - Comércio: Negociador (+10% venda) → Faro para raros (raros 50% mais frequentes) → Joalheiro (raros/especiais +50%).
+- Save: `House` e `Skills` (saneados: níveis limitados, ids desconhecidos removidos, sem duplicatas).
+- Testes: casa/habilidades (efeitos, limites, pré-requisitos, compra em casa fora do turno, bônus do turno uma vez, save, renascer, saneamento) e coleta direta a 40 m → **318/318**. Bot compra pela tela da casa (20 melhorias, 12 habilidades), confere o efeito do Golpe firme → SUCESSO (Região 2 em 11,4 min, Região 3 em 30,2 min, Coração em 49,8 min; o bot completa a árvore inteira antes de renascer — custos dos nós de nível 3 podem subir se o diretor achar rápido demais).

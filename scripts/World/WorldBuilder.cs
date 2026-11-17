@@ -413,7 +413,7 @@ public partial class WorldBuilder : Node3D
 
     public static MaterialDef PickFor(RegionDef r, Random rng)
     {
-        if (rng.NextDouble() < r.RareChance) return GameData.Mat(r.RareMaterialId);
+        if (rng.NextDouble() < r.RareChance * (GameState.Instance?.RareChanceMultiplier ?? 1f)) return GameData.Mat(r.RareMaterialId);
         double total = 0;
         foreach (var s in r.Spawns) total += s.Weight;
         double roll = rng.NextDouble() * total;

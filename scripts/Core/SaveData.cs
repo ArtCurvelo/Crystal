@@ -33,6 +33,10 @@ public sealed class SaveData
     public bool DayOver { get; set; }
     public long DayEarned { get; set; }
     public long DayCrystals { get; set; }
+    public long DayBonus { get; set; }
+    // casa e árvore de habilidades
+    public Dictionary<string, int> House { get; set; } = new();
+    public List<string> Skills { get; set; } = new();
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
     public float PlayerZ { get; set; } = 14f;
@@ -63,6 +67,16 @@ public sealed class SaveData
         if (DayTimeSeconds < 0 || double.IsNaN(DayTimeSeconds)) DayTimeSeconds = 0;
         if (DayEarned < 0) DayEarned = 0;
         if (DayCrystals < 0) DayCrystals = 0;
+        if (DayBonus < 0) DayBonus = 0;
+        House ??= new();
+        Skills ??= new();
+        foreach (var key in House.Keys.ToList())
+        {
+            var hd = HomeData.HouseDef(key);
+            if (hd == null) { House.Remove(key); continue; }
+            House[key] = System.Math.Clamp(House[key], 0, hd.MaxLevel);
+        }
+        Skills = Skills.Where(k => k != null && HomeData.Skill(k) != null).Distinct().ToList();
 
         // upgrades: remove desconhecidos e limita níveis
         foreach (var key in Upgrades.Keys.ToList())

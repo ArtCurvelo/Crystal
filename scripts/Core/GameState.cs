@@ -67,13 +67,19 @@ public partial class GameState : Node
     /// <summary>Bônus permanente da Essência Ancestral: +10% por ponto.</summary>
     public float EssenceMultiplier => 1f + Data.Essence * EssenceBonusPerPoint;
     public const float EssenceBonusPerPoint = 0.10f;
-    public float Damage => StatValue(UpgradeIds.Damage) * EventDamageMultiplier * EssenceMultiplier;
-    public float SwingsPerSecond => StatValue(UpgradeIds.Speed);
+    public float Damage => StatValue(UpgradeIds.Damage) * EventDamageMultiplier * EssenceMultiplier
+                           * HouseMul(HouseIds.Workbench) * (HasSkill(SkillIds.FirmStrike) ? 1.15f : 1f);
+    public float SwingsPerSecond => StatValue(UpgradeIds.Speed) * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f);
     public float SwingInterval => 1f / SwingsPerSecond;
-    public int Capacity => (int)StatValue(UpgradeIds.Capacity);
-    public float MoveSpeed => StatValue(UpgradeIds.Move);
-    public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier;
-    public float MagnetRadius => StatValue(UpgradeIds.Reach);
+    public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f));
+    public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen);
+    public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier
+                                    * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f);
+    public float MagnetRadius => StatValue(UpgradeIds.Reach) * (HasSkill(SkillIds.Magnet) ? 1.3f : 1f);
+    public float CritChance => HasSkill(SkillIds.Critical) ? 0.12f : 0f;
+    public const float CritMultiplier = 3f;
+    public float RareChanceMultiplier => HasSkill(SkillIds.RareNose) ? 1.5f : 1f;
+    public bool DirectCollect => HasSkill(SkillIds.DirectCollect);
     public float MiningReach => 3.2f + Data.Level(UpgradeIds.Reach) * 0.28f;
     public float DamagePerSecond => Damage * SwingsPerSecond;
     public float ResonanceMultiplier => StatValue(UpgradeIds.Resonance);
@@ -117,7 +123,8 @@ public partial class GameState : Node
         return accepted;
     }
 
-    public long SellPrice(MaterialDef def) => (long)Math.Round(def.Value * ValueMultiplier);
+    public long SellPrice(MaterialDef def) =>
+        (long)Math.Round(def.Value * ValueMultiplier * ((def.Rare || def.Special) && HasSkill(SkillIds.Jeweler) ? 1.5f : 1f));
 
     public long InventoryValue() =>
         Data.Inventory.Sum(kv => GameData.Mat(kv.Key) is { } m ? SellPrice(m) * kv.Value : 0);
@@ -204,7 +211,9 @@ public partial class GameState : Node
     public const float DefaultDayLength = 600f;
     /// <summary>Permite a testes/bot encurtar o dia.</summary>
     public static float? DayLengthOverride;
-    public float DayLength => DayLengthOverride ?? DefaultDayLength;
+    public float DayLength => DayLengthOverride ?? DefaultDayLength
+        + HouseLevel(HouseIds.Bed) * HomeData.HouseDef(HouseIds.Bed).PerLevel
+        + (HasSkill(SkillIds.Early) ? 120f : 0f) + (HasSkill(SkillIds.Overtime) ? 120f : 0f);
     public const float DayWarningSeconds = 60f;
     public bool DayOver => Data.DayOver;
     /// <summary>Fora do turno o jogador só pode vender e voltar para casa.</summary>
@@ -260,8 +269,60 @@ public partial class GameState : Node
         Data.DayOver = false;
         Data.DayEarned = 0;
         Data.DayCrystals = 0;
+        Data.DayBonus = 0;
         DayStarted?.Invoke();
         SaveGame(true);
+    }
+
+    /// <summary>Prêmio do turno (habilidade): +10% do ganho do dia, pago uma vez ao chegar em casa.</summary>
+    public long PayShiftBonus()
+    {
+        if (!HasSkill(SkillIds.ShiftBonus) || Data.DayBonus > 0 || Data.DayEarned <= 0) return 0;
+        long bonus = Math.Max(1, Data.DayEarned / 10);
+        Data.DayBonus = bonus;
+        AddMoney(bonus);
+        return bonus;
+    }
+
+    // ================= Casa e habilidades =================
+    public event Action HomeChanged;
+    public int HouseLevel(string id) => Data.House.TryGetValue(id, out int l) ? l : 0;
+    float HouseMul(string id) => 1f + HouseLevel(id) * HomeData.HouseDef(id).PerLevel;
+    public long HouseCost(string id) => HomeData.HouseDef(id).CostAt(HouseLevel(id));
+    public bool HouseMaxed(string id) => HouseLevel(id) >= HomeData.HouseDef(id).MaxLevel;
+
+    public bool TryBuyHouse(string id)
+    {
+        var def = HomeData.HouseDef(id);
+        if (def == null || HouseMaxed(id)) return false;
+        long cost = HouseCost(id);
+        if (!CanAfford(cost)) return false;
+        Data.Money -= cost;
+        Data.House[id] = HouseLevel(id) + 1;
+        MoneyChanged?.Invoke();
+        UpgradesChanged?.Invoke();
+        HomeChanged?.Invoke();
+        return true;
+    }
+
+    public bool HasSkill(string id) => Data.Skills.Contains(id);
+    public bool SkillAvailable(string id)
+    {
+        var def = HomeData.Skill(id);
+        return def != null && !HasSkill(id) && (def.Requires == null || HasSkill(def.Requires));
+    }
+
+    public bool TryBuySkill(string id)
+    {
+        var def = HomeData.Skill(id);
+        if (!SkillAvailable(id) || !CanAfford(def.Cost)) return false;
+        Data.Money -= def.Cost;
+        Data.Skills.Add(id);
+        MoneyChanged?.Invoke();
+        UpgradesChanged?.Invoke();
+        InventoryChanged?.Invoke(); // capacidade pode mudar
+        HomeChanged?.Invoke();
+        return true;
     }
 
     /// <summary>Avisa e devolve false quando a ação exige o turno aberto.</summary>
@@ -369,6 +430,7 @@ public partial class GameState : Node
         Data.Money = 0;
         Data.RunEarned = 0;
         Data.Upgrades.Clear();
+        Data.Skills.Clear(); // a árvore recomeça; a casa é permanente
         Data.Inventory.Clear();
         Data.UnlockedRegions.Clear();
         Data.UnlockedRegions.Add("caves");

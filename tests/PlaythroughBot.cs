@@ -113,8 +113,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Renascimento: {(_prestiged ? "sim" : "não")} | Região 2 na 2ª jornada: {(_secondR2 > 0 ? $"{_secondR2:0.0} min" : "não alcançada")}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
-        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome})");
-        bool ok = _days >= 2 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
+        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
+        bool ok = _days >= 2 && _houseBuys > 0 && _skillBuys > 0 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
         GameState.Instance.QuitClean(ok ? 0 : 1);
@@ -348,6 +348,7 @@ public partial class PlaythroughBot : Node
         PressAction("pause"); // Esc não deve tirar o jogador de casa
         await Frames(3);
         if (!home.IsOpen) { _errors++; Log("ERRO: Esc fechou a casa sem dormir"); return; }
+        await BuyAtHome(home);
         var sleep = FindButtons(home).FirstOrDefault(b => b.Text.StartsWith("Dormir"));
         if (sleep == null) { _errors++; Log("ERRO: botão Dormir ausente"); return; }
         sleep.EmitSignal(BaseButton.SignalName.Pressed);
@@ -357,6 +358,46 @@ public partial class PlaythroughBot : Node
         if (P.GlobalPosition.DistanceTo(Main.World.SpawnPoint) > 1.5f) { _errors++; Log("ERRO: jogador não voltou ao elevador"); }
         _days++;
         if (_days <= 2 || _days % 3 == 0) Log($"Dia {GS.Data.Day} começou (saldo {GameState.FormatMoney(GS.Data.Money)})");
+    }
+
+    int _houseBuys, _skillBuys;
+
+    /// <summary>Em casa: compra melhorias da casa e habilidades baratas em relação ao saldo, pelos botões da tela.</summary>
+    async Task BuyAtHome(HomeScreen home)
+    {
+        var next = GS.NextLockedRegion();
+        bool Cheap(long cost) => cost <= GS.Data.Money * (next == null ? 0.6 : 0.2);
+        home.ShowHouseTab();
+        await Frames(2);
+        for (int i = 0; i < 8; i++)
+        {
+            var opts = FindButtons(home).Where(b => !b.Disabled && b.IsVisibleInTree() && (b.Text.StartsWith("◈") || b.Text.StartsWith("Construir")))
+                .Select(b => (b, cost: ParseCost(b.Text))).Where(x => Cheap(x.cost)).OrderBy(x => x.cost).ToList();
+            if (opts.Count == 0) break;
+            int before = GS.Data.House.Values.Sum();
+            opts[0].b.EmitSignal(BaseButton.SignalName.Pressed);
+            await Frames(2);
+            if (GS.Data.House.Values.Sum() != before + 1) { _errors++; Log("ERRO: compra da casa não aplicou"); break; }
+            _houseBuys++;
+        }
+        home.ShowSkillsTab();
+        await Frames(2);
+        foreach (var def in HomeData.Skills.OrderBy(s => s.Cost))
+        {
+            if (!GS.SkillAvailable(def.Id) || !Cheap(def.Cost)) continue;
+            home.SelectSkill(def.Id);
+            await Frames(2);
+            float dmg = GS.Damage;
+            var learn = FindButtons(home).FirstOrDefault(b => b.Text.StartsWith("Aprender") && !b.Disabled);
+            if (learn == null) { _errors++; Log($"ERRO: botão Aprender indisponível para {def.Name}"); break; }
+            learn.EmitSignal(BaseButton.SignalName.Pressed);
+            await Frames(2);
+            if (!GS.HasSkill(def.Id)) { _errors++; Log($"ERRO: habilidade {def.Name} não foi aprendida"); break; }
+            if (def.Id == SkillIds.FirmStrike && GS.Damage < dmg * 1.14f) { _errors++; Log("ERRO: Golpe firme não aumentou o dano"); }
+            _skillBuys++;
+            Log($"Aprendeu {def.Name}");
+        }
+        home.ShowHouseTab();
     }
 
     async Task SellTrip()

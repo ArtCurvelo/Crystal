@@ -46,6 +46,7 @@ public partial class TestRunner : Node
             Run("Atualização automática", TestUpdater);
             Run("Proteção do save (regressão do bug da atualização)", TestSaveProtection);
             Run("Ciclo do dia (turno, fim do dia, novo dia)", TestDayCycle);
+            Run("Casa e árvore de habilidades", TestHomeAndSkills);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -54,6 +55,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
             await RunAsync("Integração: galerias laterais", TestWings);
+            await RunAsync("Integração: coleta direta", TestDirectCollect);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -89,6 +91,77 @@ public partial class TestRunner : Node
     static GameState GS => GameState.Instance;
 
     void Fresh() { GS.NewGame(); }
+
+    // ---------------------------------------------------------------
+    void TestHomeAndSkills()
+    {
+        Fresh();
+        float dmg0 = GS.Damage, spd0 = GS.MoveSpeed, val0 = GS.ValueMultiplier, mag0 = GS.MagnetRadius, sw0 = GS.SwingsPerSecond;
+        int cap0 = GS.Capacity;
+        float day0 = GS.DayLength;
+        Check(!GS.TryBuyHouse(HouseIds.Bed), "sem dinheiro não compra melhoria da casa");
+        GS.AddMoney(50_000_000);
+        // casa
+        Check(GS.TryBuyHouse(HouseIds.Bed) && GS.TryBuyHouse(HouseIds.Bed), "compra a cama duas vezes");
+        Check(Mathf.IsEqualApprox(GS.DayLength, day0 + 120), $"cama nível 2 = +2 min de turno ({GS.DayLength})");
+        GS.TryBuyHouse(HouseIds.Workbench);
+        Check(Mathf.IsEqualApprox(GS.Damage, dmg0 * 1.06f), "bancada +6% de dano");
+        GS.TryBuyHouse(HouseIds.Wardrobe);
+        Check(GS.Capacity == (int)(cap0 * 1.10f), "armário +10% de mochila");
+        GS.TryBuyHouse(HouseIds.Kitchen);
+        Check(Mathf.IsEqualApprox(GS.MoveSpeed, spd0 * 1.05f), "cozinha +5% de velocidade");
+        GS.TryBuyHouse(HouseIds.Trophies);
+        Check(Mathf.IsEqualApprox(GS.ValueMultiplier, val0 * 1.04f), "troféus +4% de venda");
+        for (int i = 0; i < 10; i++) GS.TryBuyHouse(HouseIds.Bed);
+        Check(GS.HouseLevel(HouseIds.Bed) == 3 && GS.HouseMaxed(HouseIds.Bed) && GS.HouseCost(HouseIds.Bed) == long.MaxValue, "cama para no nível máximo");
+        GS.EndDay(early: true);
+        Check(GS.TryBuyHouse(HouseIds.Kitchen), "em casa (fora do turno) as melhorias da casa podem ser compradas");
+        GS.StartNewDay();
+        // habilidades: pré-requisitos
+        Check(!GS.TryBuySkill(SkillIds.DirectCollect), "habilidade de nível 2 exige a anterior");
+        Check(GS.TryBuySkill(SkillIds.Magnet) && Mathf.IsEqualApprox(GS.MagnetRadius, mag0 * 1.3f), "Ímã ampliado +30%");
+        Check(!GS.TryBuySkill(SkillIds.Magnet), "não compra a mesma habilidade duas vezes");
+        Check(GS.TryBuySkill(SkillIds.DirectCollect) && GS.DirectCollect, "Coleta direta liberada após o Ímã");
+        float dmg1 = GS.Damage;
+        GS.TryBuySkill(SkillIds.FirmStrike);
+        Check(Mathf.IsEqualApprox(GS.Damage, dmg1 * 1.15f), "Golpe firme +15%");
+        GS.TryBuySkill(SkillIds.Cadence);
+        Check(Mathf.IsEqualApprox(GS.SwingsPerSecond, sw0 * 1.10f), "Cadência +10%");
+        Check(GS.CritChance == 0, "sem crítico antes da habilidade");
+        GS.TryBuySkill(SkillIds.Critical);
+        Check(GS.CritChance > 0.1f, "Golpe crítico ativo");
+        float day1 = GS.DayLength;
+        GS.TryBuySkill(SkillIds.Early); GS.TryBuySkill(SkillIds.Overtime);
+        Check(Mathf.IsEqualApprox(GS.DayLength, day1 + 240), "Madrugador + Hora extra = +4 min");
+        var rare = GameData.Mat("sunstone");
+        long rp = GS.SellPrice(rare);
+        GS.TryBuySkill(SkillIds.Haggle); GS.TryBuySkill(SkillIds.RareNose);
+        Check(GS.RareChanceMultiplier > 1.4f, "Faro para raros aumenta a chance");
+        long rp2 = GS.SellPrice(rare);
+        GS.TryBuySkill(SkillIds.Jeweler);
+        Check(GS.SellPrice(rare) >= (long)(rp2 * 1.49) && rp2 > rp, "Joalheiro valoriza raros");
+        // bônus do turno: só com a habilidade, uma vez por dia
+        GS.Data.DayEarned = 0;
+        GS.AddItem("quartz", 10);
+        long sold = GS.SellAll();
+        Check(GS.PayShiftBonus() == 0, "sem a habilidade não há bônus do turno");
+        GS.TryBuySkill(SkillIds.Compactor); GS.TryBuySkill(SkillIds.ShiftBonus);
+        long bonus = GS.PayShiftBonus();
+        Check(bonus == Math.Max(1, sold / 10) && GS.PayShiftBonus() == 0, "bônus do turno = 10% do dia, pago uma vez");
+        // save e renascimento
+        GS.SaveGame(true);
+        int houseSum = GS.Data.House.Values.Sum();
+        GS.LoadGame();
+        Check(GS.Data.House.Values.Sum() == houseSum && GS.Data.Skills.Count == HomeData.Skills.Count, "casa e habilidades são salvas");
+        GS.Data.GameCompleted = true;
+        GS.Data.RunEarned = 10_000_000;
+        GS.Prestige();
+        Check(GS.Data.Skills.Count == 0 && GS.Data.House.Values.Sum() == houseSum, "renascer zera a árvore e mantém a casa");
+        var bad = new SaveData { House = new() { ["bed"] = 99, ["nada"] = 2 }, Skills = new() { "magnet", "magnet", "inexistente" } };
+        bad.Sanitize();
+        Check(bad.House["bed"] == 3 && !bad.House.ContainsKey("nada") && bad.Skills.Count == 1, "casa/habilidades inválidas são saneadas");
+        Fresh();
+    }
 
     // ---------------------------------------------------------------
     void TestDayCycle()
@@ -741,6 +814,30 @@ public partial class TestRunner : Node
         Check(wn.Visible, "galeria deve aparecer perto da entrada");
         root.QueueFree();
         await Frames(2);
+    }
+
+    async Task TestDirectCollect()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        var shards = new ShardManager();
+        root.AddChild(shards);
+        shards.PlayerPosition = () => new Vector3(0, 1, 0);
+        var q = GameData.Mat("quartz");
+        shards.SpawnShards(q, new Vector3(40, 1, 0), 4);
+        await Frames(150);
+        Check(GS.InventoryCount == 0, "sem a habilidade, fragmentos a 40 m não vêm sozinhos");
+        shards.ClearAll();
+        GS.AddMoney(1_000_000);
+        GS.TryBuySkill(SkillIds.Magnet);
+        GS.TryBuySkill(SkillIds.DirectCollect);
+        shards.SpawnShards(q, new Vector3(40, 1, 0), 4);
+        for (int i = 0; i < 400 && GS.InventoryCount < 4; i++) await Frames(1);
+        Check(GS.InventoryCount == 4, $"Coleta direta: fragmentos a 40 m vão para a mochila ({GS.InventoryCount}/4)");
+        root.QueueFree();
+        await Frames(2);
+        Fresh();
     }
 
     async Task TestObjectiveMarker()

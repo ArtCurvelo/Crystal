@@ -396,7 +396,7 @@ public partial class HelpScreen : ModalScreen
         right.AddThemeConstantOverride("separation", 8);
         cols.AddChild(right);
         Section(right, "CICLO", "Minere → os fragmentos voam até você → leve-os à única Estação de Venda (verde), no acampamento → compre melhorias no Terminal (dourado) → abra portões para regiões mais ricas. Galerias laterais guardam minérios em destaque.");
-        Section(right, "O TURNO", "Cada dia de trabalho vai das 06:00 às 18:00 (10 min). No fim do turno você só pode vender e pegar o Elevador do acampamento para casa. Dormir começa o próximo dia.");
+        Section(right, "O TURNO", "Cada dia vai das 06:00 às 18:00 (10 min). No fim do turno você só pode vender e pegar o Elevador do acampamento. Em casa: melhorias da casa (permanentes), árvore de habilidades e dormir para o próximo dia.");
         Section(right, "RESSONÂNCIA", "Golpes em ritmo constante enchem o arco violeta da mira. Quando ficar dourado, o próximo golpe libera um pulso que atinge todos os cristais próximos.");
         Section(right, "EVENTOS", "Cada região tem condições próprias: Eco Luminoso (cristais renascem), Maré Gélida (fragmentos x2) e Surto do Núcleo (dano +50%).");
         Section(right, "RENASCIMENTO", "Depois de concluir a jornada, renasça no Terminal: recomece com Essência Ancestral (+10% de dano e venda por ponto, para sempre).");
@@ -472,62 +472,6 @@ public partial class CompletionScreen : ModalScreen
             $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}\n" +
             $"Materiais descobertos: {d.Discovered.Count}/{GameData.Materials.Count}   ·   Melhorias no máximo: {maxed}/{UpgradeIds.All.Length}\n" +
             $"Ferramenta: {GameState.ToolTierNames[GameState.Instance.ToolTier]}";
-    }
-}
-
-// =====================================================================
-/// <summary>Casa do escavador: resumo do dia e dormir para começar o próximo.</summary>
-public partial class HomeScreen : ModalScreen
-{
-    public Action OnSleep;
-    Label _title, _stats, _warn;
-    Button _sleep;
-
-    public override void _Ready()
-    {
-        BuildFrame("", new Vector2(600, 0), UiTheme.Gold);
-        Layer = 22;
-        Panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.05f, 0.04f, 0.07f, 0.99f), UiTheme.Gold, 18, 3, 30, 24));
-        var icon = HudIcon.Make(HudIcon.Kind.Star, UiTheme.Gold, 52);
-        icon.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
-        Body.AddChild(icon);
-        Body.AddChild(UiTheme.Label("CASA", 20, UiTheme.Muted, true, HorizontalAlignment.Center));
-        _title = UiTheme.Shadowed(UiTheme.Label("", 36, UiTheme.Gold, true, HorizontalAlignment.Center), 6);
-        Body.AddChild(_title);
-        Body.AddChild(new ColorRect { Color = new Color(UiTheme.Gold, 0.35f), CustomMinimumSize = new Vector2(0, 2) });
-        _stats = UiTheme.Label("", 18, UiTheme.Text, false, HorizontalAlignment.Center);
-        Body.AddChild(_stats);
-        _warn = UiTheme.Label("", 15, new Color(1f, 0.7f, 0.35f), false, HorizontalAlignment.Center);
-        _warn.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _warn.CustomMinimumSize = new Vector2(520, 0);
-        Body.AddChild(_warn);
-        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
-        Body.AddChild(row);
-        _sleep = UiTheme.Button("Dormir", () => OnSleep?.Invoke(), 340, 22);
-        _sleep.AddThemeColorOverride("font_color", UiTheme.Gold);
-        row.AddChild(_sleep);
-    }
-
-    public override void Open()
-    {
-        base.Open();
-        Audio.AudioManager.Instance?.Play("unlock", -6f);
-    }
-
-    public override void Refresh()
-    {
-        var gs = GameState.Instance;
-        var d = gs.Data;
-        _title.Text = $"FIM DO DIA {d.Day}";
-        _stats.Text =
-            $"Ganho no dia: {GameState.FormatMoney(d.DayEarned)}\n" +
-            $"Depósitos quebrados: {GameState.FormatNumber(d.DayCrystals)}\n" +
-            $"Saldo: {GameState.FormatMoney(d.Money)}";
-        _warn.Text = gs.InventoryCount > 0
-            ? $"Você trouxe {gs.InventoryCount} fragmentos sem vender. Eles continuam na mochila para amanhã."
-            : "";
-        _warn.Visible = gs.InventoryCount > 0;
-        _sleep.Text = $"Dormir e começar o Dia {d.Day + 1}";
     }
 }
 

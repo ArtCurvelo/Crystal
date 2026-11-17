@@ -426,6 +426,7 @@ public partial class Main : Node
         var gs = GameState.Instance;
         if (CurrentMode != Mode.Playing) return;
         gs.EndDay(early: true);
+        gs.PayShiftBonus();
         _shards.ClearAll();
         Input.MouseMode = Input.MouseModeEnum.Visible;
         Player.InputEnabled = false;

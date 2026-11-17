@@ -241,7 +241,14 @@ public partial class PlayerController : CharacterBody3D
                 _resonance += 1;
                 if (ResonanceReady) AudioManager.Instance?.Play("charged", -6f);
             }
-            bool broke = c.IsMineable && c.Hit(gs.Damage, pos, normal);
+            float dmg = gs.Damage;
+            bool crit = gs.CritChance > 0 && GD.Randf() < gs.CritChance;
+            if (crit)
+            {
+                dmg *= GameState.CritMultiplier;
+                Effects.Instance?.FloatText(pos + Vector3.Up * 0.4f, "CRÍTICO!", new Color(1f, 0.85f, 0.3f), 1.1f);
+            }
+            bool broke = c.IsMineable && c.Hit(dmg, pos, normal);
             _shakeAmount = Mathf.Min(1.5f, _shakeAmount + (broke ? 1.2f : 0.45f));
             _fovKick = broke ? 3f : 1f;
             CrystalHit?.Invoke(c, broke);

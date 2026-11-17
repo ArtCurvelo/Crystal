@@ -26,6 +26,7 @@ public partial class ShardManager : Node3D
         public Vector3 Vel;
         public float Age;
         public bool Homing;
+        public bool Direct; // habilidade Coleta direta: vem até o jogador de qualquer distância
         public float Spin;
     }
 
@@ -54,6 +55,7 @@ public partial class ShardManager : Node3D
 
     public void SpawnShards(MaterialDef mat, Vector3 origin, int count)
     {
+        bool direct = GameState.Instance?.DirectCollect == true;
         for (int i = 0; i < count; i++)
         {
             if (_shards.Count >= MaxShards)
@@ -75,6 +77,7 @@ public partial class ShardManager : Node3D
                 Node = node, Mat = mat,
                 Vel = new Vector3(MathF.Cos(a) * sp, Rand(3f, 6f), MathF.Sin(a) * sp),
                 Spin = Rand(-8f, 8f),
+                Direct = direct,
             });
         }
     }
@@ -120,17 +123,17 @@ public partial class ShardManager : Node3D
             var pos = s.Node.GlobalPosition;
             float dist = hasPlayer ? pos.DistanceTo(ppos) : 999f;
 
-            if (s.Age > 0.45f && hasPlayer && dist < magnet)
+            if (s.Age > (s.Direct ? 0.35f : 0.45f) && hasPlayer && (dist < magnet || s.Direct))
             {
                 if (gs.FreeSpace > 0) s.Homing = true;
                 else { blocked = true; s.Homing = false; }
             }
-            else if (s.Homing && dist > magnet * 1.6f) s.Homing = false;
+            else if (s.Homing && !s.Direct && dist > magnet * 1.6f) s.Homing = false;
 
             if (s.Homing)
             {
                 var dir = (ppos - pos).Normalized();
-                float speed = 6f + s.Age * 4f;
+                float speed = s.Direct ? 10f + s.Age * 14f : 6f + s.Age * 4f;
                 s.Vel = s.Vel.Lerp(dir * speed, Mathf.Min(1, dt * 8f));
                 pos += s.Vel * dt;
                 if (pos.DistanceTo(ppos) < 0.65f)

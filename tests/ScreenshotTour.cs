@@ -214,9 +214,18 @@ public partial class ScreenshotTour : Node
         await Wait(1.0f);
         await Shot("15b_day_over");
         gs.SellAll();
+        gs.AddMoney(600_000);
+        foreach (var (id, n) in new[] { ("bed", 2), ("workbench", 3), ("wardrobe", 2), ("kitchen", 3), ("trophies", 3) })
+            for (int i = 0; i < n; i++) gs.TryBuyHouse(id);
+        foreach (var id in new[] { "magnet", "firm_strike", "cadence", "haggle" }) gs.TryBuySkill(id);
         UiBus.RequestHome();
-        await Wait(0.8f);
+        await Wait(1.2f);
         await Shot("15c_home");
+        var home = Main.GetChildren().OfType<UI.HomeScreen>().First();
+        home.ShowSkillsTab();
+        home.SelectSkill("direct_collect");
+        await Wait(0.4f);
+        await Shot("15d_skills");
         Main.CloseAllForTour();
         gs.StartNewDay();
 
