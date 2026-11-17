@@ -150,6 +150,24 @@ public partial class ScreenshotTour : Node
         p.SetLook(0.6f, 0.25f);
         await Wait(0.6f);
         await Shot("10c_region4b");
+        // galerias laterais: entrada vista da sala principal e o interior de cada uma
+        {
+            var r0 = GameData.Regions[0]; var w0 = r0.Wings[0];
+            p.GlobalPosition = new Vector3(w0.Side * (r0.HalfX - 10f), 0.1f, r0.CenterZ + w0.ZOffset + 3f);
+            p.SetLook(-w0.Side * Mathf.Pi / 2 - 0.2f * w0.Side, 0.12f);
+            await Wait(1f);
+            await Shot("10d_wing_entrance");
+            int wi = 0;
+            foreach (var r in GameData.Regions)
+                foreach (var w in r.Wings)
+                {
+                    float wx = w.Side * (r.HalfX + 2 + World.WorldBuilder.WingTunnelLength + 1.2f);
+                    p.GlobalPosition = new Vector3(wx, 0.1f, r.CenterZ + w.ZOffset);
+                    p.SetLook(-w.Side * Mathf.Pi / 2, -0.05f);
+                    await Wait(0.8f);
+                    await Shot($"10w_{wi++}_{w.Id}");
+                }
+        }
         float fps3 = (float)Engine.GetFramesPerSecond();
         string dc3 = DrawStats();
 

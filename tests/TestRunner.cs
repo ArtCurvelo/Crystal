@@ -52,6 +52,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: eventos de região", TestRegionEvents);
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
+            await RunAsync("Integração: galerias laterais", TestWings);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -627,6 +628,62 @@ public partial class TestRunner : Node
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Godot.Key.Shift, Keycode = Godot.Key.Shift, Pressed = false });
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         Check(!InputHints.UsingPad && InputHints.Interact == "[E]", "dicas voltam ao teclado");
+        root.QueueFree();
+        await Frames(2);
+    }
+
+    /// <summary>Galerias laterais: existem, têm cristais do minério em destaque e são alcançáveis andando.</summary>
+    async Task TestWings()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        player.SimulateCapturedMouse = true;
+        await Frames(3);
+        int total = 0;
+        foreach (var r in GameData.Regions)
+        {
+            Check(r.Wings.Count >= 2, $"região {r.Id} deve ter ao menos 2 galerias laterais");
+            foreach (var w in r.Wings)
+            {
+                total++;
+                Check(GameData.Mat(w.FeaturedMaterialId) != null, $"galeria {w.Id}: minério em destaque inexistente");
+                var wing = world.RegionRoots[r.Index].GetNodeOrNull<Node3D>("Wing_" + w.Id);
+                Check(wing != null, $"galeria {w.Id} não foi construída");
+                if (wing == null) continue;
+                var crystals = world.Crystals.Where(c => wing.IsAncestorOf(c)).ToList();
+                Check(crystals.Count >= w.Slots - 2, $"galeria {w.Id}: poucos cristais ({crystals.Count})");
+                Check(crystals.Count(c => c.Material.Id == w.FeaturedMaterialId) >= 2, $"galeria {w.Id}: minério em destaque quase ausente");
+                // anda da sala principal até dentro da galeria
+                float oz = r.CenterZ + w.ZOffset;
+                player.GlobalPosition = new Vector3(w.Side * (r.HalfX - 6f), 0.1f, oz);
+                player.Velocity = Vector3.Zero;
+                player.SetLook(-w.Side * Mathf.Pi / 2, 0);
+                await Frames(2);
+                Input.ActionPress("move_forward");
+                float goal = r.HalfX + 2 + WorldBuilder.WingTunnelLength + 2f;
+                for (int i = 0; i < 600 && player.GlobalPosition.X * w.Side < goal; i++) await Frames(1);
+                Input.ActionRelease("move_forward");
+                Check(player.GlobalPosition.X * w.Side >= goal, $"galeria {w.Id}: jogador não conseguiu entrar andando (x={player.GlobalPosition.X:0.0})");
+                Check(player.GlobalPosition.Y > -1f, $"galeria {w.Id}: jogador caiu do mapa");
+            }
+        }
+        Check(total >= 8, $"devem existir ao menos 8 galerias (há {total})");
+        // oclusão por distância: longe da entrada some, dentro aparece
+        var r1 = GameData.Regions[1]; var w1 = r1.Wings[0];
+        var wn = world.RegionRoots[1].GetNode<Node3D>("Wing_" + w1.Id);
+        world.UpdateWingVisibility(new Vector3(0, 1.5f, GameData.Regions[0].CenterZ));
+        Check(!wn.Visible, "galeria distante deve ficar oculta");
+        world.UpdateWingVisibility(new Vector3(WorldBuilder.WingCenterX(r1, w1), 1.5f, r1.CenterZ + w1.ZOffset));
+        Check(wn.Visible, "galeria deve aparecer com a câmera dentro dela");
+        world.UpdateWingVisibility(new Vector3(w1.Side * (r1.HalfX - 8f), 1.5f, r1.CenterZ + w1.ZOffset));
+        Check(wn.Visible, "galeria deve aparecer perto da entrada");
         root.QueueFree();
         await Frames(2);
     }

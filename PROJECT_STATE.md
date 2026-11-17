@@ -71,6 +71,7 @@ docs/screenshots/   Capturas do jogo real.
 
 ### Regras técnicas
 - A região é detectada pela coordenada Z (`WorldBuilder.RegionAt`). Os portões ficam nos túneis.
+- Cada região tem galerias laterais (`RegionDef.Wings`): sala extra a leste/oeste ligada por túnel curto, montada num nó deslocado em X. `WorldBuilder._Process` oculta galerias distantes (sem oclusão no Compatibility).
 - Camadas de física: 1 mundo, 2 jogador, 3 (valor 4) cristais, 4 (valor 8) interagíveis.
 - `Basis.Scaled()` escala nos eixos **globais**; usar `ScaleLocal()` para transformações compostas.
 - Malhas estáticas sob Node3D "puros" são mescladas na carga (`StaticBatcher`); nós com script não são tocados.

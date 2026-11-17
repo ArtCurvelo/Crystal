@@ -81,6 +81,22 @@ public sealed class RegionDef
     public float HalfX;
     public float HalfZ;
     public float Height;
+    /// <summary>Galerias laterais (salas extras ligadas às paredes leste/oeste).</summary>
+    public List<WingDef> Wings = new();
+}
+
+/// <summary>Galeria lateral de uma região: sala menor com um minério em destaque.</summary>
+public sealed class WingDef
+{
+    public string Id;
+    public string Name;
+    /// <summary>-1 = oeste, +1 = leste.</summary>
+    public int Side;
+    /// <summary>Deslocamento em Z da abertura em relação ao centro da região.</summary>
+    public float ZOffset;
+    public string FeaturedMaterialId;
+    public int Slots = 9;
+    public float HalfX = 13, HalfZ = 12;
 }
 
 /// <summary>Definição de um upgrade com custo e efeito progressivos.</summary>
@@ -301,6 +317,8 @@ public static class GameData
         r1.Spawns.Add(new SpawnEntry("quartz", 0.5f));
         r1.Spawns.Add(new SpawnEntry("copper", 0.3f));
         r1.Spawns.Add(new SpawnEntry("amethyst", 0.2f));
+        r1.Wings.Add(new WingDef { Id = "copper_vein", Name = "Veio de Cobre", Side = -1, ZOffset = -12, FeaturedMaterialId = "copper", Slots = 8, HalfX = 11, HalfZ = 10 });
+        r1.Wings.Add(new WingDef { Id = "amethyst_grotto", Name = "Gruta das Ametistas", Side = 1, ZOffset = 6, FeaturedMaterialId = "amethyst", Slots = 8, HalfX = 11, HalfZ = 10 });
         Regions.Add(r1);
 
         var r2 = new RegionDef
@@ -319,6 +337,8 @@ public static class GameData
         r2.Spawns.Add(new SpawnEntry("silver", 0.2f));
         r2.Spawns.Add(new SpawnEntry("emerald", 0.12f));
         r2.Spawns.Add(new SpawnEntry("malachite", 0.08f));
+        r2.Wings.Add(new WingDef { Id = "frozen_grotto", Name = "Gruta Congelada", Side = -1, ZOffset = 2, FeaturedMaterialId = "frostice" });
+        r2.Wings.Add(new WingDef { Id = "silver_vein", Name = "Veio de Prata", Side = 1, ZOffset = -8, FeaturedMaterialId = "silver" });
         Regions.Add(r2);
 
         var r3 = new RegionDef
@@ -337,6 +357,8 @@ public static class GameData
         r3.Spawns.Add(new SpawnEntry("magmite", 0.2f));
         r3.Spawns.Add(new SpawnEntry("gold", 0.12f));
         r3.Spawns.Add(new SpawnEntry("ancestralite", 0.08f));
+        r3.Wings.Add(new WingDef { Id = "old_forge", Name = "Forja Antiga", Side = -1, ZOffset = -0.5f, FeaturedMaterialId = "magmite", Slots = 10, HalfX = 14, HalfZ = 13 });
+        r3.Wings.Add(new WingDef { Id = "obsidian_hall", Name = "Câmara de Obsidiana", Side = 1, ZOffset = -0.5f, FeaturedMaterialId = "obsidian", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r3);
 
         var r4 = new RegionDef
@@ -354,6 +376,8 @@ public static class GameData
         r4.Spawns.Add(new SpawnEntry("coralprism", 0.25f));
         r4.Spawns.Add(new SpawnEntry("titanium", 0.2f));
         r4.Spawns.Add(new SpawnEntry("opal", 0.15f));
+        r4.Wings.Add(new WingDef { Id = "coral_garden", Name = "Jardim de Coral", Side = -1, ZOffset = 4, FeaturedMaterialId = "coralprism", Slots = 10, HalfX = 14, HalfZ = 13 });
+        r4.Wings.Add(new WingDef { Id = "opal_well", Name = "Poço de Opalas", Side = 1, ZOffset = 6, FeaturedMaterialId = "opal", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r4);
 
         // ---------------- Upgrades ----------------

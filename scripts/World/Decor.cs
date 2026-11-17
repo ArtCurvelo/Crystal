@@ -383,7 +383,7 @@ public static class Decor
     }
 
     /// <summary>Formações gigantes de cristal (decorativas) junto às paredes, com o shader de cristal.</summary>
-    public static void GiantClusters(Node3D root, RegionDef r, Random rng, int count, Color[] palette)
+    public static void GiantClusters(Node3D root, RegionDef r, Random rng, int count, Color[] palette, Func<int, float, bool> blockedWall = null)
     {
         var shader = GD.Load<Shader>("res://shaders/crystal.gdshader");
         var mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.3f);
@@ -401,6 +401,8 @@ public static class Decor
                 Vector3 basePos;
                 int side = rng.Next(3);
                 float t = (float)(rng.NextDouble() * 2 - 1);
+                // parede lateral bloqueada (abertura de galeria) → usa a parede do fundo
+                if (side < 2 && blockedWall != null && blockedWall(side == 0 ? -1 : 1, r.CenterZ + t * (r.HalfZ - 4))) side = 2;
                 if (side == 0) basePos = new Vector3(-r.HalfX + 1.2f, 0, r.CenterZ + t * (r.HalfZ - 4));
                 else if (side == 1) basePos = new Vector3(r.HalfX - 1.2f, 0, r.CenterZ + t * (r.HalfZ - 4));
                 else

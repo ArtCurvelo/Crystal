@@ -27,6 +27,33 @@ public partial class WorldBuilder : Node3D
         Build();
     }
 
+    /// <summary>Galerias montadas: nó, ponto da abertura (na parede da sala principal) e meia-extensão em X/Z.</summary>
+    readonly List<(Node3D node, Vector3 opening, float cx, float oz, float hx, float hz)> _wings = new();
+    public const float WingViewDistance = 34f;
+    int _cullTick;
+
+    /// <summary>
+    /// Sem oclusão no renderizador Compatibility: o que está atrás das paredes ainda é desenhado.
+    /// Cada galeria só fica visível com a câmera dentro dela ou a até ~34 m da entrada.
+    /// </summary>
+    public override void _Process(double delta)
+    {
+        if (_wings.Count == 0 || ++_cullTick % 6 != 0) return;
+        var cam = GetViewport()?.GetCamera3D();
+        if (cam == null) return;
+        UpdateWingVisibility(cam.GlobalPosition);
+    }
+
+    public void UpdateWingVisibility(Vector3 eye)
+    {
+        foreach (var w in _wings)
+        {
+            bool inside = MathF.Abs(eye.X - w.cx) < w.hx + 2 && MathF.Abs(eye.Z - w.oz) < w.hz + 2;
+            bool vis = inside || eye.DistanceTo(w.opening) < WingViewDistance;
+            if (w.node.Visible != vis) w.node.Visible = vis;
+        }
+    }
+
     void Build()
     {
         ulong t0 = Time.GetTicksMsec();
@@ -43,7 +70,10 @@ public partial class WorldBuilder : Node3D
         // chão contínuo de colisão sob todo o mapa
         float minZ = regions[^1].CenterZ - regions[^1].HalfZ - 2;
         float maxZ = regions[0].CenterZ + regions[0].HalfZ + 2;
-        AddCollider(this, new Vector3(0, -0.5f, (minZ + maxZ) / 2), new Vector3(80, 1, maxZ - minZ));
+        float maxX = 40;
+        foreach (var r in regions)
+            foreach (var w in r.Wings) maxX = MathF.Max(maxX, WingCenterX(r, w) * w.Side + w.HalfX + 2);
+        AddCollider(this, new Vector3(0, -0.5f, (minZ + maxZ) / 2), new Vector3(maxX * 2 + 4, 1, maxZ - minZ));
 
         // agrupa malhas estáticas por material em cada região e túnel
         int saved = 0;
@@ -68,14 +98,16 @@ public partial class WorldBuilder : Node3D
 
         bool hasNorth = index + 1 < GameData.Regions.Count;
         bool hasSouth = index > 0;
-        // paredes leste/oeste
-        AddBox(root, new Vector3(-hx - 0.5f, h / 2, cz), new Vector3(1, h, hz * 2 + 2), wallMat, true);
-        AddBox(root, new Vector3(hx + 0.5f, h / 2, cz), new Vector3(1, h, hz * 2 + 2), wallMat, true);
+        // paredes leste/oeste (com aberturas para as galerias laterais)
+        var openings = new List<(int side, float z)>();
+        foreach (var w in r.Wings) openings.Add((w.Side, cz + w.ZOffset));
+        BuildSideWall(root, -hx - 0.5f, cz, hz, h, OpeningZ(openings, -1), wallMat);
+        BuildSideWall(root, hx + 0.5f, cz, hz, h, OpeningZ(openings, 1), wallMat);
         BuildWallWithOpening(root, cz - hz - 0.5f, hx, h, hasNorth, wallMat);
         BuildWallWithOpening(root, cz + hz + 0.5f, hx, h, hasSouth, wallMat);
 
-        BuildDecoration(root, r, rng);
-        BuildLights(root, r, rng);
+        BuildDecoration(root, r, rng, openings);
+        BuildLights(root, r, r.Index == 0 ? 4 : 5);
         BuildAmbientParticles(root, r);
 
         // estações próximas da entrada da região
@@ -97,9 +129,117 @@ public partial class WorldBuilder : Node3D
             AddPlatform(root, new Vector3(0, 0, entranceZ), r);
         }
 
+        _blockedWall = (side, z) => NearOpening(openings, side, z);
         BuildSetPieces(root, r, new Random(500 + index));
-        BuildCrystals(root, r, rng, entranceZ);
+        var blocked = new List<Vector2>();
+        foreach (var (side, z) in openings)
+            for (float d = 2.5f; d < 9f; d += 3f) blocked.Add(new Vector2(side * (hx - d), z));
+        BuildCrystals(root, r, rng, entranceZ, blocked);
+        foreach (var w in r.Wings) BuildWing(root, r, w, index);
     }
+
+    static float? OpeningZ(List<(int side, float z)> openings, int side)
+    {
+        foreach (var o in openings) if (o.side == side) return o.z;
+        return null;
+    }
+
+    /// <summary>Centro X de uma galeria lateral (fora da sala principal, depois de um túnel curto).</summary>
+    public const float WingTunnelLength = 5f;
+    public static float WingCenterX(RegionDef r, WingDef w) => w.Side * (r.HalfX + 2 + WingTunnelLength + w.HalfX);
+
+    /// <summary>Parede leste/oeste, opcionalmente com uma abertura do tamanho de um túnel.</summary>
+    void BuildSideWall(Node3D root, float x, float cz, float hz, float h, float? openZ, Material mat)
+    {
+        if (openZ == null)
+        {
+            AddBox(root, new Vector3(x, h / 2, cz), new Vector3(1, h, hz * 2 + 2), mat, true);
+            return;
+        }
+        float w = TunnelHalfWidth, oz = openZ.Value;
+        float z0 = cz - hz - 1, z1 = cz + hz + 1;
+        float aLen = oz - w - z0, bLen = z1 - (oz + w);
+        if (aLen > 0.01f) AddBox(root, new Vector3(x, h / 2, z0 + aLen / 2), new Vector3(1, h, aLen), mat, true);
+        if (bLen > 0.01f) AddBox(root, new Vector3(x, h / 2, oz + w + bLen / 2), new Vector3(1, h, bLen), mat, true);
+        AddBox(root, new Vector3(x, (h + TunnelHeight) / 2, oz), new Vector3(1, h - TunnelHeight, w * 2), mat, true);
+    }
+
+    /// <summary>
+    /// Galeria lateral: túnel curto + sala menor com minério em destaque.
+    /// O conteúdo é montado num nó deslocado em X, então os construtores de sala (centrados em x=0) servem sem mudança.
+    /// </summary>
+    void BuildWing(Node3D regionRoot, RegionDef r, WingDef w, int index)
+    {
+        var rng = new Random(3000 + index * 31 + (w.Side > 0 ? 7 : 0));
+        float oz = r.CenterZ + w.ZOffset;
+        float cx = WingCenterX(r, w);
+        float h = MathF.Min(r.Height, 11f);
+        var featured = GameData.Mat(w.FeaturedMaterialId);
+        var fake = new RegionDef
+        {
+            Id = r.Id + "_" + w.Id, Index = -1, Name = w.Name,
+            RockColor = r.RockColor, AccentColor = featured.Glow, LightColor = r.LightColor,
+            RareMaterialId = r.RareMaterialId, RareChance = r.RareChance * 1.6f, CrystalSlots = w.Slots,
+            CenterZ = oz, HalfX = w.HalfX, HalfZ = w.HalfZ, Height = h,
+        };
+        // minério em destaque domina; os demais da região continuam aparecendo
+        fake.Spawns.Add(new SpawnEntry(w.FeaturedMaterialId, 0.55f));
+        foreach (var s in r.Spawns) if (s.MaterialId != w.FeaturedMaterialId) fake.Spawns.Add(new SpawnEntry(s.MaterialId, s.Weight * 0.45f));
+
+        var node = new Node3D { Name = "Wing_" + w.Id, Position = new Vector3(cx, 0, 0) };
+        regionRoot.AddChild(node);
+        var wallMat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.05f), Roughness = 1f };
+        var floorMat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.4f), Roughness = 1f };
+        float hx = w.HalfX, hz = w.HalfZ;
+        AddBox(node, new Vector3(0, -0.25f, oz), new Vector3(hx * 2 + 2, 0.5f, hz * 2 + 2), floorMat, false);
+        AddBox(node, new Vector3(0, h + 0.5f, oz), new Vector3(hx * 2 + 2, 1f, hz * 2 + 2), wallMat, true);
+        // parede voltada para a sala principal tem a abertura; a oposta é fechada
+        int inner = -w.Side;
+        BuildSideWall(node, inner * (hx + 0.5f), oz, hz, h, oz, wallMat);
+        BuildSideWall(node, -inner * (hx + 0.5f), oz, hz, h, null, wallMat);
+        AddBox(node, new Vector3(0, h / 2, oz - hz - 0.5f), new Vector3(hx * 2 + 2, h, 1), wallMat, true);
+        AddBox(node, new Vector3(0, h / 2, oz + hz + 0.5f), new Vector3(hx * 2 + 2, h, 1), wallMat, true);
+
+        var openings = new List<(int side, float z)> { (inner, oz) };
+        BuildDecoration(node, fake, rng, openings);
+        BuildLights(node, fake, 2);
+        Decor.GiantClusters(node, fake, rng, 2, new[] { featured.Glow, r.AccentColor }, (side, z) => side == inner);
+
+        var blocked = new List<Vector2>();
+        for (float d = 2.5f; d < 9f; d += 3f) blocked.Add(new Vector2(inner * (hx - d), oz));
+        BuildCrystals(node, fake, rng, 99999f, blocked);
+
+        BuildWingTunnel(regionRoot, r, w, oz, featured);
+        _wings.Add((node, new Vector3(w.Side * (r.HalfX + 0.5f), 1.5f, oz), cx, oz, hx, hz));
+    }
+
+    void BuildWingTunnel(Node3D root, RegionDef r, WingDef w, float oz, MaterialDef featured)
+    {
+        float xa = w.Side * (r.HalfX + 1), xb = w.Side * (r.HalfX + 1 + WingTunnelLength);
+        float cx = (xa + xb) / 2, len = WingTunnelLength + 0.2f;
+        var mat = new StandardMaterial3D { AlbedoColor = r.RockColor.Darkened(0.2f), Roughness = 1 };
+        AddBox(root, new Vector3(cx, TunnelHeight / 2, oz - TunnelHalfWidth - 0.5f), new Vector3(len, TunnelHeight, 1), mat, true);
+        AddBox(root, new Vector3(cx, TunnelHeight / 2, oz + TunnelHalfWidth + 0.5f), new Vector3(len, TunnelHeight, 1), mat, true);
+        AddBox(root, new Vector3(cx, TunnelHeight + 0.5f, oz), new Vector3(len, 1, TunnelHalfWidth * 2 + 2), mat, true);
+        AddBox(root, new Vector3(cx, -0.25f, oz), new Vector3(len, 0.5f, TunnelHalfWidth * 2), mat.Duplicate() as Material, false);
+        var strip = MeshFactory.Emissive(featured.Glow.Darkened(0.4f), featured.Glow, 1.5f);
+        for (float t = 0.6f; t < WingTunnelLength; t += 2.2f)
+            AddMeshOnly(root, new BoxMesh { Size = new Vector3(1.0f, 0.03f, 0.6f) }, strip, new Vector3(xa + w.Side * t, 0.02f, oz));
+        // placa com o nome da galeria, acima da abertura, voltada para a sala principal
+        var sign = new Label3D
+        {
+            Name = "WingSign_" + w.Id,
+            Text = w.Name.ToUpperInvariant(),
+            FontSize = 64, PixelSize = 0.01f, OutlineSize = 12,
+            Modulate = featured.Glow.Lightened(0.35f), OutlineModulate = new Color(0, 0, 0, 0.85f),
+            Shaded = false, DoubleSided = false,
+            Position = new Vector3(w.Side * (r.HalfX - 0.05f), TunnelHeight + 0.7f, oz),
+            Rotation = new Vector3(0, -w.Side * Mathf.Pi / 2, 0),
+        };
+        root.AddChild(sign);
+    }
+
+    Func<int, float, bool> _blockedWall;
 
     /// <summary>Cenografia por região (posto avançado, cachoeiras, flora, ruínas).</summary>
     void BuildSetPieces(Node3D root, RegionDef r, Random rng)
@@ -119,7 +259,7 @@ public partial class WorldBuilder : Node3D
                 Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 2f), r.Height * 0.9f, 2f, Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
                 Decor.Mushrooms(root, r, rng, low ? 5 : 9, new Color(0.3f, 1f, 0.9f));
                 Decor.Ferns(root, r, rng, low ? 6 : 12, new Color(0.95f, 0.42f, 0.15f));
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) });
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, _blockedWall);
                 break;
             case "depths":
                 Decor.Outpost(root, new Vector3(r.HalfX - 3f, 0, r.CenterZ + r.HalfZ - 9f), -Mathf.Pi / 2);
@@ -129,7 +269,7 @@ public partial class WorldBuilder : Node3D
                 Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ + 6f), r.Height, 2.4f, -Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
                 Decor.Mushrooms(root, r, rng, low ? 4 : 8, new Color(0.4f, 0.6f, 1f));
                 Decor.Ferns(root, r, rng, low ? 4 : 8, new Color(0.2f, 0.7f, 0.6f));
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) });
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, _blockedWall);
                 Decor.Bridge(root, new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ - 14f), new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ + 10f), 1.6f);
                 Decor.Bridge(root, new Vector3(-r.HalfX + 3f, 4.5f, r.CenterZ - 14f), new Vector3(r.HalfX - 10f, 4.5f, r.CenterZ - 20f), 1.6f);
                 break;
@@ -141,11 +281,11 @@ public partial class WorldBuilder : Node3D
                 Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 14f), r.Height, 3.4f, Mathf.Pi / 2, new Color(0.4f, 0.9f, 1f));
                 Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ - 10f), r.Height, 3f, -Mathf.Pi / 2, new Color(0.4f, 0.9f, 1f));
                 Decor.Waterfall(root, new Vector3(8f, 0, r.CenterZ - r.HalfZ + 0.4f), r.Height, 4f, 0f, new Color(0.5f, 0.85f, 1f));
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) });
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, _blockedWall);
                 break;
             case "core":
                 Decor.AncientRuins(root, r, rng);
-                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) });
+                Decor.GiantClusters(root, r, rng, low ? 2 : 3, new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, _blockedWall);
                 break;
         }
     }
@@ -210,7 +350,7 @@ public partial class WorldBuilder : Node3D
     }
 
     // =================== Cristais ===================
-    void BuildCrystals(Node3D root, RegionDef r, Random rng, float entranceZ)
+    void BuildCrystals(Node3D root, RegionDef r, Random rng, float entranceZ, List<Vector2> blocked)
     {
         var placed = new List<Vector2>();
         // reserva áreas de estações, caminho central e túneis
@@ -232,6 +372,9 @@ public partial class WorldBuilder : Node3D
             float z = r.CenterZ + (float)(rng.NextDouble() * 2 - 1) * (r.HalfZ - 2.5f);
             var p = new Vector2(x, z);
             if (MathF.Abs(x) < 2.2f) continue; // corredor central livre
+            bool nearOpening = false;
+            foreach (var b in blocked) if (b.DistanceTo(p) < 3.5f) { nearOpening = true; break; }
+            if (nearOpening) continue; // passagem para as galerias
             if (r.Index == 0 && x < -8.5f && z > r.CenterZ + 2.5f) continue; // posto avançado e refinaria
             if (r.Index == 0 && new Vector2(-6.2f, r.CenterZ + 7.2f).DistanceTo(p) < 2f) continue; // scanner
             if (r.Index == 1 && x > r.HalfX - 9f && z > r.CenterZ + r.HalfZ - 16f) continue; // posto das Profundezas
@@ -299,7 +442,7 @@ public partial class WorldBuilder : Node3D
     }
 
     // =================== Decoração ===================
-    void BuildDecoration(Node3D root, RegionDef r, Random rng)
+    void BuildDecoration(Node3D root, RegionDef r, Random rng, List<(int side, float z)> openings)
     {
         float cz = r.CenterZ, hx = r.HalfX, hz = r.HalfZ, h = r.Height;
         var rockMat = MeshFactory.RockMaterial(r.RockColor.Lightened(0.15f));
@@ -322,6 +465,7 @@ public partial class WorldBuilder : Node3D
             };
             // mantém aberturas dos túneis livres
             if ((side == 2 || side == 3) && MathF.Abs(p.X) < TunnelHalfWidth + 2.5f) continue;
+            if (side < 2 && NearOpening(openings, side == 0 ? -1 : 1, p.Z)) continue;
             float s = 1.6f + (float)rng.NextDouble() * 2.8f;
             p.Y = (float)rng.NextDouble() * h * 0.7f;
             var basis = new Basis(new Vector3(0, 1, 0), (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(s, s * (0.8f + (float)rng.NextDouble() * 0.6f), s));
@@ -372,6 +516,7 @@ public partial class WorldBuilder : Node3D
             if (side == 0) { p = new Vector3(-hx + 0.2f, (float)rng.NextDouble() * h, cz + t * hz); up = Vector3.Right; }
             else if (side == 1) { p = new Vector3(hx - 0.2f, (float)rng.NextDouble() * h, cz + t * hz); up = Vector3.Left; }
             else { p = new Vector3(t * hx, h - 0.1f, cz + (float)(rng.NextDouble() * 2 - 1) * hz); up = Vector3.Down; }
+            if (side < 2 && NearOpening(openings, side == 0 ? -1 : 1, p.Z) && p.Y < TunnelHeight + 0.5f) continue;
             up = (up + new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f) * 0.9f).Normalized();
             var basis = BasisFromUp(up).ScaleLocal(new Vector3(0.12f, 0.4f + (float)rng.NextDouble() * 0.9f, 0.12f) * (1f + (float)rng.NextDouble()));
             deco.Add(new Transform3D(basis, p));
@@ -431,6 +576,12 @@ public partial class WorldBuilder : Node3D
         }
     }
 
+    static bool NearOpening(List<(int side, float z)> openings, int side, float z)
+    {
+        foreach (var o in openings) if (o.side == side && MathF.Abs(o.z - z) < TunnelHalfWidth + 2f) return true;
+        return false;
+    }
+
     static Basis BasisFromUp(Vector3 up)
     {
         var x = up.Cross(MathF.Abs(up.Y) > 0.9f ? Vector3.Right : Vector3.Up).Normalized();
@@ -438,9 +589,9 @@ public partial class WorldBuilder : Node3D
         return new Basis(x, up, z);
     }
 
-    void BuildLights(Node3D root, RegionDef r, Random rng)
+    void BuildLights(Node3D root, RegionDef r, int count)
     {
-        int count = r.Index == 0 ? 4 : 5; // na Baixa as luzes são ocultadas em tempo real
+        // na Baixa as luzes são ocultadas em tempo real
         for (int i = 0; i < count; i++)
         {
             float a = Mathf.Tau * i / count + 0.4f;

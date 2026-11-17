@@ -210,3 +210,12 @@ Decisões do diretor:
 - Galeria de minérios no tour (`16_ores_*`, `docs/screenshots/ores_sheet.png`) para revisão visual.
 - Custo: benchmark Baixa na mesma ordem (24,2 → 23,1 FPS, dentro da variação do ambiente; trocar o shader por material simples não altera).
 - Testes 214/214; bot SUCESSO (economia preservada: Região 2 em 7,3 min, Região 3 em 36,6 min).
+- Publicado como **v0.2.4** (atualização automática).
+
+### Etapa 2: mapa maior (galerias laterais)
+- **8 galerias laterais** (2 por região, leste/oeste), ligadas à sala principal por um túnel curto com faixa luminosa e placa com o nome acima da entrada. Cada uma tem um **minério em destaque** (55% das ocorrências) e chance de raro x1,6: Veio de Cobre, Gruta das Ametistas, Gruta Congelada, Veio de Prata, Forja Antiga, Câmara de Obsidiana, Jardim de Coral e Poço de Opalas. Área de mineração ~+45%, 74 depósitos a mais.
+- Dados em `RegionDef.Wings` / `WingDef` (GameData). A sala da galeria é montada num nó deslocado em X, reaproveitando decoração, luzes e distribuição de cristais das salas principais.
+- Paredes leste/oeste agora têm abertura; rochas, cristais decorativos, formações gigantes e depósitos são mantidos longe das passagens (as formações gigantes nasciam na entrada e tapavam a visão — corrigido após revisar as capturas).
+- **Oclusão por distância:** o renderizador Compatibility não tem oclusão, então os cristais das galerias eram desenhados através das paredes (R1: 260 → 315 draw calls, média 22,8 → 21,1 FPS). Cada galeria só fica visível com a câmera dentro dela ou a até 34 m da entrada → média de volta a **22,8 FPS** (Baixa, 75%).
+- Teste novo "galerias laterais": cada uma existe, tem depósitos do minério em destaque, o jogador **entra andando** pela física real e a oclusão liga/desliga corretamente. Tour com capturas `10d_wing_entrance` e `10w_*`.
+- Testes 270/270; bot SUCESSO (Região 2 em 9,4 min, Região 3 em 30,4 min, Coração em 45,5 min, Renascimento OK).
