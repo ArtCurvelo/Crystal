@@ -38,6 +38,8 @@ o próximo golpe libera um pulso que atinge todos os cristais próximos.
 4. **Reservatório Abissal** (região bônus, ◈ 1,5 mi): lago luminoso e águas-vivas, Cristal de Maré, Coral Prismático e a lendária Lágrima Abissal.
 
 Cada região tem um **evento ambiental** periódico (Eco Luminoso, Maré Gélida, Surto do Núcleo, Maré Luminosa).
+Depois de concluir a jornada (4 regiões + Coração Ancestral), o **Renascimento** recomeça a partida e concede
+**Essência Ancestral**: +10% permanente em dano e valor de venda por ponto.
 Os materiais têm **raridade** (Comum, Incomum, Raro, Épico, Lendário), e a ferramenta evolui por **6 modelos**
 (Broca Inicial → Quebra-Núcleo) conforme a Potência do Feixe.
 

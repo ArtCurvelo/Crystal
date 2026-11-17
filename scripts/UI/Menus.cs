@@ -373,7 +373,7 @@ public partial class HelpScreen : ModalScreen
         Section(right, "CICLO", "Minere cristais → os fragmentos voam até você → venda na Estação (verde) → compre melhorias no Terminal (dourado) → abra os portões para regiões mais ricas.");
         Section(right, "RESSONÂNCIA", "Golpes em ritmo constante enchem o arco violeta da mira. Quando ficar dourado, o próximo golpe libera um pulso que atinge todos os cristais próximos.");
         Section(right, "EVENTOS", "Cada região tem condições próprias: Eco Luminoso (cristais renascem), Maré Gélida (fragmentos x2) e Surto do Núcleo (dano +50%).");
-        Section(right, "DICA", "Cristais raros (★) pulsam e brilham mais. Valem muito mais que os comuns!");
+        Section(right, "RENASCIMENTO", "Depois de concluir a jornada, renasça no Terminal: recomece com Essência Ancestral (+10% de dano e venda por ponto, para sempre).");
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);
