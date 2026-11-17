@@ -43,6 +43,12 @@ Depois de concluir a jornada (4 regiões + Coração Ancestral), o **Renasciment
 Os materiais têm **raridade** (Comum, Incomum, Raro, Épico, Lendário), e a ferramenta evolui por **6 modelos**
 (Broca Inicial → Quebra-Núcleo) conforme a Potência do Feixe.
 
+## Instalar e atualizar no Windows
+- **Primeira vez:** `dist/CrystalExcavator-Setup.exe` (instalador completo, ~53 MB).
+- **Atualizações:** `dist/CrystalExcavator-Atualizacao.exe` (~4 MB): substitui apenas o conteúdo do jogo (`.pck`)
+  e o código C# (`.dll`) na instalação existente, mantendo saves e configurações. A versão aparece no menu principal.
+- O instalador completo só volta a ser necessário se a versão do motor Godot mudar.
+
 ## Executar no Windows (build pronta)
 1. Copie a pasta `build/windows/` inteira. O `.exe` precisa da pasta `data_CrystalExcavator_windows_x86_64` e do `.pck` ao lado.
 2. Execute `CrystalExcavator.exe`. Não é preciso instalar .NET; o runtime vai junto.

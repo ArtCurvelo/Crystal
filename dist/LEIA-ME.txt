@@ -9,3 +9,8 @@ Crystal Excavator - instalador para Windows
 
 Os saves ficam em %APPDATA%\CrystalExcavator e são mantidos ao desinstalar.
 Para regenerar este instalador: tools/build_installer.sh (no ambiente de desenvolvimento).
+
+ATUALIZAR (sem reinstalar)
+- Use CrystalExcavator-Atualizacao.exe (cerca de 4 MB): ele troca só os arquivos que mudaram.
+  Feche o jogo, dê dois cliques, Avançar > Concluir. Saves e configurações são mantidos.
+- O instalador completo (Setup) só é necessário na primeira vez ou quando a versão do motor Godot mudar.
