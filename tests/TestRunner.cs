@@ -56,7 +56,7 @@ public partial class TestRunner : Node
         SaveSystem.SavePath = originalPath;
         GD.Print($"===== RESULTADO: {_pass} passaram, {_fail} falharam =====");
         foreach (var f in _failures) GD.Print("  FALHA: " + f);
-        GetTree().Quit(_fail == 0 ? 0 : 1);
+        GameState.Instance.QuitClean(_fail == 0 ? 0 : 1);
     }
 
     void Run(string name, Action t)
@@ -472,7 +472,7 @@ public partial class TestRunner : Node
         Check(spawned > maxNormal, $"fragmentos com evento ({spawned}) devem superar o máximo normal ({maxNormal})");
         GS.IsPlaying = true;
         region = GameData.Regions[0]; // jogador sai da região → evento termina
-        await Frames(3);
+        for (int i = 0; i < 60 && ev.Active != null; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         Check(ev.Active == null && GS.EventShardMultiplier == 1f, "evento deve terminar ao sair da região");
 
         region = GameData.Regions[2];

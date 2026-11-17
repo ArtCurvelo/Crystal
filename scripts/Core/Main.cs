@@ -216,7 +216,7 @@ public partial class Main : Node
     void QuitGame()
     {
         if (CurrentMode == Mode.Playing) GameState.Instance.SaveGame(true);
-        GetTree().Quit();
+        GameState.Instance.QuitClean();
     }
 
     void Pause()

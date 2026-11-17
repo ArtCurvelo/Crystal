@@ -84,7 +84,7 @@ public partial class PlaythroughBot : Node
         bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
-        GetTree().Quit(ok ? 0 : 1);
+        GameState.Instance.QuitClean(ok ? 0 : 1);
     }
 
     double GameMinutes => GS.Data.PlayTimeSeconds / 60.0;

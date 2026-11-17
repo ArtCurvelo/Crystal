@@ -10,6 +10,13 @@ public static class MeshFactory
     static readonly Dictionary<string, Mesh> Cache = new();
     static readonly Dictionary<string, Material> MatCache = new();
 
+    /// <summary>Libera caches estáticos (antes de encerrar o processo, evita referências C# pendentes).</summary>
+    public static void ClearCaches()
+    {
+        Cache.Clear();
+        MatCache.Clear();
+    }
+
     /// <summary>Prisma hexagonal com ponta (cristal). Base em y=0, ponta em y=height.</summary>
     public static ArrayMesh CrystalPrism(int sides = 6, float radius = 0.25f, float height = 1.2f, float tipRatio = 0.28f)
     {

@@ -225,6 +225,18 @@ public partial class GameState : Node
         return ok;
     }
 
+    /// <summary>Encerra o jogo de forma limpa: libera caches estáticos e coleta o lixo gerenciado antes de sair.</summary>
+    public async void QuitClean(int exitCode = 0)
+    {
+        World.MeshFactory.ClearCaches();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        GC.Collect();
+        GetTree().Quit(exitCode);
+    }
+
     public void Notify(string title, string body, NotifyKind kind = NotifyKind.Info) => Notified?.Invoke(title, body, kind);
 
     public void RaiseAll()
