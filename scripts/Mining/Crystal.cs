@@ -15,6 +15,7 @@ namespace CrystalExcavator.Mining;
 public partial class Crystal : StaticBody3D
 {
     public enum CrystalState { Active, Broken, Growing }
+    public const string Group = "crystals";
 
     public MaterialDef Material { get; private set; }
     public float Hp { get; private set; }
@@ -44,6 +45,7 @@ public partial class Crystal : StaticBody3D
     {
         _rng = new Random(seed);
         SizeScale = sizeScale;
+        AddToGroup(Group);
         CollisionLayer = 4;   // camada 3: cristais
         CollisionMask = 0;
         _visual = new Node3D { Name = "Visual" };
@@ -183,7 +185,7 @@ public partial class Crystal : StaticBody3D
     }
 
     /// <summary>Aplica dano. Retorna true se este golpe quebrou o cristal.</summary>
-    public bool Hit(float damage, Vector3 point, Vector3 normal)
+    public bool Hit(float damage, Vector3 point, Vector3 normal, bool quiet = false)
     {
         if (State != CrystalState.Active) return false;
         Hp -= damage;
@@ -195,7 +197,7 @@ public partial class Crystal : StaticBody3D
 
         Effects.Instance?.Hit(point, normal, Material.Glow.Lightened(0.3f));
         float pitch = 0.85f + (1f - HpRatio) * 0.5f;
-        AudioManager.Instance?.Play("hit", -4f, pitch, 0.06f);
+        if (!quiet) AudioManager.Instance?.Play("hit", -4f, pitch, 0.06f);
         var jitter = new Vector3((float)_rng.NextDouble() - 0.5f, (float)_rng.NextDouble() * 0.6f, (float)_rng.NextDouble() - 0.5f) * 0.5f;
         Effects.Instance?.FloatText(point + normal * 0.25f + jitter, GameState.FormatNumber(Math.Min(damage, Hp + damage)),
             new Color(1, 1, 1).Lerp(Material.Glow, 0.4f), 0.8f);

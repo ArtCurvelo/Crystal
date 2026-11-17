@@ -148,6 +148,15 @@ public partial class AudioManager : Node
         _sounds["respawn"] = Synth(0.5f, (t, i) => MathF.Sin(Tau * (400 + t * 900) * t) * MathF.Sin(MathF.PI * t / 0.5f) * 0.18f);
         _sounds["swing"] = Synth(0.12f, (t, i) => Noise() * MathF.Sin(MathF.PI * t / 0.12f) * 0.12f);
         _sounds["full"] = Arp(new[] { 440f, 349f }, 0.09f, 0.3f);
+        // pulso de ressonância: sub-grave + varredura cristalina
+        _sounds["pulse"] = Synth(1.1f, (t, i) =>
+        {
+            float boom = MathF.Sin(Tau * (70 - t * 30) * t) * MathF.Exp(-t * 4f) * 0.7f;
+            float sweep = MathF.Sin(Tau * (600 + t * 2400) * t) * MathF.Exp(-t * 3.5f) * 0.25f;
+            float shimmer = MathF.Sin(Tau * 2637 * t) * MathF.Sin(Tau * 7 * t) * MathF.Exp(-t * 2.5f) * 0.12f;
+            return boom + sweep + shimmer + Noise() * MathF.Exp(-t * 25f) * 0.3f;
+        });
+        _sounds["charged"] = Synth(0.25f, (t, i) => (MathF.Sin(Tau * 1760 * t) + MathF.Sin(Tau * 2217 * t)) * MathF.Exp(-t * 10f) * 0.18f);
         _sounds["step"] = Synth(0.08f, (t, i) => Noise() * MathF.Exp(-t * 60f) * 0.12f);
     }
 

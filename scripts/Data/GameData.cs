@@ -85,7 +85,8 @@ public static class UpgradeIds
     public const string Move = "move_speed";
     public const string Value = "sell_value";
     public const string Reach = "reach";
-    public static readonly string[] All = { Damage, Speed, Capacity, Move, Value, Reach };
+    public const string Resonance = "resonance";
+    public static readonly string[] All = { Damage, Speed, Capacity, Move, Value, Reach, Resonance };
 }
 
 public static class GameData
@@ -263,7 +264,22 @@ public static class GameData
             ValueAt = l => 2.5f + l * 0.9f,
             Format = v => $"{v:0.0} m de atração"
         });
+        AddUp(new UpgradeDef
+        {
+            Id = UpgradeIds.Resonance, Name = "Amplificador de Ressonância", Icon = "✺",
+            Description = "Golpes em ritmo carregam um pulso que atinge todos os cristais próximos.",
+            BaseCost = 250, CostGrowth = 1.75, MaxLevel = 12,
+            ValueAt = l => 1.5f + l * 0.75f,
+            Format = v => $"pulso x{v:0.0} · raio {ResonanceRadius(v):0.0} m"
+        });
     }
+
+    /// <summary>Raio do pulso de ressonância derivado do multiplicador.</summary>
+    public static float ResonanceRadius(float mult) => 4f + (mult - 1.5f) * 0.8f;
+    /// <summary>Golpes rítmicos necessários para carregar um pulso.</summary>
+    public const int ResonanceHits = 10;
+    /// <summary>Janela (s) entre golpes para manter o ritmo.</summary>
+    public const float ResonanceWindow = 1.4f;
 
     static void Add(MaterialDef m) => Materials[m.Id] = m;
     static void AddUp(UpgradeDef u) => Upgrades[u.Id] = u;

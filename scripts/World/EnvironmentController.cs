@@ -71,7 +71,7 @@ public partial class EnvironmentController : WorldEnvironment
     {
         var e = Environment;
         e.AmbientLightColor = _ambient;
-        e.AmbientLightEnergy = _energy;
+        e.AmbientLightEnergy = _energy * (Settings.Quality == GraphicsQuality.Low ? 1.25f : 1f);
         e.FogLightColor = _fog;
         e.FogDensity = _density;
         e.BackgroundColor = _fog.Darkened(0.5f);

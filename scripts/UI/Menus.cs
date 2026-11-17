@@ -389,7 +389,7 @@ public partial class SettingsScreen : ModalScreen
 /// <summary>Menu de pausa.</summary>
 public partial class PauseScreen : ModalScreen
 {
-    public Action OnResume, OnSave, OnSettings, OnMainMenu, OnQuit;
+    public Action OnResume, OnSave, OnSettings, OnCodex, OnMainMenu, OnQuit;
     Label _stats;
 
     public override void _Ready()
@@ -400,7 +400,7 @@ public partial class PauseScreen : ModalScreen
         Body.AddChild(UiTheme.Spacer(4));
         foreach (var (text, act) in new (string, Func<Action>)[]
                  {
-                     ("Continuar", () => OnResume), ("Salvar jogo", () => OnSave), ("Configurações", () => OnSettings),
+                     ("Continuar", () => OnResume), ("Salvar jogo", () => OnSave), ("Coleção", () => OnCodex), ("Configurações", () => OnSettings),
                      ("Menu principal", () => OnMainMenu), ("Sair do jogo", () => OnQuit)
                  })
         {
@@ -454,5 +454,77 @@ public partial class ConfirmScreen : ModalScreen
         _text.Text = text;
         _onYes = onYes;
         Open();
+    }
+}
+
+// =====================================================================
+/// <summary>Coleção de materiais: descobertos com detalhes, desconhecidos como silhueta.</summary>
+public partial class CodexScreen : ModalScreen
+{
+    GridContainer _grid;
+    Label _progress;
+
+    public override void _Ready()
+    {
+        BuildFrame("COLEÇÃO DE MATERIAIS", new Vector2(900, 560), UiTheme.Violet);
+        Layer = 20;
+        _progress = UiTheme.Label("", 16, UiTheme.Muted);
+        Body.AddChild(_progress);
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 400), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        Body.AddChild(scroll);
+        _grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _grid.AddThemeConstantOverride("h_separation", 10);
+        _grid.AddThemeConstantOverride("v_separation", 10);
+        scroll.AddChild(_grid);
+        var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        Body.AddChild(footer);
+        footer.AddChild(UiTheme.Button("Voltar", Close, 160));
+    }
+
+    public override void Refresh()
+    {
+        var gs = GameState.Instance;
+        foreach (Node c in _grid.GetChildren()) c.QueueFree();
+        int found = 0;
+        foreach (var r in GameData.Regions)
+        {
+            var ids = r.Spawns.Select(s => s.MaterialId).Append(r.RareMaterialId).ToList();
+            if (r.Id == "core") ids.Add("heart");
+            foreach (var id in ids)
+            {
+                var m = GameData.Mat(id);
+                bool known = gs.Data.Discovered.Contains(id);
+                if (known) found++;
+                _grid.AddChild(Card(m, r, known));
+            }
+        }
+        _progress.Text = $"Descobertos: {found}/{GameData.Materials.Count}   ·   Cristais minerados: {gs.Data.CrystalsMined}   ·   Fragmentos vendidos: {gs.Data.ShardsSold}";
+    }
+
+    Control Card(MaterialDef m, RegionDef r, bool known)
+    {
+        var gs = GameState.Instance;
+        var card = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(410, 0) };
+        var border = known ? new Color(m.Glow, 0.7f) : new Color(1, 1, 1, 0.1f);
+        card.AddThemeStyleboxOverride("panel", UiTheme.Box(UiTheme.Card, border, 12, 2, 12));
+        var h = new HBoxContainer();
+        h.AddThemeConstantOverride("separation", 12);
+        card.AddChild(h);
+        var gem = UiTheme.Label(m.Special ? "✦" : m.Rare ? "★" : "◆", 34, known ? m.Glow.Lightened(0.2f) : new Color(0.3f, 0.3f, 0.4f), true, HorizontalAlignment.Center);
+        gem.CustomMinimumSize = new Vector2(44, 0);
+        gem.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        h.AddChild(gem);
+        var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        v.AddThemeConstantOverride("separation", 1);
+        h.AddChild(v);
+        string tag = m.Special ? "  ESPECIAL" : m.Rare ? "  RARO" : "";
+        v.AddChild(UiTheme.Label(known ? m.Name + tag : "???" + tag, 18, known ? m.Glow.Lightened(0.35f) : UiTheme.Muted, true));
+        var desc = UiTheme.Label(known ? m.Description : $"Encontrado em: {r.Name}", 14, UiTheme.Muted);
+        desc.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        desc.CustomMinimumSize = new Vector2(320, 0);
+        v.AddChild(desc);
+        if (known)
+            v.AddChild(UiTheme.Label($"{GameState.FormatMoney(gs.SellPrice(m))}/frag  ·  resistência {GameState.FormatNumber(m.Hp)}  ·  {r.Name}", 14, UiTheme.Cyan));
+        return card;
     }
 }

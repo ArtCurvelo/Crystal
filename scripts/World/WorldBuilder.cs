@@ -375,15 +375,15 @@ public partial class WorldBuilder : Node3D
 
     void BuildLights(Node3D root, RegionDef r, Random rng)
     {
-        int count = r.Index == 0 ? 4 : 5;
+        int count = Settings.Quality == GraphicsQuality.Low ? 2 : r.Index == 0 ? 4 : 5;
         for (int i = 0; i < count; i++)
         {
             float a = Mathf.Tau * i / count + 0.4f;
             var light = new OmniLight3D
             {
                 LightColor = i % 2 == 0 ? r.LightColor : r.AccentColor,
-                LightEnergy = 1.6f,
-                OmniRange = Mathf.Max(r.HalfX, r.HalfZ) * 0.85f,
+                LightEnergy = Settings.Quality == GraphicsQuality.Low ? 2.0f : 1.6f,
+                OmniRange = Mathf.Max(r.HalfX, r.HalfZ) * (Settings.Quality == GraphicsQuality.Low ? 1.1f : 0.85f),
                 OmniAttenuation = 1.2f,
                 ShadowEnabled = false,
                 Position = new Vector3(Mathf.Cos(a) * r.HalfX * 0.55f, r.Height * 0.7f, r.CenterZ + Mathf.Sin(a) * r.HalfZ * 0.55f),

@@ -266,6 +266,22 @@ public partial class Hud : CanvasLayer
         }));
     }
 
+    public void ShowPulse(int count)
+    {
+        var l = UiTheme.Shadowed(UiTheme.Label(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", 30, UiTheme.Gold, true, HorizontalAlignment.Center), 8);
+        UiTheme.Place(l, Control.LayoutPreset.Center, new Vector2(-250, -110), new Vector2(500, 0));
+        l.PivotOffset = new Vector2(250, 20);
+        l.Scale = new Vector2(0.6f, 0.6f);
+        _crosshair.GetParent().AddChild(l);
+        var tw = l.CreateTween();
+        tw.TweenProperty(l, "scale", Vector2.One * 1.1f, 0.15f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        tw.TweenProperty(l, "scale", Vector2.One, 0.1f);
+        tw.TweenInterval(0.5f);
+        tw.Parallel().TweenProperty(l, "position:y", l.Position.Y - 30, 0.9f);
+        tw.TweenProperty(l, "modulate:a", 0f, 0.4f);
+        tw.TweenCallback(Callable.From(l.QueueFree));
+    }
+
     public void ShowRegionBanner(RegionDef r)
     {
         _regionTitle.Text = r.Name.ToUpper();
@@ -277,8 +293,13 @@ public partial class Hud : CanvasLayer
         tw.TweenProperty(_regionBanner, "modulate:a", 0f, 1.2f);
     }
 
+    double _lastFullWarn = -100;
+
     public void FlashFull()
     {
+        double now = Godot.Time.GetTicksMsec() / 1000.0;
+        if (now - _lastFullWarn < 6.0) { _fullFlash = 1f; return; }
+        _lastFullWarn = now;
         _fullFlash = 1f;
         AudioManager.Instance?.Play("full", -6f);
         GameState.Instance.Notify("Mochila cheia!", "Venda seus fragmentos ou compre a Mochila Reforçada.", NotifyKind.Warning);
@@ -320,6 +341,8 @@ public partial class Hud : CanvasLayer
         _crosshair.Target = c != null;
         _crosshair.Progress = c != null ? 1f - c.HpRatio : 0f;
         _crosshair.Cooldown = Player.SwingCooldown01;
+        _crosshair.Resonance = Player.Resonance01;
+        _crosshair.Time += dt;
         _crosshair.TargetColor = c?.Material.Glow ?? UiTheme.Cyan;
         _crosshair.QueueRedraw();
         _targetPanel.Visible = c != null;
@@ -353,6 +376,8 @@ public partial class Hud : CanvasLayer
 public partial class Crosshair : Control
 {
     public bool Target;
+    public float Resonance;
+    public float Time;
     public float Progress;
     public float Cooldown;
     public Color TargetColor = UiTheme.Cyan;
@@ -362,6 +387,13 @@ public partial class Crosshair : Control
         var c = Size / 2;
         var white = new Color(1, 1, 1, 0.9f);
         DrawCircle(c, 2.5f, white);
+        if (Resonance > 0.001f)
+        {
+            bool ready = Resonance >= 0.999f;
+            var col = ready ? UiTheme.Gold.Lerp(Colors.White, 0.5f + 0.5f * Mathf.Sin(Time * 14f)) : new Color(UiTheme.Violet, 0.85f);
+            float r = ready ? 28 + Mathf.Sin(Time * 14f) * 1.5f : 27;
+            DrawArc(c, r, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * Resonance, 48, col, ready ? 4 : 3, true);
+        }
         if (Target)
         {
             DrawArc(c, 18, 0, Mathf.Tau, 40, new Color(0, 0, 0, 0.45f), 5, true);

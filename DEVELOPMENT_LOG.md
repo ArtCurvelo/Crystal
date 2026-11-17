@@ -6,8 +6,8 @@
 
 ## Sessão 1 — Protótipo jogável (meta: horas 0–5)
 
-- **Tempo consumido (informado):** _aguardando informação do diretor_
-- **Tempo restante (informado):** _aguardando informação do diretor_
+- **Tempo consumido (informado):** 29 min (00:51 → 01:20)
+- **Tempo restante (informado):** ~29h31min
 
 ### Ambiente
 - Desenvolvimento em container Linux na nuvem (Ubuntu 24.04), não na máquina Windows do diretor.

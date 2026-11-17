@@ -43,6 +43,7 @@ public partial class TestRunner : Node
             Run("Configurações inválidas", TestSettings);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
+            await RunAsync("Integração: pulso de ressonância", TestResonance);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -83,7 +84,7 @@ public partial class TestRunner : Node
     void TestDefinitions()
     {
         Check(GameData.Regions.Count >= 3, "deve haver ao menos 3 regiões");
-        Check(GameData.Upgrades.Count == 6, "devem existir 6 upgrades");
+        Check(GameData.Upgrades.Count == 7, "devem existir 7 upgrades");
         foreach (var r in GameData.Regions)
         {
             Check(r.Spawns.All(s => GameData.Mat(s.MaterialId) != null), $"região {r.Id} referencia material inexistente");
@@ -371,6 +372,44 @@ public partial class TestRunner : Node
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, -60)).Id == "depths", "detecção de região por posição");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, 10)).Id == "caves", "detecção da região inicial");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, -130)).Id == "core", "detecção da região final");
+        root.QueueFree();
+        await Frames(2);
+    }
+
+    async Task TestResonance()
+    {
+        Fresh();
+        GS.Data.Upgrades[UpgradeIds.Resonance] = 6;
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        var shards = new ShardManager();
+        root.AddChild(shards);
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        await Frames(3);
+        float radius = GS.ResonanceRadius;
+        // cristal resistente com um vizinho dentro do raio
+        var target = world.Crystals.Where(c => c.Material.Id == "sapphire")
+            .FirstOrDefault(c => world.Crystals.Any(o => o != c && o.GlobalPosition.DistanceTo(c.GlobalPosition) < radius - 0.5f));
+        Check(target != null, "deve existir safira com vizinho no raio");
+        if (target == null) { root.QueueFree(); return; }
+        var neighbors = world.Crystals.Where(o => o != target && o.GlobalPosition.DistanceTo(target.GlobalPosition) < radius - 0.5f).ToList();
+        player.GlobalPosition = target.GlobalPosition + new Vector3(0, 0, 1.6f);
+        player.SetLook(0, -0.35f);
+        player.SimulateCapturedMouse = true;
+        int pulses = 0, hitCount = 0;
+        player.ResonancePulse += n => { pulses++; hitCount = n; };
+        await Frames(3);
+        Check(player.TargetCrystal == target, "deve mirar a safira");
+        Input.ActionPress("mine");
+        for (int i = 0; i < 60 * 9 && pulses == 0; i++) await Frames(1);
+        Input.ActionRelease("mine");
+        Check(pulses >= 1, "segurar o ritmo deve disparar um pulso");
+        Check(hitCount >= 2, $"pulso deve atingir o alvo e vizinhos (atingiu {hitCount})");
+        Check(neighbors.Any(n => n.Hp < n.MaxHp), "vizinho deve receber dano do pulso");
         root.QueueFree();
         await Frames(2);
     }

@@ -45,11 +45,16 @@ public static class Settings
 
     public static GraphicsQuality Quality => (GraphicsQuality)Data.Quality;
 
+    /// <summary>True quando as configurações foram criadas agora (primeira execução).</summary>
+    public static bool FirstRun { get; private set; }
+
     public static void Load()
     {
         try
         {
-            if (FileAccess.FileExists(Path))
+            FirstRun = !FileAccess.FileExists(Path);
+            if (FirstRun) AutoDetect();
+            else
             {
                 var d = JsonSerializer.Deserialize<SettingsData>(FileAccess.GetFileAsString(Path));
                 if (d != null) Data = d;
@@ -61,6 +66,24 @@ public static class Settings
             Data = new SettingsData();
         }
         Data.Sanitize();
+        if (FirstRun) Save();
+    }
+
+    /// <summary>Na primeira execução escolhe preset conforme a GPU (integradas Intel antigas → Baixa).</summary>
+    static void AutoDetect()
+    {
+        Data = new SettingsData();
+        string gpu = "";
+        try { gpu = RenderingServer.GetVideoAdapterName() ?? ""; } catch { }
+        string g = gpu.ToLowerInvariant();
+        bool weak = g.Contains("intel") && (g.Contains("hd graphics") || g.Contains("uhd") || g.Contains("haswell") || g.Contains("ivybridge"))
+                    || g.Contains("llvmpipe") || g.Contains("swiftshader");
+        if (weak)
+        {
+            Data.Quality = (int)GraphicsQuality.Low;
+            Data.RenderScale = 0.85f;
+        }
+        GD.Print($"[Settings] GPU: '{gpu}' → qualidade {(GraphicsQuality)Data.Quality}");
     }
 
     public static void Save()

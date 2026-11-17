@@ -30,6 +30,7 @@ public partial class Main : Node
     PauseScreen _pause;
     SettingsScreen _settings;
     ConfirmScreen _confirm;
+    CodexScreen _codex;
     RegionDef _currentRegion;
     float _menuT;
     float _cullTimer;
@@ -78,6 +79,7 @@ public partial class Main : Node
             OnResume = Resume,
             OnSave = () => GameState.Instance.SaveGame(),
             OnSettings = () => _settings.Open(),
+            OnCodex = () => _codex.Open(),
             OnMainMenu = BackToMenu,
             OnQuit = QuitGame,
         };
@@ -86,6 +88,8 @@ public partial class Main : Node
         AddChild(_settings);
         _confirm = new ConfirmScreen();
         AddChild(_confirm);
+        _codex = new CodexScreen();
+        AddChild(_codex);
 
         UiBus.OpenShop += OpenShop;
         UiBus.OpenSell += OpenSell;
@@ -146,6 +150,7 @@ public partial class Main : Node
             Player = new PlayerController { Name = "Player" };
             World.GetParent().AddChild(Player);
             Player.CrystalHit += OnCrystalHit;
+            Player.ResonancePulse += n => Hud.ShowPulse(n);
             _shards.PlayerPosition = () => Player.BodyCenter;
             Hud.Player = Player;
         }
@@ -205,6 +210,7 @@ public partial class Main : Node
     {
         _pause.Close();
         _settings.Close();
+        _codex.Close();
         GetTree().Paused = false;
         if (CurrentMode == Mode.Playing) Input.MouseMode = Input.MouseModeEnum.Captured;
     }
@@ -232,7 +238,9 @@ public partial class Main : Node
         if (!_pause.IsOpen) Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
-    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen;
+    public void OpenCodexForTour() => _codex.Open();
+
+    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen;
 
     public override void _UnhandledInput(InputEvent e)
     {
@@ -241,6 +249,7 @@ public partial class Main : Node
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) { _confirm.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
+            if (_codex.IsOpen) { _codex.Close(); return; }
             if (CurrentMode != Mode.Playing) return;
             if (_shop.IsOpen) { _shop.Close(); return; }
             if (_sell.IsOpen) { _sell.Close(); return; }

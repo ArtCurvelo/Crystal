@@ -37,6 +37,13 @@ public partial class PlayerController : CharacterBody3D
     const float EyeHeight = 1.55f;
 
     public event Action<Crystal, bool> CrystalHit; // (cristal, quebrou)
+    public event Action<int> ResonancePulse;        // (cristais atingidos)
+
+    /// <summary>Carga de ressonância (0..1). Golpes em ritmo carregam; pausa longa descarrega.</summary>
+    public float Resonance01 => Mathf.Clamp(_resonance / Data.GameData.ResonanceHits, 0, 1);
+    public bool ResonanceReady => _resonance >= Data.GameData.ResonanceHits;
+    float _resonance;
+    float _sinceLastHit = 99f;
 
     public override void _Ready()
     {
@@ -132,6 +139,9 @@ public partial class PlayerController : CharacterBody3D
         // ---------- Mineração ----------
         _swingInterval = gs.SwingInterval;
         if (_swingTimer > 0) _swingTimer -= dt;
+        _sinceLastHit += dt;
+        float window = Mathf.Max(Data.GameData.ResonanceWindow, _swingInterval * 2.5f);
+        if (_sinceLastHit > window && _resonance > 0) _resonance = Mathf.Max(0, _resonance - dt * 3f);
         if (active && Input.IsActionPressed("mine") && _swingTimer <= 0 && TargetInteractable == null)
         {
             _swingTimer = _swingInterval;
@@ -194,7 +204,18 @@ public partial class PlayerController : CharacterBody3D
         var normal = hit["normal"].AsVector3();
         if (collider is Crystal c && c.IsMineable)
         {
-            bool broke = c.Hit(gs.Damage, pos, normal);
+            _sinceLastHit = 0;
+            if (ResonanceReady)
+            {
+                _resonance = 0;
+                TriggerPulse(gs, c, pos);
+            }
+            else
+            {
+                _resonance += 1;
+                if (ResonanceReady) AudioManager.Instance?.Play("charged", -6f);
+            }
+            bool broke = c.IsMineable && c.Hit(gs.Damage, pos, normal);
             _shakeAmount = Mathf.Min(1.5f, _shakeAmount + (broke ? 1.2f : 0.45f));
             _fovKick = broke ? 3f : 1f;
             CrystalHit?.Invoke(c, broke);
@@ -205,6 +226,29 @@ public partial class PlayerController : CharacterBody3D
             Effects.Instance?.Hit(pos, normal, new Color(0.6f, 0.55f, 0.65f));
             _shakeAmount = Mathf.Min(1f, _shakeAmount + 0.2f);
         }
+    }
+
+    /// <summary>Pulso de ressonância: dano em área em todos os cristais dentro do raio.</summary>
+    void TriggerPulse(GameState gs, Crystal origin, Vector3 point)
+    {
+        float radius = gs.ResonanceRadius;
+        float dmg = gs.Damage * gs.ResonanceMultiplier;
+        int count = 0;
+        var center = origin.GlobalPosition;
+        foreach (var node in GetTree().GetNodesInGroup(Crystal.Group))
+        {
+            if (node is not Crystal c || !c.IsMineable || !c.IsVisibleInTree()) continue;
+            float d = c.GlobalPosition.DistanceTo(center);
+            if (d > radius) continue;
+            var hitPos = c.GlobalPosition + Vector3.Up * 0.8f;
+            c.Hit(dmg, hitPos, (BodyCenter - hitPos).Normalized(), true);
+            count++;
+        }
+        Effects.Instance?.Shockwave(center + Vector3.Up * 0.3f, radius, origin.Material.Glow);
+        AudioManager.Instance?.Play("pulse", -1f);
+        _shakeAmount = Mathf.Min(2f, _shakeAmount + 1.4f);
+        _fovKick = 5f;
+        ResonancePulse?.Invoke(count);
     }
 
     public void AddShake(float amount) => _shakeAmount = Mathf.Min(2f, _shakeAmount + amount);

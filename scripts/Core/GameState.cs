@@ -66,6 +66,8 @@ public partial class GameState : Node
     public float MagnetRadius => StatValue(UpgradeIds.Reach);
     public float MiningReach => 3.2f + Data.Level(UpgradeIds.Reach) * 0.28f;
     public float DamagePerSecond => Damage * SwingsPerSecond;
+    public float ResonanceMultiplier => StatValue(UpgradeIds.Resonance);
+    public float ResonanceRadius => GameData.ResonanceRadius(ResonanceMultiplier);
 
     /// <summary>Nível de "tier" visual da ferramenta (0..4) baseado em dano.</summary>
     public int ToolTier

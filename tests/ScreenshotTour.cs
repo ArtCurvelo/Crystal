@@ -108,6 +108,9 @@ public partial class ScreenshotTour : Node
         Input.ParseInputEvent(new InputEventAction { Action = "pause", Pressed = true });
         await Wait(0.5f);
         await Shot("12_pause");
+        Main.GetNode<Node>(".").Call("OpenCodexForTour");
+        await Wait(0.5f);
+        await Shot("13_codex");
 
         GD.Print($"[Tour] FPS (software, Xvfb): R1={fps1:0} R2={fps2:0} R3={fps3:0}");
         SaveSystem.Delete();

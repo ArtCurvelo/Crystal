@@ -114,6 +114,46 @@ public partial class Effects : Node3D
         p.Emitting = true;
     }
 
+    readonly List<MeshInstance3D> _waves = new();
+    int _waveIdx;
+
+    /// <summary>Anel de energia expandindo (pulso de ressonância).</summary>
+    public void Shockwave(Vector3 pos, float radius, Color color)
+    {
+        if (_waves.Count == 0)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                var m = new MeshInstance3D
+                {
+                    Mesh = new TorusMesh { InnerRadius = 0.86f, OuterRadius = 1f, Rings = 32, RingSegments = 6 },
+                    CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                    Visible = false,
+                };
+                m.MaterialOverride = new StandardMaterial3D
+                {
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+                    CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+                };
+                AddChild(m);
+                _waves.Add(m);
+            }
+        }
+        var w = _waves[_waveIdx++ % _waves.Count];
+        var mat = (StandardMaterial3D)w.MaterialOverride;
+        mat.AlbedoColor = new Color(color.Lightened(0.3f), 1f);
+        w.GlobalPosition = pos;
+        w.Scale = new Vector3(0.2f, 0.6f, 0.2f);
+        w.Visible = true;
+        var tw = w.CreateTween().SetParallel();
+        tw.TweenProperty(w, "scale", new Vector3(radius, 1.4f, radius), 0.45f).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        tw.TweenProperty(mat, "albedo_color:a", 0f, 0.5f).SetDelay(0.1f);
+        tw.Chain().TweenCallback(Callable.From(() => w.Visible = false));
+        Burst(pos + Vector3.Up * 0.5f, color.Lightened(0.4f), 1.6f);
+    }
+
     public void FloatText(Vector3 pos, string text, Color color, float size = 1f)
     {
         var l = _textPool[_textIdx++ % _textPool.Count];
