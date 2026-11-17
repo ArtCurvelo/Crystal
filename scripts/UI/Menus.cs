@@ -216,7 +216,8 @@ public partial class PauseScreen : ModalScreen
         var d = GameState.Instance.Data;
         var t = TimeSpan.FromSeconds(d.PlayTimeSeconds);
         _stats.Text = $"Tempo de jogo: {(int)t.TotalHours}h {t.Minutes:00}m   ·   Cristais minerados: {d.CrystalsMined}\n" +
-                      $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}   ·   Materiais: {d.Discovered.Count}/{GameData.Materials.Count}";
+                      $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}   ·   Materiais: {d.Discovered.Count}/{GameData.Materials.Count}" +
+                      (d.PrestigeCount > 0 ? $"\nRenascimentos: {d.PrestigeCount}   ·   Essência: ✦{d.Essence} (x{GameState.Instance.EssenceMultiplier:0.0})" : "");
     }
 }
 
