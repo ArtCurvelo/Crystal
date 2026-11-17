@@ -41,6 +41,7 @@ public partial class TestRunner : Node
             Run("Save com dados inválidos é saneado", TestSanitize);
             Run("Compatibilidade com save antigo", TestOldSave);
             Run("Configurações inválidas", TestSettings);
+            Run("Conclusão da jornada", TestCompletion);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -288,6 +289,27 @@ public partial class TestRunner : Node
         s.Sanitize();
         Check(s.WindowSize == Settings.WindowSizes.Length - 1, "resolução inválida deve ser limitada");
         Check(s.MouseSensitivity > 0 && s.Fov <= 100 && s.MasterVolume == 0 && s.Quality == 2 && s.RenderScale >= 0.5f, "configurações saneadas");
+    }
+
+    void TestCompletion()
+    {
+        Fresh();
+        int fired = 0;
+        void H() => fired++;
+        GS.Completed += H;
+        GS.CheckCompletion();
+        Check(fired == 0 && !GS.Data.GameCompleted, "não conclui no início");
+        foreach (var r in GameData.Regions) if (!GS.Data.UnlockedRegions.Contains(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+        GS.CheckCompletion();
+        Check(fired == 0, "sem o Coração não conclui");
+        GS.AddItem("heart", 1);
+        GS.CheckCompletion();
+        Check(fired == 1 && GS.Data.GameCompleted, "regiões + Coração concluem a jornada");
+        GS.CheckCompletion();
+        Check(fired == 1, "conclusão dispara uma única vez");
+        GS.Completed -= H;
+        Check(SaveSystem.TryParse(System.Text.Json.JsonSerializer.Serialize(GS.Data), out var d) && d.GameCompleted, "conclusão persiste no save");
+        Fresh();
     }
 
     void TestAudio()

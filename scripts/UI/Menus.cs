@@ -359,3 +359,54 @@ public partial class HelpScreen : ModalScreen
         parent.AddChild(l);
     }
 }
+
+// =====================================================================
+/// <summary>Tela de conclusão da jornada com estatísticas da partida.</summary>
+public partial class CompletionScreen : ModalScreen
+{
+    Label _stats;
+
+    public override void _Ready()
+    {
+        BuildFrame("", new Vector2(640, 0), UiTheme.Gold);
+        Layer = 25;
+        Panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.99f), UiTheme.Gold, 18, 3, 30, 24));
+        var icon = HudIcon.Make(HudIcon.Kind.Star, UiTheme.Gold, 64);
+        icon.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        Body.AddChild(icon);
+        Body.AddChild(UiTheme.Shadowed(UiTheme.Label("MESTRE ESCAVADOR", 40, UiTheme.Gold, true, HorizontalAlignment.Center), 8));
+        var sub = UiTheme.Label("Você atravessou as quatro regiões e destruiu o Coração Ancestral.", 18, UiTheme.Text, false, HorizontalAlignment.Center);
+        sub.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        sub.CustomMinimumSize = new Vector2(560, 0);
+        Body.AddChild(sub);
+        Body.AddChild(new ColorRect { Color = new Color(UiTheme.Gold, 0.35f), CustomMinimumSize = new Vector2(0, 2) });
+        _stats = UiTheme.Label("", 17, UiTheme.Text, false, HorizontalAlignment.Center);
+        Body.AddChild(_stats);
+        var note = UiTheme.Label("O jogo continua: complete a Coleção e maximize suas melhorias.", 15, UiTheme.Muted, false, HorizontalAlignment.Center);
+        Body.AddChild(note);
+        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        Body.AddChild(row);
+        var b = UiTheme.Button("Continuar minerando", Close, 280, 22);
+        row.AddChild(b);
+    }
+
+    public override void Open()
+    {
+        base.Open();
+        Audio.AudioManager.Instance?.Play("unlock", 0f);
+        Audio.AudioManager.Instance?.Play("rare", -3f);
+    }
+
+    public override void Refresh()
+    {
+        var d = GameState.Instance.Data;
+        var t = TimeSpan.FromSeconds(d.CompletedAtSeconds > 0 ? d.CompletedAtSeconds : d.PlayTimeSeconds);
+        int maxed = UpgradeIds.All.Count(id => GameState.Instance.IsMaxed(id));
+        _stats.Text =
+            $"Tempo de jornada: {(int)t.TotalHours}h {t.Minutes:00}min\n" +
+            $"Cristais minerados: {GameState.FormatNumber(d.CrystalsMined)}   ·   Fragmentos vendidos: {GameState.FormatNumber(d.ShardsSold)}\n" +
+            $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}\n" +
+            $"Materiais descobertos: {d.Discovered.Count}/{GameData.Materials.Count}   ·   Melhorias no máximo: {maxed}/{UpgradeIds.All.Length}\n" +
+            $"Ferramenta: {GameState.ToolTierNames[GameState.Instance.ToolTier]}";
+    }
+}

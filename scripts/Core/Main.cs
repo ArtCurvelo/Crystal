@@ -34,6 +34,7 @@ public partial class Main : Node
     CodexScreen _codex;
     ObjectiveMarker _marker;
     HelpScreen _help;
+    CompletionScreen _completion;
     RegionDef _currentRegion;
     float _menuT;
     float _cullTimer;
@@ -101,6 +102,10 @@ public partial class Main : Node
         AddChild(_codex);
         _help = new HelpScreen();
         AddChild(_help);
+        _completion = new CompletionScreen();
+        _completion.Closed += ReturnToGameplay;
+        AddChild(_completion);
+        GameState.Instance.Completed += OnCompleted;
 
         UiBus.OpenShop += OpenShop;
         UiBus.OpenSell += OpenSell;
@@ -108,6 +113,8 @@ public partial class Main : Node
         GameState.Instance.BeforeSave = WritePlayerToSave;
         GameState.Instance.RegionsChanged += UpdateRegionCulling;
         GameState.Instance.Sold += OnSold;
+        GameState.Instance.RegionsChanged += () => GameState.Instance.CheckCompletion();
+        GameState.Instance.MaterialDiscovered += _ => GameState.Instance.CheckCompletion();
 
         ShowMenu();
 
@@ -260,6 +267,12 @@ public partial class Main : Node
     void ReturnToGameplay()
     {
         if (CurrentMode != Mode.Playing) return;
+        if (_pendingCompletion && !AnyModal())
+        {
+            _pendingCompletion = false;
+            _completion.Open();
+            return;
+        }
         if (Player != null) Player.InputEnabled = true;
         if (!_pause.IsOpen) Input.MouseMode = Input.MouseModeEnum.Captured;
     }
@@ -267,8 +280,9 @@ public partial class Main : Node
     public void OpenCodexForTour() => _codex.Open();
     public void OpenHelpForTour() => _help.Open();
     public void OpenSettingsForTour() => _settings.Open();
+    public void OpenCompletionForTour() => _completion.Open();
 
-    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen;
+    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen;
 
     public override void _UnhandledInput(InputEvent e)
     {
@@ -279,6 +293,7 @@ public partial class Main : Node
             if (_settings.IsOpen) { _settings.Close(); return; }
             if (_codex.IsOpen) { _codex.Close(); return; }
             if (_help.IsOpen) { _help.Close(); return; }
+            if (_completion.IsOpen) { _completion.Close(); return; }
             if (CurrentMode != Mode.Playing) return;
             if (_shop.IsOpen) { _shop.Close(); return; }
             if (_sell.IsOpen) { _sell.Close(); return; }
@@ -360,8 +375,25 @@ public partial class Main : Node
         Effects.Instance?.FloatText(p + Vector3.Up * 0.3f, "+" + GameState.FormatMoney(amount), UiTheme.Gold, 1.6f);
     }
 
+    void OnCompleted()
+    {
+        if (CurrentMode != Mode.Playing) return;
+        // pequena pausa dramática antes da tela
+        GetTree().CreateTimer(1.5f).Timeout += () =>
+        {
+            if (CurrentMode != Mode.Playing || AnyModal()) { _pendingCompletion = true; return; }
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+            Player.InputEnabled = false;
+            AudioManager.Instance?.SetBeam(false);
+            _completion.Open();
+        };
+    }
+
+    bool _pendingCompletion;
+
     void OnCrystalHit(Crystal c, bool broke)
     {
+        if (broke && c.Material.Special) GameState.Instance.CheckCompletion();
         if (broke && GameState.Instance.InventoryFull) Hud.FlashFull();
     }
 

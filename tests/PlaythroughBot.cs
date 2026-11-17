@@ -51,6 +51,7 @@ public partial class PlaythroughBot : Node
         {
             while (GameMinutes < MaxGameMinutes)
             {
+                await DismissCompletion();
                 if (GS.InventoryCount >= GS.Capacity - 2)
                 {
                     await SellTrip();
@@ -81,6 +82,10 @@ public partial class PlaythroughBot : Node
         if (nodes1 > nodes0 * 1.25 + 200) { _errors++; Log("ERRO: crescimento anormal de nós (possível vazamento)"); }
         if (objs1 > objs0 * 2 + 3000) { _errors++; Log("ERRO: crescimento anormal de objetos após GC (possível vazamento)"); }
 
+        await Frames(120);
+        await DismissCompletion();
+        if (!GS.Data.GameCompleted) { _errors++; Log("ERRO: jornada não foi marcada como concluída"); }
+
         // caminhada real do acampamento até o Núcleo (colisões, túneis e portões abertos)
         if (_r3 > 0) await WalkTest();
 
@@ -99,7 +104,7 @@ public partial class PlaythroughBot : Node
         GD.Print($"Vendas: {_sells} | Compras: {_buys} | Pulsos: {_pulses} | Cristais: {GS.Data.CrystalsMined} | Total ganho: {GS.Data.TotalEarned}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
-        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
+        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
         GameState.Instance.QuitClean(ok ? 0 : 1);
@@ -155,6 +160,18 @@ public partial class PlaythroughBot : Node
             Log("Coração Ancestral destruído!");
         }
         await Frames(50); // fragmentos chegam pelo ímã
+    }
+
+    bool _sawCompletion;
+
+    async Task DismissCompletion()
+    {
+        var c = Main.GetChildren().OfType<CompletionScreen>().FirstOrDefault();
+        if (c == null || !c.IsOpen) return;
+        if (!_sawCompletion) { _sawCompletion = true; Log("Tela de conclusão exibida (Mestre Escavador)"); }
+        PressAction("pause");
+        await Frames(3);
+        if (c.IsOpen) { _errors++; Log("ERRO: Esc não fechou a tela de conclusão"); }
     }
 
     void AimAt(Vector3 point)

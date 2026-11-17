@@ -20,6 +20,8 @@ public sealed class SaveData
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
     public bool TutorialDone { get; set; }
+    public bool GameCompleted { get; set; }
+    public double CompletedAtSeconds { get; set; }
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
     public float PlayerZ { get; set; } = 14f;

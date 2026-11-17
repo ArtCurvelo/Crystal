@@ -144,3 +144,4 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - **02:36 → 04:12** (+1h36, informado). **Total consumido: 3h21min. Restante: ~26h39min.**
 - Fases do cronograma já cobertas: protótipo, loop econômico, progressão completa (4 regiões), save/load, apresentação (direção de arte dos conceitos), boa parte da qualidade (testes, bot, estabilidade, otimização).
 - Prioridades para o tempo restante: balanceamento fino, polimento, regressão, validação no Windows real (pendente com o diretor), documentação final e candidato 1.0.
+- **Conclusão da jornada:** com as 4 regiões liberadas e o Coração Ancestral destruído, aparece uma única vez a tela **Mestre Escavador** com estatísticas (tempo, cristais, fragmentos, ganhos, materiais e melhorias no máximo). Persistida no save (`GameCompleted`). O jogo continua depois. O bot exige a tela de conclusão para passar (concluiu aos 45 min de jogo). Testes: 166/166.

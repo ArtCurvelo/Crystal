@@ -249,6 +249,21 @@ public partial class GameState : Node
 
     public void RecordCrystalMined() => Data.CrystalsMined++;
 
+    /// <summary>Jornada concluída: todas as regiões liberadas e o Coração Ancestral destruído.</summary>
+    public bool JourneyComplete => GameData.Regions.All(r => IsUnlocked(r.Id)) && Data.Discovered.Contains("heart");
+
+    public event Action Completed;
+
+    /// <summary>Verifica a conclusão (dispara uma única vez por save).</summary>
+    public void CheckCompletion()
+    {
+        if (Data.GameCompleted || !JourneyComplete) return;
+        Data.GameCompleted = true;
+        Data.CompletedAtSeconds = Data.PlayTimeSeconds;
+        Completed?.Invoke();
+        SaveGame(true);
+    }
+
     // ================= Utilidades =================
     public static string FormatMoney(long v) => "◈ " + FormatNumber(v);
 
