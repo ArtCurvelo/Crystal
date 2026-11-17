@@ -34,7 +34,7 @@ public partial class Effects : Node3D
                 Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
                 FontSize = 48,
                 OutlineSize = 12,
-                PixelSize = 0.006f,
+                PixelSize = 0.0042f,
                 NoDepthTest = true,
                 Visible = false,
                 Modulate = Colors.White,

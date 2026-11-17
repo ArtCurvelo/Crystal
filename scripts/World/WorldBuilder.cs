@@ -135,7 +135,7 @@ public partial class WorldBuilder : Node3D
     void AddPlatform(Node3D root, Vector3 pos, RegionDef r)
     {
         // plataforma decorativa do acampamento inicial
-        var mat = MeshFactory.Emissive(new Color(0.15f, 0.12f, 0.2f), r.AccentColor, 0.25f);
+        var mat = MeshFactory.Emissive(new Color(0.1f, 0.09f, 0.14f), r.AccentColor, 0.06f);
         AddMeshOnly(root, new CylinderMesh { TopRadius = 9f, BottomRadius = 9.2f, Height = 0.08f, RadialSegments = 24, Rings = 1 }, mat, pos + new Vector3(0, 0.02f, 0));
         var lantern = MeshFactory.Emissive(new Color(1f, 0.8f, 0.5f), new Color(1f, 0.7f, 0.35f), 2f);
         for (int i = 0; i < 6; i++)
@@ -219,7 +219,7 @@ public partial class WorldBuilder : Node3D
 
     void BuildHeartPedestal(Node3D root, Vector3 pos, RegionDef r)
     {
-        var mat = MeshFactory.Emissive(new Color(0.25f, 0.12f, 0.1f), r.AccentColor, 0.6f);
+        var mat = MeshFactory.Emissive(new Color(0.18f, 0.08f, 0.07f), r.AccentColor, 0.12f);
         AddMeshOnly(root, new CylinderMesh { TopRadius = 4.2f, BottomRadius = 4.8f, Height = 0.15f, RadialSegments = 20, Rings = 1 }, mat, pos + new Vector3(0, 0.05f, 0));
         var rune = MeshFactory.Emissive(r.AccentColor, r.AccentColor, 2.5f);
         for (int i = 0; i < 8; i++)

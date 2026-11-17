@@ -132,7 +132,7 @@ public partial class Crystal : StaticBody3D
                 _light = new OmniLight3D
                 {
                     LightColor = mat.Glow,
-                    LightEnergy = special ? 2.5f : 1.2f,
+                    LightEnergy = special ? 1.4f : 1.0f,
                     OmniRange = special ? 12f : 4f,
                     ShadowEnabled = false,
                     Position = new Vector3(0, 0.8f * s, 0),
@@ -196,7 +196,8 @@ public partial class Crystal : StaticBody3D
         Effects.Instance?.Hit(point, normal, Material.Glow.Lightened(0.3f));
         float pitch = 0.85f + (1f - HpRatio) * 0.5f;
         AudioManager.Instance?.Play("hit", -4f, pitch, 0.06f);
-        Effects.Instance?.FloatText(point + normal * 0.2f, GameState.FormatNumber(Math.Min(damage, Hp + damage)),
+        var jitter = new Vector3((float)_rng.NextDouble() - 0.5f, (float)_rng.NextDouble() * 0.6f, (float)_rng.NextDouble() - 0.5f) * 0.5f;
+        Effects.Instance?.FloatText(point + normal * 0.25f + jitter, GameState.FormatNumber(Math.Min(damage, Hp + damage)),
             new Color(1, 1, 1).Lerp(Material.Glow, 0.4f), 0.8f);
 
         if (Hp <= 0)

@@ -18,7 +18,7 @@ public partial class ToolView : Node3D
     float _swingT = 1f;
     float _swingDuration = 0.25f;
     float _bobT;
-    Vector3 _restPos = new(0.38f, -0.36f, -0.55f);
+    Vector3 _restPos = new(0.36f, -0.4f, -0.62f);
     int _tier = -1;
     Vector2 _sway;
 
@@ -56,7 +56,7 @@ public partial class ToolView : Node3D
         var handle = new MeshInstance3D
         {
             Mesh = new CylinderMesh { TopRadius = 0.025f, BottomRadius = 0.03f, Height = 0.62f, RadialSegments = 8, Rings = 1 },
-            MaterialOverride = MeshFactory.Metal(tier >= 3 ? new Color(0.25f, 0.2f, 0.18f) : new Color(0.4f, 0.27f, 0.16f), 0.8f),
+            MaterialOverride = MeshFactory.Metal(tier >= 3 ? new Color(0.32f, 0.27f, 0.3f) : new Color(0.62f, 0.4f, 0.22f), 0.85f),
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         handle.Position = new Vector3(0, 0.1f, 0);
@@ -74,7 +74,7 @@ public partial class ToolView : Node3D
             _model.AddChild(ring);
         }
         // cabeça da picareta (duas pontas)
-        var headMat = MeshFactory.Metal(HeadColors[tier], 0.3f);
+        var headMat = MeshFactory.Emissive(HeadColors[tier], HeadColors[tier], 0.12f + tier * 0.12f);
         var head = new Node3D { Position = new Vector3(0, 0.4f, 0) };
         _model.AddChild(head);
         float len = 0.2f + tier * 0.025f;
@@ -107,7 +107,8 @@ public partial class ToolView : Node3D
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         head.AddChild(_headGem);
-        _model.Rotation = new Vector3(-0.2f, 0.25f, 0.15f);
+        _model.Rotation = new Vector3(-0.35f, 0.5f, 0.32f);
+        _model.Scale = Vector3.One * 0.85f;
     }
 
     /// <summary>Inicia a animação de golpe com a duração ligada à velocidade de extração.</summary>

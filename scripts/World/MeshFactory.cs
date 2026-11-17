@@ -218,7 +218,7 @@ public static class MeshFactory
     {
         string key = "metal" + c.ToHtml() + rough;
         if (MatCache.TryGetValue(key, out var m)) return (StandardMaterial3D)m;
-        var mat = new StandardMaterial3D { AlbedoColor = c, Metallic = 0.8f, Roughness = rough };
+        var mat = new StandardMaterial3D { AlbedoColor = c, Metallic = 0.25f, Roughness = rough, RimEnabled = true, Rim = 0.25f, RimTint = 0.5f };
         MatCache[key] = mat;
         return mat;
     }

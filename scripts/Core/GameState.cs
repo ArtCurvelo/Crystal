@@ -214,7 +214,7 @@ public partial class GameState : Node
 
     public void Notify(string title, string body, NotifyKind kind = NotifyKind.Info) => Notified?.Invoke(title, body, kind);
 
-    void RaiseAll()
+    public void RaiseAll()
     {
         MoneyChanged?.Invoke();
         InventoryChanged?.Invoke();

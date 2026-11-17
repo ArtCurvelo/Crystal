@@ -81,7 +81,7 @@ public partial class ScreenshotTour : Node
         gs.TryUnlockRegion("core");
         foreach (var id in UpgradeIds.All) gs.Data.Upgrades[id] = 10;
         gs.Data.Upgrades[UpgradeIds.Damage] = 18;
-        gs.Notify("Teste", "Melhorias aplicadas", NotifyKind.Success);
+        gs.RaiseAll();
         p.GlobalPosition = new Vector3(0, 0.1f, -36);
         p.SetLook(0, 0);
         await Wait(3f);

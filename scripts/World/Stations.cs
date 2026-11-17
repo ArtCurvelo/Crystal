@@ -178,11 +178,13 @@ public partial class RegionGate : StationBase
         AddMesh(new BoxMesh { Size = new Vector3(0.5f, _height, 0.6f) }, pillar, new Vector3(_width / 2, _height / 2, 0));
         Label = MakeLabel("", Colors.White, _height + 0.6f, 56);
         Label.Billboard = BaseMaterial3D.BillboardModeEnum.Disabled;
+        Label.DoubleSided = false;
         Label.Position = new Vector3(0, _height - 0.9f, 0.3f);
         Label.RotationDegrees = new Vector3(0, 0, 0);
         // rótulo também no lado de trás
         var back = MakeLabel("", Colors.White, _height - 0.9f, 56);
         back.Billboard = BaseMaterial3D.BillboardModeEnum.Disabled;
+        back.DoubleSided = false;
         back.Position = new Vector3(0, _height - 0.9f, -0.3f);
         back.RotationDegrees = new Vector3(0, 180, 0);
         _backLabel = back;
