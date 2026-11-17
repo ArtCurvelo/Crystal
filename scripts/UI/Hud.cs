@@ -409,7 +409,7 @@ public partial class Hud : CanvasLayer
     void RefreshStats()
     {
         var gs = GameState.Instance;
-        _toolName.Text = GameState.ToolTierNames[gs.ToolTier];
+        _toolName.Text = GameState.ToolTierNames[gs.ToolTier] + (gs.Data.Essence > 0 ? $"  ✦{gs.Data.Essence}" : "");
         _toolStats.Text = $"{GameState.FormatNumber(gs.Damage)} dano · {gs.SwingsPerSecond:0.0}/s";
         _pulseInfo.Text = $"Pulso x{gs.ResonanceMultiplier:0.0} do dano · raio {gs.ResonanceRadius:0.0} m";
     }

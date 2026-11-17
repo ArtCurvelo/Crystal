@@ -164,7 +164,6 @@ public abstract partial class TerminalScreen : ModalScreen
         gs.SaveGame(true);
     }
 
-    public void CloseSilently() => Visible = false;
 }
 
 // =====================================================================
@@ -174,6 +173,7 @@ public partial class ShopScreen : TerminalScreen
     protected override bool IsShopTab => true;
     GridContainer _grid;
     VBoxContainer _regionBox;
+    VBoxContainer _prestigeBox;
     string _lastBought;
 
     public override void _Ready()
@@ -194,6 +194,9 @@ public partial class ShopScreen : TerminalScreen
         _regionBox = new VBoxContainer();
         _regionBox.AddThemeConstantOverride("separation", 8);
         inner.AddChild(_regionBox);
+        inner.AddChild(UiTheme.Label("RENASCIMENTO", 20, UiTheme.Gold, true));
+        _prestigeBox = new VBoxContainer();
+        inner.AddChild(_prestigeBox);
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);
@@ -226,6 +229,8 @@ public partial class ShopScreen : TerminalScreen
         foreach (var id in UpgradeIds.All) _grid.AddChild(BuildCard(GameData.Upgrades[id]));
         foreach (Node c in _regionBox.GetChildren()) c.QueueFree();
         foreach (var r in GameData.Regions.Skip(1)) _regionBox.AddChild(BuildRegionRow(r));
+        foreach (Node c in _prestigeBox.GetChildren()) c.QueueFree();
+        _prestigeBox.AddChild(BuildPrestigeRow());
     }
 
     Control BuildCard(UpgradeDef u)
@@ -289,6 +294,32 @@ public partial class ShopScreen : TerminalScreen
             gs.Notify("Melhoria adquirida", $"{u.Name} — Nível {gs.Data.Level(id)}", NotifyKind.Success);
         }
         else AudioManager.Instance?.Play("error", -6f);
+    }
+
+    Control BuildPrestigeRow()
+    {
+        var gs = GameState.Instance;
+        var row = new PanelContainer();
+        row.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.08f, 0.07f, 0.03f, 0.95f), new Color(UiTheme.Gold, gs.CanPrestige ? 0.8f : 0.3f), 12, 2, 14, 8));
+        var h = new HBoxContainer();
+        h.AddThemeConstantOverride("separation", 12);
+        row.AddChild(h);
+        h.AddChild(HudIcon.Make(HudIcon.Kind.Star, UiTheme.Gold, 34));
+        var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        h.AddChild(v);
+        v.AddChild(UiTheme.Label($"Essência Ancestral: {gs.Data.Essence}   ·   bônus x{gs.EssenceMultiplier:0.0} em dano e venda", 17, UiTheme.Gold, true));
+        string info = gs.Data.GameCompleted
+            ? $"Renascer recomeça a jornada e concede +{gs.PendingEssence} Essência (+10% permanente por ponto). Coleção e estatísticas são mantidas."
+            : "Disponível após concluir a jornada (4 regiões + Coração Ancestral).";
+        var l = UiTheme.Label(info, 13, UiTheme.Muted);
+        l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        l.CustomMinimumSize = new Vector2(380, 0);
+        v.AddChild(l);
+        var btn = UiTheme.Button(gs.CanPrestige ? $"Renascer (+{gs.PendingEssence})" : "Bloqueado", () => UiBus.RequestPrestige(), 200, 17);
+        btn.Disabled = !gs.CanPrestige;
+        btn.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        h.AddChild(btn);
+        return row;
     }
 
     Control BuildRegionRow(RegionDef r)

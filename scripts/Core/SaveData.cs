@@ -21,6 +21,11 @@ public sealed class SaveData
     public double PlayTimeSeconds { get; set; }
     public bool TutorialDone { get; set; }
     public bool GameCompleted { get; set; }
+    /// <summary>Ganhos na partida atual (zerado no Renascimento).</summary>
+    public long RunEarned { get; set; }
+    /// <summary>Essência Ancestral acumulada (bônus permanente).</summary>
+    public int Essence { get; set; }
+    public int PrestigeCount { get; set; }
     public double CompletedAtSeconds { get; set; }
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
@@ -40,6 +45,12 @@ public sealed class SaveData
         if (Money < 0) Money = 0;
         if (TotalEarned < Money) TotalEarned = Money;
         if (CrystalsMined < 0) CrystalsMined = 0;
+        if (RunEarned < 0) RunEarned = 0;
+        // saves anteriores ao Renascimento: a partida atual é todo o histórico
+        if (RunEarned == 0 && PrestigeCount == 0 && TotalEarned > 0) RunEarned = TotalEarned;
+        if (RunEarned > TotalEarned) RunEarned = TotalEarned;
+        Essence = System.Math.Clamp(Essence, 0, 100000);
+        PrestigeCount = System.Math.Max(0, PrestigeCount);
         if (ShardsSold < 0) ShardsSold = 0;
         if (PlayTimeSeconds < 0 || double.IsNaN(PlayTimeSeconds)) PlayTimeSeconds = 0;
 

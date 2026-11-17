@@ -89,6 +89,11 @@ public partial class PlaythroughBot : Node
         // caminhada real do acampamento até o Núcleo (colisões, túneis e portões abertos)
         if (_r3 > 0) await WalkTest();
 
+        // ---------- Renascimento pela interface e 2ª jornada ----------
+        _firstR2 = _r2;
+        await PrestigeViaUi();
+        _r2 = _firstR2;
+
         // verificação final de salvamento/carregamento do estado real
         GS.SaveGame(true);
         long money = GS.Data.Money;
@@ -102,9 +107,10 @@ public partial class PlaythroughBot : Node
         foreach (var l in _log) GD.Print(l);
         GD.Print($"Tempo de jogo: {GameMinutes:0.0} min | Região 2: {Fmt(_r2)} | Região 3: {Fmt(_r3)} | Coração quebrado: {Fmt(_heart)} | Reservatório: {Fmt(_r4)}");
         GD.Print($"Vendas: {_sells} | Compras: {_buys} | Pulsos: {_pulses} | Cristais: {GS.Data.CrystalsMined} | Total ganho: {GS.Data.TotalEarned}");
+        GD.Print($"Renascimento: {(_prestiged ? "sim" : "não")} | Região 2 na 2ª jornada: {(_secondR2 > 0 ? $"{_secondR2:0.0} min" : "não alcançada")}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
-        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
+        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
         GameState.Instance.QuitClean(ok ? 0 : 1);
@@ -160,6 +166,43 @@ public partial class PlaythroughBot : Node
             Log("Coração Ancestral destruído!");
         }
         await Frames(50); // fragmentos chegam pelo ímã
+    }
+
+    bool _prestiged;
+    double _firstR2 = -1;
+    double _secondR2 = -1;
+
+    async Task PrestigeViaUi()
+    {
+        if (!GS.CanPrestige) { _errors++; Log($"ERRO: Renascimento indisponível após concluir (pendente {GS.PendingEssence})"); return; }
+        int pending = GS.PendingEssence;
+        if (!await UseStation<ShopTerminal>(GameData.Regions[0])) return;
+        var shop = Main.GetChildren().OfType<ShopScreen>().First();
+        var btn = FindButtons(shop).FirstOrDefault(b => b.Text.StartsWith("Renascer"));
+        if (btn == null || btn.Disabled) { _errors++; Log("ERRO: botão Renascer ausente/desabilitado"); return; }
+        btn.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(3);
+        var confirm = Main.GetChildren().OfType<ConfirmScreen>().First();
+        var yes = FindButtons(confirm).First(b => b.Text == "Confirmar");
+        yes.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(10);
+        if (GS.Data.PrestigeCount != 1 || GS.Data.Essence != pending || GS.IsUnlocked("depths") || shop.IsOpen)
+        { _errors++; Log("ERRO: Renascimento não aplicou corretamente"); return; }
+        if (Main.World.Gates[0].IsOpen) { _errors++; Log("ERRO: portão não voltou a fechar após renascer"); }
+        _prestiged = true;
+        Log($"Renasceu pela interface: +{pending} Essência (bônus x{GS.EssenceMultiplier:0.0})");
+        // 2ª jornada até a Região 2
+        double t0 = GameMinutes;
+        _r2 = -1;
+        int guard = 0;
+        while (!GS.IsUnlocked("depths") && GameMinutes - t0 < 30 && guard++ < 5000)
+        {
+            await DismissCompletion();
+            if (GS.InventoryCount >= GS.Capacity - 2) { await SellTrip(); await SpendTrip(); }
+            else await MineOne();
+        }
+        _secondR2 = GS.IsUnlocked("depths") ? GameMinutes - t0 : -1;
+        Log($"2ª jornada: Região 2 em {_secondR2:0.0} min");
     }
 
     bool _sawCompletion;

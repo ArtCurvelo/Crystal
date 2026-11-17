@@ -88,6 +88,9 @@ public abstract partial class ModalScreen : CanvasLayer
     }
 
     public virtual void Refresh() { }
+
+    /// <summary>Esconde sem disparar Closed (troca de tela sem devolver o controle ao jogo).</summary>
+    public void CloseSilently() => Visible = false;
 }
 
 // =====================================================================
@@ -415,7 +418,13 @@ public partial class CompletionScreen : ModalScreen
         Body.AddChild(row);
         var b = UiTheme.Button("Continuar minerando", Close, 280, 22);
         row.AddChild(b);
+        _prestigeBtn = UiTheme.Button("Renascer agora", () => UiBus.RequestPrestige(), 280, 22);
+        _prestigeBtn.AddThemeColorOverride("font_color", UiTheme.Gold);
+        row.AddChild(_prestigeBtn);
+        row.AddThemeConstantOverride("separation", 12);
     }
+
+    Button _prestigeBtn;
 
     public override void Open()
     {
@@ -429,6 +438,8 @@ public partial class CompletionScreen : ModalScreen
         var d = GameState.Instance.Data;
         var t = TimeSpan.FromSeconds(d.CompletedAtSeconds > 0 ? d.CompletedAtSeconds : d.PlayTimeSeconds);
         int maxed = UpgradeIds.All.Count(id => GameState.Instance.IsMaxed(id));
+        _prestigeBtn.Text = $"Renascer (+{GameState.Instance.PendingEssence} Essência)";
+        _prestigeBtn.Disabled = !GameState.Instance.CanPrestige;
         _stats.Text =
             $"Tempo de jornada: {(int)t.TotalHours}h {t.Minutes:00}min\n" +
             $"Cristais minerados: {GameState.FormatNumber(d.CrystalsMined)}   ·   Fragmentos vendidos: {GameState.FormatNumber(d.ShardsSold)}\n" +

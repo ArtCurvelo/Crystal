@@ -11,5 +11,7 @@ public static class UiBus
 
     public static void RequestSell() => OpenSell?.Invoke();
     public static void RequestShop() => OpenShop?.Invoke();
+    public static event Action PrestigeRequested;
+    public static void RequestPrestige() => PrestigeRequested?.Invoke();
     public static void EnterRegion(string id) => RegionEntered?.Invoke(id);
 }

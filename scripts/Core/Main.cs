@@ -108,6 +108,7 @@ public partial class Main : Node
         GameState.Instance.Completed += OnCompleted;
 
         UiBus.OpenShop += OpenShop;
+        UiBus.PrestigeRequested += AskPrestige;
         UiBus.OpenSell += OpenSell;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         GameState.Instance.BeforeSave = WritePlayerToSave;
@@ -177,6 +178,7 @@ public partial class Main : Node
     public override void _ExitTree()
     {
         UiBus.OpenShop -= OpenShop;
+        UiBus.PrestigeRequested -= AskPrestige;
         UiBus.OpenSell -= OpenSell;
         if (GameState.Instance != null)
         {
@@ -433,6 +435,37 @@ public partial class Main : Node
         var p = Player.Camera.GlobalPosition - Player.Camera.GlobalTransform.Basis.Z * 1.6f + Vector3.Down * 0.4f;
         Effects.Instance?.Burst(p, UiTheme.Gold, 1.2f);
         Effects.Instance?.FloatText(p + Vector3.Up * 0.3f, "+" + GameState.FormatMoney(amount), UiTheme.Gold, 1.6f);
+    }
+
+    void AskPrestige()
+    {
+        var gs = GameState.Instance;
+        if (!gs.CanPrestige) return;
+        _confirm.Ask($"Renascer recomeça a jornada: dinheiro, melhorias, mochila e regiões voltam ao início. " +
+                     $"Você recebe +{gs.PendingEssence} Essência Ancestral (bônus permanente de +10% em dano e venda por ponto). " +
+                     "A Coleção e as estatísticas são mantidas. Continuar?", DoPrestige);
+    }
+
+    void DoPrestige()
+    {
+        var gs = GameState.Instance;
+        if (!gs.Prestige()) return;
+        _shop.CloseSilently();
+        _sell.CloseSilently();
+        _completion.CloseSilently();
+        _shards.ClearAll();
+        Events.ResetAll();
+        if (Player != null)
+        {
+            Player.GlobalPosition = World.SpawnPoint;
+            Player.Velocity = Vector3.Zero;
+            Player.SetLook(0);
+        }
+        _currentRegion = null;
+        UpdateRegion(true);
+        UpdateRegionCulling();
+        Hud.ResetMoneyDisplay();
+        ReturnToGameplay();
     }
 
     void OnCompleted()

@@ -42,6 +42,7 @@ public partial class TestRunner : Node
             Run("Compatibilidade com save antigo", TestOldSave);
             Run("Configurações inválidas", TestSettings);
             Run("Conclusão da jornada", TestCompletion);
+            Run("Renascimento (prestígio)", TestPrestige);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -310,6 +311,36 @@ public partial class TestRunner : Node
         Check(fired == 1, "conclusão dispara uma única vez");
         GS.Completed -= H;
         Check(SaveSystem.TryParse(System.Text.Json.JsonSerializer.Serialize(GS.Data), out var d) && d.GameCompleted, "conclusão persiste no save");
+        Fresh();
+    }
+
+    void TestPrestige()
+    {
+        Fresh();
+        Check(!GS.CanPrestige && !GS.Prestige(), "não renasce sem concluir");
+        GS.AddMoney(4_000_000);
+        GS.Data.Upgrades[UpgradeIds.Damage] = 20;
+        foreach (var r in GameData.Regions) if (!GS.Data.UnlockedRegions.Contains(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+        GS.AddItem("heart", 1);
+        GS.CheckCompletion();
+        Check(GS.CanPrestige, "concluído com ganhos permite renascer");
+        int pending = GS.PendingEssence;
+        Check(pending == 4, $"4 mi de ganhos devem render 4 de Essência (obtido {pending})");
+        float dmgBase0 = GameData.Upgrades[UpgradeIds.Damage].ValueAt(0);
+        long totalBefore = GS.Data.TotalEarned;
+        Check(GS.Prestige(), "renascimento deve ocorrer");
+        var d = GS.Data;
+        Check(d.Essence == 4 && d.PrestigeCount == 1, "Essência e contagem registradas");
+        Check(d.Money == 0 && d.Upgrades.Count == 0 && d.Inventory.Count == 0, "progresso da partida zerado");
+        Check(d.UnlockedRegions.Count == 1 && d.UnlockedRegions[0] == "caves", "regiões voltam ao início");
+        Check(!d.GameCompleted && d.RunEarned == 0, "nova jornada começa");
+        Check(d.Discovered.Contains("heart") && d.TotalEarned == totalBefore, "Coleção e estatísticas mantidas");
+        Check(Mathf.IsEqualApprox(GS.Damage, dmgBase0 * 1.4f), $"bônus de dano x1,4 (obtido {GS.Damage / dmgBase0:0.00})");
+        Check(Mathf.IsEqualApprox(GS.ValueMultiplier, 1.4f), "bônus de venda x1,4");
+        Check(!GS.CanPrestige, "não renasce de novo sem nova conclusão");
+        Check(SaveSystem.TryParse(System.Text.Json.JsonSerializer.Serialize(d), out var d2) && d2.Essence == 4 && d2.PrestigeCount == 1, "Essência persiste no save");
+        // migração: save antigo concluído, sem RunEarned
+        Check(SaveSystem.TryParse(@"{ ""TotalEarned"": 1000000, ""GameCompleted"": true }", out var old) && old.RunEarned == 1000000, "save antigo usa o total ganho como partida atual");
         Fresh();
     }
 

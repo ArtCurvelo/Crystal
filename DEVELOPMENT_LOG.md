@@ -164,3 +164,5 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 
 ## Retomada ("Pode continuar")
 - `project.godot` regravado pelo próprio Godot (`ProjectSettings.save()`) no formato oficial: cabeçalho, ordem das chaves e remoção de valores iguais ao padrão. Isso evita que o editor do diretor altere o arquivo ao abrir/salvar, o que causou o conflito no `git pull`.
+- **Renascimento (prestígio):** após concluir a jornada, recomeça a partida (dinheiro, melhorias, mochila e regiões) e concede **Essência Ancestral** = ⌊√(ganhos da partida / 250 mil)⌋. Cada ponto dá **+10% permanente em dano e em valor de venda**. Mantém Coleção, estatísticas e Essência. Disponível no Terminal (seção Renascimento) e na tela de conclusão, sempre com confirmação. Saves antigos migram usando o total ganho. HUD mostra ✦Essência ao lado da ferramenta.
+- Bot renasce **pela interface** (Terminal → Renascer → Confirmar) e joga a 2ª jornada: +6 Essência (x1,6) → **Região 2 em 3,6 min** (1ª jornada: 10,3 min). Testes: 192/192.

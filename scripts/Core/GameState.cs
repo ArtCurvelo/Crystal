@@ -63,12 +63,15 @@ public partial class GameState : Node
     /// <summary>Multiplicadores temporários de eventos de região (não persistem).</summary>
     public float EventDamageMultiplier { get; set; } = 1f;
     public float EventShardMultiplier { get; set; } = 1f;
-    public float Damage => StatValue(UpgradeIds.Damage) * EventDamageMultiplier;
+    /// <summary>Bônus permanente da Essência Ancestral: +10% por ponto.</summary>
+    public float EssenceMultiplier => 1f + Data.Essence * EssenceBonusPerPoint;
+    public const float EssenceBonusPerPoint = 0.10f;
+    public float Damage => StatValue(UpgradeIds.Damage) * EventDamageMultiplier * EssenceMultiplier;
     public float SwingsPerSecond => StatValue(UpgradeIds.Speed);
     public float SwingInterval => 1f / SwingsPerSecond;
     public int Capacity => (int)StatValue(UpgradeIds.Capacity);
     public float MoveSpeed => StatValue(UpgradeIds.Move);
-    public float ValueMultiplier => StatValue(UpgradeIds.Value);
+    public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier;
     public float MagnetRadius => StatValue(UpgradeIds.Reach);
     public float MiningReach => 3.2f + Data.Level(UpgradeIds.Reach) * 0.28f;
     public float DamagePerSecond => Damage * SwingsPerSecond;
@@ -137,6 +140,7 @@ public partial class GameState : Node
         if (amount <= 0) return;
         Data.Money += amount;
         Data.TotalEarned += amount;
+        Data.RunEarned += amount;
         MoneyChanged?.Invoke();
     }
 
@@ -253,6 +257,37 @@ public partial class GameState : Node
     public bool JourneyComplete => GameData.Regions.All(r => IsUnlocked(r.Id)) && Data.Discovered.Contains("heart");
 
     public event Action Completed;
+    public event Action Prestiged;
+
+    /// <summary>Essência que seria obtida ao renascer agora: raiz dos ganhos da partida (em blocos de 250 mil).</summary>
+    public int PendingEssence => (int)Math.Floor(Math.Sqrt(Data.RunEarned / 250_000.0));
+    public bool CanPrestige => Data.GameCompleted && PendingEssence > 0;
+
+    /// <summary>
+    /// Renascimento: converte ganhos da partida em Essência e recomeça a progressão.
+    /// Mantém Coleção, estatísticas, Essência e contagem de renascimentos.
+    /// </summary>
+    public bool Prestige()
+    {
+        if (!CanPrestige) return false;
+        int gained = PendingEssence;
+        Data.Essence += gained;
+        Data.PrestigeCount++;
+        Data.Money = 0;
+        Data.RunEarned = 0;
+        Data.Upgrades.Clear();
+        Data.Inventory.Clear();
+        Data.UnlockedRegions.Clear();
+        Data.UnlockedRegions.Add("caves");
+        Data.GameCompleted = false;
+        Data.HasPosition = false;
+        RaiseAll();
+        Notify("Renascimento!", $"+{gained} Essência Ancestral · bônus permanente x{EssenceMultiplier:0.0}", NotifyKind.Unlock);
+        BigMessage?.Invoke($"RENASCIMENTO {Data.PrestigeCount}");
+        Prestiged?.Invoke();
+        SaveGame(true);
+        return true;
+    }
 
     /// <summary>Verifica a conclusão (dispara uma única vez por save).</summary>
     public void CheckCompletion()
