@@ -28,7 +28,7 @@ public partial class PlaythroughBot : Node
     GameState GS => GameState.Instance;
     readonly List<string> _log = new();
     int _errors;
-    double _r2 = -1, _r3 = -1, _heart = -1;
+    double _r2 = -1, _r3 = -1, _r4 = -1, _heart = -1;
     int _sells, _buys, _pulses;
 
     public override async void _Ready()
@@ -51,7 +51,7 @@ public partial class PlaythroughBot : Node
                 {
                     await SellTrip();
                     await SpendTrip();
-                    if (_r3 > 0 && _heart > 0) break;
+                    if (_r3 > 0 && _heart > 0 && _r4 > 0) break;
                     continue;
                 }
                 await MineOne();
@@ -77,11 +77,11 @@ public partial class PlaythroughBot : Node
         string Fmt(double m) => m < 0 ? "não alcançado" : $"{m:0.0} min";
         GD.Print("===== BOT DE JOGO — RESUMO =====");
         foreach (var l in _log) GD.Print(l);
-        GD.Print($"Tempo de jogo: {GameMinutes:0.0} min | Região 2: {Fmt(_r2)} | Região 3: {Fmt(_r3)} | Coração quebrado: {Fmt(_heart)}");
+        GD.Print($"Tempo de jogo: {GameMinutes:0.0} min | Região 2: {Fmt(_r2)} | Região 3: {Fmt(_r3)} | Coração quebrado: {Fmt(_heart)} | Reservatório: {Fmt(_r4)}");
         GD.Print($"Vendas: {_sells} | Compras: {_buys} | Pulsos: {_pulses} | Cristais: {GS.Data.CrystalsMined} | Total ganho: {GS.Data.TotalEarned}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
-        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
+        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
         GetTree().Quit(ok ? 0 : 1);
@@ -155,7 +155,8 @@ public partial class PlaythroughBot : Node
         P.SetLook(0, 0);
         await Frames(5);
         double t0 = GS.Data.PlayTimeSeconds;
-        float targetZ = GameData.Regions[2].CenterZ + 12f; // antes do pedestal central
+        // pelo corredor central até o Núcleo; se o Reservatório estiver aberto, desvia do pedestal e segue até ele
+        float targetZ = GameData.Regions[2].CenterZ + 12f;
         Input.ActionPress("move_forward");
         Input.ActionPress("sprint");
         int guard = 0;
@@ -168,10 +169,40 @@ public partial class PlaythroughBot : Node
         }
         Input.ActionRelease("move_forward");
         Input.ActionRelease("sprint");
+        if (P.GlobalPosition.Z <= targetZ && GS.IsUnlocked("abyss"))
+        {
+            // contorna o anel de pilares do Coração (raio ~6 m) pela lateral esquerda
+            float heartZ = GameData.Regions[2].CenterZ - 4f;
+            async Task WalkUntil(float yaw, Func<bool> done)
+            {
+                P.SetLook(yaw, 0);
+                Input.ActionPress("move_forward");
+                for (int i = 0; i < 600 && !done(); i++) await Frames(1);
+                Input.ActionRelease("move_forward");
+            }
+            await WalkUntil(Mathf.Pi / 2, () => P.GlobalPosition.X < -8.5f);          // esquerda (-X)
+            float sideX = P.GlobalPosition.X;
+            await WalkUntil(0, () => P.GlobalPosition.Z < heartZ - 8.5f);             // frente (-Z)
+            await WalkUntil(-Mathf.Pi / 2, () => P.GlobalPosition.X > -0.3f);         // volta ao centro (+X)
+            P.SetLook(0, 0);
+            targetZ = GameData.Regions[3].CenterZ + 10f;
+            Input.ActionPress("move_forward");
+            Input.ActionPress("sprint");
+            guard = 0; stuck = 0; lastZ = P.GlobalPosition.Z;
+            while (P.GlobalPosition.Z > targetZ && guard++ < 60 * 120)
+            {
+                await Frames(10);
+                if (lastZ - P.GlobalPosition.Z < 0.05f) { if (++stuck > 12) break; } else stuck = 0;
+                lastZ = P.GlobalPosition.Z;
+            }
+            Input.ActionRelease("move_forward");
+            Input.ActionRelease("sprint");
+            Log($"Desvio do pedestal (x={sideX:0.0}) e caminhada até o Reservatório");
+        }
         double secs = GS.Data.PlayTimeSeconds - t0;
         bool ok = P.GlobalPosition.Z <= targetZ;
         if (!ok) { _errors++; Log($"ERRO: caminhada travou em {P.GlobalPosition}"); }
-        else Log($"Caminhada acampamento → Núcleo: {secs:0.0} s, sem travar (pos {P.GlobalPosition.Z:0.0})");
+        else Log($"Caminhada acampamento → destino: {secs:0.0} s, sem travar (z final {P.GlobalPosition.Z:0.0})");
     }
 
     // ---------------- Estações ----------------
@@ -233,6 +264,7 @@ public partial class PlaythroughBot : Node
             if (!GS.IsUnlocked(next.Id) || !gate.IsOpen) { _errors++; Log("ERRO: portão não abriu"); return; }
             if (next.Index == 1) _r2 = GameMinutes;
             if (next.Index == 2) _r3 = GameMinutes;
+            if (next.Index == 3) _r4 = GameMinutes;
             Log($"Desbloqueou {next.Name}");
             // atravessa o portão (testa colisão aberta)
             var start = gate.GlobalPosition + new Vector3(0, 0.05f, 1.5f);

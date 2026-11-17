@@ -130,3 +130,4 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - **Região bônus: Reservatório Abissal** (◈ 1,5 mi, após o Núcleo). Lago luminoso com shader próprio (ondulações e cáusticas), águas-vivas animadas, três cachoeiras, passarela iluminada, posto avançado, bolhas subindo e formações gigantes. Materiais: Cristal de Maré (Raro), Coral Prismático (Épico) e Lágrima Abissal (Lendário). Evento **Maré Luminosa**: fragmentos x1,5 e dano +25%. Trilha sonora própria.
 - **Passarelas suspensas** com lanternas nas Profundezas (conceito "Cavern Bridge").
 - Testes ajustados para 4 regiões: 156/156.
+- Bot estendido: desbloqueia as **4 regiões** e caminha do acampamento até o Reservatório contornando o pedestal do Coração. Resultado: SUCESSO (Região 2 em 10,2 min, Região 3 em 32 min, Reservatório em 39,8 min, Coração em 45,7 min; caminhada de 18,9 s sem travar).
