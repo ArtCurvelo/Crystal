@@ -59,6 +59,23 @@ public partial class ScreenshotTour : Node
         Input.ActionRelease("mine");
         await Wait(0.3f);
         await Shot("04_shards");
+        // as 6 ferramentas disparando contra um cristal
+        int[] tierLevels = { 0, 3, 7, 12, 18, 24 };
+        var tc = Main.World.Crystals.Where(x => x.IsMineable && x.Material.Id == "amethyst")
+            .OrderBy(x => x.GlobalPosition.DistanceTo(p.GlobalPosition)).First();
+        p.GlobalPosition = tc.GlobalPosition + new Vector3(0, 0, 2.4f);
+        p.SetLook(0, -0.3f);
+        for (int t = 0; t < tierLevels.Length; t++)
+        {
+            gs.Data.Upgrades[UpgradeIds.Damage] = tierLevels[t];
+            gs.RaiseAll();
+            Input.ActionPress("mine");
+            await Wait(0.35f);
+            await Shot($"tool_{t}");
+            Input.ActionRelease("mine");
+        }
+        gs.Data.Upgrades.Remove(UpgradeIds.Damage);
+        gs.RaiseAll();
         await Wait(1.5f);
 
         // vista geral da região 1 com FPS

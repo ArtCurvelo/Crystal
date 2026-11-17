@@ -32,7 +32,7 @@ public partial class ToolView : Node3D
 
     public static readonly Color[] TierColors =
     {
-        new(0.35f, 0.9f, 1f), new(0.45f, 0.7f, 1f), new(0.75f, 0.45f, 1f), new(1f, 0.78f, 0.3f), new(1f, 0.4f, 0.3f)
+        new(0.35f, 0.9f, 1f), new(1f, 0.3f, 0.85f), new(0.4f, 0.75f, 1f), new(0.7f, 0.4f, 1f), new(1f, 0.55f, 0.85f), new(1f, 0.25f, 0.75f)
     };
 
     public override void _Ready()
@@ -76,10 +76,10 @@ public partial class ToolView : Node3D
         _model = new Node3D();
         _pivot.AddChild(_model);
         var accent = TierColors[tier];
-        var orange = Lit(tier >= 3 ? new Color(0.95f, 0.62f, 0.2f) : new Color(0.95f, 0.5f, 0.15f), 0.5f);
+        var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.5f);
         var grey = Lit(new Color(0.42f, 0.44f, 0.5f), 0.45f);
         var dark = Lit(new Color(0.16f, 0.17f, 0.21f), 0.6f);
-        var glove = Lit(new Color(0.12f, 0.12f, 0.14f), 0.85f);
+        var steel = Lit(new Color(0.6f, 0.63f, 0.7f), 0.3f);
         _screenMat = new StandardMaterial3D
         {
             AlbedoColor = accent.Darkened(0.7f), EmissionEnabled = true, Emission = accent.Darkened(0.2f), EmissionEnergyMultiplier = 0.7f,
@@ -88,36 +88,93 @@ public partial class ToolView : Node3D
         {
             AlbedoColor = accent, EmissionEnabled = true, Emission = accent, EmissionEnergyMultiplier = 1.2f,
         };
+        var rx = new Vector3(Mathf.Pi / 2, 0, 0);
+        float bulk = 1f + tier * 0.07f; // ferramentas superiores são mais robustas
 
-        // corpo principal (eixo da arma ao longo de -Z)
-        Part(_model, new BoxMesh { Size = new Vector3(0.11f, 0.1f, 0.2f) }, orange, new Vector3(0, 0, 0.07f));
-        Part(_model, new BoxMesh { Size = new Vector3(0.125f, 0.05f, 0.16f) }, orange, new Vector3(0, 0.065f, 0.05f));
-        Part(_model, new BoxMesh { Size = new Vector3(0.128f, 0.012f, 0.165f) }, grey, new Vector3(0, 0.035f, 0.05f));
-        Part(_model, new BoxMesh { Size = new Vector3(0.13f, 0.03f, 0.1f) }, dark, new Vector3(0, -0.06f, 0.1f));
-        // tela lateral e superior
-        Part(_model, new BoxMesh { Size = new Vector3(0.005f, 0.045f, 0.09f) }, _screenMat, new Vector3(-0.058f, 0.005f, 0.07f));
-        Part(_model, new BoxMesh { Size = new Vector3(0.06f, 0.004f, 0.08f) }, _screenMat, new Vector3(0, 0.092f, 0.06f));
-        // carcaça frontal e cano
-        Part(_model, new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.065f, Height = 0.1f, RadialSegments = 10, Rings = 1 }, grey,
-            new Vector3(0, 0.005f, -0.07f), new Vector3(Mathf.Pi / 2, 0, 0));
-        int coils = 3 + tier;
-        for (int i = 0; i < coils; i++)
-            Part(_model, new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.045f, Height = 0.012f, RadialSegments = 10, Rings = 1 }, i % 2 == 0 ? _coilMat : dark,
-                new Vector3(0, 0.005f, -0.135f - i * 0.024f), new Vector3(Mathf.Pi / 2, 0, 0));
-        float barrelLen = 0.1f + coils * 0.024f;
-        Part(_model, new CylinderMesh { TopRadius = 0.028f, BottomRadius = 0.036f, Height = barrelLen, RadialSegments = 10, Rings = 1 }, dark,
-            new Vector3(0, 0.005f, -0.125f - barrelLen / 2), new Vector3(Mathf.Pi / 2, 0, 0));
-        // emissor
-        float muzzleZ = -0.13f - barrelLen;
-        Part(_model, new CylinderMesh { TopRadius = 0.02f, BottomRadius = 0.026f, Height = 0.02f, RadialSegments = 10, Rings = 1 }, _coilMat,
-            new Vector3(0, 0.005f, muzzleZ), new Vector3(Mathf.Pi / 2, 0, 0));
-        _muzzle = new Node3D { Position = new Vector3(0, 0.005f, muzzleZ - 0.02f) };
-        _model.AddChild(_muzzle);
-        // empunhadura + luva
+        // corpo (comum a todas)
+        Part(_model, new BoxMesh { Size = new Vector3(0.11f, 0.1f, 0.2f) * bulk }, orange, new Vector3(0, 0, 0.07f));
+        Part(_model, new BoxMesh { Size = new Vector3(0.125f, 0.05f, 0.16f) * bulk }, orange, new Vector3(0, 0.065f * bulk, 0.05f));
+        Part(_model, new BoxMesh { Size = new Vector3(0.128f, 0.012f, 0.165f) * bulk }, grey, new Vector3(0, 0.035f * bulk, 0.05f));
+        Part(_model, new BoxMesh { Size = new Vector3(0.13f, 0.03f, 0.1f) * bulk }, dark, new Vector3(0, -0.06f, 0.1f));
+        Part(_model, new BoxMesh { Size = new Vector3(0.005f, 0.045f, 0.09f) }, _screenMat, new Vector3(-0.058f * bulk, 0.005f, 0.07f));
+        Part(_model, new BoxMesh { Size = new Vector3(0.06f, 0.004f, 0.08f) }, _screenMat, new Vector3(0, 0.092f * bulk, 0.06f));
+        // empunhadura + luva + manga
         Part(_model, new BoxMesh { Size = new Vector3(0.06f, 0.14f, 0.07f) }, dark, new Vector3(0, -0.1f, 0.1f), new Vector3(-0.3f, 0, 0));
-        Part(_model, new BoxMesh { Size = new Vector3(0.09f, 0.1f, 0.1f) }, glove, new Vector3(0.005f, -0.12f, 0.11f), new Vector3(-0.3f, 0, 0));
-        Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.12f, 0.22f) }, orange, new Vector3(0.02f, -0.2f, 0.26f), new Vector3(-0.55f, 0, 0)); // manga
+        Part(_model, new BoxMesh { Size = new Vector3(0.09f, 0.1f, 0.1f) }, Lit(new Color(0.12f, 0.12f, 0.14f), 0.85f), new Vector3(0.005f, -0.12f, 0.11f), new Vector3(-0.3f, 0, 0));
+        Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.12f, 0.22f) }, orange, new Vector3(0.02f, -0.2f, 0.26f), new Vector3(-0.55f, 0, 0));
         Part(_model, new BoxMesh { Size = new Vector3(0.105f, 0.02f, 0.05f) }, _coilMat, new Vector3(0.02f, -0.155f, 0.18f), new Vector3(-0.55f, 0, 0));
+        if (tier >= 2)
+        {
+            // alça superior de transporte
+            Part(_model, new BoxMesh { Size = new Vector3(0.03f, 0.025f, 0.16f) }, dark, new Vector3(0, 0.15f * bulk, 0.04f));
+            Part(_model, new BoxMesh { Size = new Vector3(0.03f, 0.06f, 0.025f) }, dark, new Vector3(0, 0.12f * bulk, -0.03f));
+            Part(_model, new BoxMesh { Size = new Vector3(0.03f, 0.06f, 0.025f) }, dark, new Vector3(0, 0.12f * bulk, 0.11f));
+        }
+
+        // carcaça frontal
+        Part(_model, new CylinderMesh { TopRadius = 0.06f * bulk, BottomRadius = 0.065f * bulk, Height = 0.1f, RadialSegments = 10, Rings = 1 }, grey, new Vector3(0, 0.005f, -0.07f), rx);
+        float z = -0.125f;
+        switch (tier)
+        {
+            case 0: // Broca Inicial: duas bobinas + ponta cônica
+            case 1: // Cortador de Pulso: três bobinas magenta
+            {
+                int coils = tier == 0 ? 2 : 3;
+                for (int i = 0; i < coils; i++)
+                    Part(_model, new CylinderMesh { TopRadius = 0.047f, BottomRadius = 0.047f, Height = 0.014f, RadialSegments = 10, Rings = 1 }, _coilMat, new Vector3(0, 0.005f, z - 0.012f - i * 0.026f), rx);
+                z -= coils * 0.026f + 0.01f;
+                Part(_model, new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.04f, Height = 0.04f, RadialSegments = 10, Rings = 1 }, dark, new Vector3(0, 0.005f, z - 0.02f), rx);
+                z -= 0.04f;
+                Part(_model, MeshFactory.Spike(8, 0.034f, 0.1f), steel, new Vector3(0, 0.005f, z), new Vector3(-Mathf.Pi / 2, 0, 0));
+                z -= 0.1f;
+                break;
+            }
+            case 2: // Perfurador de Arco: anéis espirais elétricos + broca grande
+            {
+                for (int i = 0; i < 5; i++)
+                    Part(_model, new TorusMesh { InnerRadius = 0.04f, OuterRadius = 0.055f, Rings = 12, RingSegments = 6 }, _coilMat, new Vector3(0, 0.005f, z - 0.015f - i * 0.024f), rx);
+                Part(_model, new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.035f, Height = 0.13f, RadialSegments = 10, Rings = 1 }, dark, new Vector3(0, 0.005f, z - 0.065f), rx);
+                z -= 0.13f;
+                Part(_model, MeshFactory.Spike(8, 0.05f, 0.14f), steel, new Vector3(0, 0.005f, z), new Vector3(-Mathf.Pi / 2, 0, 0));
+                z -= 0.14f;
+                break;
+            }
+            case 3: // Ressonador Cristalino: câmara de vidro com cristais dentro
+            {
+                var glass = new StandardMaterial3D { AlbedoColor = new Color(accent, 0.25f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.05f, EmissionEnabled = true, Emission = accent * 0.3f };
+                Part(_model, new CylinderMesh { TopRadius = 0.058f, BottomRadius = 0.058f, Height = 0.13f, RadialSegments = 12, Rings = 1 }, glass, new Vector3(0, 0.005f, z - 0.065f), rx);
+                for (int i = 0; i < 3; i++)
+                    Part(_model, MeshFactory.CrystalPrism(6, 1, 1, 0.4f), _coilMat, new Vector3(-0.025f + i * 0.025f, -0.035f, z - 0.03f - i * 0.035f)).Scale = new Vector3(0.016f, 0.06f + i * 0.01f, 0.016f);
+                for (int k = 0; k < 2; k++)
+                    Part(_model, new CylinderMesh { TopRadius = 0.064f, BottomRadius = 0.064f, Height = 0.014f, RadialSegments = 12, Rings = 1 }, orange, new Vector3(0, 0.005f, z - k * 0.13f), rx);
+                z -= 0.14f;
+                Part(_model, new CylinderMesh { TopRadius = 0.07f, BottomRadius = 0.03f, Height = 0.04f, RadialSegments = 12, Rings = 1 }, _coilMat, new Vector3(0, 0.005f, z - 0.02f), new Vector3(-Mathf.Pi / 2, 0, 0));
+                z -= 0.04f;
+                break;
+            }
+            case 4: // Lança Prismática: ponta de cristal longa
+            {
+                for (int i = 0; i < 3; i++)
+                    Part(_model, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.05f, Height = 0.016f, RadialSegments = 10, Rings = 1 }, i == 1 ? orange : _coilMat, new Vector3(0, 0.005f, z - 0.012f - i * 0.026f), rx);
+                z -= 0.09f;
+                var lance = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.6f, 0.9f), EmissionEnabled = true, Emission = new Color(1f, 0.45f, 0.85f), EmissionEnergyMultiplier = 1.4f, RimEnabled = true, Rim = 0.8f };
+                Part(_model, MeshFactory.CrystalPrism(6, 1, 1, 0.45f), lance, new Vector3(0, 0.005f, z + 0.02f), new Vector3(-Mathf.Pi / 2, 0, 0)).Scale = new Vector3(0.04f, 0.22f, 0.04f);
+                z -= 0.2f;
+                break;
+            }
+            default: // Quebra-Núcleo: canhão largo com três anéis
+            {
+                Part(_model, new CylinderMesh { TopRadius = 0.075f, BottomRadius = 0.075f, Height = 0.16f, RadialSegments = 12, Rings = 1 }, dark, new Vector3(0, 0.005f, z - 0.08f), rx);
+                for (int i = 0; i < 3; i++)
+                    Part(_model, new TorusMesh { InnerRadius = 0.07f, OuterRadius = 0.088f, Rings = 14, RingSegments = 6 }, _coilMat, new Vector3(0, 0.005f, z - 0.03f - i * 0.05f), rx);
+                z -= 0.16f;
+                Part(_model, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.08f, Height = 0.05f, RadialSegments = 12, Rings = 1 }, orange, new Vector3(0, 0.005f, z - 0.025f), rx);
+                z -= 0.05f;
+                break;
+            }
+        }
+        _muzzle = new Node3D { Position = new Vector3(0, 0.005f, z - 0.01f) };
+        _model.AddChild(_muzzle);
         _model.Rotation = new Vector3(0.1f, 0.32f, 0.06f);
         _model.Scale = Vector3.One * 0.8f;
     }

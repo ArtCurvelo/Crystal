@@ -123,3 +123,4 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - **Raridades** (Comum/Incomum/Raro/Épico/Lendário) com cores e selos no painel do alvo, na Coleção, na venda e nas notificações de descoberta.
 - **Depósitos**: base de duas rochas mescladas + lascas de cristal ao redor.
 - **Otimização**: todos os prismas de um cristal mesclados em uma única malha (UV codifica ângulo/altura para o shader). Draw calls na qualidade Baixa: R1 ~340 → 246, R2 ~308 → 245, R3 ~300 → 210.
+- **6 ferramentas** com modelos distintos (Broca Inicial, Cortador de Pulso, Perfurador de Arco, Ressonador Cristalino, Lança Prismática, Quebra-Núcleo), trocando por nível de Potência (0/3/7/12/18/24). Tour gera folha comparativa `tools_sheet.png`.

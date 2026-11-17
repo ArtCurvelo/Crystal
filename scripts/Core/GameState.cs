@@ -80,12 +80,12 @@ public partial class GameState : Node
         get
         {
             int l = Data.Level(UpgradeIds.Damage);
-            return l >= 24 ? 4 : l >= 16 ? 3 : l >= 9 ? 2 : l >= 4 ? 1 : 0;
+            return l >= 24 ? 5 : l >= 18 ? 4 : l >= 12 ? 3 : l >= 7 ? 2 : l >= 3 ? 1 : 0;
         }
     }
 
     public static readonly string[] ToolTierNames =
-        { "Escavadeira de Feixe", "Escavadeira Pulsar", "Feixe Prismático", "Perfurador Solar", "Ressonador Ancestral" };
+        { "Broca Inicial", "Cortador de Pulso", "Perfurador de Arco", "Ressonador Cristalino", "Lança Prismática", "Quebra-Núcleo" };
 
     // ================= Inventário =================
     public int InventoryCount => Data.Inventory.Values.Sum();
