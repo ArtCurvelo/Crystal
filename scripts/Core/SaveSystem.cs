@@ -32,7 +32,7 @@ public static class SaveSystem
             string tmp = SavePath + ".tmp";
             using (var f = FileAccess.Open(tmp, FileAccess.ModeFlags.Write))
             {
-                if (f == null) { GD.PushError($"Save: não foi possível abrir {tmp}: {FileAccess.GetOpenError()}"); return false; }
+                if (f == null) { GD.PushError($"Salvamento: não foi possível abrir {tmp}: {FileAccess.GetOpenError()}"); return false; }
                 f.StoreString(json);
             }
             string abs = ProjectSettings.GlobalizePath(SavePath);
@@ -48,7 +48,7 @@ public static class SaveSystem
         }
         catch (Exception e)
         {
-            GD.PushError($"Save falhou: {e.Message}");
+            GD.PushError($"Falha ao salvar: {e.Message}");
             return false;
         }
     }
@@ -58,7 +58,7 @@ public static class SaveSystem
     {
         message = "";
         if (TryLoadFile(SavePath, out var data)) return data;
-        if (FileAccess.FileExists(SavePath)) message = "Save principal corrompido. ";
+        if (FileAccess.FileExists(SavePath)) message = "Arquivo de salvamento principal corrompido. ";
         if (TryLoadFile(BackupPath, out data))
         {
             message += "Backup restaurado.";
@@ -109,7 +109,7 @@ public static class SaveSystem
         if (d.Version <= 0) d.Version = 1;
         // Futuro: if (d.Version < 2) { ... }
         if (d.Version > SaveData.CurrentVersion)
-            GD.Print($"[Save] Versão mais nova ({d.Version}); carregando em modo compatível.");
+            GD.Print($"[Salvamento] Versão mais nova ({d.Version}); carregando em modo compatível.");
     }
 
     public static void Delete()

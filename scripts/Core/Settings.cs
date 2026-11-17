@@ -87,7 +87,7 @@ public static class Settings
             Data.Quality = (int)GraphicsQuality.Low;
             Data.RenderScale = 0.85f;
         }
-        GD.Print($"[Settings] GPU: '{gpu}' → qualidade {(GraphicsQuality)Data.Quality}");
+        GD.Print($"[Configurações] GPU: '{gpu}' → qualidade {(GraphicsQuality)Data.Quality}");
     }
 
     public static void Save()
