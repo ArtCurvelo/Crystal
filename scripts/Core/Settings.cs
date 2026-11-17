@@ -20,6 +20,7 @@ public sealed class SettingsData
     public float RenderScale { get; set; } = 1f;
     public bool ShowFps { get; set; }
     public int MaxFps { get; set; } = 60;
+    public int WindowSize { get; set; } = 0; // índice em Settings.WindowSizes
 
     public void Sanitize()
     {
@@ -32,6 +33,7 @@ public sealed class SettingsData
         SfxVolume = ok(SfxVolume, 0f, 1f, 0.9f);
         RenderScale = ok(RenderScale, 0.5f, 1f, 1f);
         Quality = Math.Clamp(Quality, 0, 2);
+        WindowSize = Math.Clamp(WindowSize, 0, Settings.WindowSizes.Length - 1);
         if (MaxFps != 0) MaxFps = Math.Clamp(MaxFps, 30, 240);
     }
 }
@@ -44,6 +46,7 @@ public static class Settings
     public static event Action Changed;
 
     public static GraphicsQuality Quality => (GraphicsQuality)Data.Quality;
+    public static readonly Vector2I[] WindowSizes = { new(1280, 720), new(1366, 768), new(1600, 900), new(1920, 1080) };
 
     /// <summary>True quando as configurações foram criadas agora (primeira execução).</summary>
     public static bool FirstRun { get; private set; }
@@ -106,6 +109,18 @@ public static class Settings
         {
             var mode = Data.Fullscreen ? DisplayServer.WindowMode.Fullscreen : DisplayServer.WindowMode.Windowed;
             if (DisplayServer.WindowGetMode() != mode) DisplayServer.WindowSetMode(mode);
+            if (!Data.Fullscreen)
+            {
+                var size = WindowSizes[Data.WindowSize];
+                var screen = DisplayServer.ScreenGetUsableRect();
+                // não maior que a tela disponível
+                size = new Vector2I(Math.Min(size.X, screen.Size.X), Math.Min(size.Y, screen.Size.Y));
+                if (DisplayServer.WindowGetSize() != size)
+                {
+                    DisplayServer.WindowSetSize(size);
+                    DisplayServer.WindowSetPosition(screen.Position + (screen.Size - size) / 2);
+                }
+            }
             DisplayServer.WindowSetVsyncMode(Data.VSync ? DisplayServer.VSyncMode.Enabled : DisplayServer.VSyncMode.Disabled);
         }
         Engine.MaxFps = Data.MaxFps;

@@ -283,8 +283,9 @@ public partial class TestRunner : Node
 
     void TestSettings()
     {
-        var s = new SettingsData { MouseSensitivity = float.NaN, Fov = 500, MasterVolume = -3, Quality = 9, RenderScale = 0 };
+        var s = new SettingsData { MouseSensitivity = float.NaN, Fov = 500, MasterVolume = -3, Quality = 9, RenderScale = 0, WindowSize = 42 };
         s.Sanitize();
+        Check(s.WindowSize == Settings.WindowSizes.Length - 1, "resolução inválida deve ser limitada");
         Check(s.MouseSensitivity > 0 && s.Fov <= 100 && s.MasterVolume == 0 && s.Quality == 2 && s.RenderScale >= 0.5f, "configurações saneadas");
     }
 

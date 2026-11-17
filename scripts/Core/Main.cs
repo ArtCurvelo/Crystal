@@ -263,6 +263,7 @@ public partial class Main : Node
 
     public void OpenCodexForTour() => _codex.Open();
     public void OpenHelpForTour() => _help.Open();
+    public void OpenSettingsForTour() => _settings.Open();
 
     bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen;
 

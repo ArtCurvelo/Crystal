@@ -77,10 +77,12 @@ public partial class SettingsScreen : ModalScreen
         BuildFrame("CONFIGURAÇÕES", new Vector2(620, 0), UiTheme.Cyan);
         Layer = 20;
         var d = Settings.Data;
-        var grid = new GridContainer { Columns = 2 };
+        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 470), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        Body.AddChild(scroll);
+        var grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 24);
-        grid.AddThemeConstantOverride("v_separation", 10);
-        Body.AddChild(grid);
+        grid.AddThemeConstantOverride("v_separation", 6);
+        scroll.AddChild(grid);
 
         AddSlider(grid, "Sensibilidade do mouse", 0.02f, 1.0f, 0.01f, d.MouseSensitivity, v => d.MouseSensitivity = v, v => $"{v * 100:0}");
         AddSlider(grid, "Campo de visão", 60, 100, 1, d.Fov, v => d.Fov = v, v => $"{v:0}°");
@@ -90,7 +92,7 @@ public partial class SettingsScreen : ModalScreen
         AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v => d.RenderScale = v, v => $"{v * 100:0}%");
 
         grid.AddChild(UiTheme.Label("Qualidade gráfica", 18));
-        var q = new OptionButton { CustomMinimumSize = new Vector2(260, 40) };
+        var q = new OptionButton { CustomMinimumSize = new Vector2(260, 34) };
         q.AddItem("Baixa (PCs modestos)", 0);
         q.AddItem("Média", 1);
         q.AddItem("Alta", 2);
@@ -98,8 +100,15 @@ public partial class SettingsScreen : ModalScreen
         q.ItemSelected += i => { d.Quality = (int)i; Changed(); GameState.Instance.Notify("Qualidade alterada", "Alguns efeitos são aplicados ao reiniciar a partida.", NotifyKind.Info); };
         grid.AddChild(q);
 
+        grid.AddChild(UiTheme.Label("Resolução da janela", 18));
+        var res = new OptionButton { CustomMinimumSize = new Vector2(260, 34) };
+        foreach (var sz in Settings.WindowSizes) res.AddItem($"{sz.X} × {sz.Y}" + (sz.Y == 720 ? " (recomendado p/ PCs modestos)" : ""));
+        res.Selected = d.WindowSize;
+        res.ItemSelected += i => { d.WindowSize = (int)i; Changed(); };
+        grid.AddChild(res);
+
         grid.AddChild(UiTheme.Label("Limite de FPS", 18));
-        var fps = new OptionButton { CustomMinimumSize = new Vector2(260, 40) };
+        var fps = new OptionButton { CustomMinimumSize = new Vector2(260, 34) };
         int[] fpsVals = { 30, 60, 120, 0 };
         foreach (var f in fpsVals) fps.AddItem(f == 0 ? "Ilimitado" : f.ToString());
         fps.Selected = Math.Max(0, Array.IndexOf(fpsVals, d.MaxFps));
@@ -112,7 +121,6 @@ public partial class SettingsScreen : ModalScreen
         AddCheck(grid, "Mostrar FPS (F3)", d.ShowFps, v => d.ShowFps = v);
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
-        Body.AddChild(UiTheme.Spacer(6));
         Body.AddChild(footer);
         footer.AddChild(UiTheme.Button("Voltar", Close, 180));
     }
@@ -139,7 +147,9 @@ public partial class SettingsScreen : ModalScreen
     void AddCheck(GridContainer g, string label, bool value, Action<bool> set)
     {
         g.AddChild(UiTheme.Label(label, 18));
-        var c = new CheckButton { ButtonPressed = value };
+        var c = new CheckButton { ButtonPressed = value, SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin };
+        foreach (var st in new[] { "normal", "hover", "pressed", "hover_pressed", "focus", "disabled" })
+            c.AddThemeStyleboxOverride(st, new StyleBoxEmpty());
         c.Toggled += x => { set(x); AudioManager.Instance?.Play("click", -6f); Changed(); };
         g.AddChild(c);
     }

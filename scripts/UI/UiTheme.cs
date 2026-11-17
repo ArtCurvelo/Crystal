@@ -6,7 +6,7 @@ namespace CrystalExcavator.UI;
 /// <summary>Identidade visual da interface: paleta, estilos e fábricas de controles.</summary>
 public static class UiTheme
 {
-    public static readonly Color Bg = new(0.03f, 0.05f, 0.1f, 0.95f);
+    public static readonly Color Bg = new(0.03f, 0.05f, 0.1f, 0.99f);
     public static readonly Color BgSoft = new(0.05f, 0.08f, 0.14f, 0.9f);
     public static readonly Color Card = new(0.06f, 0.1f, 0.17f, 0.95f);
     public static readonly Color CardHover = new(0.09f, 0.15f, 0.24f, 0.98f);
