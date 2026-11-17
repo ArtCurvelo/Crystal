@@ -14,3 +14,8 @@ ATUALIZAR (sem reinstalar)
 - Use CrystalExcavator-Atualizacao.exe (cerca de 4 MB): ele troca só os arquivos que mudaram.
   Feche o jogo, dê dois cliques, Avançar > Concluir. Saves e configurações são mantidos.
 - O instalador completo (Setup) só é necessário na primeira vez ou quando a versão do motor Godot mudar.
+
+ATUALIZAÇÃO AUTOMÁTICA (a partir da v0.2.1)
+- Ao abrir, o jogo verifica se há versão nova e mostra "Nova versão disponível".
+  Clique em "Atualizar agora": ele baixa, fecha, aplica e reabre sozinho.
+- Pode ser desligada em Configurações > "Procurar atualizações ao iniciar".
