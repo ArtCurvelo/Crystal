@@ -93,3 +93,12 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - `run_tests.sh`: 115 verificações, 0 falhas.
 - `run_bot.sh`: SUCESSO (Região 2 em 10,4 min, Região 3 em 36,5 min, Coração em 41,9 min; caminhada completa sem travar).
 - Tour de capturas: sem erros. Maré Gélida verificada visualmente (névoa reduzida após a primeira captura ficar opaca demais).
+- **Teste de áudio:** pico de cada um dos 17 sons sintetizados. Detectou saturação no som do pulso de ressonância (pico 1,00, com distorção); corrigido para 0,71.
+- **Métricas de renderização** (tour, 720p):
+  | Qualidade | Draw calls | Primitivas | FPS em software* |
+  |---|---|---|---|
+  | Baixa | 201–271 | 14–21 mil | 30–37 |
+  | Alta | 194–389 | 18–35 mil | 16–21 |
+
+  \*llvmpipe na CPU; não representa a GPU real. Os números de draw calls e primitivas são leves para uma Intel HD 4400.
+- `run_tests.sh`: 150 verificações, 0 falhas.

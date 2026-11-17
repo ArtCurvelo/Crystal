@@ -97,6 +97,21 @@ public partial class AudioManager : Node
         tw.Chain().TweenCallback(Callable.From(() => { if (from.VolumeDb < -50) from.Stop(); }));
     }
 
+    /// <summary>Pico absoluto (0..1) de cada efeito sintetizado — usado nos testes para detectar saturação.</summary>
+    public System.Collections.Generic.Dictionary<string, float> PeakLevels()
+    {
+        var r = new System.Collections.Generic.Dictionary<string, float>();
+        foreach (var kv in _sounds)
+        {
+            var d = kv.Value.Data;
+            int peak = 0;
+            for (int i = 0; i + 1 < d.Length; i += 2)
+                peak = Math.Max(peak, Math.Abs((int)(short)(d[i] | (d[i + 1] << 8))));
+            r[kv.Key] = peak / 32000f;
+        }
+        return r;
+    }
+
     // ===================== Síntese =====================
     void BuildSounds()
     {
@@ -154,7 +169,7 @@ public partial class AudioManager : Node
             float boom = MathF.Sin(Tau * (70 - t * 30) * t) * MathF.Exp(-t * 4f) * 0.7f;
             float sweep = MathF.Sin(Tau * (600 + t * 2400) * t) * MathF.Exp(-t * 3.5f) * 0.25f;
             float shimmer = MathF.Sin(Tau * 2637 * t) * MathF.Sin(Tau * 7 * t) * MathF.Exp(-t * 2.5f) * 0.12f;
-            return boom + sweep + shimmer + Noise() * MathF.Exp(-t * 25f) * 0.3f;
+            return (boom + sweep + shimmer + Noise() * MathF.Exp(-t * 25f) * 0.3f) * 0.62f;
         });
         _sounds["charged"] = Synth(0.25f, (t, i) => (MathF.Sin(Tau * 1760 * t) + MathF.Sin(Tau * 2217 * t)) * MathF.Exp(-t * 10f) * 0.18f);
         _sounds["step"] = Synth(0.08f, (t, i) => Noise() * MathF.Exp(-t * 60f) * 0.12f);

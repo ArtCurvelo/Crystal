@@ -41,6 +41,7 @@ public partial class TestRunner : Node
             Run("Save com dados inválidos é saneado", TestSanitize);
             Run("Compatibilidade com save antigo", TestOldSave);
             Run("Configurações inválidas", TestSettings);
+            Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
@@ -280,6 +281,18 @@ public partial class TestRunner : Node
         var s = new SettingsData { MouseSensitivity = float.NaN, Fov = 500, MasterVolume = -3, Quality = 9, RenderScale = 0 };
         s.Sanitize();
         Check(s.MouseSensitivity > 0 && s.Fov <= 100 && s.MasterVolume == 0 && s.Quality == 2 && s.RenderScale >= 0.5f, "configurações saneadas");
+    }
+
+    void TestAudio()
+    {
+        var peaks = Audio.AudioManager.Instance.PeakLevels();
+        Check(peaks.Count >= 15, "efeitos sonoros sintetizados");
+        foreach (var kv in peaks)
+        {
+            GD.Print($"      som '{kv.Key}': pico {kv.Value:0.00}");
+            Check(kv.Value < 0.99f, $"som '{kv.Key}' satura (pico {kv.Value:0.00})");
+            Check(kv.Value > 0.05f, $"som '{kv.Key}' quase inaudível (pico {kv.Value:0.00})");
+        }
     }
 
     // ---------------------------------------------------------------

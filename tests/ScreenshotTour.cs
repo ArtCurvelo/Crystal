@@ -54,6 +54,7 @@ public partial class ScreenshotTour : Node
         await Wait(2f);
         await Shot("05_region1");
         float fps1 = (float)Engine.GetFramesPerSecond();
+        string dc1 = DrawStats();
 
         // loja e venda
         gs.AddMoney(5000);
@@ -91,6 +92,7 @@ public partial class ScreenshotTour : Node
         await Shot("09b_event_depths");
         Main.Events.Stop();
         float fps2 = (float)Engine.GetFramesPerSecond();
+        string dc2 = DrawStats();
 
         // região 3 e o Coração Ancestral
         p.GlobalPosition = new Vector3(0, 0.1f, -100);
@@ -98,6 +100,7 @@ public partial class ScreenshotTour : Node
         await Wait(3f);
         await Shot("10_region3");
         float fps3 = (float)Engine.GetFramesPerSecond();
+        string dc3 = DrawStats();
 
         var heart = Main.World.Crystals.First(x => x.Material.Special);
         p.GlobalPosition = heart.GlobalPosition + new Vector3(0, 0, 4.2f);
@@ -117,8 +120,17 @@ public partial class ScreenshotTour : Node
         await Shot("13_codex");
 
         GD.Print($"[Tour] FPS (software, Xvfb): R1={fps1:0} R2={fps2:0} R3={fps3:0}");
+        GD.Print($"[Tour] Qualidade {Settings.Quality} | R1: {dc1} | R2: {dc2} | R3: {dc3}");
         SaveSystem.Delete();
         GetTree().Quit();
+    }
+
+    static string DrawStats()
+    {
+        var draws = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
+        var objs = Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame);
+        var prims = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
+        return $"{draws:0} draw calls, {objs:0} objetos, {prims / 1000:0}k primitivas";
     }
 
     async Task Wait(float s)
