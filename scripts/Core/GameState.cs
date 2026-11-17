@@ -59,7 +59,10 @@ public partial class GameState : Node
 
     // ================= Estatísticas derivadas dos upgrades =================
     public float StatValue(string id) => GameData.Upgrades[id].ValueAt(Data.Level(id));
-    public float Damage => StatValue(UpgradeIds.Damage);
+    /// <summary>Multiplicadores temporários de eventos de região (não persistem).</summary>
+    public float EventDamageMultiplier { get; set; } = 1f;
+    public float EventShardMultiplier { get; set; } = 1f;
+    public float Damage => StatValue(UpgradeIds.Damage) * EventDamageMultiplier;
     public float SwingsPerSecond => StatValue(UpgradeIds.Speed);
     public float SwingInterval => 1f / SwingsPerSecond;
     public int Capacity => (int)StatValue(UpgradeIds.Capacity);

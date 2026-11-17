@@ -13,6 +13,10 @@ namespace CrystalExcavator.UI;
 public partial class Hud : CanvasLayer
 {
     public PlayerController Player;
+    public World.RegionEvents Events;
+    PanelContainer _eventPanel;
+    Label _eventTitle, _eventDesc;
+    ProgressBar _eventBar;
 
     Label _money, _moneyGain, _capLabel, _prompt, _targetName, _targetInfo, _regionTitle, _regionSub, _fps, _objective, _stats;
     ProgressBar _capBar, _targetHp;
@@ -100,6 +104,20 @@ public partial class Hud : CanvasLayer
         _regionSub = UiTheme.Shadowed(UiTheme.Label("", 20, UiTheme.Text, false, HorizontalAlignment.Center), 6);
         _regionBanner.AddChild(_regionTitle);
         _regionBanner.AddChild(_regionSub);
+
+        // ---------- Evento de região (topo, centro) ----------
+        _eventPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        UiTheme.Place(_eventPanel, Control.LayoutPreset.CenterTop, new Vector2(-200, 18), new Vector2(400, 0));
+        root.AddChild(_eventPanel);
+        var ev = new VBoxContainer();
+        ev.AddThemeConstantOverride("separation", 2);
+        _eventPanel.AddChild(ev);
+        _eventTitle = UiTheme.Label("", 20, UiTheme.Text, true, HorizontalAlignment.Center);
+        _eventDesc = UiTheme.Label("", 14, UiTheme.Text, false, HorizontalAlignment.Center);
+        _eventBar = new ProgressBar { CustomMinimumSize = new Vector2(370, 6), ShowPercentage = false, MaxValue = 1, Step = 0.001 };
+        ev.AddChild(_eventTitle);
+        ev.AddChild(_eventDesc);
+        ev.AddChild(_eventBar);
 
         // ---------- Notificações (direita) ----------
         _notifs = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -339,6 +357,7 @@ public partial class Hud : CanvasLayer
         }
         else _capBar.Modulate = Colors.White;
 
+        UpdateEventPanel();
         _fps.Visible = Settings.Data.ShowFps;
         if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS";
 
@@ -377,6 +396,27 @@ public partial class Hud : CanvasLayer
     }
 
     public void SetGameplayVisible(bool v) => Visible = v;
+
+    World.RegionEvents.EventDef _shownEvent;
+
+    void UpdateEventPanel()
+    {
+        var a = Events?.Active;
+        if (a == null) { _eventPanel.Visible = false; _shownEvent = null; return; }
+        if (a != _shownEvent)
+        {
+            _shownEvent = a;
+            _eventPanel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.04f, 0.03f, 0.08f, 0.8f), a.Color, 10, 2, 12));
+            _eventTitle.Text = a.Name.ToUpper();
+            _eventTitle.AddThemeColorOverride("font_color", a.Color);
+            _eventDesc.Text = a.Description;
+            var fill = UiTheme.Box(a.Color, new Color(0, 0, 0, 0), 3, 0, 0); fill.ShadowSize = 0;
+            _eventBar.AddThemeStyleboxOverride("fill", fill);
+            _eventPanel.Visible = true;
+            UiTheme.PopIn(_eventPanel);
+        }
+        _eventBar.Value = a.Duration > 0 ? Events.Remaining / a.Duration : 0;
+    }
 }
 
 /// <summary>Mira desenhada por código: anel de progresso de dano e indicador de cadência.</summary>

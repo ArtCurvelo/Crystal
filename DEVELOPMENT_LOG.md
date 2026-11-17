@@ -74,3 +74,22 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 1. Receber o resultado do diretor rodando o `.exe` no Windows (abre? FPS com F3 na qualidade Baixa a 720p?).
 2. ~~Configurar o repositório remoto~~ feito: https://github.com/ArtCurvelo/Crystal (`main`).
 3. Continuar o polimento (Sessões 4–5): condições ambientais com impacto no jogo, refinamento de áudio e animações.
+
+---
+
+## Sessão 2 — condições ambientais e qualidade
+- **Tempo:** _aguardando atualização do diretor_ (último informado: 29 min consumidos às 01:20).
+- **Repositório:** https://github.com/ArtCurvelo/Crystal, com clone do diretor em `C:\Users\silvi\Documents\Crystal`.
+
+### Concluído (e testado)
+- **Eventos ambientais por região** (`World/RegionEvents.cs`), com efeito real no jogo e painel com contagem no topo do HUD:
+  - Cavernas Luminosas, **Eco Luminoso**: todos os cristais quebrados da caverna renascem de uma vez.
+  - Profundezas Prismáticas, **Maré Gélida** (22 s): névoa gelada densa e fragmentos x2.
+  - Núcleo Ancestral, **Surto do Núcleo** (18 s): ambiente incandescente e dano +50%.
+  - O primeiro evento ocorre aos 45 s de jogo; os seguintes a cada 70–110 s. O evento termina se o jogador sair da região.
+- Teste de integração dos eventos (multiplicadores ligam e desligam; renascimento).
+
+### Testes
+- `run_tests.sh`: 115 verificações, 0 falhas.
+- `run_bot.sh`: SUCESSO (Região 2 em 10,4 min, Região 3 em 36,5 min, Coração em 41,9 min; caminhada completa sem travar).
+- Tour de capturas: sem erros. Maré Gélida verificada visualmente (névoa reduzida após a primeira captura ficar opaca demais).

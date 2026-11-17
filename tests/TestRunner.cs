@@ -44,6 +44,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
+            await RunAsync("Integração: eventos de região", TestRegionEvents);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -418,6 +419,55 @@ public partial class TestRunner : Node
         Check(pulses >= 1, "segurar o ritmo deve disparar um pulso");
         Check(hitCount >= 2, $"pulso deve atingir o alvo e vizinhos (atingiu {hitCount})");
         Check(neighbors.Any(n => n.Hp < n.MaxHp), "vizinho deve receber dano do pulso");
+        root.QueueFree();
+        await Frames(2);
+    }
+
+    async Task TestRegionEvents()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var env = new EnvironmentController();
+        root.AddChild(env);
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        RegionDef region = GameData.Regions[1];
+        var ev = new RegionEvents { Env = env, World = world, CurrentRegion = () => region };
+        root.AddChild(ev);
+        await Frames(3);
+        float baseDmg = GS.Damage;
+
+        ev.Begin("depths");
+        Check(ev.Active != null && GS.EventShardMultiplier == 2f, "Maré Gélida deve dobrar fragmentos");
+        var sapph = world.Crystals.First(c => c.Material.Id == "sapphire" || c.Material.Id == "emerald");
+        int before = ShardManager.Instance.ActiveCount;
+        while (sapph.IsMineable) sapph.Hit(1e6f, sapph.GlobalPosition, Vector3.Up);
+        int spawned = ShardManager.Instance.ActiveCount - before;
+        int maxNormal = (int)MathF.Round(sapph.Material.ShardsMax * sapph.SizeScale);
+        Check(spawned > maxNormal, $"fragmentos com evento ({spawned}) devem superar o máximo normal ({maxNormal})");
+        GS.IsPlaying = true;
+        region = GameData.Regions[0]; // jogador sai da região → evento termina
+        await Frames(3);
+        Check(ev.Active == null && GS.EventShardMultiplier == 1f, "evento deve terminar ao sair da região");
+
+        region = GameData.Regions[2];
+        ev.Begin("core");
+        Check(Mathf.IsEqualApprox(GS.Damage, baseDmg * 1.5f), "Surto do Núcleo deve dar +50% de dano");
+        ev.Stop();
+        Check(Mathf.IsEqualApprox(GS.Damage, baseDmg), "dano volta ao normal após o evento");
+
+        var cave = world.Crystals.First(c => c.GetParent() == world.RegionRoots[0]);
+        while (cave.IsMineable) cave.Hit(1e6f, cave.GlobalPosition, Vector3.Up);
+        Check(cave.State == Crystal.CrystalState.Broken, "cristal da caverna quebrado");
+        region = GameData.Regions[0];
+        ev.Begin("caves");
+        await Frames(100);
+        Check(cave.State == Crystal.CrystalState.Active, "Eco Luminoso deve fazer o cristal renascer");
+        ev.Stop();
+        GS.IsPlaying = false;
         root.QueueFree();
         await Frames(2);
     }

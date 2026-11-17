@@ -46,6 +46,13 @@ public partial class EnvironmentController : WorldEnvironment
         Environment.GlowIntensity = q == GraphicsQuality.High ? 0.85f : 0.65f;
     }
 
+    /// <summary>Sobreposição temporária de evento (névoa/cor/energia). Intensidade 0 = desligado.</summary>
+    public float OverlayAmount;
+    public Color OverlayFog = Colors.White;
+    public float OverlayFogDensity;
+    public Color OverlayAmbient = Colors.White;
+    float _overlay;
+
     public void SetRegion(RegionDef r, bool instant = false)
     {
         _target = r;
@@ -64,16 +71,17 @@ public partial class EnvironmentController : WorldEnvironment
         _fog = _fog.Lerp(_target.FogColor, k);
         _energy = Mathf.Lerp(_energy, _target.AmbientEnergy, k);
         _density = Mathf.Lerp(_density, _target.FogDensity, k);
+        _overlay = Mathf.MoveToward(_overlay, OverlayAmount, (float)delta * 0.6f);
         Push();
     }
 
     void Push()
     {
         var e = Environment;
-        e.AmbientLightColor = _ambient;
+        e.AmbientLightColor = _ambient.Lerp(OverlayAmbient, _overlay * 0.6f);
         e.AmbientLightEnergy = _energy * (Settings.Quality == GraphicsQuality.Low ? 1.25f : 1f);
-        e.FogLightColor = _fog;
-        e.FogDensity = _density;
+        e.FogLightColor = _fog.Lerp(OverlayFog, _overlay);
+        e.FogDensity = Mathf.Lerp(_density, OverlayFogDensity, _overlay);
         e.BackgroundColor = _fog.Darkened(0.5f);
     }
 }

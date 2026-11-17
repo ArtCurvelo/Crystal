@@ -21,6 +21,7 @@ public partial class Main : Node
     public WorldBuilder World { get; private set; }
     public PlayerController Player { get; private set; }
     public Hud Hud { get; private set; }
+    public RegionEvents Events { get; private set; }
     EnvironmentController _env;
     ShardManager _shards;
     Camera3D _menuCam;
@@ -55,10 +56,12 @@ public partial class Main : Node
         world3d.AddChild(_shards);
         World = new WorldBuilder { Name = "World" };
         world3d.AddChild(World);
+        Events = new RegionEvents { Name = "RegionEvents", Env = _env, World = World, CurrentRegion = () => _currentRegion };
+        world3d.AddChild(Events);
         _menuCam = new Camera3D { Current = true, Fov = 70, Far = 120 };
         world3d.AddChild(_menuCam);
 
-        Hud = new Hud { Visible = false };
+        Hud = new Hud { Visible = false, Events = Events };
         AddChild(Hud);
         _menu = new MainMenu
         {
@@ -129,6 +132,7 @@ public partial class Main : Node
     {
         CurrentMode = Mode.Menu;
         GameState.Instance.IsPlaying = false;
+        Events?.ResetAll();
         GetTree().Paused = false;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         Hud.Visible = false;
@@ -154,6 +158,7 @@ public partial class Main : Node
         else { SaveSystem.Delete(); gs.NewGame(); }
 
         _shards.ClearAll();
+        Events.ResetAll();
         if (Player == null)
         {
             Player = new PlayerController { Name = "Player" };

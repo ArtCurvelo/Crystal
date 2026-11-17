@@ -221,6 +221,7 @@ public partial class Crystal : StaticBody3D
 
         int shards = _rng.Next(Material.ShardsMin, Material.ShardsMax + 1);
         if (!Material.Special) shards = Math.Max(1, (int)MathF.Round(shards * SizeScale));
+        shards = (int)MathF.Round(shards * (GameState.Instance?.EventShardMultiplier ?? 1f));
         ShardManager.Instance?.SpawnShards(Material, center, shards);
         GameState.Instance?.RecordCrystalMined();
 

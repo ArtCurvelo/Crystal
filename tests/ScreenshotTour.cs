@@ -86,6 +86,10 @@ public partial class ScreenshotTour : Node
         p.SetLook(0, 0);
         await Wait(3f);
         await Shot("09_region2");
+        Main.Events.Begin("depths");
+        await Wait(2.5f);
+        await Shot("09b_event_depths");
+        Main.Events.Stop();
         float fps2 = (float)Engine.GetFramesPerSecond();
 
         // região 3 e o Coração Ancestral
