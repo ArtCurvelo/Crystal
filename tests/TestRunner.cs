@@ -43,6 +43,7 @@ public partial class TestRunner : Node
             Run("Configurações inválidas", TestSettings);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
+            Run("Atualização automática", TestUpdater);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -342,6 +343,33 @@ public partial class TestRunner : Node
         // migração: save antigo concluído, sem RunEarned
         Check(SaveSystem.TryParse(@"{ ""TotalEarned"": 1000000, ""GameCompleted"": true }", out var old) && old.RunEarned == 1000000, "save antigo usa o total ganho como partida atual");
         Fresh();
+    }
+
+    void TestUpdater()
+    {
+        Check(UpdateManager.IsNewer("0.2.1", "0.2.0") && UpdateManager.IsNewer("0.10.0", "0.9.9") && UpdateManager.IsNewer("1.0.0", "0.99.99"), "versões mais novas detectadas");
+        Check(!UpdateManager.IsNewer("0.2.0", "0.2.0") && !UpdateManager.IsNewer("0.1.9", "0.2.0") && !UpdateManager.IsNewer("lixo", "0.2.0"), "versões iguais/antigas/inválidas ignoradas");
+        string h = new string('a', 64);
+        string ok = $@"{{""version"":""0.3.0"",""engine"":""4.5.1"",""files"":[{{""path"":""CrystalExcavator.pck"",""url"":""https://x/y.pck"",""sha256"":""{h}"",""size"":10}}]}}";
+        var m = UpdateManager.ParseManifest(ok);
+        Check(m != null && m.Version == "0.3.0" && m.Files.Count == 1, "manifesto válido aceito");
+        Check(UpdateManager.ParseManifest(ok.Replace("CrystalExcavator.pck", "../../Windows/x.dll")) == null, "caminho fora da pasta do jogo recusado");
+        Check(UpdateManager.ParseManifest(ok.Replace("CrystalExcavator.pck", "C:/x.pck")) == null, "caminho absoluto recusado");
+        Check(UpdateManager.ParseManifest(ok.Replace("https://", "http://")) == null, "URL sem HTTPS recusada");
+        Check(UpdateManager.ParseManifest(ok.Replace(h, "abc")) == null, "hash inválido recusado");
+        Check(UpdateManager.ParseManifest("{ quebrado") == null && UpdateManager.ParseManifest(@"{""version"":""1.0.0"",""files"":[]}") == null, "manifesto inválido/vazio recusado");
+        // SHA-256 e script de aplicação
+        string dir = ProjectSettings.GlobalizePath("user://test_update");
+        System.IO.Directory.CreateDirectory(dir);
+        string f = System.IO.Path.Combine(dir, "a.bin");
+        System.IO.File.WriteAllText(f, "abc");
+        Check(UpdateManager.Sha256Of(f) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256 correto");
+        var files = new List<UpdateFile> { new() { Path = "CrystalExcavator.pck" }, new() { Path = "data_CrystalExcavator_windows_x86_64/CrystalExcavator.dll" } };
+        string bat = System.IO.File.ReadAllText(UpdateManager.WriteApplyScript(dir, @"C:\Jogo", @"C:\Jogo\CrystalExcavator.exe", files, 1234));
+        Check(bat.Contains("PID eq 1234") && bat.Contains(@"C:\Jogo\data_CrystalExcavator_windows_x86_64\CrystalExcavator.dll") && bat.Contains("start \"\" \"C:\\Jogo\\CrystalExcavator.exe\"") && bat.Contains("\r\n"),
+            "script de aplicação espera o jogo fechar, copia os arquivos e reabre");
+        Check(!UpdateManager.Supported, "verificação desativada fora do executável Windows");
+        System.IO.Directory.Delete(dir, true);
     }
 
     void TestAudio()

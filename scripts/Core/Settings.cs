@@ -21,6 +21,8 @@ public sealed class SettingsData
     public bool ShowFps { get; set; }
     /// <summary>Ajusta a resolução 3D automaticamente para manter ~30 FPS.</summary>
     public bool DynamicResolution { get; set; } = true;
+    /// <summary>Procurar atualizações ao iniciar o jogo.</summary>
+    public bool CheckUpdates { get; set; } = true;
     public int MaxFps { get; set; } = 60;
     public int WindowSize { get; set; } = 0; // índice em Settings.WindowSizes
 

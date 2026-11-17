@@ -145,6 +145,7 @@ public partial class SettingsScreen : ModalScreen
         AddCheck(grid, "Inverter eixo Y", d.InvertY, v => d.InvertY = v);
         AddCheck(grid, "Mostrar FPS (F3)", d.ShowFps, v => d.ShowFps = v);
         AddCheck(grid, "Resolução dinâmica (mantém ~30 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
+        AddCheck(grid, "Procurar atualizações ao iniciar", d.CheckUpdates, v => d.CheckUpdates = v);
 
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);
@@ -448,5 +449,89 @@ public partial class CompletionScreen : ModalScreen
             $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}\n" +
             $"Materiais descobertos: {d.Discovered.Count}/{GameData.Materials.Count}   ·   Melhorias no máximo: {maxed}/{UpgradeIds.All.Length}\n" +
             $"Ferramenta: {GameState.ToolTierNames[GameState.Instance.ToolTier]}";
+    }
+}
+
+// =====================================================================
+/// <summary>Aviso de nova versão com download e aplicação automáticos.</summary>
+public partial class UpdateScreen : ModalScreen
+{
+    public UpdateManager Updater;
+    Label _title, _notes, _status;
+    ProgressBar _bar;
+    Button _updateBtn, _laterBtn;
+
+    public override void _Ready()
+    {
+        BuildFrame("", new Vector2(600, 0), UiTheme.Cyan);
+        Layer = 40;
+        var icon = HudIcon.Make(HudIcon.Kind.Gem, UiTheme.Cyan, 54);
+        icon.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
+        Body.AddChild(icon);
+        _title = UiTheme.Label("NOVA VERSÃO DISPONÍVEL", 30, UiTheme.Cyan, true, HorizontalAlignment.Center);
+        Body.AddChild(_title);
+        _notes = UiTheme.Label("", 16, UiTheme.Text, false, HorizontalAlignment.Center);
+        _notes.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _notes.CustomMinimumSize = new Vector2(540, 0);
+        Body.AddChild(_notes);
+        _bar = UiTheme.Bar(UiTheme.Cyan, 540, 12);
+        _bar.Visible = false;
+        Body.AddChild(_bar);
+        _status = UiTheme.Label("", 14, UiTheme.Muted, false, HorizontalAlignment.Center);
+        Body.AddChild(_status);
+        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        row.AddThemeConstantOverride("separation", 12);
+        Body.AddChild(row);
+        _laterBtn = UiTheme.Button("Depois", Close, 200, 20);
+        _updateBtn = UiTheme.Button("Atualizar agora", OnUpdate, 260, 20);
+        _updateBtn.AddThemeColorOverride("font_color", UiTheme.Success);
+        row.AddChild(_laterBtn);
+        row.AddChild(_updateBtn);
+    }
+
+    public void Show(UpdateManifest m)
+    {
+        string notes = string.IsNullOrWhiteSpace(m.Notes) ? "" : "\n\n" + m.Notes;
+        _notes.Text = $"Versão instalada: v{UpdateManager.CurrentVersion}   →   nova: v{m.Version}{notes}";
+        if (Updater.NeedsFullInstaller)
+        {
+            _status.Text = "Esta versão usa um motor novo e precisa do instalador completo.";
+            _updateBtn.Text = "Baixar instalador";
+        }
+        else
+        {
+            long total = 0; foreach (var f in m.Files) total += f.Size;
+            _status.Text = $"Download de {total / 1048576.0:0.0} MB. O jogo fecha, atualiza e reabre sozinho. Seus saves são mantidos.";
+            _updateBtn.Text = "Atualizar agora";
+        }
+        _bar.Visible = false;
+        _updateBtn.Disabled = false;
+        _laterBtn.Disabled = false;
+        Open();
+        _updateBtn.GrabFocus();
+    }
+
+    void OnUpdate()
+    {
+        if (Updater.NeedsFullInstaller)
+        {
+            OS.ShellOpen(string.IsNullOrEmpty(Updater.Available.SetupUrl) ? "https://github.com/ArtCurvelo/Crystal/tree/main/dist" : Updater.Available.SetupUrl);
+            return;
+        }
+        _updateBtn.Disabled = true;
+        _laterBtn.Disabled = true;
+        _bar.Visible = true;
+        Updater.DownloadAndApply();
+    }
+
+    public void OnProgress(float p, string text) { _bar.Value = p; _status.Text = text; }
+
+    public void OnFailed(string msg)
+    {
+        _status.Text = msg;
+        _status.AddThemeColorOverride("font_color", UiTheme.Danger);
+        _updateBtn.Disabled = false;
+        _laterBtn.Disabled = false;
+        _updateBtn.Text = "Tentar de novo";
     }
 }

@@ -35,6 +35,8 @@ public partial class Main : Node
     ObjectiveMarker _marker;
     HelpScreen _help;
     CompletionScreen _completion;
+    UpdateManager _updater;
+    UpdateScreen _updateScreen;
     RegionDef _currentRegion;
     float _menuT;
     float _cullTimer;
@@ -102,6 +104,13 @@ public partial class Main : Node
         AddChild(_codex);
         _help = new HelpScreen();
         AddChild(_help);
+        _updater = new UpdateManager { Name = "Updater" };
+        AddChild(_updater);
+        _updateScreen = new UpdateScreen { Updater = _updater };
+        AddChild(_updateScreen);
+        _updater.UpdateFound += m => { if (CurrentMode == Mode.Menu) _updateScreen.Show(m); };
+        _updater.Progress += (p, t) => _updateScreen.OnProgress(p, t);
+        _updater.Failed += msg => _updateScreen.OnFailed(msg);
         _completion = new CompletionScreen();
         _completion.Closed += ReturnToGameplay;
         AddChild(_completion);
@@ -186,6 +195,7 @@ public partial class Main : Node
         loading.QueueFree();
         _booting = false;
         ShowMenu();
+        _updater.CheckForUpdates();
 
 
         if (args.Contains("--autostart")) StartGame(false);
@@ -380,7 +390,7 @@ public partial class Main : Node
     public void OpenSettingsForTour() => _settings.Open();
     public void OpenCompletionForTour() => _completion.Open();
 
-    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen;
+    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen;
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -390,6 +400,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) { _confirm.Close(); return; }
+            if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
             if (_codex.IsOpen) { _codex.Close(); return; }
             if (_help.IsOpen) { _help.Close(); return; }
