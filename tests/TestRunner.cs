@@ -46,6 +46,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
+            await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -442,6 +443,39 @@ public partial class TestRunner : Node
         Check(pulses >= 1, "segurar o ritmo deve disparar um pulso");
         Check(hitCount >= 2, $"pulso deve atingir o alvo e vizinhos (atingiu {hitCount})");
         Check(neighbors.Any(n => n.Hp < n.MaxHp), "vizinho deve receber dano do pulso");
+        root.QueueFree();
+        await Frames(2);
+    }
+
+    async Task TestObjectiveMarker()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var pos = world.SpawnPoint;
+        var marker = new ObjectiveMarker { World = world, PlayerPos = () => pos, CurrentRegion = () => GameData.Regions[0] };
+        root.AddChild(marker);
+        GS.IsPlaying = true;
+        await Frames(40);
+        Check(marker.TargetPosition is Vector3 t0 && world.Crystals.Any(c => c.GlobalPosition == t0), "início: marcador aponta para um cristal");
+        GS.Data.CrystalsMined = 1;
+        GS.AddItem("quartz", 30);
+        await Frames(40);
+        var sell = world.RegionRoots[0].GetChildren().OfType<SellStation>().First();
+        Check(marker.TargetPosition == sell.GlobalPosition, "mochila cheia: marcador aponta para a venda");
+        GS.SellAll();
+        await Frames(40);
+        var shop = world.RegionRoots[0].GetChildren().OfType<ShopTerminal>().First();
+        Check(marker.TargetPosition == shop.GlobalPosition, "após vender: marcador aponta para o terminal");
+        GS.Data.Upgrades[UpgradeIds.Damage] = 1;
+        GS.AddMoney(GameData.Regions[1].UnlockCost);
+        await Frames(40);
+        Check(marker.TargetPosition == world.Gates[0].GlobalPosition, "com dinheiro: marcador aponta para o portão");
+        GS.IsPlaying = false;
         root.QueueFree();
         await Frames(2);
     }

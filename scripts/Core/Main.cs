@@ -32,6 +32,7 @@ public partial class Main : Node
     SettingsScreen _settings;
     ConfirmScreen _confirm;
     CodexScreen _codex;
+    ObjectiveMarker _marker;
     HelpScreen _help;
     RegionDef _currentRegion;
     float _menuT;
@@ -173,6 +174,8 @@ public partial class Main : Node
             Player.CrystalHit += OnCrystalHit;
             Player.ResonancePulse += n => Hud.ShowPulse(n);
             _shards.PlayerPosition = () => Player.BodyCenter;
+            _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
+            World.GetParent().AddChild(_marker);
             Hud.Player = Player;
         }
         // posição: usa a salva se for válida e estiver numa região liberada
