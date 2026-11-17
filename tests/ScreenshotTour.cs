@@ -24,6 +24,11 @@ public partial class ScreenshotTour : Node
         SaveSystem.SavePath = "user://shots_save.json";
         await Wait(1.5f);
         await Shot("01_menu");
+        Main.OpenHelpForTour();
+        await Wait(0.5f);
+        await Shot("01b_help");
+        Input.ParseInputEvent(new InputEventAction { Action = "pause", Pressed = true });
+        await Wait(0.3f);
 
         Main.StartGame(false);
         var gs = GameState.Instance;

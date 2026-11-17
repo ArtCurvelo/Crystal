@@ -399,7 +399,7 @@ public partial class SettingsScreen : ModalScreen
 /// <summary>Menu de pausa.</summary>
 public partial class PauseScreen : ModalScreen
 {
-    public Action OnResume, OnSave, OnSettings, OnCodex, OnMainMenu, OnQuit;
+    public Action OnResume, OnSave, OnSettings, OnCodex, OnHelp, OnMainMenu, OnQuit;
     Label _stats;
 
     public override void _Ready()
@@ -410,7 +410,7 @@ public partial class PauseScreen : ModalScreen
         Body.AddChild(UiTheme.Spacer(4));
         foreach (var (text, act) in new (string, Func<Action>)[]
                  {
-                     ("Continuar", () => OnResume), ("Salvar jogo", () => OnSave), ("Coleção", () => OnCodex), ("Configurações", () => OnSettings),
+                     ("Continuar", () => OnResume), ("Salvar jogo", () => OnSave), ("Coleção", () => OnCodex), ("Como jogar", () => OnHelp), ("Configurações", () => OnSettings),
                      ("Menu principal", () => OnMainMenu), ("Sair do jogo", () => OnQuit)
                  })
         {
@@ -536,5 +536,59 @@ public partial class CodexScreen : ModalScreen
         if (known)
             v.AddChild(UiTheme.Label($"{GameState.FormatMoney(gs.SellPrice(m))}/frag  ·  resistência {GameState.FormatNumber(m.Hp)}  ·  {r.Name}", 14, UiTheme.Cyan));
         return card;
+    }
+}
+
+// =====================================================================
+/// <summary>Tela "Como jogar": controles, ciclo de jogo e mecânicas especiais.</summary>
+public partial class HelpScreen : ModalScreen
+{
+    public override void _Ready()
+    {
+        BuildFrame("COMO JOGAR", new Vector2(860, 0), UiTheme.Cyan);
+        Layer = 20;
+        var cols = new HBoxContainer();
+        cols.AddThemeConstantOverride("separation", 28);
+        Body.AddChild(cols);
+
+        var left = new VBoxContainer { CustomMinimumSize = new Vector2(330, 0) };
+        left.AddThemeConstantOverride("separation", 6);
+        cols.AddChild(left);
+        left.AddChild(UiTheme.Label("CONTROLES", 20, UiTheme.Gold, true));
+        foreach (var (k, a) in new[]
+                 {
+                     ("W A S D", "Mover"), ("Mouse", "Olhar"), ("Botão esquerdo", "Minerar (segure)"),
+                     ("E", "Interagir"), ("Shift", "Correr"), ("Espaço", "Pular"),
+                     ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
+                 })
+        {
+            var row = new HBoxContainer();
+            var key = UiTheme.Label(k, 16, UiTheme.Cyan, true);
+            key.CustomMinimumSize = new Vector2(150, 0);
+            row.AddChild(key);
+            row.AddChild(UiTheme.Label(a, 16, UiTheme.Text));
+            left.AddChild(row);
+        }
+
+        var right = new VBoxContainer { CustomMinimumSize = new Vector2(440, 0) };
+        right.AddThemeConstantOverride("separation", 8);
+        cols.AddChild(right);
+        Section(right, "CICLO", "Minere cristais → os fragmentos voam até você → venda na Estação (verde) → compre melhorias no Terminal (dourado) → abra os portões para regiões mais ricas.");
+        Section(right, "RESSONÂNCIA", "Golpes em ritmo constante enchem o arco violeta da mira. Quando ficar dourado, o próximo golpe libera um pulso que atinge todos os cristais próximos.");
+        Section(right, "EVENTOS", "Cada região tem condições próprias: Eco Luminoso (cristais renascem), Maré Gélida (fragmentos x2) e Surto do Núcleo (dano +50%).");
+        Section(right, "DICA", "Cristais raros (★) pulsam e brilham mais. Valem muito mais que os comuns!");
+
+        var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        Body.AddChild(footer);
+        footer.AddChild(UiTheme.Button("Entendi", Close, 180));
+    }
+
+    static void Section(VBoxContainer parent, string title, string text)
+    {
+        parent.AddChild(UiTheme.Label(title, 18, UiTheme.Gold, true));
+        var l = UiTheme.Label(text, 15, UiTheme.Text);
+        l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        l.CustomMinimumSize = new Vector2(440, 0);
+        parent.AddChild(l);
     }
 }

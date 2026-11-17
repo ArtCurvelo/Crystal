@@ -7,7 +7,7 @@ namespace CrystalExcavator.UI;
 /// <summary>Menu principal sobre o cenário 3D (câmera orbitando a caverna inicial).</summary>
 public partial class MainMenu : CanvasLayer
 {
-    public Action OnContinue, OnNewGame, OnSettings, OnQuit;
+    public Action OnContinue, OnNewGame, OnSettings, OnHelp, OnQuit;
     Button _continue;
     VBoxContainer _buttons;
     Control _root;
@@ -48,6 +48,7 @@ public partial class MainMenu : CanvasLayer
         left.AddChild(_buttons);
         _continue = Make("Continuar", () => OnContinue?.Invoke());
         Make("Novo jogo", () => OnNewGame?.Invoke());
+        Make("Como jogar", () => OnHelp?.Invoke());
         Make("Configurações", () => OnSettings?.Invoke());
         Make("Sair", () => OnQuit?.Invoke());
 
@@ -72,6 +73,16 @@ public partial class MainMenu : CanvasLayer
     {
         Visible = true;
         _continue.Visible = hasSave;
+        _continue.Text = "Continuar";
+        if (hasSave)
+        {
+            var d = SaveSystem.Load(out _);
+            if (d != null)
+            {
+                var t = TimeSpan.FromSeconds(d.PlayTimeSeconds);
+                _continue.Text = $"Continuar   ·   {GameState.FormatMoney(d.Money)}   ·   {(int)t.TotalHours}h{t.Minutes:00}";
+            }
+        }
         _root.Modulate = new Color(1, 1, 1, 0);
         CreateTween().TweenProperty(_root, "modulate:a", 1f, 0.6f);
         (hasSave ? _continue : (Button)_buttons.GetChild(1)).GrabFocus();

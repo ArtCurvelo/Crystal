@@ -102,3 +102,4 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 
   \*llvmpipe na CPU; não representa a GPU real. Os números de draw calls e primitivas são leves para uma Intel HD 4400.
 - `run_tests.sh`: 150 verificações, 0 falhas.
+- Tela **Como jogar** (no menu principal e na pausa) e resumo do save no botão Continuar (moeda e tempo de jogo).

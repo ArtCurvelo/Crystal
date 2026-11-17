@@ -32,6 +32,7 @@ public partial class Main : Node
     SettingsScreen _settings;
     ConfirmScreen _confirm;
     CodexScreen _codex;
+    HelpScreen _help;
     RegionDef _currentRegion;
     float _menuT;
     float _cullTimer;
@@ -67,6 +68,7 @@ public partial class Main : Node
         {
             OnContinue = () => StartGame(true),
             OnNewGame = AskNewGame,
+            OnHelp = () => _help.Open(),
             OnSettings = () => _settings.Open(),
             OnQuit = QuitGame,
         };
@@ -83,6 +85,7 @@ public partial class Main : Node
             OnSave = () => GameState.Instance.SaveGame(),
             OnSettings = () => _settings.Open(),
             OnCodex = () => _codex.Open(),
+            OnHelp = () => _help.Open(),
             OnMainMenu = BackToMenu,
             OnQuit = QuitGame,
         };
@@ -93,6 +96,8 @@ public partial class Main : Node
         AddChild(_confirm);
         _codex = new CodexScreen();
         AddChild(_codex);
+        _help = new HelpScreen();
+        AddChild(_help);
 
         UiBus.OpenShop += OpenShop;
         UiBus.OpenSell += OpenSell;
@@ -225,6 +230,7 @@ public partial class Main : Node
         _pause.Close();
         _settings.Close();
         _codex.Close();
+        _help.Close();
         GetTree().Paused = false;
         if (CurrentMode == Mode.Playing) Input.MouseMode = Input.MouseModeEnum.Captured;
     }
@@ -253,8 +259,9 @@ public partial class Main : Node
     }
 
     public void OpenCodexForTour() => _codex.Open();
+    public void OpenHelpForTour() => _help.Open();
 
-    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen;
+    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen;
 
     public override void _UnhandledInput(InputEvent e)
     {
@@ -264,6 +271,7 @@ public partial class Main : Node
             if (_confirm.IsOpen) { _confirm.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
             if (_codex.IsOpen) { _codex.Close(); return; }
+            if (_help.IsOpen) { _help.Close(); return; }
             if (CurrentMode != Mode.Playing) return;
             if (_shop.IsOpen) { _shop.Close(); return; }
             if (_sell.IsOpen) { _sell.Close(); return; }
