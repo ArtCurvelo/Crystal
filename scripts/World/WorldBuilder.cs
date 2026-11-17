@@ -43,6 +43,12 @@ public partial class WorldBuilder : Node3D
         float minZ = regions[^1].CenterZ - regions[^1].HalfZ - 2;
         float maxZ = regions[0].CenterZ + regions[0].HalfZ + 2;
         AddCollider(this, new Vector3(0, -0.5f, (minZ + maxZ) / 2), new Vector3(80, 1, maxZ - minZ));
+
+        // agrupa malhas estáticas por material em cada região e túnel
+        int saved = 0;
+        foreach (Node c in GetChildren())
+            if (c.GetType() == typeof(Node3D)) saved += StaticBatcher.Batch((Node3D)c);
+        GD.Print($"[World] Agrupamento estático: {saved} instâncias de malha a menos");
     }
 
     // =================== Salas ===================

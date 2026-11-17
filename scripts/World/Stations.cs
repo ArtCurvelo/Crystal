@@ -127,6 +127,7 @@ public partial class SellStation : StationBase
         var light = new OmniLight3D { LightColor = accent, LightEnergy = 1.3f, OmniRange = 6f, Position = new Vector3(0, 2.2f, 1.2f) };
         AddChild(light);
         Label = MakeLabel("VENDA", accent, 2.75f);
+        StaticBatcher.Batch(this);
     }
 
     public override string GetPrompt()
@@ -196,6 +197,7 @@ public partial class ShopTerminal : StationBase
         var light = new OmniLight3D { LightColor = new Color(0.5f, 0.85f, 1f), LightEnergy = 1.3f, OmniRange = 6f, Position = new Vector3(0, 2f, 1.2f) };
         AddChild(light);
         Label = MakeLabel("MELHORIAS", new Color(1f, 0.75f, 0.3f), 2.75f);
+        StaticBatcher.Batch(this);
     }
 
     public override string GetPrompt() => "[E] Terminal de Melhorias";
