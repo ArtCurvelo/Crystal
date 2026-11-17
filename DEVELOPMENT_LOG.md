@@ -42,7 +42,7 @@ Além do escopo da Sessão 1, o loop completo já funciona:
 - ~~Números de dano sobrepostos~~ corrigido (deslocamento aleatório).
 - ~~Rótulos do portão espelhados através da barreira~~ corrigido.
 - O ícone do `.exe` não é aplicado (exigiria rcedit e Wine).
-- Repositório remoto ainda não configurado: o container é temporário, então o código existe só aqui.
+- ~~Repositório remoto não configurado~~ resolvido: GitHub ArtCurvelo/Crystal.
 
 ### Próxima tarefa prioritária
 Polimento visual (ferramenta, números de dano, iluminação da região 3), revisão da experiência inicial e o diretor validar o `.exe` no Windows.
@@ -72,5 +72,5 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 
 ### Próxima tarefa prioritária
 1. Receber o resultado do diretor rodando o `.exe` no Windows (abre? FPS com F3 na qualidade Baixa a 720p?).
-2. Configurar o repositório remoto (o container é temporário).
+2. ~~Configurar o repositório remoto~~ feito: https://github.com/ArtCurvelo/Crystal (`main`).
 3. Continuar o polimento (Sessões 4–5): condições ambientais com impacto no jogo, refinamento de áudio e animações.

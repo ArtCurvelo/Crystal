@@ -6,6 +6,12 @@ Documento de continuidade. Leia isto primeiro ao retomar o projeto em uma nova c
 Jogo incremental 3D em primeira pessoa: minerar cristais, vender, comprar upgrades e desbloquear regiões.
 Godot **4.5.1 .NET**, C# (.NET 8), renderizador **Compatibility**. Todo o conteúdo (malhas, materiais, sons, música) é **gerado proceduralmente em código**, sem assets externos.
 
+## Repositório
+- GitHub: https://github.com/ArtCurvelo/Crystal (branch `main`). **Fonte da verdade.**
+- O desenvolvimento acontece num container Linux na nuvem (`/home/user/crystal-excavator`), e cada etapa é enviada com `git push`.
+- No Windows do diretor: `git clone https://github.com/ArtCurvelo/Crystal.git`, depois `git pull` para atualizar.
+- Ao retomar num container novo: clonar o repositório e reinstalar as ferramentas (ver "Comandos").
+
 ## Arquitetura
 ```
 project.godot            Configuração (autoloads, renderizador, janela)
@@ -43,7 +49,11 @@ tools/run_bot.sh   Roda o bot de partida completa (cerca de 1,5 min real).
 - Cada região tem estação de venda e terminal de melhorias na entrada.
 
 ## Comandos
-Ambiente do container (ferramentas fora do repositório):
+Ferramentas do container (fora do repositório, precisam ser reinstaladas num container novo):
+- Godot 4.5.1 mono (zip oficial do GitHub) em `/home/user/tools/godot`, com o arquivo `._sc_` (modo autocontido) e os modelos em `editor_data/export_templates/4.5.1.stable.mono/`.
+- .NET 8: `apt-get download` dos pacotes `dotnet-*`, `aspnetcore-*` e `netstandard-*` do Ubuntu, `dpkg -x` e mover `usr/lib/dotnet` para `/home/user/tools/dotnet`.
+- `/home/user/tools/env.sh` exporta `DOTNET_ROOT`, `PATH` e `GODOT`.
+
 ```bash
 source /home/user/tools/env.sh          # define DOTNET_ROOT, PATH e $GODOT
 dotnet build                            # compila C#
