@@ -87,7 +87,33 @@ public partial class WorldBuilder : Node3D
             AddPlatform(root, new Vector3(0, 0, entranceZ), r);
         }
 
+        BuildSetPieces(root, r, new Random(500 + index));
         BuildCrystals(root, r, rng, entranceZ);
+    }
+
+    /// <summary>Cenografia por região (posto avançado, cachoeiras, flora, ruínas).</summary>
+    void BuildSetPieces(Node3D root, RegionDef r, Random rng)
+    {
+        bool low = Settings.Quality == GraphicsQuality.Low;
+        switch (r.Id)
+        {
+            case "caves":
+                Decor.Outpost(root, new Vector3(-17.5f, 0, r.CenterZ + r.HalfZ - 3.5f), Mathf.Pi / 2);
+                Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ - 6f), r.Height, 2.6f, -Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
+                Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 2f), r.Height * 0.9f, 2f, Mathf.Pi / 2, new Color(0.45f, 0.85f, 1f));
+                Decor.Mushrooms(root, r, rng, low ? 5 : 9, new Color(0.3f, 1f, 0.9f));
+                Decor.Ferns(root, r, rng, low ? 6 : 12, new Color(0.95f, 0.42f, 0.15f));
+                break;
+            case "depths":
+                Decor.Waterfall(root, new Vector3(-r.HalfX + 0.4f, 0, r.CenterZ - 8f), r.Height, 3.2f, Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
+                Decor.Waterfall(root, new Vector3(r.HalfX - 0.4f, 0, r.CenterZ + 6f), r.Height, 2.4f, -Mathf.Pi / 2, new Color(0.4f, 1f, 0.85f));
+                Decor.Mushrooms(root, r, rng, low ? 4 : 8, new Color(0.4f, 0.6f, 1f));
+                Decor.Ferns(root, r, rng, low ? 4 : 8, new Color(0.2f, 0.7f, 0.6f));
+                break;
+            case "core":
+                Decor.AncientRuins(root, r, rng);
+                break;
+        }
     }
 
     void BuildWallWithOpening(Node3D root, float z, float hx, float h, bool opening, Material mat)
@@ -172,6 +198,8 @@ public partial class WorldBuilder : Node3D
             float z = r.CenterZ + (float)(rng.NextDouble() * 2 - 1) * (r.HalfZ - 2.5f);
             var p = new Vector2(x, z);
             if (MathF.Abs(x) < 2.2f) continue; // corredor central livre
+            if (r.Index == 0 && x < -8.5f && z > r.CenterZ + r.HalfZ - 9f) continue; // posto avançado
+            if (r.Index == 2 && MathF.Abs(MathF.Abs(x) - (r.HalfX - 4f)) < 2.5f) continue; // pilares das ruínas
             if (r.Index == 0 && new Vector2(0, entranceZ).DistanceTo(p) < 8.5f) continue; // acampamento livre
             bool ok = true;
             float minD = r.Index == 2 && new Vector2(0, r.CenterZ - 4f).DistanceTo(p) < 9 ? 9 : 3.2f;
@@ -337,7 +365,7 @@ public partial class WorldBuilder : Node3D
         else if (r.Id == "core")
         {
             // fissuras de lava/energia no chão
-            var crack = MeshFactory.Emissive(new Color(1f, 0.35f, 0.1f), new Color(1f, 0.35f, 0.05f), 2.6f);
+            var crack = MeshFactory.Emissive(new Color(1f, 0.7f, 0.25f), new Color(1f, 0.6f, 0.15f), 2.2f);
             var cracks = new List<Transform3D>();
             for (int i = 0; i < 40; i++)
             {
@@ -432,7 +460,7 @@ public partial class WorldBuilder : Node3D
         {
             // brasas subindo
             p.Gravity = new Vector3(0, 0.8f, 0);
-            p.Color = new Color(1f, 0.55f, 0.2f);
+            p.Color = new Color(1f, 0.75f, 0.35f);
             p.InitialVelocityMax = 0.8f;
         }
         p.MaterialOverride = mat;

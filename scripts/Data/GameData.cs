@@ -174,10 +174,10 @@ public static class GameData
         {
             Id = "caves", Index = 0, Name = "Cavernas Luminosas",
             Subtitle = "Onde todo escavador começa.", UnlockCost = 0,
-            AmbientColor = new Color(0.35f, 0.45f, 0.7f), AmbientEnergy = 0.55f,
-            FogColor = new Color(0.06f, 0.08f, 0.16f), FogDensity = 0.018f,
-            RockColor = new Color(0.27f, 0.24f, 0.36f), AccentColor = new Color(0.35f, 0.9f, 1.0f),
-            LightColor = new Color(0.55f, 0.8f, 1.0f),
+            AmbientColor = new Color(0.5f, 0.45f, 0.65f), AmbientEnergy = 0.6f,
+            FogColor = new Color(0.09f, 0.07f, 0.15f), FogDensity = 0.016f,
+            RockColor = new Color(0.46f, 0.3f, 0.22f), AccentColor = new Color(0.35f, 0.9f, 1.0f),
+            LightColor = new Color(1.0f, 0.7f, 0.45f),
             RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 20,
             CenterZ = 0, HalfX = 21, HalfZ = 20, Height = 9
         };
@@ -204,10 +204,10 @@ public static class GameData
         {
             Id = "core", Index = 2, Name = "Núcleo Ancestral",
             Subtitle = "O coração quente do mundo.", UnlockCost = 400000,
-            AmbientColor = new Color(0.6f, 0.3f, 0.2f), AmbientEnergy = 0.55f,
-            FogColor = new Color(0.18f, 0.05f, 0.03f), FogDensity = 0.022f,
-            RockColor = new Color(0.3f, 0.14f, 0.12f), AccentColor = new Color(1.0f, 0.55f, 0.2f),
-            LightColor = new Color(1.0f, 0.55f, 0.3f),
+            AmbientColor = new Color(0.55f, 0.35f, 0.75f), AmbientEnergy = 0.6f,
+            FogColor = new Color(0.13f, 0.05f, 0.2f), FogDensity = 0.02f,
+            RockColor = new Color(0.36f, 0.24f, 0.3f), AccentColor = new Color(1.0f, 0.75f, 0.3f),
+            LightColor = new Color(0.8f, 0.45f, 1.0f),
             RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 24,
             CenterZ = -124, HalfX = 30, HalfZ = 30, Height = 16
         };

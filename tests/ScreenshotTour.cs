@@ -36,6 +36,10 @@ public partial class ScreenshotTour : Node
         p.SimulateCapturedMouse = true;
         await Wait(1.2f);
         await Shot("02_spawn");
+        p.SetLook(1.35f, 0.02f);
+        await Wait(0.4f);
+        await Shot("02b_outpost");
+        p.SetLook(0, 0);
 
         // mira em um cristal e minera
         var c = Main.World.Crystals.Where(x => x.Material.Id == "quartz")

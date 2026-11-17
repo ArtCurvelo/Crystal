@@ -30,7 +30,8 @@ public partial class Crystal : StaticBody3D
 
     Node3D _visual;
     CollisionShape3D _shape;
-    readonly List<StandardMaterial3D> _mats = new();
+    readonly List<ShaderMaterial> _mats = new();
+    static Shader _crystalShader;
     Random _rng;
     float _respawnTimer;
     float _flash;
@@ -74,7 +75,7 @@ public partial class Crystal : StaticBody3D
         bool special = mat.Special;
         int count = special ? 9 : _rng.Next(4, 8);
         float s = special ? 2.6f : SizeScale;
-        _baseEnergy = mat.Rare ? 1.8f : special ? 2.2f : 1.1f;
+        _baseEnergy = mat.Rare ? 1.3f : special ? 1.5f : 0.85f;
 
         // base rochosa
         var baseRock = new MeshInstance3D
@@ -87,8 +88,13 @@ public partial class Crystal : StaticBody3D
         baseRock.Position = new Vector3(0, 0.05f * s, 0);
         _visual.AddChild(baseRock);
 
-        var crystalMat = MeshFactory.CrystalMaterial(mat.Color, mat.Glow, _baseEnergy);
+        _crystalShader ??= GD.Load<Shader>("res://shaders/crystal.gdshader");
+        var crystalMat = new ShaderMaterial { Shader = _crystalShader };
+        crystalMat.SetShaderParameter("base_color", mat.Color);
+        crystalMat.SetShaderParameter("glow_color", mat.Glow);
+        crystalMat.SetShaderParameter("seed", (float)_rng.NextDouble() * 50f);
         _mats.Add(crystalMat);
+        SetGlow(_baseEnergy, 0f, 0f);
         for (int i = 0; i < count; i++)
         {
             float h = (0.6f + (float)_rng.NextDouble() * 0.9f) * s;
@@ -167,7 +173,7 @@ public partial class Crystal : StaticBody3D
             _flash = Mathf.Max(0, _flash - dt * 5f);
             _shake = Mathf.Max(0, _shake - dt * 6f);
             float damageGlow = (1f - HpRatio) * 1.4f;
-            foreach (var m in _mats) m.EmissionEnergyMultiplier = _baseEnergy + damageGlow + _flash * 3.5f;
+            SetGlow(_baseEnergy + damageGlow * 0.4f, 1f - HpRatio, _flash);
             float wob = MathF.Sin(_time * 60f) * _shake * 0.06f;
             _visual.Position = _shakeDir * wob;
             float squash = 1f - _shake * 0.08f;
@@ -179,8 +185,18 @@ public partial class Crystal : StaticBody3D
         {
             // pulsação de cristais raros
             float pulse = 0.35f * (0.5f + 0.5f * MathF.Sin(_time * 3f));
-            foreach (var m in _mats) m.EmissionEnergyMultiplier = _baseEnergy + pulse + (1f - HpRatio) * 1.4f;
+            SetGlow(_baseEnergy + pulse, 1f - HpRatio, 0f);
             if (Material.Special) _visual.RotateY(dt * 0.15f);
+        }
+    }
+
+    void SetGlow(float energy, float damage, float flash)
+    {
+        foreach (var m in _mats)
+        {
+            m.SetShaderParameter("glow_energy", energy);
+            m.SetShaderParameter("damage", damage);
+            m.SetShaderParameter("flash", flash);
         }
     }
 
@@ -239,7 +255,7 @@ public partial class Crystal : StaticBody3D
         _visual.Scale = Vector3.One * 0.01f;
         _visual.Position = Vector3.Zero;
         _flash = 0; _shake = 0;
-        foreach (var m in _mats) m.EmissionEnergyMultiplier = _baseEnergy;
+        SetGlow(_baseEnergy, 0f, 0f);
         var tw = CreateTween();
         tw.TweenProperty(_visual, "scale", Vector3.One, 1.2f).SetTrans(Tween.TransitionType.Elastic).SetEase(Tween.EaseType.Out);
         tw.TweenCallback(Callable.From(() =>

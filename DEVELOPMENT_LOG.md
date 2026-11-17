@@ -103,3 +103,13 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
   \*llvmpipe na CPU; não representa a GPU real. Os números de draw calls e primitivas são leves para uma Intel HD 4400.
 - `run_tests.sh`: 150 verificações, 0 falhas.
 - Tela **Como jogar** (no menu principal e na pausa) e resumo do save no botão Continuar (moeda e tempo de jogo).
+
+### Direção de arte (a partir das imagens conceituais do diretor)
+- **Escavadeira de feixe** substitui a picareta: modelo procedural laranja/cinza com tela ciano e bobinas, feixe de energia contínuo até o ponto atingido (com a cor do cristal), recuo e vibração. Tiers mudam cores e número de bobinas.
+- **HUD sci-fi**: painéis chanfrados com borda ciano, etiqueta do título, etiqueta da região (nome + "Região X de 3"), Créditos com moeda e Capacidade com mochila (ícones desenhados por código), **barra de fragmentos** com gemas e contagem, painel de **Ressonância** (energia), mira de scanner tracejada e **painel do alvo com cantoneiras** (nome, raridade, % extraída, rendimento estimado).
+- **Shader de cristal** (`shaders/crystal.gdshader`): facetas com brilho interno, borda fresnel e **rachaduras luminosas** (Voronoi) que se espalham conforme o dano.
+- **Cenografia** (`World/Decor.cs`): posto avançado com janelas acesas e antena, cachoeiras animadas (shader próprio) com poça e névoa, cogumelos luminosos, samambaias, ruínas com pilares rúnicos, anel rúnico giratório e cristais flutuantes.
+- **Paletas**: Cavernas com rocha quente e luzes alaranjadas; Núcleo em violeta/dourado.
+- Correção técnica: `Basis.Scaled()` escala nos eixos globais; criado `ScaleLocal()` para transformações corretas.
+- Custo (qualidade Baixa, 720p): 298–344 draw calls, 16–26 mil primitivas (antes 200–270).
+- Testes: 150/150. Bot: SUCESSO (Região 2 em 7,3 min, Região 3 em 28,8 min, Coração em 34,5 min).

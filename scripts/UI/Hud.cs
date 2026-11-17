@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CrystalExcavator.Audio;
 using CrystalExcavator.Core;
 using CrystalExcavator.Data;
@@ -9,135 +10,58 @@ using Godot;
 
 namespace CrystalExcavator.UI;
 
-/// <summary>HUD de jogo: dinheiro, mochila, mira com progresso, alvo, prompts, notificações e objetivos.</summary>
+/// <summary>
+/// HUD sci-fi: título, região atual, créditos e capacidade, objetivo, painel do alvo com cantoneiras,
+/// barra de fragmentos, energia de ressonância, notificações, eventos e prompts.
+/// </summary>
 public partial class Hud : CanvasLayer
 {
     public PlayerController Player;
     public World.RegionEvents Events;
+
+    Control _root;
+    Label _money, _moneyGain, _capLabel, _prompt, _regionName, _regionSub, _fps, _objective, _keys;
+    ProgressBar _capBar;
+    PanelContainer _promptPanel, _objectivePanel, _regionTag, _capPanel;
+    HudIcon _regionIcon;
+    Crosshair _crosshair;
+    VBoxContainer _notifs;
+    // alvo
+    Control _targetBox;
+    BracketFrame _brackets;
+    Label _targetName, _targetRarity, _targetPct, _targetYield;
+    HudIcon _targetGem;
+    ProgressBar _targetHp;
+    // barra de fragmentos
+    HBoxContainer _hotbar;
+    readonly List<(PanelContainer panel, HudIcon gem, Label count)> _slots = new();
+    // energia / ressonância
+    Label _toolName, _toolStats, _energyPct, _pulseInfo;
+    ProgressBar _energyBar;
+    // eventos
     PanelContainer _eventPanel;
     Label _eventTitle, _eventDesc;
     ProgressBar _eventBar;
+    World.RegionEvents.EventDef _shownEvent;
 
-    Label _money, _moneyGain, _capLabel, _prompt, _targetName, _targetInfo, _regionTitle, _regionSub, _fps, _objective, _stats;
-    ProgressBar _capBar, _targetHp;
-    PanelContainer _promptPanel, _targetPanel, _objectivePanel;
-    Control _regionBanner;
-    Crosshair _crosshair;
-    VBoxContainer _notifs;
-    long _displayMoney;
-    long _shownMoney;
-    float _gainTimer;
-    long _gainAccum;
+    long _displayMoney, _shownMoney, _gainAccum;
+    float _gainTimer, _fullFlash;
+    double _lastFullWarn = -100;
     readonly Queue<(string, string, NotifyKind)> _pending = new();
-    float _fullFlash;
+    const int SlotCount = 6;
 
     public override void _Ready()
     {
         Layer = 5;
-        var root = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Theme = UiTheme.Get() };
-        root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        AddChild(root);
+        _root = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Theme = UiTheme.Get() };
+        _root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        AddChild(_root);
 
-        // ---------- Canto superior esquerdo: dinheiro + mochila ----------
-        var tl = new PanelContainer { Position = new Vector2(20, 18), MouseFilter = Control.MouseFilterEnum.Ignore };
-        tl.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.04f, 0.03f, 0.08f, 0.72f), new Color(UiTheme.Gold, 0.35f), 12, 2, 16));
-        root.AddChild(tl);
-        var tlv = new VBoxContainer { CustomMinimumSize = new Vector2(250, 0) };
-        tlv.AddThemeConstantOverride("separation", 6);
-        tl.AddChild(tlv);
-        var moneyRow = new HBoxContainer();
-        tlv.AddChild(moneyRow);
-        _money = UiTheme.Shadowed(UiTheme.Label("◈ 0", 34, UiTheme.Gold, true));
-        moneyRow.AddChild(_money);
-        _moneyGain = UiTheme.Shadowed(UiTheme.Label("", 20, UiTheme.Success, true));
-        _moneyGain.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        moneyRow.AddChild(_moneyGain);
-        _capLabel = UiTheme.Label("Mochila 0/30", 16, UiTheme.Muted);
-        tlv.AddChild(_capLabel);
-        _capBar = new ProgressBar { CustomMinimumSize = new Vector2(250, 14), ShowPercentage = false, MaxValue = 1, Step = 0.001 };
-        tlv.AddChild(_capBar);
-
-        // ---------- Objetivo (abaixo) ----------
-        _objectivePanel = new PanelContainer { Position = new Vector2(20, 140), MouseFilter = Control.MouseFilterEnum.Ignore };
-        _objectivePanel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.04f, 0.03f, 0.08f, 0.6f), new Color(UiTheme.Cyan, 0.25f), 10, 1, 12));
-        root.AddChild(_objectivePanel);
-        _objective = UiTheme.Label("", 16, UiTheme.Text);
-        _objective.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _objective.CustomMinimumSize = new Vector2(270, 0);
-        _objectivePanel.AddChild(_objective);
-
-        // ---------- Mira ----------
-        _crosshair = new Crosshair { MouseFilter = Control.MouseFilterEnum.Ignore };
-        UiTheme.Place(_crosshair, Control.LayoutPreset.Center, new Vector2(-32, -32), new Vector2(64, 64));
-        root.AddChild(_crosshair);
-
-        // ---------- Painel do alvo (abaixo da mira) ----------
-        _targetPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-        _targetPanel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.04f, 0.03f, 0.08f, 0.7f), new Color(1, 1, 1, 0.15f), 10, 1, 12));
-        UiTheme.Place(_targetPanel, Control.LayoutPreset.Center, new Vector2(-130, 52));
-        _targetPanel.CustomMinimumSize = new Vector2(260, 0);
-        root.AddChild(_targetPanel);
-        var tv = new VBoxContainer();
-        tv.AddThemeConstantOverride("separation", 3);
-        _targetPanel.AddChild(tv);
-        _targetName = UiTheme.Label("", 18, UiTheme.Text, true, HorizontalAlignment.Center);
-        tv.AddChild(_targetName);
-        _targetHp = new ProgressBar { CustomMinimumSize = new Vector2(236, 10), ShowPercentage = false, MaxValue = 1, Step = 0.001 };
-        tv.AddChild(_targetHp);
-        _targetInfo = UiTheme.Label("", 14, UiTheme.Muted, false, HorizontalAlignment.Center);
-        tv.AddChild(_targetInfo);
-
-        // ---------- Prompt de interação ----------
-        _promptPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-        _promptPanel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.04f, 0.03f, 0.08f, 0.8f), UiTheme.Gold, 10, 2, 16));
-        UiTheme.Place(_promptPanel, Control.LayoutPreset.CenterBottom, new Vector2(-150, -150));
-        root.AddChild(_promptPanel);
-        _prompt = UiTheme.Label("", 20, UiTheme.Text, true, HorizontalAlignment.Center);
-        _promptPanel.AddChild(_prompt);
-
-        // ---------- Banner de região ----------
-        _regionBanner = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Modulate = new Color(1, 1, 1, 0) };
-        UiTheme.Place(_regionBanner, Control.LayoutPreset.CenterTop, new Vector2(-300, 100), new Vector2(600, 0));
-        _regionBanner.CustomMinimumSize = new Vector2(600, 0);
-        root.AddChild(_regionBanner);
-        _regionTitle = UiTheme.Shadowed(UiTheme.Label("", 36, UiTheme.Cyan, true, HorizontalAlignment.Center), 10);
-        _regionSub = UiTheme.Shadowed(UiTheme.Label("", 20, UiTheme.Text, false, HorizontalAlignment.Center), 6);
-        _regionBanner.AddChild(_regionTitle);
-        _regionBanner.AddChild(_regionSub);
-
-        // ---------- Evento de região (topo, centro) ----------
-        _eventPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
-        UiTheme.Place(_eventPanel, Control.LayoutPreset.CenterTop, new Vector2(-200, 18), new Vector2(400, 0));
-        root.AddChild(_eventPanel);
-        var ev = new VBoxContainer();
-        ev.AddThemeConstantOverride("separation", 2);
-        _eventPanel.AddChild(ev);
-        _eventTitle = UiTheme.Label("", 20, UiTheme.Text, true, HorizontalAlignment.Center);
-        _eventDesc = UiTheme.Label("", 14, UiTheme.Text, false, HorizontalAlignment.Center);
-        _eventBar = new ProgressBar { CustomMinimumSize = new Vector2(370, 6), ShowPercentage = false, MaxValue = 1, Step = 0.001 };
-        ev.AddChild(_eventTitle);
-        ev.AddChild(_eventDesc);
-        ev.AddChild(_eventBar);
-
-        // ---------- Notificações (direita) ----------
-        _notifs = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        _notifs.AddThemeConstantOverride("separation", 8);
-        UiTheme.Place(_notifs, Control.LayoutPreset.TopRight, new Vector2(-340, 18));
-        _notifs.CustomMinimumSize = new Vector2(320, 0);
-        root.AddChild(_notifs);
-
-        // ---------- Rodapé: estatísticas e atalhos ----------
-        _stats = UiTheme.Shadowed(UiTheme.Label("", 15, UiTheme.Muted));
-        UiTheme.Place(_stats, Control.LayoutPreset.BottomLeft, new Vector2(20, -62));
-        root.AddChild(_stats);
-        var keys = UiTheme.Shadowed(UiTheme.Label("[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [Esc] Pausa", 15, UiTheme.Muted, false, HorizontalAlignment.Right));
-        UiTheme.Place(keys, Control.LayoutPreset.BottomRight, new Vector2(-640, -36));
-        keys.CustomMinimumSize = new Vector2(620, 0);
-        root.AddChild(keys);
-
-        _fps = UiTheme.Shadowed(UiTheme.Label("", 14, UiTheme.Success));
-        UiTheme.Place(_fps, Control.LayoutPreset.BottomRight, new Vector2(-120, -62));
-        root.AddChild(_fps);
+        BuildTopLeft();
+        BuildTopCenter();
+        BuildTopRight();
+        BuildCenter();
+        BuildBottom();
 
         var gs = GameState.Instance;
         gs.MoneyChanged += OnMoney;
@@ -147,11 +71,7 @@ public partial class Hud : CanvasLayer
         gs.RegionsChanged += RefreshObjective;
         gs.Notified += OnNotified;
         gs.BigMessage += OnBigMessage;
-        _displayMoney = _shownMoney = gs.Data.Money;
-        OnInventory();
-        RefreshStats();
-        RefreshObjective();
-        _money.Text = GameState.FormatMoney(_displayMoney);
+        ResetMoneyDisplay();
     }
 
     public override void _ExitTree()
@@ -167,10 +87,244 @@ public partial class Hud : CanvasLayer
         gs.BigMessage -= OnBigMessage;
     }
 
+    // ============================ Construção ============================
+    void BuildTopLeft()
+    {
+        // etiqueta de título inclinada
+        var title = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        var st = UiTheme.Chamfer(null, null, 8, 2, 18, 4);
+        st.Skew = new Vector2(0.25f, 0);
+        title.AddThemeStyleboxOverride("panel", st);
+        title.AddChild(UiTheme.Label("Crystal Excavator", 20, UiTheme.Text, true));
+        UiTheme.Place(title, Control.LayoutPreset.TopLeft, new Vector2(22, 16));
+        _root.AddChild(title);
+
+        _objectivePanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _objectivePanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.09f, 0.62f), new Color(UiTheme.Cyan, 0.3f), 8, 1, 12, 8));
+        UiTheme.Place(_objectivePanel, Control.LayoutPreset.TopLeft, new Vector2(20, 66));
+        _root.AddChild(_objectivePanel);
+        _objective = UiTheme.Label("", 15, UiTheme.Text);
+        _objective.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _objective.CustomMinimumSize = new Vector2(270, 0);
+        _objectivePanel.AddChild(_objective);
+    }
+
+    void BuildTopCenter()
+    {
+        _regionTag = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _regionTag.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 14, 2, 22, 6));
+        UiTheme.Place(_regionTag, Control.LayoutPreset.CenterTop, new Vector2(-190, 12), new Vector2(380, 0));
+        _root.AddChild(_regionTag);
+        var h = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        h.AddThemeConstantOverride("separation", 12);
+        _regionTag.AddChild(h);
+        _regionIcon = HudIcon.Make(HudIcon.Kind.Region, UiTheme.Cyan, 34);
+        h.AddChild(_regionIcon);
+        var v = new VBoxContainer();
+        v.AddThemeConstantOverride("separation", -2);
+        h.AddChild(v);
+        _regionName = UiTheme.Label("", 24, UiTheme.Text, true);
+        _regionSub = UiTheme.Label("", 13, UiTheme.Muted);
+        v.AddChild(_regionName);
+        v.AddChild(_regionSub);
+
+        // evento de região logo abaixo
+        _eventPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        UiTheme.Place(_eventPanel, Control.LayoutPreset.CenterTop, new Vector2(-170, 86), new Vector2(340, 0));
+        _root.AddChild(_eventPanel);
+        var ev = new VBoxContainer();
+        ev.AddThemeConstantOverride("separation", 2);
+        _eventPanel.AddChild(ev);
+        _eventTitle = UiTheme.Label("", 18, UiTheme.Text, true, HorizontalAlignment.Center);
+        _eventDesc = UiTheme.Label("", 13, UiTheme.Text, false, HorizontalAlignment.Center);
+        _eventBar = UiTheme.Bar(UiTheme.Cyan, 310, 6);
+        ev.AddChild(_eventTitle);
+        ev.AddChild(_eventDesc);
+        ev.AddChild(_eventBar);
+    }
+
+    void BuildTopRight()
+    {
+        var col = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        col.AddThemeConstantOverride("separation", 8);
+        UiTheme.Place(col, Control.LayoutPreset.TopRight, new Vector2(-322, 14), new Vector2(300, 0));
+        _root.AddChild(col);
+
+        var money = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        money.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 8));
+        col.AddChild(money);
+        var mh = new HBoxContainer();
+        mh.AddThemeConstantOverride("separation", 10);
+        money.AddChild(mh);
+        mh.AddChild(HudIcon.Make(HudIcon.Kind.Coin, UiTheme.Gold, 30));
+        var lbl = UiTheme.Label("Créditos:", 20, UiTheme.Text, true);
+        lbl.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        mh.AddChild(lbl);
+        _money = UiTheme.Label("0", 24, UiTheme.Gold, true);
+        _money.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _money.HorizontalAlignment = HorizontalAlignment.Right;
+        mh.AddChild(_money);
+        _moneyGain = UiTheme.Shadowed(UiTheme.Label("", 16, UiTheme.Success, true, HorizontalAlignment.Right));
+        col.AddChild(_moneyGain);
+        _moneyGain.Visible = false;
+
+        _capPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _capPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 8));
+        col.AddChild(_capPanel);
+        var ch = new HBoxContainer();
+        ch.AddThemeConstantOverride("separation", 10);
+        _capPanel.AddChild(ch);
+        ch.AddChild(HudIcon.Make(HudIcon.Kind.Bag, new Color(0.75f, 0.85f, 0.95f), 30));
+        var cv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        cv.AddThemeConstantOverride("separation", 4);
+        ch.AddChild(cv);
+        _capLabel = UiTheme.Label("Capacidade: 0 / 30", 18, UiTheme.Text, true);
+        cv.AddChild(_capLabel);
+        _capBar = UiTheme.Bar(UiTheme.Cyan, 210, 9);
+        cv.AddChild(_capBar);
+
+        _notifs = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _notifs.AddThemeConstantOverride("separation", 8);
+        col.AddChild(_notifs);
+    }
+
+    void BuildCenter()
+    {
+        _crosshair = new Crosshair { MouseFilter = Control.MouseFilterEnum.Ignore };
+        UiTheme.Place(_crosshair, Control.LayoutPreset.Center, new Vector2(-36, -36), new Vector2(72, 72));
+        _root.AddChild(_crosshair);
+
+        // painel do alvo acima da mira, com cantoneiras
+        _targetBox = new Control { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        UiTheme.Place(_targetBox, Control.LayoutPreset.Center, new Vector2(-175, -205), new Vector2(350, 150));
+        _root.AddChild(_targetBox);
+        _brackets = new BracketFrame();
+        _brackets.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _targetBox.AddChild(_brackets);
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.82f), new Color(1, 1, 1, 0.12f), 10, 1, 14, 8));
+        UiTheme.Place(panel, Control.LayoutPreset.FullRect, new Vector2(12, 12));
+        panel.OffsetRight = -12; panel.OffsetBottom = -12;
+        _targetBox.AddChild(panel);
+        var v = new VBoxContainer();
+        v.AddThemeConstantOverride("separation", 4);
+        panel.AddChild(v);
+        var nameRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        nameRow.AddThemeConstantOverride("separation", 8);
+        v.AddChild(nameRow);
+        nameRow.AddChild(HudIcon.Make(HudIcon.Kind.Pick, UiTheme.Text, 20));
+        _targetName = UiTheme.Label("", 20, UiTheme.Text, true);
+        nameRow.AddChild(_targetName);
+        _targetRarity = UiTheme.Label("", 14, UiTheme.Gold, false, HorizontalAlignment.Center);
+        v.AddChild(_targetRarity);
+        var barRow = new PanelContainer();
+        barRow.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.02f, 0.03f, 0.06f, 0.9f), new Color(1, 1, 1, 0.25f), 6, 1, 6, 3));
+        v.AddChild(barRow);
+        var bh = new HBoxContainer();
+        bh.AddThemeConstantOverride("separation", 8);
+        barRow.AddChild(bh);
+        _targetHp = UiTheme.Bar(UiTheme.Violet, 230, 14);
+        _targetHp.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        _targetHp.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        bh.AddChild(_targetHp);
+        _targetPct = UiTheme.Label("0%", 18, UiTheme.Text, true, HorizontalAlignment.Right);
+        _targetPct.CustomMinimumSize = new Vector2(52, 0);
+        bh.AddChild(_targetPct);
+        var yRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
+        yRow.AddThemeConstantOverride("separation", 6);
+        v.AddChild(yRow);
+        yRow.AddChild(UiTheme.Label("Rendimento est.:", 14, UiTheme.Muted));
+        _targetGem = HudIcon.Make(HudIcon.Kind.Gem, UiTheme.Cyan, 20);
+        yRow.AddChild(_targetGem);
+        _targetYield = UiTheme.Label("", 15, UiTheme.Text, true);
+        yRow.AddChild(_targetYield);
+
+        // prompt de interação
+        _promptPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        _promptPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.85f), UiTheme.Gold, 10, 2, 18, 8));
+        UiTheme.Place(_promptPanel, Control.LayoutPreset.Center, new Vector2(-150, 70));
+        _root.AddChild(_promptPanel);
+        _prompt = UiTheme.Label("", 19, UiTheme.Text, true, HorizontalAlignment.Center);
+        _promptPanel.AddChild(_prompt);
+    }
+
+    void BuildBottom()
+    {
+        // barra de fragmentos (canto inferior esquerdo)
+        _hotbar = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _hotbar.AddThemeConstantOverride("separation", 6);
+        UiTheme.Place(_hotbar, Control.LayoutPreset.BottomLeft, new Vector2(20, -86));
+        _root.AddChild(_hotbar);
+        for (int i = 0; i < SlotCount; i++)
+        {
+            var p = new PanelContainer { CustomMinimumSize = new Vector2(66, 66), MouseFilter = Control.MouseFilterEnum.Ignore };
+            p.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.75f), new Color(UiTheme.Cyan, 0.35f), 10, 2, 4, 4));
+            var ov = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
+            p.AddChild(ov);
+            var gem = HudIcon.Make(HudIcon.Kind.Gem, UiTheme.Cyan, 40);
+            UiTheme.Place(gem, Control.LayoutPreset.Center, new Vector2(-20, -24), new Vector2(40, 40));
+            ov.AddChild(gem);
+            var count = UiTheme.Shadowed(UiTheme.Label("", 17, UiTheme.Text, true, HorizontalAlignment.Right), 5);
+            UiTheme.Place(count, Control.LayoutPreset.BottomRight, new Vector2(-50, -24), new Vector2(46, 0));
+            ov.AddChild(count);
+            _hotbar.AddChild(p);
+            _slots.Add((p, gem, count));
+        }
+
+        // energia de ressonância e ferramenta (canto inferior direito)
+        var energy = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        energy.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 8));
+        UiTheme.Place(energy, Control.LayoutPreset.BottomRight, new Vector2(-342, -132), new Vector2(320, 0));
+        _root.AddChild(energy);
+        var ev = new VBoxContainer();
+        ev.AddThemeConstantOverride("separation", 4);
+        energy.AddChild(ev);
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 10);
+        ev.AddChild(row);
+        row.AddChild(HudIcon.Make(HudIcon.Kind.Bolt, UiTheme.Cyan, 30));
+        var rv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        rv.AddThemeConstantOverride("separation", 3);
+        row.AddChild(rv);
+        var title = new HBoxContainer();
+        rv.AddChild(title);
+        var t = UiTheme.Label("Ressonância:", 18, UiTheme.Text, true);
+        t.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        title.AddChild(t);
+        _energyPct = UiTheme.Label("0%", 18, UiTheme.Text, true);
+        title.AddChild(_energyPct);
+        _energyBar = UiTheme.Bar(UiTheme.Cyan, 230, 9);
+        rv.AddChild(_energyBar);
+        _pulseInfo = UiTheme.Label("", 13, UiTheme.Muted);
+        ev.AddChild(_pulseInfo);
+
+        var tool = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        tool.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, new Color(UiTheme.Cyan, 0.5f), 10, 2, 14, 6));
+        UiTheme.Place(tool, Control.LayoutPreset.BottomRight, new Vector2(-342, -56), new Vector2(320, 0));
+        _root.AddChild(tool);
+        var th = new HBoxContainer();
+        th.AddThemeConstantOverride("separation", 8);
+        tool.AddChild(th);
+        _toolName = UiTheme.Label("", 16, UiTheme.Cyan, true);
+        _toolName.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        th.AddChild(_toolName);
+        _toolStats = UiTheme.Label("", 14, UiTheme.Text);
+        th.AddChild(_toolStats);
+
+        _keys = UiTheme.Shadowed(UiTheme.Label("[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [Esc] Pausa", 14, UiTheme.Muted, false, HorizontalAlignment.Center));
+        UiTheme.Place(_keys, Control.LayoutPreset.CenterBottom, new Vector2(-300, -30), new Vector2(600, 0));
+        _root.AddChild(_keys);
+
+        _fps = UiTheme.Shadowed(UiTheme.Label("", 14, UiTheme.Success));
+        UiTheme.Place(_fps, Control.LayoutPreset.BottomRight, new Vector2(-90, -164));
+        _root.AddChild(_fps);
+    }
+
+    // ============================ Atualizações ============================
     public void ResetMoneyDisplay()
     {
         _displayMoney = _shownMoney = GameState.Instance.Data.Money;
-        _money.Text = GameState.FormatMoney(_displayMoney);
+        _money.Text = GameState.FormatNumber(_displayMoney);
         OnInventory();
         RefreshStats();
         RefreshObjective();
@@ -183,7 +337,8 @@ public partial class Hud : CanvasLayer
         {
             _gainAccum += m - _shownMoney;
             _gainTimer = 2.2f;
-            _moneyGain.Text = "  +" + GameState.FormatNumber(_gainAccum);
+            _moneyGain.Text = "+" + GameState.FormatNumber(_gainAccum);
+            _moneyGain.Visible = true;
             _moneyGain.Modulate = Colors.White;
             _money.PivotOffset = _money.Size / 2;
             var tw = _money.CreateTween();
@@ -199,21 +354,43 @@ public partial class Hud : CanvasLayer
         var gs = GameState.Instance;
         int cnt = gs.InventoryCount, cap = gs.Capacity;
         bool full = cnt >= cap;
-        _capLabel.Text = full
-            ? $"Mochila {cnt}/{cap}  —  CHEIA! Venda na estação"
-            : $"Mochila {cnt}/{cap}   ·   {GameState.FormatMoney(gs.InventoryValue())}";
+        _capLabel.Text = full ? $"Capacidade: {cnt} / {cap}  CHEIA" : $"Capacidade: {cnt} / {cap}";
+        _capLabel.AddThemeColorOverride("font_color", full ? UiTheme.Danger : UiTheme.Text);
         _capBar.Value = cap > 0 ? (double)cnt / cap : 0;
-        var fill = UiTheme.Box(full ? UiTheme.Danger : cnt > cap * 0.75f ? UiTheme.Gold : UiTheme.Cyan, new Color(0, 0, 0, 0), 6, 0, 0);
-        fill.ShadowSize = 0;
-        _capBar.AddThemeStyleboxOverride("fill", fill);
-        _capLabel.AddThemeColorOverride("font_color", full ? UiTheme.Danger : UiTheme.Muted);
+        UiTheme.SetBarColor(_capBar, full ? UiTheme.Danger : cnt > cap * 0.75f ? UiTheme.Gold : UiTheme.Cyan);
+
+        // barra de fragmentos: materiais mais valiosos primeiro
+        var items = gs.Data.Inventory.Where(kv => kv.Value > 0 && GameData.Mat(kv.Key) != null)
+            .OrderByDescending(kv => GameData.Mat(kv.Key).Value).Take(SlotCount).ToList();
+        for (int i = 0; i < SlotCount; i++)
+        {
+            var (panel, gem, count) = _slots[i];
+            if (i < items.Count)
+            {
+                var m = GameData.Mat(items[i].Key);
+                gem.Visible = true;
+                gem.Color = m.Glow.Lightened(0.15f);
+                gem.QueueRedraw();
+                count.Text = items[i].Value.ToString();
+                panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.8f), new Color(m.Glow, 0.6f), 10, 2, 4, 4));
+                panel.TooltipText = m.Name;
+            }
+            else
+            {
+                gem.Visible = false;
+                count.Text = "";
+                panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.55f), new Color(UiTheme.Cyan, 0.2f), 10, 2, 4, 4));
+            }
+        }
         RefreshObjective();
     }
 
     void RefreshStats()
     {
         var gs = GameState.Instance;
-        _stats.Text = $"{GameState.ToolTierNames[gs.ToolTier]}   ·   {GameState.FormatNumber(gs.Damage)} dano   ·   {gs.SwingsPerSecond:0.0} golpes/s   ·   {GameState.FormatNumber(gs.DamagePerSecond)} DPS";
+        _toolName.Text = GameState.ToolTierNames[gs.ToolTier];
+        _toolStats.Text = $"{GameState.FormatNumber(gs.Damage)} dano · {gs.SwingsPerSecond:0.0}/s";
+        _pulseInfo.Text = $"Pulso x{gs.ResonanceMultiplier:0.0} do dano · raio {gs.ResonanceRadius:0.0} m";
     }
 
     /// <summary>Guia de objetivos para a experiência inicial e metas de longo prazo.</summary>
@@ -244,7 +421,7 @@ public partial class Hud : CanvasLayer
 
     void OnNotified(string title, string body, NotifyKind kind)
     {
-        if (_notifs.GetChildCount() >= 4) { _pending.Enqueue((title, body, kind)); return; }
+        if (_notifs.GetChildCount() >= 3) { _pending.Enqueue((title, body, kind)); return; }
         ShowNotification(title, body, kind);
     }
 
@@ -260,14 +437,14 @@ public partial class Hud : CanvasLayer
         };
         if (kind == NotifyKind.Unlock) AudioManager.Instance?.Play("unlock", -6f);
         var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        panel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.05f, 0.04f, 0.1f, 0.9f), color, 10, 2, 14));
+        panel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.88f), color, 10, 2, 14, 8));
         var v = new VBoxContainer();
         v.AddThemeConstantOverride("separation", 2);
         panel.AddChild(v);
-        v.AddChild(UiTheme.Label(title, 18, color, true));
-        var b = UiTheme.Label(body, 15, UiTheme.Text);
+        v.AddChild(UiTheme.Label(title, 17, color, true));
+        var b = UiTheme.Label(body, 14, UiTheme.Text);
         b.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        b.CustomMinimumSize = new Vector2(290, 0);
+        b.CustomMinimumSize = new Vector2(268, 0);
         v.AddChild(b);
         _notifs.AddChild(panel);
         panel.Modulate = new Color(1, 1, 1, 0);
@@ -287,9 +464,9 @@ public partial class Hud : CanvasLayer
     }
 
     public void ShowPulse(int count) =>
-        Pop(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", UiTheme.Gold, 30, -110);
+        Pop(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", UiTheme.Gold, 30, 60);
 
-    void OnBigMessage(string text) => Pop(text, UiTheme.Cyan, 40, -190, 2.2f);
+    void OnBigMessage(string text) => Pop(text, UiTheme.Cyan, 40, -260, 2.2f);
 
     void Pop(string text, Color color, int size, float y, float hold = 0.5f)
     {
@@ -297,7 +474,7 @@ public partial class Hud : CanvasLayer
         UiTheme.Place(l, Control.LayoutPreset.Center, new Vector2(-450, y), new Vector2(900, 0));
         l.PivotOffset = new Vector2(450, size * 0.7f);
         l.Scale = new Vector2(0.6f, 0.6f);
-        _crosshair.GetParent().AddChild(l);
+        _root.AddChild(l);
         var tw = l.CreateTween();
         tw.TweenProperty(l, "scale", Vector2.One * 1.1f, 0.15f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
         tw.TweenProperty(l, "scale", Vector2.One, 0.1f);
@@ -307,25 +484,29 @@ public partial class Hud : CanvasLayer
         tw.TweenCallback(Callable.From(l.QueueFree));
     }
 
+    /// <summary>Atualiza a etiqueta de região e anima a entrada.</summary>
     public void ShowRegionBanner(RegionDef r)
     {
-        _regionTitle.Text = r.Name.ToUpper();
-        _regionTitle.AddThemeColorOverride("font_color", r.AccentColor.Lightened(0.2f));
-        _regionSub.Text = r.Subtitle;
-        var tw = _regionBanner.CreateTween();
-        tw.TweenProperty(_regionBanner, "modulate:a", 1f, 0.6f);
-        tw.TweenInterval(2.8f);
-        tw.TweenProperty(_regionBanner, "modulate:a", 0f, 1.2f);
+        _regionName.Text = r.Name;
+        _regionSub.Text = $"◇ Região {r.Index + 1} de {GameData.Regions.Count} · {r.Subtitle}";
+        _regionIcon.Color = r.AccentColor;
+        _regionIcon.QueueRedraw();
+        _regionTag.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, new Color(r.AccentColor, 0.85f), 14, 2, 22, 6));
+        _regionName.AddThemeColorOverride("font_color", r.AccentColor.Lightened(0.45f));
+        _regionTag.PivotOffset = new Vector2(190, 30);
+        _regionTag.Scale = new Vector2(1.25f, 1.25f);
+        _regionTag.Modulate = new Color(1.6f, 1.6f, 1.6f);
+        var tw = _regionTag.CreateTween().SetParallel();
+        tw.TweenProperty(_regionTag, "scale", Vector2.One, 0.6f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+        tw.TweenProperty(_regionTag, "modulate", Colors.White, 1.2f);
     }
-
-    double _lastFullWarn = -100;
 
     public void FlashFull()
     {
         double now = Godot.Time.GetTicksMsec() / 1000.0;
-        if (now - _lastFullWarn < 6.0) { _fullFlash = 1f; return; }
-        _lastFullWarn = now;
         _fullFlash = 1f;
+        if (now - _lastFullWarn < 6.0) return;
+        _lastFullWarn = now;
         AudioManager.Instance?.Play("full", -6f);
         GameState.Instance.Notify("Mochila cheia!", "Venda seus fragmentos ou compre a Mochila Reforçada.", NotifyKind.Warning);
     }
@@ -334,7 +515,6 @@ public partial class Hud : CanvasLayer
     {
         float dt = (float)delta;
         var gs = GameState.Instance;
-        // contador de dinheiro animado
         long target = gs.Data.Money;
         if (_displayMoney != target)
         {
@@ -342,47 +522,57 @@ public partial class Hud : CanvasLayer
             long step = (long)Math.Ceiling(Math.Abs(diff) * Math.Min(1.0, dt * 8.0));
             _displayMoney += Math.Sign(diff) * Math.Max(1, step);
             if (Math.Sign(target - _displayMoney) != Math.Sign(diff)) _displayMoney = target;
-            _money.Text = GameState.FormatMoney(_displayMoney);
+            _money.Text = GameState.FormatNumber(_displayMoney);
         }
         if (_gainTimer > 0)
         {
             _gainTimer -= dt;
             if (_gainTimer < 0.6f) _moneyGain.Modulate = new Color(1, 1, 1, Mathf.Max(0, _gainTimer / 0.6f));
-            if (_gainTimer <= 0) { _gainAccum = 0; _moneyGain.Text = ""; }
+            if (_gainTimer <= 0) { _gainAccum = 0; _moneyGain.Text = ""; _moneyGain.Visible = false; }
         }
-        if (_fullFlash > 0)
-        {
-            _fullFlash -= dt;
-            _capBar.Modulate = new Color(1, 1, 1, 0.5f + 0.5f * Mathf.Abs(Mathf.Sin(_fullFlash * 12f)));
-        }
-        else _capBar.Modulate = Colors.White;
+        _capPanel.Modulate = _fullFlash > 0
+            ? new Color(1, 0.6f + 0.4f * Mathf.Abs(Mathf.Cos((_fullFlash -= dt) * 12f)), 0.6f + 0.4f * Mathf.Abs(Mathf.Cos(_fullFlash * 12f)))
+            : Colors.White;
 
         UpdateEventPanel();
         _fps.Visible = Settings.Data.ShowFps;
         if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS";
 
         if (Player == null || !IsInstanceValid(Player)) return;
+        // ressonância
+        float res = Player.Resonance01;
+        _energyBar.Value = res;
+        _energyPct.Text = Player.ResonanceReady ? "PRONTO" : $"{res * 100:0}%";
+        UiTheme.SetBarColor(_energyBar, Player.ResonanceReady ? UiTheme.Gold : UiTheme.Cyan);
+
         // alvo
         var c = Player.TargetCrystal;
         _crosshair.Target = c != null;
         _crosshair.Progress = c != null ? 1f - c.HpRatio : 0f;
         _crosshair.Cooldown = Player.SwingCooldown01;
-        _crosshair.Resonance = Player.Resonance01;
+        _crosshair.Resonance = res;
         _crosshair.Time += dt;
         _crosshair.TargetColor = c?.Material.Glow ?? UiTheme.Cyan;
         _crosshair.QueueRedraw();
-        _targetPanel.Visible = c != null;
+        _targetBox.Visible = c != null;
         if (c != null)
         {
             var m = c.Material;
-            _targetName.Text = m.Name + (m.Rare ? "  ★ RARO" : m.Special ? "  ✦ ESPECIAL" : "");
-            _targetName.AddThemeColorOverride("font_color", m.Glow.Lightened(0.35f));
-            _targetHp.Value = c.HpRatio;
-            var fill = UiTheme.Box(m.Glow, new Color(0, 0, 0, 0), 5, 0, 0);
-            fill.ShadowSize = 0;
-            _targetHp.AddThemeStyleboxOverride("fill", fill);
-            float hitsLeft = Mathf.Ceil(c.Hp / Mathf.Max(0.01f, gs.Damage));
-            _targetInfo.Text = $"{GameState.FormatNumber(c.Hp)} / {GameState.FormatNumber(c.MaxHp)}  ·  {GameState.FormatMoney(gs.SellPrice(m))}/frag  ·  {hitsLeft:0} golpes";
+            _targetName.Text = m.Name;
+            _targetRarity.Text = m.Special ? "✦ Formação Especial" : m.Rare ? "★ Raro" : "Comum";
+            _targetRarity.AddThemeColorOverride("font_color", m.Special || m.Rare ? UiTheme.Gold : UiTheme.Muted);
+            _brackets.Color = m.Glow.Lightened(0.3f);
+            _brackets.QueueRedraw();
+            float pct = 1f - c.HpRatio;
+            _targetHp.Value = pct;
+            UiTheme.SetBarColor(_targetHp, m.Glow);
+            _targetPct.Text = $"{pct * 100:0}%";
+            _targetGem.Color = m.Glow.Lightened(0.15f);
+            _targetGem.QueueRedraw();
+            float scale = m.Special ? 1f : c.SizeScale;
+            int lo = Math.Max(1, (int)MathF.Round(m.ShardsMin * scale * gs.EventShardMultiplier));
+            int hi = Math.Max(lo, (int)MathF.Round(m.ShardsMax * scale * gs.EventShardMultiplier));
+            _targetYield.Text = (lo == hi ? $"×{lo}" : $"×{lo}–{hi}") + $"   ·   {GameState.FormatMoney(gs.SellPrice(m))}/frag";
         }
         // prompt
         string prompt = Player.TargetInteractable?.GetPrompt();
@@ -391,13 +581,12 @@ public partial class Hud : CanvasLayer
         {
             _prompt.Text = prompt;
             _promptPanel.ResetSize();
-            _promptPanel.OffsetLeft = -_promptPanel.Size.X / 2; _promptPanel.OffsetRight = _promptPanel.Size.X / 2;
+            _promptPanel.OffsetLeft = -_promptPanel.Size.X / 2;
+            _promptPanel.OffsetRight = _promptPanel.Size.X / 2;
         }
     }
 
     public void SetGameplayVisible(bool v) => Visible = v;
-
-    World.RegionEvents.EventDef _shownEvent;
 
     void UpdateEventPanel()
     {
@@ -406,12 +595,11 @@ public partial class Hud : CanvasLayer
         if (a != _shownEvent)
         {
             _shownEvent = a;
-            _eventPanel.AddThemeStyleboxOverride("panel", UiTheme.Box(new Color(0.04f, 0.03f, 0.08f, 0.8f), a.Color, 10, 2, 12));
+            _eventPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.85f), a.Color, 10, 2, 12, 6));
             _eventTitle.Text = a.Name.ToUpper();
             _eventTitle.AddThemeColorOverride("font_color", a.Color);
             _eventDesc.Text = a.Description;
-            var fill = UiTheme.Box(a.Color, new Color(0, 0, 0, 0), 3, 0, 0); fill.ShadowSize = 0;
-            _eventBar.AddThemeStyleboxOverride("fill", fill);
+            UiTheme.SetBarColor(_eventBar, a.Color);
             _eventPanel.Visible = true;
             UiTheme.PopIn(_eventPanel);
         }
@@ -419,14 +607,14 @@ public partial class Hud : CanvasLayer
     }
 }
 
-/// <summary>Mira desenhada por código: anel de progresso de dano e indicador de cadência.</summary>
+/// <summary>Mira de scanner: círculo tracejado, progresso do alvo, cadência e ressonância.</summary>
 public partial class Crosshair : Control
 {
     public bool Target;
-    public float Resonance;
-    public float Time;
     public float Progress;
     public float Cooldown;
+    public float Resonance;
+    public float Time;
     public Color TargetColor = UiTheme.Cyan;
 
     public override void _Draw()
@@ -434,28 +622,28 @@ public partial class Crosshair : Control
         var c = Size / 2;
         var white = new Color(1, 1, 1, 0.9f);
         DrawCircle(c, 2.5f, white);
+        // círculo tracejado (4 segmentos) que gira devagar
+        float rot = Target ? Time * 1.5f : 0f;
+        var ringCol = Target ? TargetColor.Lightened(0.4f) : new Color(1, 1, 1, 0.75f);
+        float rad = Target ? 20 : 14;
+        for (int i = 0; i < 4; i++)
+        {
+            float a0 = rot + i * Mathf.Pi / 2 + 0.2f;
+            DrawArc(c, rad, a0, a0 + Mathf.Pi / 2 - 0.4f, 10, ringCol, 2.5f, true);
+        }
+        if (Target)
+        {
+            if (Progress > 0.001f)
+                DrawArc(c, 26, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * Progress, 40, TargetColor.Lightened(0.2f), 4, true);
+            if (Cooldown > 0.01f)
+                DrawArc(c, 9, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * Cooldown, 20, new Color(1, 1, 1, 0.5f), 2, true);
+        }
         if (Resonance > 0.001f)
         {
             bool ready = Resonance >= 0.999f;
             var col = ready ? UiTheme.Gold.Lerp(Colors.White, 0.5f + 0.5f * Mathf.Sin(Time * 14f)) : new Color(UiTheme.Violet, 0.85f);
-            float r = ready ? 28 + Mathf.Sin(Time * 14f) * 1.5f : 27;
+            float r = ready ? 32 + Mathf.Sin(Time * 14f) * 1.5f : 31;
             DrawArc(c, r, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * Resonance, 48, col, ready ? 4 : 3, true);
-        }
-        if (Target)
-        {
-            DrawArc(c, 18, 0, Mathf.Tau, 40, new Color(0, 0, 0, 0.45f), 5, true);
-            if (Progress > 0.001f)
-                DrawArc(c, 18, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * Progress, 40, TargetColor.Lightened(0.3f), 4, true);
-            if (Cooldown > 0.01f)
-                DrawArc(c, 11, -Mathf.Pi / 2, -Mathf.Pi / 2 + Mathf.Tau * Cooldown, 24, new Color(1, 1, 1, 0.5f), 2, true);
-        }
-        else
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                var dir = Vector2.Right.Rotated(i * Mathf.Pi / 2);
-                DrawLine(c + dir * 6, c + dir * 11, new Color(1, 1, 1, 0.7f), 2, true);
-            }
         }
     }
 }

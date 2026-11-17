@@ -173,4 +173,45 @@ public static class UiTheme
         c.OffsetRight = offset.X + s.X;
         c.OffsetBottom = offset.Y + s.Y;
     }
+
+    public static readonly Color HudBg = new(0.03f, 0.06f, 0.1f, 0.78f);
+
+    /// <summary>Painel sci-fi com cantos chanfrados (corner_detail = 1) e borda ciano.</summary>
+    public static StyleBoxFlat Chamfer(Color? bg = null, Color? border = null, int cut = 10, int borderW = 2, int padX = 14, int padY = 8)
+    {
+        var s = new StyleBoxFlat
+        {
+            BgColor = bg ?? HudBg,
+            BorderColor = border ?? new Color(Cyan, 0.75f),
+            CornerDetail = 1,
+            ShadowColor = new Color(0, 0, 0, 0.3f),
+            ShadowSize = 4,
+            AntiAliasing = true,
+        };
+        s.SetCornerRadiusAll(cut);
+        s.SetBorderWidthAll(borderW);
+        s.ContentMarginLeft = s.ContentMarginRight = padX;
+        s.ContentMarginTop = s.ContentMarginBottom = padY;
+        return s;
+    }
+
+    public static StyleBoxFlat Flat(Color c, int radius = 3)
+    {
+        var s = new StyleBoxFlat { BgColor = c, CornerDetail = 1 };
+        s.SetCornerRadiusAll(radius);
+        return s;
+    }
+
+    /// <summary>Barra de progresso estilizada (fundo escuro, preenchimento colorido).</summary>
+    public static ProgressBar Bar(Color fill, float w, float h)
+    {
+        var b = new ProgressBar { CustomMinimumSize = new Vector2(w, h), ShowPercentage = false, MaxValue = 1, Step = 0.001, MouseFilter = Control.MouseFilterEnum.Ignore };
+        var bg = Flat(new Color(0.02f, 0.03f, 0.06f, 0.9f), (int)(h / 2));
+        bg.BorderColor = new Color(fill, 0.35f); bg.SetBorderWidthAll(1);
+        b.AddThemeStyleboxOverride("background", bg);
+        b.AddThemeStyleboxOverride("fill", Flat(fill, (int)(h / 2)));
+        return b;
+    }
+
+    public static void SetBarColor(ProgressBar b, Color fill) => b.AddThemeStyleboxOverride("fill", Flat(fill, (int)(b.CustomMinimumSize.Y / 2)));
 }
