@@ -1,0 +1,64 @@
+using System.Collections.Generic;
+using System.Linq;
+using CrystalExcavator.Data;
+
+namespace CrystalExcavator.Core;
+
+/// <summary>Estado persistente do jogador. Todos os campos têm padrões seguros.</summary>
+public sealed class SaveData
+{
+    public const int CurrentVersion = 1;
+
+    public int Version { get; set; } = CurrentVersion;
+    public long Money { get; set; }
+    public long TotalEarned { get; set; }
+    public Dictionary<string, int> Upgrades { get; set; } = new();
+    public List<string> UnlockedRegions { get; set; } = new() { "caves" };
+    public Dictionary<string, int> Inventory { get; set; } = new();
+    public List<string> Discovered { get; set; } = new();
+    public long CrystalsMined { get; set; }
+    public long ShardsSold { get; set; }
+    public double PlayTimeSeconds { get; set; }
+    public bool TutorialDone { get; set; }
+    public float PlayerX { get; set; }
+    public float PlayerY { get; set; } = 1f;
+    public float PlayerZ { get; set; } = 14f;
+    public float PlayerYaw { get; set; }
+    public bool HasPosition { get; set; }
+
+    public int Level(string upgradeId) => Upgrades.TryGetValue(upgradeId, out int l) ? l : 0;
+
+    /// <summary>Corrige qualquer valor inválido (dados corrompidos, editados ou de versões antigas).</summary>
+    public void Sanitize()
+    {
+        Upgrades ??= new();
+        UnlockedRegions ??= new();
+        Inventory ??= new();
+        Discovered ??= new();
+        if (Money < 0) Money = 0;
+        if (TotalEarned < Money) TotalEarned = Money;
+        if (CrystalsMined < 0) CrystalsMined = 0;
+        if (ShardsSold < 0) ShardsSold = 0;
+        if (PlayTimeSeconds < 0 || double.IsNaN(PlayTimeSeconds)) PlayTimeSeconds = 0;
+
+        // upgrades: remove desconhecidos e limita níveis
+        foreach (var key in Upgrades.Keys.ToList())
+        {
+            if (!GameData.Upgrades.TryGetValue(key, out var def)) { Upgrades.Remove(key); continue; }
+            Upgrades[key] = System.Math.Clamp(Upgrades[key], 0, def.MaxLevel);
+        }
+        // regiões: apenas conhecidas, sem duplicatas, a primeira sempre liberada
+        UnlockedRegions = UnlockedRegions.Where(r => r != null && GameData.Region(r) != null).Distinct().ToList();
+        if (!UnlockedRegions.Contains("caves")) UnlockedRegions.Insert(0, "caves");
+        // inventário: apenas materiais conhecidos e quantidades positivas
+        foreach (var key in Inventory.Keys.ToList())
+        {
+            if (GameData.Mat(key) == null || Inventory[key] <= 0) Inventory.Remove(key);
+        }
+        Discovered = Discovered.Where(d => d != null && GameData.Mat(d) != null).Distinct().ToList();
+
+        bool bad(float f) => float.IsNaN(f) || float.IsInfinity(f) || System.MathF.Abs(f) > 10000f;
+        if (bad(PlayerX) || bad(PlayerY) || bad(PlayerZ) || bad(PlayerYaw)) HasPosition = false;
+        Version = CurrentVersion;
+    }
+}
