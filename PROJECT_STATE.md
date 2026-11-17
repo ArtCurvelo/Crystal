@@ -8,7 +8,7 @@ Godot **4.5.1 .NET**, C# (.NET 8), renderizador **Compatibility**. Todo o conte�
 A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrado, ferramenta laranja/cinza, cristais facetados com rachaduras, postos avançados, cachoeiras.
 
 ## Tempo (informado pelo diretor)
-3h21 consumidas às 04:12, ~26h39 restantes. Histórico completo em `DEVELOPMENT_LOG.md`.
+4h26 consumidas às 05:17, ~25h34 restantes. **Pausado: aguardar "Pode continuar".** Histórico em `DEVELOPMENT_LOG.md`.
 
 ## Repositório
 - GitHub: https://github.com/ArtCurvelo/Crystal (branch `main`). **Fonte da verdade.**

@@ -153,3 +153,11 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - Teste de integração com eventos de controle simulados (girar câmera, minerar com RT, mover, troca de dicas): 178/178.
 - **Instalador Windows** (`installer/CrystalExcavator.nsi`, NSIS 3.09 extraído em `/home/user/tools/nsis`; gerado por `tools/build_installer.sh`): `build/CrystalExcavator-Setup.exe` (53 MB, LZMA). Interface em pt-BR, instala em `%LOCALAPPDATA%\Programs\CrystalExcavator` sem exigir administrador, cria atalhos no Menu Iniciar e na Área de Trabalho, registra em "Adicionar ou remover programas" com desinstalador (preserva os saves) e oferece "Jogar agora" ao final. Validado como executável PE Nullsoft; a execução em Windows real depende do diretor.
 - **Instalador versionado em `dist/`** (com `LEIA-ME.txt`), regenerado a partir do commit atual; `tools/build_installer.sh` copia automaticamente para `dist/`. A pasta `build/` e o cache `.godot/` continuam fora do Git.
+
+---
+
+## Controle de tempo
+- **04:12 → 05:17** (+1h05, informado). **Total consumido: 4h26min. Restante: ~25h34min.**
+- Entregue neste período: tela de conclusão, ícone embutido no `.exe`, pré-aquecimento de shaders com tela de carregamento, correção do menu a 720p, suporte a controle, instalador Windows (NSIS) versionado em `dist/`.
+- **Desenvolvimento pausado** pelo diretor. Retomar somente após a instrução "Pode continuar".
+- Pendente com o diretor: resultado de FPS no Windows real (720p, qualidade Baixa) e o conteúdo de `git diff project.godot` no clone local (o Godot alterou o arquivo ao abrir).
