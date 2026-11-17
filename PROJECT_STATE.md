@@ -64,6 +64,8 @@ tests/
   PlaythroughBot.cs Bot que joga a partida real via entradas e telas (--bot[=min]): 4 regiões, conclusão, caminhada, estabilidade.
 tools/run_tests.sh  Compila e roda os testes (código de saída 0 = sucesso).
 tools/run_bot.sh    Roda o bot (cerca de 1,5 min real).
+tools/build_installer.sh  Exporta para Windows e gera build/CrystalExcavator-Setup.exe (NSIS em /home/user/tools/nsis).
+installer/          Script NSIS do instalador.
 docs/screenshots/   Capturas do jogo real.
 ```
 
