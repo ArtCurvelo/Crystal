@@ -106,7 +106,6 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 
 ## Problemas pendentes
 - **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
-- O ícone do `.exe` não é aplicado (exigiria rcedit; `application/modify_resources=false`).
 
 ## Próxima ação recomendada
 Polimento final e regressão; aguardar o resultado do teste no Windows e ajustar o desempenho conforme o FPS real.
