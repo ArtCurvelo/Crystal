@@ -30,7 +30,12 @@ o próximo golpe libera um pulso que atinge todos os cristais próximos.
 ### Regiões
 1. **Cavernas Luminosas**: Quartzo Lúmen, Ametista Cintilante e a rara Lágrima Solar.
 2. **Profundezas Prismáticas** (◈ 6.000): névoa gelada, Safira, Esmeralda e o raro Prisma Estelar.
-3. **Núcleo Ancestral** (◈ 400.000): calor, brasas, Rubi, Ancestralita, a rara Pérola do Vazio e a formação especial **Coração Ancestral**.
+3. **Núcleo Ancestral** (◈ 400.000): ruínas rúnicas, brasas douradas, Rubi, Ancestralita, a rara Pérola do Vazio e a formação especial **Coração Ancestral**.
+4. **Reservatório Abissal** (região bônus, ◈ 1,5 mi): lago luminoso e águas-vivas, Cristal de Maré, Coral Prismático e a lendária Lágrima Abissal.
+
+Cada região tem um **evento ambiental** periódico (Eco Luminoso, Maré Gélida, Surto do Núcleo, Maré Luminosa).
+Os materiais têm **raridade** (Comum, Incomum, Raro, Épico, Lendário), e a ferramenta evolui por **6 modelos**
+(Broca Inicial → Quebra-Núcleo) conforme a Potência do Feixe.
 
 ## Executar no Windows (build pronta)
 1. Copie a pasta `build/windows/` inteira. O `.exe` precisa da pasta `data_CrystalExcavator_windows_x86_64` e do `.pck` ao lado.
@@ -55,7 +60,7 @@ Requisitos: **Godot 4.5.1 .NET** (versão "Mono/.NET" do site oficial) e **.NET 
 ### Linha de comando
 ```bash
 dotnet build                                   # compila o C#
-godot --headless --path . -- --run-tests       # 108 testes automatizados
+godot --headless --path . -- --run-tests       # 156 verificações automatizadas
 godot --headless --fixed-fps 60 --path . -- --bot=120   # bot que joga a partida completa
 godot --path . -- --shots=C:/pasta/saida       # tour de capturas de tela + FPS
 godot --headless --path . --export-release "Windows Desktop" build/windows/CrystalExcavator.exe

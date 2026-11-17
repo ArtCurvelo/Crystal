@@ -403,6 +403,8 @@ public partial class Hud : CanvasLayer
         else if (d.ShardsSold == 0 && gs.InventoryCount < 8) text = "OBJETIVO\nColete os fragmentos. Eles são atraídos até você.";
         else if (d.ShardsSold == 0) text = "OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.";
         else if (d.Upgrades.Count == 0) text = "OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).";
+        else if (gs.IsUnlocked("core") && !d.Discovered.Contains("heart") && gs.Damage * gs.SwingsPerSecond * 120 > GameData.Mat("heart").Hp)
+            text = "META\nDestrua o Coração Ancestral no centro do Núcleo.";
         else
         {
             var next = gs.NextLockedRegion();
