@@ -64,3 +64,13 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 ### Testes
 - `run_tests.sh`: 108 verificações, 0 falhas.
 - `run_bot.sh`: SUCESSO (Região 2 em 9,5 min, Região 3 em 36 min, Coração em 46 min de jogo).
+- Feedback de compra (destaque no card), venda (explosão dourada e texto flutuante no mundo), desbloqueio e evolução da ferramenta (banner central).
+- Teste de caminhada real do acampamento ao Núcleo no bot: atravessa túneis e portões sem travar.
+- Saves e configurações em pasta própria (`%APPDATA%\CrystalExcavator`). Execuções headless não gravam configurações.
+- README com controles, instruções de execução e desenvolvimento.
+- Build Windows exportada (com `.console.exe` para diagnóstico) e enviada ao diretor como zip (69 MB).
+
+### Próxima tarefa prioritária
+1. Receber o resultado do diretor rodando o `.exe` no Windows (abre? FPS com F3 na qualidade Baixa a 720p?).
+2. Configurar o repositório remoto (o container é temporário).
+3. Continuar o polimento (Sessões 4–5): condições ambientais com impacto no jogo, refinamento de áudio e animações.
