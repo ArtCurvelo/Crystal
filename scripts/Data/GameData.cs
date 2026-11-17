@@ -163,7 +163,7 @@ public static class GameData
         });
         Add(new MaterialDef
         {
-            Id = "heart", Name = "Coração Ancestral", Value = 2200, Hp = 150000, Special = true,
+            Id = "heart", Name = "Coração Ancestral", Value = 2200, Hp = 600000, Special = true,
             Description = "Formação especial colossal. Libera uma chuva de fragmentos.",
             Color = new Color(1.0f, 0.95f, 0.75f), Glow = new Color(1.0f, 0.55f, 0.2f),
             ShardsMin = 18, ShardsMax = 24, RespawnSeconds = 120
@@ -188,7 +188,7 @@ public static class GameData
         var r2 = new RegionDef
         {
             Id = "depths", Index = 1, Name = "Profundezas Prismáticas",
-            Subtitle = "Névoa gelada e cristais resistentes.", UnlockCost = 4000,
+            Subtitle = "Névoa gelada e cristais resistentes.", UnlockCost = 6000,
             AmbientColor = new Color(0.2f, 0.45f, 0.6f), AmbientEnergy = 0.5f,
             FogColor = new Color(0.05f, 0.14f, 0.2f), FogDensity = 0.035f,
             RockColor = new Color(0.16f, 0.25f, 0.33f), AccentColor = new Color(0.3f, 1.0f, 0.7f),
@@ -203,7 +203,7 @@ public static class GameData
         var r3 = new RegionDef
         {
             Id = "core", Index = 2, Name = "Núcleo Ancestral",
-            Subtitle = "O coração quente do mundo.", UnlockCost = 150000,
+            Subtitle = "O coração quente do mundo.", UnlockCost = 400000,
             AmbientColor = new Color(0.6f, 0.3f, 0.2f), AmbientEnergy = 0.55f,
             FogColor = new Color(0.18f, 0.05f, 0.03f), FogDensity = 0.022f,
             RockColor = new Color(0.3f, 0.14f, 0.12f), AccentColor = new Color(1.0f, 0.55f, 0.2f),
@@ -220,7 +220,7 @@ public static class GameData
         {
             Id = UpgradeIds.Damage, Name = "Força da Picareta", Icon = "⚒",
             Description = "Aumenta o dano de cada golpe.",
-            BaseCost = 20, CostGrowth = 1.48, MaxLevel = 30,
+            BaseCost = 20, CostGrowth = 1.55, MaxLevel = 30,
             ValueAt = l => 4f * MathF.Pow(1.32f, l) + l * 2f,
             Format = v => $"{v:0} dano"
         });
@@ -236,7 +236,7 @@ public static class GameData
         {
             Id = UpgradeIds.Capacity, Name = "Mochila Reforçada", Icon = "▣",
             Description = "Carrega mais fragmentos antes de vender.",
-            BaseCost = 30, CostGrowth = 1.5, MaxLevel = 20,
+            BaseCost = 30, CostGrowth = 1.56, MaxLevel = 20,
             ValueAt = l => 30 + l * 15 + l * l * 2,
             Format = v => $"{v:0} fragmentos"
         });
@@ -252,8 +252,8 @@ public static class GameData
         {
             Id = UpgradeIds.Value, Name = "Lapidação Fina", Icon = "◆",
             Description = "Cada fragmento vale mais na venda.",
-            BaseCost = 90, CostGrowth = 1.6, MaxLevel = 25,
-            ValueAt = l => 1f + l * 0.15f + l * l * 0.01f,
+            BaseCost = 90, CostGrowth = 1.7, MaxLevel = 25,
+            ValueAt = l => 1f + l * 0.12f + l * l * 0.004f,
             Format = v => $"x{v:0.00} valor"
         });
         AddUp(new UpgradeDef
@@ -268,14 +268,14 @@ public static class GameData
         {
             Id = UpgradeIds.Resonance, Name = "Amplificador de Ressonância", Icon = "✺",
             Description = "Golpes em ritmo carregam um pulso que atinge todos os cristais próximos.",
-            BaseCost = 250, CostGrowth = 1.75, MaxLevel = 12,
-            ValueAt = l => 1.5f + l * 0.75f,
+            BaseCost = 400, CostGrowth = 1.9, MaxLevel = 12,
+            ValueAt = l => 1.5f + l * 0.5f,
             Format = v => $"pulso x{v:0.0} · raio {ResonanceRadius(v):0.0} m"
         });
     }
 
     /// <summary>Raio do pulso de ressonância derivado do multiplicador.</summary>
-    public static float ResonanceRadius(float mult) => 4f + (mult - 1.5f) * 0.8f;
+    public static float ResonanceRadius(float mult) => 4f + (mult - 1.5f) * 0.55f;
     /// <summary>Golpes rítmicos necessários para carregar um pulso.</summary>
     public const int ResonanceHits = 10;
     /// <summary>Janela (s) entre golpes para manter o ritmo.</summary>

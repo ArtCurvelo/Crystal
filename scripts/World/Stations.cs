@@ -219,6 +219,17 @@ public partial class RegionGate : StationBase
             }
             else HideBarrier();
         }
+        else if (!unlocked && _open)
+        {
+            // novo jogo / save carregado com a região bloqueada: restaura a barreira
+            _open = false;
+            _shape.SetDeferred(CollisionShape3D.PropertyName.Disabled, false);
+            foreach (Node c in GetChildren())
+                if (c is MeshInstance3D m) m.Visible = true;
+            Label.Visible = true;
+            _backLabel.Visible = true;
+            _barrierMat.AlbedoColor = new Color(Region.AccentColor, 0.35f);
+        }
         RefreshText();
     }
 

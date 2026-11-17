@@ -31,7 +31,9 @@ scripts/
 tests/
   TestRunner.cs    Suíte automatizada (--run-tests).
   ScreenshotTour.cs Tour de capturas e FPS (--shots=<pasta>).
+  PlaythroughBot.cs Bot que joga a partida real via entradas e telas (--bot[=min]).
 tools/run_tests.sh Compila e roda os testes.
+tools/run_bot.sh   Roda o bot de partida completa (cerca de 1,5 min real).
 ```
 
 ### Regras do mundo
@@ -52,17 +54,23 @@ xvfb-run -a -s "-screen 0 1280x720x24" $GODOT --path . -- --shots=/caminho/saida
 ```
 No Windows (máquina do diretor): abrir `project.godot` no Godot 4.5.1 .NET e pressionar F5, ou executar `build/windows/CrystalExcavator.exe`.
 
-Argumentos de usuário (após `--`): `--run-tests`, `--shots=<pasta>`, `--autostart`.
+Argumentos de usuário (após `--`): `--run-tests`, `--shots=<pasta>`, `--bot[=minutos]`, `--autostart`.
+O bot deve rodar com `--headless --fixed-fps 60` (simulação mais rápida que o tempo real).
 
 ## Procedimento de teste
 1. `./tools/run_tests.sh` → deve terminar com `0 falharam`.
+1b. `./tools/run_bot.sh` → deve terminar com `BOT: SUCESSO`.
 2. Tour de capturas → inspecionar os PNGs.
 3. Exportar o build Linux de QA e executá-lo com `--shots` para validar o pipeline de exportação.
 4. No Windows: executar o `.exe`, ativar FPS (F3) e testar na qualidade Baixa a 720p.
 
-## Balanceamento atual (simulação de jogador eficiente)
-- Região 2 (◈ 4.000): cerca de 9 min · Região 3 (◈ 150.000): cerca de 31 min.
+## Balanceamento atual
+Bot (teleporta e mira perfeitamente; tempos otimistas):
+- Região 2 (◈ 6.000): 9,5 min · Região 3 (◈ 400.000): 36 min · Coração Ancestral (600 mil de vida): 46 min · quase tudo no máximo: cerca de 51 min.
+- Para um humano, a estimativa é 1,5–2,5× mais lento, ou seja, cerca de 1,5–2 h para completar.
+Simulação analítica (sem ressonância): Região 2 em 15 min, Região 3 em 86 min.
 - Quartzo: 3,0 s no início, cerca de 0,03 s com upgrades no nível 12.
+- Ressonância: 10 golpes rítmicos (janela de 1,4 s) carregam um pulso de x(1,5 + 0,5·nível) do dano em raio de 4 + 0,55·(mult − 1,5) m.
 
 ## Problemas pendentes
 - FPS real na HD 4400 ainda não medido (só renderização por software aqui).

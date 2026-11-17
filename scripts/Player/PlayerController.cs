@@ -185,7 +185,7 @@ public partial class PlayerController : CharacterBody3D
         var pos = hit["position"].AsVector3();
         float dist = pos.DistanceTo(Camera.GlobalPosition);
         if (collider is Crystal c && c.IsMineable && dist <= gs.MiningReach + 0.6f) TargetCrystal = c;
-        else if (FindInteractable(collider as Node) is { } it && dist <= 3.6f) TargetInteractable = it;
+        else if (FindInteractable(collider as Node) is { } it && dist <= 3.6f && !string.IsNullOrEmpty(it.GetPrompt())) TargetInteractable = it;
     }
 
     static IInteractable FindInteractable(Node n)

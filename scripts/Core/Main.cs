@@ -102,6 +102,13 @@ public partial class Main : Node
         if (args.Contains("--autostart")) StartGame(false);
         var shots = args.FirstOrDefault(a => a.StartsWith("--shots="));
         if (shots != null) AddChild(new Tests.ScreenshotTour { Main = this, Dir = shots.Substring("--shots=".Length) });
+        var bot = args.FirstOrDefault(a => a.StartsWith("--bot"));
+        if (bot != null)
+        {
+            var b = new Tests.PlaythroughBot { Main = this };
+            if (bot.Contains('=') && float.TryParse(bot.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture, out float mins)) b.MaxGameMinutes = mins;
+            AddChild(b);
+        }
     }
 
     public override void _ExitTree()

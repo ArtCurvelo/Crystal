@@ -369,6 +369,14 @@ public partial class TestRunner : Node
         await Frames(3);
         Check(gate.IsOpen && GS.IsUnlocked(gate.Region.Id), "interagir deve abrir o portão");
         Check(GS.Data.Money == 0, "desbloqueio deve cobrar");
+        // novo jogo deve fechar o portão novamente
+        GS.NewGame();
+        await Frames(3);
+        Check(!gate.IsOpen, "novo jogo deve restaurar o portão bloqueado");
+        GS.Data.UnlockedRegions.Add(gate.Region.Id);
+        GS.RaiseAll();
+        await Frames(3);
+        Check(gate.IsOpen, "carregar save com região liberada deve abrir o portão");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, -60)).Id == "depths", "detecção de região por posição");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, 10)).Id == "caves", "detecção da região inicial");
         Check(WorldBuilder.RegionAt(new Vector3(0, 0, -130)).Id == "core", "detecção da região final");

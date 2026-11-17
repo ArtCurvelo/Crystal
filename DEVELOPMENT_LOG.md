@@ -46,3 +46,21 @@ Além do escopo da Sessão 1, o loop completo já funciona:
 
 ### Próxima tarefa prioritária
 Polimento visual (ferramenta, números de dano, iluminação da região 3), revisão da experiência inicial e o diretor validar o `.exe` no Windows.
+
+---
+
+## Sessão 1 (continuação) — profundidade e QA
+- **Tempo:** sessão iniciada às 00:51. Em 01:20, 29 min consumidos, ~29h31min restantes (informado). Próxima atualização quando o diretor informar.
+
+### Concluído (e testado)
+- **Mecânica original de Ressonância:** golpes rítmicos carregam um medidor (arco violeta na mira). Cheio, o próximo golpe libera um pulso que causa dano em área a todos os cristais no raio, com onda de choque, som grave e tremor de câmera. Novo upgrade: Amplificador de Ressonância.
+- **Coleção de materiais** (na pausa): descobertos com detalhes, desconhecidos como "???".
+- **Autodetecção de GPU** na primeira execução: Intel HD/UHD ou renderização por software usam qualidade Baixa e escala 3D de 85%. A qualidade Baixa usa 2 luzes por região em vez de 4–5 (FPS em software: 16–21 → 29–36).
+- **Correção:** portões não voltavam a fechar ao iniciar novo jogo depois de desbloquear (teste adicionado).
+- **Correção:** aviso de mochila cheia repetido.
+- **Bot de QA** (`tools/run_bot.sh`): joga a partida real usando as mesmas entradas do jogador. Mira, minera segurando o botão, usa as estações com E, aperta os botões de venda e de loja, abre portões e os atravessa andando, quebra o Coração e confere save/load ao final. Resultado: **SUCESSO, 0 erros**.
+- **Rebalanceamento** com base no bot (antes tudo era maximizado em 24 min; agora cerca de 51 min no bot e cerca de 1,5–2 h estimadas para um humano).
+
+### Testes
+- `run_tests.sh`: 108 verificações, 0 falhas.
+- `run_bot.sh`: SUCESSO (Região 2 em 9,5 min, Região 3 em 36 min, Coração em 46 min de jogo).
