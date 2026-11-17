@@ -41,7 +41,7 @@ files = []
 for rel in ["CrystalExcavator.pck", f"{data}/CrystalExcavator.dll", f"{data}/CrystalExcavator.deps.json", f"{data}/CrystalExcavator.runtimeconfig.json"]:
     p = os.path.join(pay, rel)
     b = open(p, "rb").read()
-    files.append({"path": rel, "url": f"{raw}/{rel}", "sha256": hashlib.sha256(b).hexdigest(), "size": len(b)})
+    files.append({"path": rel, "url": f"{raw}/{rel}?v={ver}", "sha256": hashlib.sha256(b).hexdigest(), "size": len(b)})
 m = {"version": ver, "engine": engine, "notes": notes,
      "setupUrl": "https://github.com/ArtCurvelo/Crystal/raw/main/dist/CrystalExcavator-Setup.exe", "files": files}
 open(os.path.join(pay, "update.json"), "w").write(json.dumps(m, ensure_ascii=False, indent=2))
