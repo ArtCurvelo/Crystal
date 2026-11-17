@@ -74,6 +74,7 @@ public partial class ShopScreen : ModalScreen
 {
     Label _money;
     GridContainer _grid;
+    string _lastBought;
     VBoxContainer _regionBox;
 
     public override void _Ready()
@@ -172,12 +173,21 @@ public partial class ShopScreen : ModalScreen
         btn.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         if (afford && !maxed) btn.AddThemeColorOverride("font_color", UiTheme.Gold);
         h.AddChild(btn);
+        if (u.Id == _lastBought)
+        {
+            // destaque visual da compra recém-feita
+            _lastBought = null;
+            card.Modulate = new Color(1.8f, 1.6f, 1.0f);
+            card.CreateTween().TweenProperty(card, "modulate", Colors.White, 0.45f);
+            Callable.From(() => btn.GrabFocus()).CallDeferred();
+        }
         return card;
     }
 
     void Buy(string id, Control card)
     {
         var gs = GameState.Instance;
+        _lastBought = id;
         if (gs.TryBuyUpgrade(id))
         {
             AudioManager.Instance?.Play("buy", -3f);

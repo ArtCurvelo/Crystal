@@ -96,6 +96,7 @@ public partial class Main : Node
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         GameState.Instance.BeforeSave = WritePlayerToSave;
         GameState.Instance.RegionsChanged += UpdateRegionCulling;
+        GameState.Instance.Sold += OnSold;
 
         ShowMenu();
 
@@ -118,6 +119,7 @@ public partial class Main : Node
         if (GameState.Instance != null)
         {
             GameState.Instance.RegionsChanged -= UpdateRegionCulling;
+            GameState.Instance.Sold -= OnSold;
             if (GameState.Instance.BeforeSave == WritePlayerToSave) GameState.Instance.BeforeSave = null;
         }
     }
@@ -328,6 +330,14 @@ public partial class Main : Node
             bool visible = Mathf.Abs(i - r.Index) <= 1;
             if (World.RegionRoots[i].Visible != visible) World.RegionRoots[i].Visible = visible;
         }
+    }
+
+    void OnSold(long amount)
+    {
+        if (Player == null || CurrentMode != Mode.Playing) return;
+        var p = Player.Camera.GlobalPosition - Player.Camera.GlobalTransform.Basis.Z * 1.6f + Vector3.Down * 0.4f;
+        Effects.Instance?.Burst(p, UiTheme.Gold, 1.2f);
+        Effects.Instance?.FloatText(p + Vector3.Up * 0.3f, "+" + GameState.FormatMoney(amount), UiTheme.Gold, 1.6f);
     }
 
     void OnCrystalHit(Crystal c, bool broke)

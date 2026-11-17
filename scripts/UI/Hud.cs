@@ -93,10 +93,10 @@ public partial class Hud : CanvasLayer
 
         // ---------- Banner de região ----------
         _regionBanner = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Modulate = new Color(1, 1, 1, 0) };
-        UiTheme.Place(_regionBanner, Control.LayoutPreset.CenterTop, new Vector2(-400, 90));
-        _regionBanner.CustomMinimumSize = new Vector2(800, 0);
+        UiTheme.Place(_regionBanner, Control.LayoutPreset.CenterTop, new Vector2(-300, 100), new Vector2(600, 0));
+        _regionBanner.CustomMinimumSize = new Vector2(600, 0);
         root.AddChild(_regionBanner);
-        _regionTitle = UiTheme.Shadowed(UiTheme.Label("", 44, UiTheme.Cyan, true, HorizontalAlignment.Center), 10);
+        _regionTitle = UiTheme.Shadowed(UiTheme.Label("", 36, UiTheme.Cyan, true, HorizontalAlignment.Center), 10);
         _regionSub = UiTheme.Shadowed(UiTheme.Label("", 20, UiTheme.Text, false, HorizontalAlignment.Center), 6);
         _regionBanner.AddChild(_regionTitle);
         _regionBanner.AddChild(_regionSub);
@@ -128,6 +128,7 @@ public partial class Hud : CanvasLayer
         gs.UpgradesChanged += RefreshStats;
         gs.RegionsChanged += RefreshObjective;
         gs.Notified += OnNotified;
+        gs.BigMessage += OnBigMessage;
         _displayMoney = _shownMoney = gs.Data.Money;
         OnInventory();
         RefreshStats();
@@ -145,6 +146,7 @@ public partial class Hud : CanvasLayer
         gs.UpgradesChanged -= RefreshStats;
         gs.RegionsChanged -= RefreshObjective;
         gs.Notified -= OnNotified;
+        gs.BigMessage -= OnBigMessage;
     }
 
     public void ResetMoneyDisplay()
@@ -266,17 +268,22 @@ public partial class Hud : CanvasLayer
         }));
     }
 
-    public void ShowPulse(int count)
+    public void ShowPulse(int count) =>
+        Pop(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", UiTheme.Gold, 30, -110);
+
+    void OnBigMessage(string text) => Pop(text, UiTheme.Cyan, 40, -190, 2.2f);
+
+    void Pop(string text, Color color, int size, float y, float hold = 0.5f)
     {
-        var l = UiTheme.Shadowed(UiTheme.Label(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", 30, UiTheme.Gold, true, HorizontalAlignment.Center), 8);
-        UiTheme.Place(l, Control.LayoutPreset.Center, new Vector2(-250, -110), new Vector2(500, 0));
-        l.PivotOffset = new Vector2(250, 20);
+        var l = UiTheme.Shadowed(UiTheme.Label(text, size, color, true, HorizontalAlignment.Center), 10);
+        UiTheme.Place(l, Control.LayoutPreset.Center, new Vector2(-450, y), new Vector2(900, 0));
+        l.PivotOffset = new Vector2(450, size * 0.7f);
         l.Scale = new Vector2(0.6f, 0.6f);
         _crosshair.GetParent().AddChild(l);
         var tw = l.CreateTween();
         tw.TweenProperty(l, "scale", Vector2.One * 1.1f, 0.15f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
         tw.TweenProperty(l, "scale", Vector2.One, 0.1f);
-        tw.TweenInterval(0.5f);
+        tw.TweenInterval(hold);
         tw.Parallel().TweenProperty(l, "position:y", l.Position.Y - 30, 0.9f);
         tw.TweenProperty(l, "modulate:a", 0f, 0.4f);
         tw.TweenCallback(Callable.From(l.QueueFree));

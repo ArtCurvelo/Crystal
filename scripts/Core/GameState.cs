@@ -25,6 +25,8 @@ public partial class GameState : Node
     public event Action RegionsChanged;
     public event Action<string, string, NotifyKind> Notified;
     public event Action<MaterialDef> MaterialDiscovered;
+    public event Action<long> Sold;
+    public event Action<string> BigMessage; // anúncios de destaque no centro da tela
 
     public const float AutosaveInterval = 45f;
     float _autosaveTimer;
@@ -122,6 +124,7 @@ public partial class GameState : Node
         Data.ShardsSold += count;
         AddMoney(total);
         InventoryChanged?.Invoke();
+        Sold?.Invoke(total);
         return total;
     }
 
@@ -149,7 +152,10 @@ public partial class GameState : Node
         MoneyChanged?.Invoke();
         UpgradesChanged?.Invoke();
         if (ToolTier > prevTier)
+        {
             Notify("Ferramenta evoluiu!", ToolTierNames[ToolTier], NotifyKind.Unlock);
+            BigMessage?.Invoke(ToolTierNames[ToolTier].ToUpper());
+        }
         return true;
     }
 
@@ -176,6 +182,7 @@ public partial class GameState : Node
         MoneyChanged?.Invoke();
         RegionsChanged?.Invoke();
         Notify("Região desbloqueada!", r.Name, NotifyKind.Unlock);
+        BigMessage?.Invoke("NOVA REGIÃO: " + r.Name.ToUpper());
         SaveGame(true);
         return true;
     }

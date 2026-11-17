@@ -66,7 +66,8 @@ public static class Settings
             Data = new SettingsData();
         }
         Data.Sanitize();
-        if (FirstRun) Save();
+        // execuções headless (testes, exportação) não devem fixar configurações sem GPU real
+        if (FirstRun && DisplayServer.GetName() != "headless") Save();
     }
 
     /// <summary>Na primeira execução escolhe preset conforme a GPU (integradas Intel antigas → Baixa).</summary>
