@@ -22,6 +22,7 @@ public partial class WorldBuilder : Node3D
     public readonly List<RegionGate> Gates = new();
     public Vector3 SpawnPoint = new(0, 0.1f, 15f);
     public MineElevator Elevator;
+    public PlayerHouse House;
     public SellStation SellStation;
 
     public override void _Ready()
@@ -40,11 +41,44 @@ public partial class WorldBuilder : Node3D
     /// </summary>
     public override void _Process(double delta)
     {
-        if (_wings.Count == 0 || ++_cullTick % 6 != 0) return;
+        if (++_cullTick % 30 == 0) UpdateRespawnRates();
+        if (_wings.Count == 0 || _cullTick % 6 != 0) return;
         var cam = GetViewport()?.GetCamera3D();
         if (cam == null) return;
         UpdateWingVisibility(cam.GlobalPosition);
     }
+
+    /// <summary>
+    /// Renascimento dinâmico: quanto mais depósitos quebrados numa região (sala + galerias),
+    /// mais rápido eles voltam. Com a região toda minerada, renascem até 6x mais rápido.
+    /// </summary>
+    public void UpdateRespawnRates()
+    {
+        var broken = new int[GameData.Regions.Count];
+        var total = new int[GameData.Regions.Count];
+        if (_crystalRegion == null || _crystalRegion.Length != Crystals.Count)
+        {
+            _crystalRegion = new int[Crystals.Count];
+            for (int k = 0; k < Crystals.Count; k++) _crystalRegion[k] = RegionAt(Crystals[k].GlobalPosition).Index;
+        }
+        for (int k = 0; k < Crystals.Count; k++)
+        {
+            var c = Crystals[k];
+            if (c.Material.Special) continue;
+            int i = _crystalRegion[k];
+            total[i]++;
+            if (!c.IsMineable) broken[i]++;
+        }
+        for (int k = 0; k < Crystals.Count; k++)
+        {
+            var c = Crystals[k];
+            int i = _crystalRegion[k];
+            c.RespawnRate = c.Material.Special ? 1f : RespawnRateFor(total[i] == 0 ? 0 : broken[i] / (float)total[i]);
+        }
+    }
+
+    int[] _crystalRegion;
+    public static float RespawnRateFor(float brokenFraction) => 1f + 5f * brokenFraction * brokenFraction;
 
     public void UpdateWingVisibility(Vector3 eye)
     {
@@ -76,6 +110,9 @@ public partial class WorldBuilder : Node3D
         foreach (var r in regions)
             foreach (var w in r.Wings) maxX = MathF.Max(maxX, WingCenterX(r, w) * w.Side + w.HalfX + 2);
         AddCollider(this, new Vector3(0, -0.5f, (minZ + maxZ) / 2), new Vector3(maxX * 2 + 4, 1, maxZ - minZ));
+
+        House = new PlayerHouse { Name = "PlayerHouse" };
+        AddChild(House);
 
         // agrupa malhas estáticas por material em cada região e túnel
         int saved = 0;

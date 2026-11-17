@@ -803,6 +803,25 @@ public partial class TestRunner : Node
             }
         }
         Check(total >= 8, $"devem existir ao menos 8 galerias (há {total})");
+        // renascimento dinâmico: região esgotada → minérios voltam bem mais rápido
+        Check(Mathf.IsEqualApprox(WorldBuilder.RespawnRateFor(0), 1f) && WorldBuilder.RespawnRateFor(1) >= 5.9f, "taxa de renascimento: 1x cheia, ~6x esgotada");
+        var depths = world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 1).ToList();
+        foreach (var c in depths) c.Hit(1e9f, c.GlobalPosition, Vector3.Up, true);
+        world.UpdateRespawnRates();
+        Check(depths.All(c => c.RespawnRate > 5.5f), "Profundezas esgotadas: renascimento acelerado");
+        Check(world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 0).All(c => c.RespawnRate < 1.5f), "outras regiões não são afetadas");
+        // casa onde se entra andando
+        var house = world.House;
+        Check(house != null && house.Bed != null && house.Panel != null && house.ElevatorDown != null, "casa com cama, painel e elevador");
+        Check(PlayerHouse.Contains(house.ArrivePoint) && PlayerHouse.Contains(house.WakePoint) && !PlayerHouse.Contains(world.SpawnPoint), "pontos da casa ficam dentro dela");
+        player.GlobalPosition = house.ArrivePoint;
+        player.Velocity = Vector3.Zero;
+        player.SetLook(0, 0);
+        await Frames(2);
+        Input.ActionPress("move_forward");
+        await Frames(240);
+        Input.ActionRelease("move_forward");
+        Check(PlayerHouse.Contains(player.GlobalPosition), "paredes da casa seguram o jogador");
         // oclusão por distância: longe da entrada some, dentro aparece
         var r1 = GameData.Regions[1]; var w1 = r1.Wings[0];
         var wn = world.RegionRoots[1].GetNode<Node3D>("Wing_" + w1.Id);

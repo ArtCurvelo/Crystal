@@ -33,6 +33,8 @@ public partial class Crystal : StaticBody3D
     readonly List<ShaderMaterial> _mats = new();
     Random _rng;
     float _respawnTimer;
+    /// <summary>Acelera o renascimento quando a região está esgotada (ajustado pelo WorldBuilder).</summary>
+    public float RespawnRate = 1f;
     float _flash;
     float _shake;
     float _baseEnergy = 1.1f;
@@ -126,7 +128,7 @@ public partial class Crystal : StaticBody3D
         switch (State)
         {
             case CrystalState.Broken:
-                _respawnTimer -= dt;
+                _respawnTimer -= dt * RespawnRate;
                 if (_respawnTimer <= 0) BeginRegrow();
                 return;
             case CrystalState.Growing:

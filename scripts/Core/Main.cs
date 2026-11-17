@@ -127,8 +127,14 @@ public partial class Main : Node
                 }
             });
         AddChild(_backups);
-        _home = new HomeScreen { OnSleep = SleepAtHome };
+        _home = new HomeScreen { OnSleep = () => { _home.CloseSilently(); SleepAtHome(); } };
+        _home.Closed += ReturnToGameplay;
         AddChild(_home);
+        _fade = new CanvasLayer { Layer = 60 };
+        _fadeRect = new ColorRect { Color = new Color(0, 0, 0, 0), MouseFilter = Control.MouseFilterEnum.Ignore };
+        _fadeRect.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        _fade.AddChild(_fadeRect);
+        AddChild(_fade);
         _confirm.Closed += ReturnToGameplay;
         _completion = new CompletionScreen();
         _completion.Closed += ReturnToGameplay;
@@ -139,6 +145,9 @@ public partial class Main : Node
         UiBus.PrestigeRequested += AskPrestige;
         UiBus.OpenSell += OpenSell;
         UiBus.OpenHome += OpenHome;
+        UiBus.OpenHomePanel += OpenHomePanel;
+        UiBus.Sleep += SleepAtHome;
+        UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         GameState.Instance.BeforeSave = WritePlayerToSave;
         GameState.Instance.RegionsChanged += UpdateRegionCulling;
@@ -160,7 +169,7 @@ public partial class Main : Node
     {
         bool on = Settings.Quality != GraphicsQuality.Low;
         foreach (var l in FindAll<OmniLight3D>(World.GetParent()))
-            if (l.GetParent() is not Mining.Effects) l.Visible = on; // clarões do Effects controlam a si mesmos
+            if (l.GetParent() is not Mining.Effects && !l.HasMeta(HouseDiorama.AlwaysOnMeta)) l.Visible = on; // clarões do Effects controlam a si mesmos
         // decoração por MultiMesh: na Baixa desenha só uma fração (as posições já são aleatórias)
         foreach (var mm in FindAll<MultiMeshInstance3D>(World))
         {
@@ -276,6 +285,9 @@ public partial class Main : Node
         Settings.Changed -= ApplyLightQuality;
         UiBus.OpenSell -= OpenSell;
         UiBus.OpenHome -= OpenHome;
+        UiBus.OpenHomePanel -= OpenHomePanel;
+        UiBus.Sleep -= SleepAtHome;
+        UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
             GameState.Instance.RegionsChanged -= UpdateRegionCulling;
@@ -421,34 +433,89 @@ public partial class Main : Node
         else _confirm.Ask($"Encerrar o turno agora ({gs.ClockText}) e subir para casa? O dia termina mais cedo.", GoHome);
     }
 
+    CanvasLayer _fade;
+    ColorRect _fadeRect;
+    bool _fading;
+
+    /// <summary>Escurece a tela, executa a troca (teleporte) e clareia de novo.</summary>
+    void FadeThrough(System.Action mid)
+    {
+        _fading = true;
+        Player.InputEnabled = false;
+        var tw = CreateTween();
+        tw.TweenProperty(_fadeRect, "color:a", 1f, 0.25f);
+        tw.TweenCallback(Callable.From(() => { mid(); }));
+        tw.TweenInterval(0.15f);
+        tw.TweenProperty(_fadeRect, "color:a", 0f, 0.35f);
+        tw.TweenCallback(Callable.From(() => { _fading = false; ReturnToGameplay(); }));
+    }
+
+    void PlaceTo(Vector3 pos, float yaw)
+    {
+        Player.GlobalPosition = pos;
+        Player.Velocity = Vector3.Zero;
+        Player.SetLook(yaw);
+        _currentRegion = null;
+        UpdateRegion(true);
+        UpdateRegionCulling();
+    }
+
+    /// <summary>Elevador da mina → casa (encerra o dia).</summary>
     void GoHome()
     {
         var gs = GameState.Instance;
         if (CurrentMode != Mode.Playing) return;
         gs.EndDay(early: true);
-        gs.PayShiftBonus();
+        long bonus = gs.PayShiftBonus();
         _shards.ClearAll();
+        AudioManager.Instance?.SetBeam(false);
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        FadeThrough(() =>
+        {
+            PlaceTo(World.House.ArrivePoint, 0);
+            Hud.ShowBigMessage("CASA");
+            gs.Notify($"Fim do Dia {gs.Data.Day}",
+                $"Ganho no dia: {GameState.FormatMoney(gs.Data.DayEarned)}" + (bonus > 0 ? $" (+{GameState.FormatMoney(bonus)} de bônus)" : "") +
+                ". Use o PAINEL para melhorias e a CAMA para dormir.", NotifyKind.Success);
+        });
+    }
+
+    void OpenHomePanel()
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         Player.InputEnabled = false;
         AudioManager.Instance?.SetBeam(false);
         _home.Open();
     }
 
+    /// <summary>Cama: começa o próximo dia; o jogador acorda em casa.</summary>
     void SleepAtHome()
     {
         var gs = GameState.Instance;
-        _home.CloseSilently();
-        gs.StartNewDay();
-        Events.ResetAll();
-        Player.GlobalPosition = World.SpawnPoint;
-        Player.Velocity = Vector3.Zero;
-        Player.SetLook(0);
-        _currentRegion = null;
-        UpdateRegion(true);
-        UpdateRegionCulling();
-        ReturnToGameplay();
-        Hud.ShowBigMessage($"DIA {gs.Data.Day}");
+        if (CurrentMode != Mode.Playing || _fading) return;
+        if (!gs.DayOver) { gs.Notify("Ainda é dia", "Você já descansou. Desça pelo elevador para trabalhar.", NotifyKind.Info); return; }
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        FadeThrough(() =>
+        {
+            gs.StartNewDay();
+            Events.ResetAll();
+            PlaceTo(World.House.WakePoint, Mathf.Pi);
+            Hud.ShowBigMessage($"DIA {gs.Data.Day}");
+            gs.Notify("Bom dia!", "Desça pelo ELEVADOR para voltar à mina.", NotifyKind.Info);
+        });
     }
+
+    /// <summary>Elevador da casa → mina (só depois de dormir).</summary>
+    void GoToMine()
+    {
+        var gs = GameState.Instance;
+        if (CurrentMode != Mode.Playing || _fading) return;
+        if (gs.DayOver) { gs.Notify("Hora de descansar", "Durma na cama antes de descer para a mina.", NotifyKind.Info); return; }
+        FadeThrough(() => PlaceTo(World.SpawnPoint, 0));
+    }
+
+    public bool PlayerInHouse => Player != null && PlayerHouse.Contains(Player.GlobalPosition);
 
     public bool HomeOpen => _home.IsOpen;
 
@@ -462,6 +529,7 @@ public partial class Main : Node
             _completion.Open();
             return;
         }
+        if (_fading) return;
         if (Player != null) Player.InputEnabled = true;
         if (!_pause.IsOpen) Input.MouseMode = Input.MouseModeEnum.Captured;
     }
@@ -490,7 +558,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) { _confirm.Close(); return; }
-            if (_home.IsOpen) return; // em casa só se sai dormindo
+            if (_home.IsOpen) { _home.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
@@ -507,7 +575,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) _confirm.Close();
-            else if (_home.IsOpen) { }
+            else if (_home.IsOpen) _home.Close();
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
             else if (_help.IsOpen) _help.Close();
@@ -561,15 +629,19 @@ public partial class Main : Node
         if (_cullTimer <= 0) { _cullTimer = 0.5f; UpdateRegionCulling(); }
     }
 
+    bool _bannerHouse;
+
     void UpdateRegion(bool instant)
     {
         if (Player == null) return;
         var r = WorldBuilder.RegionAt(Player.GlobalPosition);
-        if (r == _currentRegion) return;
+        bool inHouse = PlayerInHouse;
+        if (r == _currentRegion && inHouse == _bannerHouse) return;
+        _bannerHouse = inHouse;
         _currentRegion = r;
         GameState.Instance.CurrentRegionId = r.Id;
         _env.SetRegion(r, instant);
-        Hud.ShowRegionBanner(r);
+        if (inHouse) Hud.ShowHouseBanner(); else Hud.ShowRegionBanner(r);
         AudioManager.Instance?.PlayMusic(r.Index);
         UiBus.EnterRegion(r.Id);
     }
@@ -579,9 +651,11 @@ public partial class Main : Node
     {
         if (Player == null || CurrentMode != Mode.Playing) return;
         var r = WorldBuilder.RegionAt(Player.GlobalPosition);
+        bool inHouse = PlayerInHouse;
+        if (World.House.Visible != inHouse) World.House.Visible = inHouse;
         for (int i = 0; i < World.RegionRoots.Count; i++)
         {
-            bool visible = Mathf.Abs(i - r.Index) <= 1;
+            bool visible = !inHouse && Mathf.Abs(i - r.Index) <= 1;
             if (World.RegionRoots[i].Visible != visible) World.RegionRoots[i].Visible = visible;
         }
     }

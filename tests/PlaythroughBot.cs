@@ -329,6 +329,9 @@ public partial class PlaythroughBot : Node
         await GoHomeAndSleep();
     }
 
+    bool _checkedNightElevator;
+
+    /// <summary>Elevador da mina → casa (andando lá dentro) → painel → cama → elevador de volta à mina.</summary>
     async Task GoHomeAndSleep()
     {
         int day = GS.Data.Day;
@@ -340,24 +343,69 @@ public partial class PlaythroughBot : Node
             var confirm = Main.GetChildren().OfType<ConfirmScreen>().First();
             if (!confirm.IsOpen) { _errors++; Log("ERRO: elevador não pediu confirmação antes do fim do turno"); return; }
             FindButtons(confirm).First(b => b.Text == "Confirmar").EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames(3);
             _earlyHome++;
         }
-        var home = Main.GetChildren().OfType<HomeScreen>().First();
-        if (!home.IsOpen || !GS.DayOver) { _errors++; Log("ERRO: tela de casa não abriu"); return; }
-        PressAction("pause"); // Esc não deve tirar o jogador de casa
-        await Frames(3);
-        if (!home.IsOpen) { _errors++; Log("ERRO: Esc fechou a casa sem dormir"); return; }
-        await BuyAtHome(home);
-        var sleep = FindButtons(home).FirstOrDefault(b => b.Text.StartsWith("Dormir"));
-        if (sleep == null) { _errors++; Log("ERRO: botão Dormir ausente"); return; }
-        sleep.EmitSignal(BaseButton.SignalName.Pressed);
-        await Frames(5);
-        if (home.IsOpen || GS.DayOver || GS.Data.Day != day + 1 || GS.Data.DayTimeSeconds > 1 || !P.InputEnabled)
+        await Frames(60); // transição
+        var house = Main.World.House;
+        if (!PlayerHouse.Contains(P.GlobalPosition) || !GS.DayOver || !P.InputEnabled) { _errors++; Log("ERRO: elevador não levou o jogador para casa"); return; }
+        if (Main.World.RegionRoots.Any(r => r.Visible) || !house.Visible) { _errors++; Log("ERRO: visibilidade errada dentro de casa"); }
+
+        // anda um pouco dentro de casa (colisões do cômodo)
+        P.SetLook(0, 0);
+        Input.ActionPress("move_forward");
+        await Frames(60);
+        Input.ActionRelease("move_forward");
+        if (!PlayerHouse.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: jogador atravessou a parede da casa"); return; }
+
+        if (!_checkedNightElevator)
+        {
+            // de noite o elevador da casa não desce
+            _checkedNightElevator = true;
+            if (await UseStationNode(house.ElevatorDown))
+            {
+                await Frames(60);
+                if (!PlayerHouse.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: desceu para a mina sem dormir"); return; }
+            }
+        }
+
+        // painel da casa: melhorias e habilidades
+        if (await UseStationNode(house.Panel))
+        {
+            var home = Main.GetChildren().OfType<HomeScreen>().First();
+            if (!home.IsOpen) { _errors++; Log("ERRO: painel da casa não abriu"); return; }
+            await BuyAtHome(home);
+            PressAction("pause"); // Esc fecha o painel
+            await Frames(3);
+            if (home.IsOpen || !P.InputEnabled) { _errors++; Log("ERRO: Esc não fechou o painel da casa"); return; }
+        }
+
+        // cama
+        if (!await UseStationNode(house.Bed)) return;
+        await Frames(60);
+        if (GS.DayOver || GS.Data.Day != day + 1 || GS.Data.DayTimeSeconds > 2 || !P.InputEnabled || !PlayerHouse.Contains(P.GlobalPosition))
         { _errors++; Log("ERRO: dormir não começou um novo dia corretamente"); return; }
-        if (P.GlobalPosition.DistanceTo(Main.World.SpawnPoint) > 1.5f) { _errors++; Log("ERRO: jogador não voltou ao elevador"); }
+
+        // elevador da casa → mina
+        if (!await UseStationNode(house.ElevatorDown)) return;
+        await Frames(60);
+        if (P.GlobalPosition.DistanceTo(Main.World.SpawnPoint) > 1.5f || !Main.World.RegionRoots[0].Visible || house.Visible)
+        { _errors++; Log("ERRO: elevador da casa não levou o jogador à mina"); return; }
         _days++;
         if (_days <= 2 || _days % 3 == 0) Log($"Dia {GS.Data.Day} começou (saldo {GameState.FormatMoney(GS.Data.Money)})");
+    }
+
+    async Task<bool> UseStationNode(StationBase station)
+    {
+        var front = station.GlobalTransform.Basis.Z.Normalized();
+        P.GlobalPosition = station.GlobalPosition + new Vector3(front.X, 0, front.Z).Normalized() * 1.8f + Vector3.Up * 0.05f;
+        P.Velocity = Vector3.Zero;
+        await Frames(2);
+        AimAt(station.GlobalPosition + Vector3.Up * 0.7f);
+        await Frames(3);
+        if (P.TargetInteractable != station) { _errors++; Log($"ERRO: não mirou {station.Name} (alvo: {P.TargetInteractable})"); return false; }
+        PressAction("interact");
+        await Frames(3);
+        return true;
     }
 
     int _houseBuys, _skillBuys;

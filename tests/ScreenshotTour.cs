@@ -219,7 +219,14 @@ public partial class ScreenshotTour : Node
             for (int i = 0; i < n; i++) gs.TryBuyHouse(id);
         foreach (var id in new[] { "magnet", "firm_strike", "cadence", "haggle" }) gs.TryBuySkill(id);
         UiBus.RequestHome();
-        await Wait(1.2f);
+        await Wait(1.6f);
+        await Shot("15c_house");
+        p.GlobalPosition = Main.World.House.WakePoint + new Vector3(0.4f, 0, 0.9f);
+        p.SetLook(2.4f, -0.1f);
+        await Wait(0.5f);
+        await Shot("15c_house2");
+        UiBus.RequestHomePanel();
+        await Wait(0.8f);
         await Shot("15c_home");
         var home = Main.GetChildren().OfType<UI.HomeScreen>().First();
         home.ShowSkillsTab();

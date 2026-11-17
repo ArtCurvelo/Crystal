@@ -84,6 +84,12 @@ public partial class ObjectiveMarker : Node3D
         var root = World.RegionRoots[region.Index];
         _target = null;
         _targetHeight = 2.2f;
+        if (PlayerHouse.Contains(PlayerPos()) && World.House != null)
+        {
+            _target = gs.DayOver ? World.House.Bed : World.House.ElevatorDown;
+            _targetHeight = gs.DayOver ? 1.6f : 3.0f;
+            return;
+        }
         if (gs.DayOver)
         {
             // fim do turno: vender (se houver o que vender) e voltar ao elevador

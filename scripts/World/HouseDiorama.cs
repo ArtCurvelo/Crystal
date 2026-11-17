@@ -13,6 +13,9 @@ public partial class HouseDiorama : Node3D
 {
     Node3D _props;
     Camera3D _cam;
+    /// <summary>true = casa de verdade no mundo do jogo (paredes fechadas, teto e colisões); false = maquete.</summary>
+    public bool Interior;
+    public const string AlwaysOnMeta = "always_on"; // luz mantida na qualidade Baixa
     float _t;
 
     static readonly Color Wood = new(0.42f, 0.27f, 0.16f);
@@ -24,6 +27,19 @@ public partial class HouseDiorama : Node3D
 
     public override void _Ready()
     {
+        if (!Interior) BuildViewer();
+        var lamp = new OmniLight3D { LightColor = Lamp, LightEnergy = Interior ? 1.4f : 1.6f, OmniRange = 9f, Position = new Vector3(0.3f, 2.6f, 0.6f) };
+        lamp.SetMeta(AlwaysOnMeta, true);
+        AddChild(lamp);
+        BuildRoom();
+        _props = new Node3D();
+        AddChild(_props);
+        Rebuild();
+        if (GameState.Instance != null) GameState.Instance.HomeChanged += Rebuild;
+    }
+
+    void BuildViewer()
+    {
         var env = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Color,
@@ -34,10 +50,12 @@ public partial class HouseDiorama : Node3D
         };
         AddChild(new WorldEnvironment { Environment = env });
         AddChild(new DirectionalLight3D { LightColor = new Color(0.75f, 0.8f, 1f), LightEnergy = 0.35f, Rotation = new Vector3(-0.9f, 0.6f, 0) });
-        AddChild(new OmniLight3D { LightColor = Lamp, LightEnergy = 1.6f, OmniRange = 9f, Position = new Vector3(0.3f, 2.6f, 0.6f) });
         _cam = new Camera3D { Fov = 42, Current = true };
         AddChild(_cam);
+    }
 
+    void BuildRoom()
+    {
         // cômodo em corte: piso, duas paredes, janela noturna e porta
         Box(this, new Vector3(6.4f, 0.2f, 5.2f), new Vector3(0, -0.1f, 0), Wood);
         for (int i = 0; i < 8; i++) Box(this, new Vector3(0.03f, 0.01f, 5.2f), new Vector3(-2.8f + i * 0.8f, 0.005f, 0), WoodDark);
@@ -60,10 +78,31 @@ public partial class HouseDiorama : Node3D
         // tapete
         Box(this, new Vector3(2.0f, 0.02f, 1.3f), new Vector3(0.4f, 0.02f, 0.9f), new Color(0.55f, 0.18f, 0.16f));
 
-        _props = new Node3D();
-        AddChild(_props);
-        Rebuild();
-        if (GameState.Instance != null) GameState.Instance.HomeChanged += Rebuild;
+        if (!Interior) return;
+        // casa de verdade: fecha o cômodo (parede da frente, parede direita, teto) e cria colisões
+        Box(this, new Vector3(6.4f, 3.2f, 0.2f), new Vector3(0, 1.6f, 2.5f), Wall.Darkened(0.05f));
+        Box(this, new Vector3(0.2f, 3.2f, 5.2f), new Vector3(3.1f, 1.6f, 0), Wall.Darkened(0.15f));
+        Box(this, new Vector3(6.4f, 0.2f, 5.2f), new Vector3(0, 3.3f, 0), new Color(0.32f, 0.24f, 0.18f));
+        for (int i = 0; i < 4; i++) Box(this, new Vector3(0.18f, 0.16f, 5.2f), new Vector3(-2.4f + i * 1.6f, 3.12f, 0), WoodDark); // vigas
+        Solid(this, new Vector3(6.4f, 0.2f, 5.2f), new Vector3(0, -0.1f, 0));
+        Solid(this, new Vector3(6.4f, 3.4f, 0.2f), new Vector3(0, 1.6f, -2.5f));
+        Solid(this, new Vector3(6.4f, 3.4f, 0.2f), new Vector3(0, 1.6f, 2.5f));
+        Solid(this, new Vector3(0.2f, 3.4f, 5.2f), new Vector3(-3.1f, 1.6f, 0));
+        Solid(this, new Vector3(0.2f, 3.4f, 5.2f), new Vector3(3.1f, 1.6f, 0));
+        Solid(this, new Vector3(6.4f, 0.2f, 5.2f), new Vector3(0, 3.3f, 0));
+        // quadro de cortiça com o mapa da mina, na parede da frente
+        Box(this, new Vector3(1.3f, 0.8f, 0.04f), new Vector3(-0.1f, 1.9f, 2.38f), new Color(0.6f, 0.45f, 0.28f));
+        for (int i = 0; i < 4; i++)
+            Box(this, new Vector3(0.2f, 0.25f, 0.02f), new Vector3(-0.5f + i * 0.27f, 1.85f + (i % 2) * 0.12f, 2.36f), new Color(0.9f, 0.88f, 0.8f));
+    }
+
+    /// <summary>Colisão estática (só na casa de verdade).</summary>
+    void Solid(Node3D parent, Vector3 size, Vector3 pos)
+    {
+        if (!Interior) return;
+        var body = new StaticBody3D { CollisionLayer = Player.PlayerController.WorldLayer, CollisionMask = 0, Position = pos };
+        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = size } });
+        parent.AddChild(body);
     }
 
     public override void _ExitTree()
@@ -73,6 +112,7 @@ public partial class HouseDiorama : Node3D
 
     public override void _Process(double delta)
     {
+        if (_cam == null) return;
         _t += (float)delta;
         float a = 0.55f + Mathf.Sin(_t * 0.25f) * 0.18f;
         var target = new Vector3(0.2f, 0.9f, -0.4f);
@@ -100,6 +140,7 @@ public partial class HouseDiorama : Node3D
         else
         {
             Box(p, new Vector3(1.2f, 0.35f, 2.1f), bp + new Vector3(0, 0.18f, 0), Wood);
+            // (a colisão da cama vem da estação "Dormir" da casa)
             Box(p, new Vector3(1.1f, 0.18f, 2.0f), bp + new Vector3(0, 0.44f, 0), new Color(0.9f, 0.88f, 0.82f));
             if (bed >= 2)
             {
@@ -119,6 +160,7 @@ public partial class HouseDiorama : Node3D
         if (bench >= 1)
         {
             Box(p, new Vector3(1.6f, 0.08f, 0.7f), wp + new Vector3(0, 0.9f, 0), Wood);
+            Solid(p, new Vector3(1.6f, 0.95f, 0.7f), wp + new Vector3(0, 0.47f, 0));
             foreach (float x in new[] { -0.7f, 0.7f })
                 Box(p, new Vector3(0.08f, 0.9f, 0.6f), wp + new Vector3(x, 0.45f, 0), WoodDark);
             Box(p, new Vector3(1.6f, 0.6f, 0.04f), wp + new Vector3(0, 1.6f, -0.3f), new Color(0.3f, 0.32f, 0.3f));
@@ -135,7 +177,7 @@ public partial class HouseDiorama : Node3D
                 p.AddChild(prism);
             }
         }
-        else Box(p, new Vector3(0.6f, 0.5f, 0.6f), wp + new Vector3(0, 0.25f, 0.1f), WoodDark); // caixote
+        else { Box(p, new Vector3(0.6f, 0.5f, 0.6f), wp + new Vector3(0, 0.25f, 0.1f), WoodDark); Solid(p, new Vector3(0.6f, 0.5f, 0.6f), wp + new Vector3(0, 0.25f, 0.1f)); } // caixote
 
         // ---- armário (parede lateral esquerda, perto da porta)
         if (wardrobe >= 1)
@@ -143,6 +185,7 @@ public partial class HouseDiorama : Node3D
             float h = 1.3f + wardrobe * 0.25f, w = 0.7f + wardrobe * 0.15f;
             var ap = new Vector3(-2.65f, 0, 0.1f);
             Box(p, new Vector3(0.6f, h, w), ap + new Vector3(0, h / 2, 0), Wood);
+            Solid(p, new Vector3(0.6f, h, w), ap + new Vector3(0, h / 2, 0));
             Box(p, new Vector3(0.02f, h - 0.1f, 0.02f), ap + new Vector3(0.31f, h / 2, 0), WoodDark);
             Box(p, new Vector3(0.04f, 0.12f, 0.04f), ap + new Vector3(0.33f, h * 0.55f, 0.08f), Metal);
             Box(p, new Vector3(0.04f, 0.12f, 0.04f), ap + new Vector3(0.33f, h * 0.55f, -0.08f), Metal);
@@ -155,6 +198,7 @@ public partial class HouseDiorama : Node3D
         if (kitchen >= 1)
         {
             Box(p, new Vector3(1.1f, 0.9f, 0.8f), kp + new Vector3(0, 0.45f, 0), new Color(0.75f, 0.75f, 0.72f));
+            Solid(p, new Vector3(1.1f, 0.9f, 0.8f), kp + new Vector3(0, 0.45f, 0));
             Box(p, new Vector3(1.12f, 0.05f, 0.82f), kp + new Vector3(0, 0.92f, 0), new Color(0.2f, 0.2f, 0.22f));
             Box(p, new Vector3(0.25f, 0.02f, 0.25f), kp + new Vector3(-0.25f, 0.95f, 0), new Color(1f, 0.3f, 0.1f), new Color(1f, 0.3f, 0.1f), 1.5f);
             if (kitchen >= 2)
@@ -162,6 +206,7 @@ public partial class HouseDiorama : Node3D
             if (kitchen >= 3)
             {
                 Box(p, new Vector3(0.75f, 1.9f, 0.7f), kp + new Vector3(0.05f, 0.95f, 1.0f), new Color(0.85f, 0.88f, 0.9f));
+                Solid(p, new Vector3(0.75f, 1.9f, 0.7f), kp + new Vector3(0.05f, 0.95f, 1.0f));
                 Box(p, new Vector3(0.03f, 0.5f, 0.04f), kp + new Vector3(-0.34f, 1.3f, 1.2f), Metal);
                 Cyl(p, 0.07f, 0.12f, kp + new Vector3(0.25f, 1.0f, 0.1f), new Color(0.95f, 0.95f, 0.95f)); // caneca
             }

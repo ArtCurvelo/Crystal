@@ -99,7 +99,9 @@ public partial class HomeScreen : ModalScreen
         BuildSkillTree();
 
         var bottom = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        bottom.AddThemeConstantOverride("separation", 10);
         Body.AddChild(bottom);
+        bottom.AddChild(UiTheme.Button("Fechar", Close, 160, 20));
         _sleep = UiTheme.Button("Dormir", () => OnSleep?.Invoke(), 360, 22);
         _sleep.AddThemeColorOverride("font_color", UiTheme.Gold);
         bottom.AddChild(_sleep);
@@ -221,7 +223,8 @@ public partial class HomeScreen : ModalScreen
     {
         var gs = GameState.Instance;
         var d = gs.Data;
-        _title.Text = $"FIM DO DIA {d.Day}";
+        _title.Text = gs.DayOver ? $"FIM DO DIA {d.Day}" : $"DIA {d.Day}";
+        _sleep.Visible = gs.DayOver;
         _money.Text = GameState.FormatNumber(d.Money);
         _stats.Text =
             $"Ganho no dia: {GameState.FormatMoney(d.DayEarned)}" +

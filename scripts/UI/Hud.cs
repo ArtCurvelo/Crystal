@@ -25,7 +25,7 @@ public partial class Hud : CanvasLayer
     Label _clock;
     ProgressBar _clockBar;
     string _clockText;
-    bool _clockOver;
+    bool _clockOver, _inHouse;
 
     void UpdateClock()
     {
@@ -35,7 +35,8 @@ public partial class Hud : CanvasLayer
         if (t != _clockText) { _clockText = t; _clock.Text = t; }
         _clockBar.Value = gs.DayProgress;
         bool late = !over && gs.DayRemaining <= GameState.DayWarningSeconds;
-        if (over != _clockOver) { _clockOver = over; RefreshObjective(); }
+        bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
+        if (over != _clockOver || inHouse != _inHouse) { _clockOver = over; _inHouse = inHouse; RefreshObjective(); }
         var col = over ? UiTheme.Danger : late ? new Color(1f, 0.6f, 0.25f) : UiTheme.Text;
         _clock.Modulate = (over || late) ? new Color(1, 1, 1, 0.75f + 0.25f * Mathf.Abs(Mathf.Sin(Time.GetTicksMsec() / 250f))) : Colors.White;
         _clock.AddThemeColorOverride("font_color", col);
@@ -458,7 +459,12 @@ public partial class Hud : CanvasLayer
         var gs = GameState.Instance;
         string text;
         var d = gs.Data;
-        if (gs.DayOver)
+        bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
+        if (inHouse)
+            text = gs.DayOver
+                ? "CASA\nUse o PAINEL para melhorias e habilidades. Durma na CAMA para começar o próximo dia."
+                : "NOVO DIA\nDesça pelo ELEVADOR para voltar à mina.";
+        else if (gs.DayOver)
             text = gs.InventoryCount > 0
                 ? "FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento e pegue o ELEVADOR para casa."
                 : "FIM DO TURNO\nPegue o ELEVADOR no acampamento para ir para casa.";
@@ -551,6 +557,13 @@ public partial class Hud : CanvasLayer
     }
 
     /// <summary>Atualiza a etiqueta de região e anima a entrada.</summary>
+    public void ShowHouseBanner()
+    {
+        var house = new RegionDef { Name = "Casa do Escavador", Subtitle = "Descanso, melhorias e habilidades", AccentColor = UiTheme.Gold };
+        ShowRegionBanner(house);
+        _regionSub.Text = "◇ " + house.Subtitle;
+    }
+
     public void ShowRegionBanner(RegionDef r)
     {
         _regionName.Text = r.Name;

@@ -243,3 +243,14 @@ Decisões do diretor:
   - Comércio: Negociador (+10% venda) → Faro para raros (raros 50% mais frequentes) → Joalheiro (raros/especiais +50%).
 - Save: `House` e `Skills` (saneados: níveis limitados, ids desconhecidos removidos, sem duplicatas).
 - Testes: casa/habilidades (efeitos, limites, pré-requisitos, compra em casa fora do turno, bônus do turno uma vez, save, renascer, saneamento) e coleta direta a 40 m → **318/318**. Bot compra pela tela da casa (20 melhorias, 12 habilidades), confere o efeito do Golpe firme → SUCESSO (Região 2 em 11,4 min, Região 3 em 30,2 min, Coração em 49,8 min; o bot completa a árvore inteira antes de renascer — custos dos nós de nível 3 podem subir se o diretor achar rápido demais).
+- Publicado como **v0.2.7**.
+
+## Feedback do diretor (após v0.2.7)
+- "No fim da noite ele não vai para uma casa, só aparece uma tela e depois não tem nada" → **casa onde se entra andando**.
+- "Nas Profundezas Prismáticas ele destrói todos os minérios e não dá tempo de renascer" → **renascimento dinâmico**.
+
+### Casa de verdade + renascimento dinâmico
+- O elevador da mina agora **leva o jogador para dentro da casa** (transição com escurecimento). A casa é um cômodo fechado com colisões, iluminado mesmo na qualidade Baixa, com os móveis das melhorias (a maquete virou o interior real em escala 1:1).
+- Dentro de casa: **Painel da casa** (melhorias e habilidades; Esc fecha), **Cama** (dormir → próximo dia; o jogador acorda em casa) e **Elevador · Mina** (só desce depois de dormir). Objetivo do HUD, marcador e faixa do topo ("Casa do Escavador") acompanham. Dentro de casa as regiões da mina não são desenhadas.
+- **Renascimento dinâmico dos minérios:** a cada 0,5 s calcula a fração de depósitos quebrados em cada região (sala + galerias) e acelera o renascimento: taxa = 1 + 5·f² (região esgotada → até 6x mais rápido). Resolve o caso relatado em todas as regiões, não só nas Profundezas.
+- Testes 324/324 (renascimento acelerado só na região esgotada; paredes da casa seguram o jogador). Bot: sobe, anda na casa, confere que o elevador não desce de noite, compra pelo painel, dorme na cama, desce pelo elevador → SUCESSO.

@@ -144,6 +144,8 @@ public partial class SellStation : StationBase
 /// <summary>Elevador da mina: leva o jogador para casa e encerra o dia.</summary>
 public partial class MineElevator : StationBase
 {
+    /// <summary>true = elevador dentro da casa (desce para a mina).</summary>
+    public bool GoesDown;
     MeshInstance3D _lamp;
     StandardMaterial3D _lampMat;
 
@@ -184,7 +186,7 @@ public partial class MineElevator : StationBase
         AddMesh(new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.06f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, MeshFactory.Emissive(orange, orange, 2f), new Vector3(1.95f, 1.12f, 0.78f)).Rotation = new Vector3(Mathf.Pi / 2, 0, 0);
         var light = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.1f, OmniRange = 6f, Position = new Vector3(0, 3.6f, 1.2f) };
         AddChild(light);
-        Label = MakeLabel("ELEVADOR · CASA", new Color(1f, 0.82f, 0.4f), 5.25f);
+        Label = MakeLabel(GoesDown ? "ELEVADOR · MINA" : "ELEVADOR · CASA", new Color(1f, 0.82f, 0.4f), GoesDown ? 3.75f : 5.25f);
         StaticBatcher.Batch(this);
     }
 
@@ -194,16 +196,27 @@ public partial class MineElevator : StationBase
         var gs = GameState.Instance;
         if (gs == null || _lampMat == null) return;
         // verde durante o turno, âmbar piscando quando é hora de voltar
-        var c = gs.DayOver ? new Color(1f, 0.6f, 0.15f) * (0.6f + 0.4f * Mathf.Abs(Mathf.Sin(Time * 4f))) : new Color(0.3f, 1f, 0.5f);
+        bool alert = GoesDown ? !gs.DayOver : gs.DayOver; // pisca quando é hora de usar
+        var c = alert ? new Color(1f, 0.6f, 0.15f) * (0.6f + 0.4f * Mathf.Abs(Mathf.Sin(Time * 4f))) : new Color(0.3f, 1f, 0.5f);
         _lampMat.Emission = c;
         _lampMat.AlbedoColor = c;
     }
 
-    public override string GetPrompt() => GameState.Instance.DayOver
-        ? $"{InputHints.Interact} Subir para casa (fim do turno)"
-        : $"{InputHints.Interact} Elevador: encerrar o dia e ir para casa";
+    public override string GetPrompt()
+    {
+        var gs = GameState.Instance;
+        if (GoesDown)
+            return gs.DayOver ? "Durma antes de descer para a mina." : $"{InputHints.Interact} Descer para a mina (Dia {gs.Data.Day})";
+        return gs.DayOver
+            ? $"{InputHints.Interact} Subir para casa (fim do turno)"
+            : $"{InputHints.Interact} Elevador: encerrar o dia e ir para casa";
+    }
 
-    public override void Interact(PlayerController player) => UiBus.RequestHome();
+    public override void Interact(PlayerController player)
+    {
+        if (GoesDown) UiBus.RequestMine();
+        else UiBus.RequestHome();
+    }
 }
 
 /// <summary>Terminal de upgrades e desbloqueios.</summary>
