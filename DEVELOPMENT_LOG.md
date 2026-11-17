@@ -194,3 +194,19 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - Configurações compactas: todas as opções visíveis sem rolar.
 - O diretor estendeu o prazo de 30 h; o desafio termina quando ele avisar.
 - Testes: 214/214. Bot: SUCESSO.
+
+## Nova direção (diretor): dia/casa/árvore de habilidades/esteiras/mapa maior/minérios únicos
+Decisões do diretor:
+- **Fim do dia:** o jogador só pode vender e ir para casa.
+- **Moeda:** o mesmo dinheiro para tudo.
+- **Construções:** a meu critério, com mais ideias além das esteiras.
+- **Ordem:** minérios e mapa primeiro.
+
+### Etapa 1: minérios com identidade própria
+- `shaders/ore.gdshader`: 8 padrões procedurais (rocha, veios brilhantes, faixas, pepitas metálicas, iridescente, magma, gelo fosco, vidro negro) + rachaduras de dano + autoiluminação leve (legível sem luzes).
+- `Mining/OreVisuals.cs`: 9 formatos (Cristal, Veio metálico, Geodo de cristais/esferas, Rocha em faixas, Lascas, Gelo, Magma, Coral ramificado, Pérolas), 1–2 malhas mescladas por depósito.
+- **22 minérios** (antes 13): Cobre Nativo, Gelo Eterno, Prata Gélida, Malaquita, Obsidiana, Magmita, Ouro Ancestral, Titânio Abissal e Opala Abissal; Ametista vira geodo, Ancestralita faixas, Pérola do Vazio pérolas, Coral Prismático coral. Cada região tem 3–5 tipos comuns + raro.
+- Ícones por formato (pepita, esfera, faixas, lasca, brasa, cristal) no HUD, terminal e Coleção.
+- Galeria de minérios no tour (`16_ores_*`, `docs/screenshots/ores_sheet.png`) para revisão visual.
+- Custo: benchmark Baixa na mesma ordem (24,2 → 23,1 FPS, dentro da variação do ambiente; trocar o shader por material simples não altera).
+- Testes 214/214; bot SUCESSO (economia preservada: Região 2 em 7,3 min, Região 3 em 36,6 min).

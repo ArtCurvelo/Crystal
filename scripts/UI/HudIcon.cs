@@ -5,7 +5,22 @@ namespace CrystalExcavator.UI;
 /// <summary>Ícones vetoriais desenhados por código (sem imagens): moeda, mochila, gema, raio, picareta, região.</summary>
 public partial class HudIcon : Control
 {
-    public enum Kind { Coin, Bag, Gem, Bolt, Pick, Region, Star }
+    public enum Kind { Coin, Bag, Gem, Bolt, Pick, Region, Star, Nugget, Orb, Banded, Shard, Ember }
+
+    /// <summary>Ícone conforme o formato do minério (cristal, pepita, esfera, faixas, lasca, brasa).</summary>
+    public static Kind KindFor(Data.MaterialDef m) => m.Archetype switch
+    {
+        Data.OreArchetype.Vein => Kind.Nugget,
+        Data.OreArchetype.Pearl => Kind.Orb,
+        Data.OreArchetype.Geode when m.GeodeSpheres => Kind.Orb,
+        Data.OreArchetype.Banded => Kind.Banded,
+        Data.OreArchetype.Shards => Kind.Shard,
+        Data.OreArchetype.Magma => Kind.Ember,
+        _ => Kind.Gem,
+    };
+
+    /// <summary>Muda o tipo/cor e redesenha.</summary>
+    public void Set(Kind k, Color c) { Type = k; Color = c; QueueRedraw(); }
     public Kind Type;
     public Color Color = UiTheme.Cyan;
 
@@ -42,6 +57,41 @@ public partial class HudIcon : Control
             case Kind.Gem:
                 DrawGem(c, r, Color);
                 break;
+            case Kind.Nugget:
+            {
+                // pepita: polígono irregular com reflexos
+                var nug = new Vector2[8];
+                float[] k = { 0.9f, 0.7f, 0.95f, 0.75f, 0.85f, 0.65f, 0.9f, 0.7f };
+                for (int i = 0; i < 8; i++) { float a = Mathf.Tau * i / 8 + 0.3f; nug[i] = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a) * 0.8f) * r * k[i]; }
+                DrawColoredPolygon(nug, Color.Darkened(0.25f));
+                DrawColoredPolygon(new[] { nug[5], nug[6], nug[7], c }, Color.Lightened(0.35f));
+                DrawCircle(c + new Vector2(-0.25f, -0.2f) * r, r * 0.14f, Colors.White);
+                break;
+            }
+            case Kind.Orb:
+                DrawCircle(c, r * 0.85f, Color);
+                DrawCircle(c + new Vector2(0.15f, 0.15f) * r, r * 0.55f, Color.Darkened(0.2f));
+                DrawCircle(c + new Vector2(-0.3f, -0.3f) * r, r * 0.22f, new Color(1, 1, 1, 0.9f));
+                break;
+            case Kind.Banded:
+                DrawCircle(c, r * 0.85f, Color);
+                for (int i = -1; i <= 1; i++)
+                    DrawArc(c + new Vector2(0, r * 0.9f), r * (0.75f + i * 0.28f), Mathf.Pi * 1.15f, Mathf.Pi * 1.85f, 14, Color.Lightened(0.45f), r * 0.12f, true);
+                break;
+            case Kind.Shard:
+                DrawColoredPolygon(new[] { c + new Vector2(-0.1f, -1f) * r, c + new Vector2(0.35f, 0.9f) * r, c + new Vector2(-0.45f, 0.75f) * r }, Color.Darkened(0.4f));
+                DrawColoredPolygon(new[] { c + new Vector2(0.45f, -0.6f) * r, c + new Vector2(0.75f, 0.9f) * r, c + new Vector2(0.3f, 0.9f) * r }, Color.Darkened(0.2f));
+                DrawPolyline(new[] { c + new Vector2(-0.1f, -1f) * r, c + new Vector2(0.35f, 0.9f) * r }, Color.Lightened(0.5f), 1.5f, true);
+                break;
+            case Kind.Ember:
+            {
+                var emb = new Vector2[7];
+                for (int i = 0; i < 7; i++) { float a = Mathf.Tau * i / 7; emb[i] = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r * (i % 2 == 0 ? 0.9f : 0.7f); }
+                DrawColoredPolygon(emb, new Color(0.15f, 0.08f, 0.06f));
+                DrawPolyline(new[] { c + new Vector2(-0.6f, -0.2f) * r, c, c + new Vector2(0.3f, 0.6f) * r }, Color, r * 0.15f, true);
+                DrawPolyline(new[] { c, c + new Vector2(0.55f, -0.45f) * r }, Color, r * 0.12f, true);
+                break;
+            }
             case Kind.Bolt:
                 var pts = new Vector2[]
                 {

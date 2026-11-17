@@ -92,6 +92,10 @@ public partial class Benchmark : Node
             foreach (var n in All<MeshInstance3D>(root))
                 if (n.MaterialOverride is ShaderMaterial sm && sm.Shader.ResourcePath.Contains("crystal"))
                     n.MaterialOverride = new StandardMaterial3D { AlbedoColor = (Color)sm.GetShaderParameter("base_color"), EmissionEnabled = true, Emission = (Color)sm.GetShaderParameter("glow_color"), VertexColorUseAsAlbedo = true };
+        if (args.Contains("--x-liteore"))
+            foreach (var n in All<MeshInstance3D>(root))
+                if (n.MaterialOverride is ShaderMaterial sm && sm.Shader.ResourcePath.Contains("ore.gdshader"))
+                    n.MaterialOverride = new StandardMaterial3D { AlbedoColor = (Color)sm.GetShaderParameter("base_color"), VertexColorUseAsAlbedo = true };
         var sc = args.FirstOrDefault(a => a.StartsWith("--x-scale="));
         if (sc != null) GetViewport().Scaling3DScale = float.Parse(sc.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture);
         if (args.Any(a => a.StartsWith("--x-"))) GD.Print("[Bench] experimentos: " + string.Join(" ", args.Where(a => a.StartsWith("--x-"))));

@@ -419,6 +419,15 @@ public partial class Main : Node
     public void OpenSettingsForTour() => _settings.Open();
     public void OpenCompletionForTour() => _completion.Open();
 
+    /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
+    public void CloseAllForTour()
+    {
+        foreach (var sc in new ModalScreen[] { _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+            sc.CloseSilently();
+        GetTree().Paused = false;
+        if (Player != null) Player.InputEnabled = true;
+    }
+
     bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);

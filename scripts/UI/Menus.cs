@@ -332,9 +332,7 @@ public partial class CodexScreen : ModalScreen
         var h = new HBoxContainer();
         h.AddThemeConstantOverride("separation", 12);
         card.AddChild(h);
-        var gem = UiTheme.Label(m.Special ? "✦" : m.Rare ? "★" : "◆", 34, known ? m.Glow.Lightened(0.2f) : new Color(0.3f, 0.3f, 0.4f), true, HorizontalAlignment.Center);
-        gem.CustomMinimumSize = new Vector2(44, 0);
-        gem.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        var gem = HudIcon.Make(HudIcon.KindFor(m), known ? m.Glow.Lightened(0.2f) : new Color(0.3f, 0.3f, 0.4f), 40);
         h.AddChild(gem);
         var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         v.AddThemeConstantOverride("separation", 1);

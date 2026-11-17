@@ -180,6 +180,8 @@ public partial class ScreenshotTour : Node
         await Wait(0.6f);
         await Shot("15_completion");
 
+        await OreGallery(p);
+
         GD.Print($"[Tour] FPS (software, Xvfb): R1={fps1:0} R2={fps2:0} R3={fps3:0}");
         GD.Print($"[Tour] Qualidade {Settings.Quality} | R1: {dc1} | R2: {dc2} | R3: {dc3}");
         SaveSystem.Delete();
@@ -192,6 +194,45 @@ public partial class ScreenshotTour : Node
         var objs = Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame);
         var prims = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
         return $"{draws:0} draw calls, {objs:0} objetos, {prims / 1000:0}k primitivas";
+    }
+
+    /// <summary>Galeria: todos os minérios lado a lado (grupos de 6), para revisão visual das texturas.</summary>
+    async Task OreGallery(Player.PlayerController p)
+    {
+        Main.CloseAllForTour();
+        await Wait(0.3f);
+        var mats = GameData.Materials.Values.ToList();
+        // galeria isolada ao sul do mapa (fundo escuro, sem outros cristais)
+        var root = new Node3D { Position = new Vector3(0, 0, 70) };
+        Main.World.GetParent().AddChild(root);
+        var floor = new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 12) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.11f, 0.14f) } };
+        root.AddChild(floor);
+        var body = new StaticBody3D { CollisionLayer = 1 };
+        body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(30, 1, 30) }, Position = new Vector3(0, -0.5f, 5) });
+        root.AddChild(body);
+        int perShot = 6;
+        for (int g = 0; g * perShot < mats.Count; g++)
+        {
+            foreach (Node c in root.GetChildren()) if (c != floor && c != body) c.QueueFree();
+            await Wait(0.1f);
+            var group = mats.Skip(g * perShot).Take(perShot).ToList();
+            for (int i = 0; i < group.Count; i++)
+            {
+                var c = new Mining.Crystal();
+                c.Init(group[i], 100 + i, group[i].Special ? 0.45f : 1f);
+                root.AddChild(c);
+                c.Position = new Vector3(-6.25f + i * 2.5f, 0.02f, 0f);
+                if (group[i].Special) c.Scale = Vector3.One * 0.4f;
+                var label = new Label3D { Text = group[i].Name, FontSize = 36, OutlineSize = 8, PixelSize = 0.006f, Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, Position = new Vector3(0, 2.1f, 0), NoDepthTest = true };
+                c.AddChild(label);
+            }
+            p.GlobalPosition = new Vector3(0, 0.1f, 76.5f);
+            p.Velocity = Vector3.Zero;
+            p.SetLook(0, -0.22f);
+            await Wait(0.8f);
+            await Shot($"16_ores_{g}");
+        }
+        root.QueueFree();
     }
 
     async Task Wait(float s)

@@ -4,6 +4,9 @@ using Godot;
 
 namespace CrystalExcavator.Data;
 
+/// <summary>Formato visual do depósito (cada um com malha e textura procedural próprias).</summary>
+public enum OreArchetype { Crystal, Vein, Geode, Banded, Shards, Ice, Magma, Coral, Pearl }
+
 /// <summary>Raridade de jogo (valor/frequência), exibida com cor e selo.</summary>
 public enum Rarity { Comum, Incomum, Raro, Epico, Lendario }
 
@@ -42,6 +45,9 @@ public sealed class MaterialDef
     public bool Special;       // formação especial (ex.: Coração Ancestral)
     public float RespawnSeconds = 25f;
     public Rarity Rarity = Rarity.Comum;
+    public OreArchetype Archetype = OreArchetype.Crystal;
+    /// <summary>Geodo com esferas iridescentes (opala) em vez de cristais.</summary>
+    public bool GeodeSpheres;
 }
 
 public sealed class SpawnEntry
@@ -130,7 +136,7 @@ public static class GameData
         });
         Add(new MaterialDef
         {
-            Id = "amethyst", Rarity = Rarity.Incomum, Name = "Ametista Cintilante", Value = 8, Hp = 60,
+            Id = "amethyst", Archetype = OreArchetype.Geode, Rarity = Rarity.Incomum, Name = "Ametista Cintilante", Value = 8, Hp = 60,
             Description = "Mais densa, vibra quando atingida.",
             Color = new Color(0.72f, 0.45f, 1.0f), Glow = new Color(0.6f, 0.25f, 1.0f),
             ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 24
@@ -172,14 +178,14 @@ public static class GameData
         });
         Add(new MaterialDef
         {
-            Id = "ancestralite", Rarity = Rarity.Epico, Name = "Ancestralita", Value = 340, Hp = 4500,
+            Id = "ancestralite", Archetype = OreArchetype.Banded, Rarity = Rarity.Epico, Name = "Ancestralita", Value = 340, Hp = 4500,
             Description = "Mineral antigo com runas naturais.",
             Color = new Color(1.0f, 0.62f, 0.25f), Glow = new Color(1.0f, 0.45f, 0.05f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 30
         });
         Add(new MaterialDef
         {
-            Id = "voidpearl", Rarity = Rarity.Lendario, Name = "Pérola do Vazio", Value = 2600, Hp = 8000, Rare = true,
+            Id = "voidpearl", Archetype = OreArchetype.Pearl, Rarity = Rarity.Lendario, Name = "Pérola do Vazio", Value = 2600, Hp = 8000, Rare = true,
             Description = "Absorve a luz ao redor. Valor incalculável.",
             Color = new Color(0.85f, 0.95f, 1.0f), Glow = new Color(0.55f, 0.4f, 1.0f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 55
@@ -201,7 +207,7 @@ public static class GameData
         });
         Add(new MaterialDef
         {
-            Id = "coralprism", Rarity = Rarity.Epico, Name = "Coral Prismático", Value = 1300, Hp = 16000,
+            Id = "coralprism", Archetype = OreArchetype.Coral, Rarity = Rarity.Epico, Name = "Coral Prismático", Value = 1300, Hp = 16000,
             Description = "Mistura de cristal e vida; muda de cor com a luz.",
             Color = new Color(1.0f, 0.45f, 0.8f), Glow = new Color(0.95f, 0.25f, 0.75f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 32
@@ -212,6 +218,72 @@ public static class GameData
             Description = "Dizem que guarda o brilho de um oceano esquecido.",
             Color = new Color(0.7f, 0.85f, 1.0f), Glow = new Color(0.4f, 0.55f, 1.0f),
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 60
+        });
+
+
+        // ---------------- Novos minérios (variedade por região) ----------------
+        Add(new MaterialDef
+        {
+            Id = "copper", Rarity = Rarity.Comum, Archetype = OreArchetype.Vein, Name = "Cobre Nativo", Value = 5, Hp = 40,
+            Description = "Veios de cobre puro que afloram nas cavernas rasas.",
+            Color = new Color(0.95f, 0.55f, 0.3f), Glow = new Color(1.0f, 0.45f, 0.15f),
+            ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 20
+        });
+        Add(new MaterialDef
+        {
+            Id = "frostice", Rarity = Rarity.Incomum, Archetype = OreArchetype.Ice, Name = "Gelo Eterno", Value = 30, Hp = 280,
+            Description = "Nunca derrete. Estala a cada golpe.",
+            Color = new Color(0.7f, 0.9f, 1.0f), Glow = new Color(0.45f, 0.8f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 24
+        });
+        Add(new MaterialDef
+        {
+            Id = "silver", Rarity = Rarity.Incomum, Archetype = OreArchetype.Vein, Name = "Prata Gélida", Value = 40, Hp = 340,
+            Description = "Pepitas de prata presas em rocha congelada.",
+            Color = new Color(0.82f, 0.86f, 0.92f), Glow = new Color(0.6f, 0.8f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 26
+        });
+        Add(new MaterialDef
+        {
+            Id = "malachite", Rarity = Rarity.Raro, Archetype = OreArchetype.Banded, Name = "Malaquita", Value = 75, Hp = 620,
+            Description = "Faixas verdes hipnóticas, polidas pela água.",
+            Color = new Color(0.08f, 0.45f, 0.3f), Glow = new Color(0.3f, 1.0f, 0.6f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "obsidian", Rarity = Rarity.Incomum, Archetype = OreArchetype.Shards, Name = "Obsidiana", Value = 120, Hp = 1800,
+            Description = "Vidro vulcânico afiado como navalha.",
+            Color = new Color(0.08f, 0.06f, 0.1f), Glow = new Color(0.7f, 0.4f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 24
+        });
+        Add(new MaterialDef
+        {
+            Id = "magmite", Rarity = Rarity.Raro, Archetype = OreArchetype.Magma, Name = "Magmita", Value = 210, Hp = 2900,
+            Description = "Rocha viva: as rachaduras pulsam com calor.",
+            Color = new Color(1.0f, 0.45f, 0.1f), Glow = new Color(1.0f, 0.35f, 0.05f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 28
+        });
+        Add(new MaterialDef
+        {
+            Id = "gold", Rarity = Rarity.Raro, Archetype = OreArchetype.Vein, Name = "Ouro Ancestral", Value = 280, Hp = 3600,
+            Description = "Ouro denso, marcado por runas antigas.",
+            Color = new Color(1.0f, 0.8f, 0.3f), Glow = new Color(1.0f, 0.7f, 0.2f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "titanium", Rarity = Rarity.Raro, Archetype = OreArchetype.Vein, Name = "Titânio Abissal", Value = 1000, Hp = 12000,
+            Description = "Leve e indestrutível. Brilha azul sob a água.",
+            Color = new Color(0.6f, 0.7f, 0.85f), Glow = new Color(0.3f, 0.7f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "opal", Rarity = Rarity.Epico, Archetype = OreArchetype.Geode, GeodeSpheres = true, Name = "Opala Abissal", Value = 1900, Hp = 21000,
+            Description = "Geodo repleto de esferas que mudam de cor.",
+            Color = new Color(0.85f, 0.9f, 1.0f), Glow = new Color(0.7f, 0.5f, 1.0f),
+            ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 40
         });
 
         // ---------------- Regiões ----------------
@@ -226,8 +298,9 @@ public static class GameData
             RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 20,
             CenterZ = 0, HalfX = 21, HalfZ = 20, Height = 9
         };
-        r1.Spawns.Add(new SpawnEntry("quartz", 0.72f));
-        r1.Spawns.Add(new SpawnEntry("amethyst", 0.28f));
+        r1.Spawns.Add(new SpawnEntry("quartz", 0.5f));
+        r1.Spawns.Add(new SpawnEntry("copper", 0.3f));
+        r1.Spawns.Add(new SpawnEntry("amethyst", 0.2f));
         Regions.Add(r1);
 
         var r2 = new RegionDef
@@ -241,8 +314,11 @@ public static class GameData
             RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 22,
             CenterZ = -58, HalfX = 26, HalfZ = 26, Height = 12
         };
-        r2.Spawns.Add(new SpawnEntry("sapphire", 0.62f));
-        r2.Spawns.Add(new SpawnEntry("emerald", 0.38f));
+        r2.Spawns.Add(new SpawnEntry("sapphire", 0.35f));
+        r2.Spawns.Add(new SpawnEntry("frostice", 0.25f));
+        r2.Spawns.Add(new SpawnEntry("silver", 0.2f));
+        r2.Spawns.Add(new SpawnEntry("emerald", 0.12f));
+        r2.Spawns.Add(new SpawnEntry("malachite", 0.08f));
         Regions.Add(r2);
 
         var r3 = new RegionDef
@@ -256,8 +332,11 @@ public static class GameData
             RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 24,
             CenterZ = -124, HalfX = 30, HalfZ = 30, Height = 16
         };
-        r3.Spawns.Add(new SpawnEntry("ruby", 0.6f));
-        r3.Spawns.Add(new SpawnEntry("ancestralite", 0.4f));
+        r3.Spawns.Add(new SpawnEntry("ruby", 0.35f));
+        r3.Spawns.Add(new SpawnEntry("obsidian", 0.25f));
+        r3.Spawns.Add(new SpawnEntry("magmite", 0.2f));
+        r3.Spawns.Add(new SpawnEntry("gold", 0.12f));
+        r3.Spawns.Add(new SpawnEntry("ancestralite", 0.08f));
         Regions.Add(r3);
 
         var r4 = new RegionDef
@@ -271,8 +350,10 @@ public static class GameData
             RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 24,
             CenterZ = -194, HalfX = 32, HalfZ = 30, Height = 16
         };
-        r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.62f));
-        r4.Spawns.Add(new SpawnEntry("coralprism", 0.38f));
+        r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.4f));
+        r4.Spawns.Add(new SpawnEntry("coralprism", 0.25f));
+        r4.Spawns.Add(new SpawnEntry("titanium", 0.2f));
+        r4.Spawns.Add(new SpawnEntry("opal", 0.15f));
         Regions.Add(r4);
 
         // ---------------- Upgrades ----------------

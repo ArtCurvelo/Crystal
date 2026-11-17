@@ -31,7 +31,6 @@ public partial class Crystal : StaticBody3D
     Node3D _visual;
     CollisionShape3D _shape;
     readonly List<ShaderMaterial> _mats = new();
-    static Shader _crystalShader;
     Random _rng;
     float _respawnTimer;
     float _flash;
@@ -73,59 +72,14 @@ public partial class Crystal : StaticBody3D
         _light = null;
         var mat = Material;
         bool special = mat.Special;
-        int count = special ? 9 : _rng.Next(4, 8);
         float s = special ? 2.6f : SizeScale;
         _baseEnergy = mat.Rare ? 1.3f : special ? 1.5f : 0.85f;
 
-        // depósito rochoso: duas rochas mescladas em uma malha
-        var rockSt = new SurfaceTool();
-        rockSt.Begin(Mesh.PrimitiveType.Triangles);
-        var rock = MeshFactory.Rock(_rng.Next(0, 6), 0.32f);
-        rockSt.AppendFrom(rock, 0, new Transform3D(Basis.Identity.ScaleLocal(new Vector3(0.62f, 0.36f, 0.62f) * s), new Vector3(0, 0.08f * s, 0)));
-        float ra = (float)_rng.NextDouble() * Mathf.Tau;
-        rockSt.AppendFrom(rock, 0, new Transform3D(new Basis(Vector3.Up, ra).ScaleLocal(new Vector3(0.38f, 0.26f, 0.38f) * s),
-            new Vector3(MathF.Cos(ra) * 0.42f * s, 0.05f * s, MathF.Sin(ra) * 0.42f * s)));
-        var baseRock = new MeshInstance3D
-        {
-            Mesh = rockSt.Commit(),
-            MaterialOverride = MeshFactory.RockMaterial(new Color(0.3f, 0.25f, 0.27f)),
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-        };
-        _visual.AddChild(baseRock);
-
-        _crystalShader ??= GD.Load<Shader>("res://shaders/crystal.gdshader");
-        var crystalMat = new ShaderMaterial { Shader = _crystalShader };
-        crystalMat.SetShaderParameter("base_color", mat.Color);
-        crystalMat.SetShaderParameter("glow_color", mat.Glow);
-        crystalMat.SetShaderParameter("seed", (float)_rng.NextDouble() * 50f);
-        _mats.Add(crystalMat);
+        // formato e textura próprios do tipo de minério
+        var built = OreVisuals.Build(_visual, mat, _rng, s);
+        _mats.AddRange(built.Materials);
         SetGlow(_baseEnergy, 0f, 0f);
-        // todos os prismas do aglomerado (grandes + lascas na base) em UMA malha → 1 chamada de desenho
-        var prism = MeshFactory.CrystalPrism(6, 1f, 1f, 0.3f);
-        var st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-        int shards = special ? 8 : _rng.Next(3, 6);
-        for (int i = 0; i < count + shards; i++)
-        {
-            bool small = i >= count;
-            float h = small ? (0.18f + (float)_rng.NextDouble() * 0.2f) * s : (0.6f + (float)_rng.NextDouble() * 0.9f) * s;
-            float r = small ? (0.05f + (float)_rng.NextDouble() * 0.04f) * s : (0.12f + (float)_rng.NextDouble() * 0.1f) * s;
-            if (i == 0) { h *= 1.35f; r *= 1.3f; }
-            float ang = (float)_rng.NextDouble() * Mathf.Tau;
-            float dist = i == 0 ? 0 : small ? (0.4f + (float)_rng.NextDouble() * 0.25f) * s : (0.12f + (float)_rng.NextDouble() * 0.22f) * s;
-            var pos = new Vector3(MathF.Cos(ang) * dist, small ? 0.02f : 0.05f * s, MathF.Sin(ang) * dist);
-            float tilt = i == 0 ? 0.1f : small ? 0.6f + (float)_rng.NextDouble() * 0.5f : 0.25f + (float)_rng.NextDouble() * 0.45f;
-            // inclina para fora do centro
-            var rot = new Vector3(MathF.Sin(ang) * tilt, (float)_rng.NextDouble() * Mathf.Tau, -MathF.Cos(ang) * tilt);
-            var basis = Basis.FromEuler(rot).ScaleLocal(new Vector3(r, h, r));
-            st.AppendFrom(prism, 0, new Transform3D(basis, pos));
-        }
-        _visual.AddChild(new MeshInstance3D
-        {
-            Mesh = st.Commit(),
-            MaterialOverride = crystalMat,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-        });
+        float vh = built.Height;
 
         if (mat.Rare || special)
         {
@@ -160,9 +114,9 @@ public partial class Crystal : StaticBody3D
             }
         }
 
-        var shape = new CylinderShape3D { Radius = 0.42f * s, Height = 1.5f * s };
+        var shape = new CylinderShape3D { Radius = built.Radius, Height = vh };
         _shape.Shape = shape;
-        _shape.Position = new Vector3(0, 0.75f * s, 0);
+        _shape.Position = new Vector3(0, vh / 2, 0);
     }
 
     public override void _Process(double delta)
