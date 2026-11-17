@@ -219,3 +219,14 @@ Decisões do diretor:
 - **Oclusão por distância:** o renderizador Compatibility não tem oclusão, então os cristais das galerias eram desenhados através das paredes (R1: 260 → 315 draw calls, média 22,8 → 21,1 FPS). Cada galeria só fica visível com a câmera dentro dela ou a até 34 m da entrada → média de volta a **22,8 FPS** (Baixa, 75%).
 - Teste novo "galerias laterais": cada uma existe, tem depósitos do minério em destaque, o jogador **entra andando** pela física real e a oclusão liga/desliga corretamente. Tour com capturas `10d_wing_entrance` e `10w_*`.
 - Testes 270/270; bot SUCESSO (Região 2 em 9,4 min, Região 3 em 30,4 min, Coração em 45,5 min, Renascimento OK).
+- Publicado como **v0.2.5**.
+
+### Etapa 3: estação de venda única, turno de trabalho e elevador para casa
+- **Uma única Estação de Venda** no mapa, no acampamento (as outras regiões ficaram só com o Terminal de Melhorias). Levar os minérios de volta passa a fazer parte do jogo.
+- **Turno de trabalho:** 10 min reais = 06:00 → 18:00 no relógio do jogo (HUD: "Dia N · HH:MM" com barra). Aviso a 1 min do fim. No fim do turno ("FIM DO TURNO"), como pedido, o jogador **só pode vender e ir para casa**: mineração, loja, troca de aba para Melhorias e portões ficam bloqueados (com aviso).
+- **Elevador da mina** no acampamento (pilares com faixas de alerta, grade, cabos, painel com lâmpada verde/âmbar piscando no fim do turno). Antes do fim do turno pede confirmação para encerrar o dia mais cedo.
+- **Casa (primeira versão):** tela "FIM DO DIA N" com ganho do dia, depósitos quebrados, saldo e aviso de fragmentos não vendidos; "Dormir e começar o Dia N+1" devolve o jogador à frente do elevador. Esc não tira o jogador de casa. Melhorias da casa e árvore de habilidades vêm na próxima etapa.
+- Marcador de objetivo: no fim do turno aponta para a venda (se houver minérios) ou para o elevador; em regiões fundas aponta o portão do caminho de volta. Objetivo do HUD e "Como jogar" atualizados.
+- Save: `Day`, `DayTimeSeconds`, `DayOver`, `DayEarned`, `DayCrystals` (saneados; saves antigos começam no Dia 1).
+- Testes: ciclo do dia (relógio, aviso, bloqueios, venda permitida, novo dia, volta antecipada, persistência, saneamento) e marcador/estação única/elevador → **291/291**. Bot: joga **7 dias**, testa que não minera fora do turno, a volta antecipada com confirmação, Esc na casa e dormir → SUCESSO (Região 2 em 9,4 min, Região 3 em 28,3 min, Coração em 49,7 min).
+- Benchmark Baixa: 21,7 FPS (dentro da variação de ±2 FPS do ambiente).

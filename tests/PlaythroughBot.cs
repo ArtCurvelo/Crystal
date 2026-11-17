@@ -52,10 +52,13 @@ public partial class PlaythroughBot : Node
             while (GameMinutes < MaxGameMinutes)
             {
                 await DismissCompletion();
+                if (GS.DayOver) { await EndOfDay(); continue; }
+                // uma volta antecipada pelo elevador (com confirmação) no 2º dia
+                if (_days == 1 && _earlyHome == 0 && GS.Data.DayTimeSeconds > 120) { if (GS.InventoryCount > 0) await SellTrip(); await GoHomeAndSleep(); continue; }
                 if (GS.InventoryCount >= GS.Capacity - 2)
                 {
                     await SellTrip();
-                    await SpendTrip();
+                    if (GS.CanWork) await SpendTrip();
                     if (_r3 > 0 && _heart > 0 && _r4 > 0) break;
                     continue;
                 }
@@ -110,7 +113,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Renascimento: {(_prestiged ? "sim" : "não")} | Região 2 na 2ª jornada: {(_secondR2 > 0 ? $"{_secondR2:0.0} min" : "não alcançada")}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
-        bool ok = _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
+        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome})");
+        bool ok = _days >= 2 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
         GameState.Instance.QuitClean(ok ? 0 : 1);
@@ -158,7 +162,7 @@ public partial class PlaythroughBot : Node
         bool wasHeart = target.Material.Special;
         Input.ActionPress("mine");
         int guard = 0;
-        while (target.IsMineable && guard++ < 60 * 60) await Frames(1);
+        while (target.IsMineable && GS.CanWork && guard++ < 60 * 60) await Frames(1);
         Input.ActionRelease("mine");
         if (!target.IsMineable && wasHeart && _heart < 0)
         {
@@ -176,6 +180,7 @@ public partial class PlaythroughBot : Node
     {
         if (!GS.CanPrestige) { _errors++; Log($"ERRO: Renascimento indisponível após concluir (pendente {GS.PendingEssence})"); return; }
         int pending = GS.PendingEssence;
+        if (GS.DayOver) await EndOfDay();
         if (!await UseStation<ShopTerminal>(GameData.Regions[0])) return;
         var shop = Main.GetChildren().OfType<ShopScreen>().First();
         var btn = FindButtons(shop).FirstOrDefault(b => b.Text.StartsWith("Renascer"));
@@ -198,7 +203,8 @@ public partial class PlaythroughBot : Node
         while (!GS.IsUnlocked("depths") && GameMinutes - t0 < 30 && guard++ < 5000)
         {
             await DismissCompletion();
-            if (GS.InventoryCount >= GS.Capacity - 2) { await SellTrip(); await SpendTrip(); }
+            if (GS.DayOver) await EndOfDay();
+            else if (GS.InventoryCount >= GS.Capacity - 2) { await SellTrip(); if (GS.CanWork) await SpendTrip(); }
             else await MineOne();
         }
         _secondR2 = GS.IsUnlocked("depths") ? GameMinutes - t0 : -1;
@@ -300,9 +306,62 @@ public partial class PlaythroughBot : Node
         return true;
     }
 
+    int _days, _earlyHome;
+
+    /// <summary>Fim do turno: vende o que tiver, pega o elevador, confere a tela de casa e dorme.</summary>
+    async Task EndOfDay()
+    {
+        if (GS.InventoryCount > 0) await SellTrip();
+        // fora do turno a mineração não pode funcionar
+        var c = Main.World.Crystals.FirstOrDefault(x => x.IsMineable && !x.Material.Special && x.GetParent() == RegionRoot(GameData.Regions[0]));
+        if (c != null && _days == 0)
+        {
+            P.GlobalPosition = c.GlobalPosition + new Vector3(0, 0.05f, 1.7f);
+            P.Velocity = Vector3.Zero;
+            await Frames(2);
+            AimAt(c.GlobalPosition + Vector3.Up * 0.5f);
+            float hp = c.Hp;
+            Input.ActionPress("mine");
+            await Frames(60);
+            Input.ActionRelease("mine");
+            if (c.Hp < hp) { _errors++; Log("ERRO: minerou depois do fim do turno"); }
+        }
+        await GoHomeAndSleep();
+    }
+
+    async Task GoHomeAndSleep()
+    {
+        int day = GS.Data.Day;
+        bool wasOver = GS.DayOver;
+        if (!await UseStation<MineElevator>(GameData.Regions[0])) { await Frames(30); return; }
+        if (!wasOver)
+        {
+            // antes do fim do turno o elevador pede confirmação
+            var confirm = Main.GetChildren().OfType<ConfirmScreen>().First();
+            if (!confirm.IsOpen) { _errors++; Log("ERRO: elevador não pediu confirmação antes do fim do turno"); return; }
+            FindButtons(confirm).First(b => b.Text == "Confirmar").EmitSignal(BaseButton.SignalName.Pressed);
+            await Frames(3);
+            _earlyHome++;
+        }
+        var home = Main.GetChildren().OfType<HomeScreen>().First();
+        if (!home.IsOpen || !GS.DayOver) { _errors++; Log("ERRO: tela de casa não abriu"); return; }
+        PressAction("pause"); // Esc não deve tirar o jogador de casa
+        await Frames(3);
+        if (!home.IsOpen) { _errors++; Log("ERRO: Esc fechou a casa sem dormir"); return; }
+        var sleep = FindButtons(home).FirstOrDefault(b => b.Text.StartsWith("Dormir"));
+        if (sleep == null) { _errors++; Log("ERRO: botão Dormir ausente"); return; }
+        sleep.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(5);
+        if (home.IsOpen || GS.DayOver || GS.Data.Day != day + 1 || GS.Data.DayTimeSeconds > 1 || !P.InputEnabled)
+        { _errors++; Log("ERRO: dormir não começou um novo dia corretamente"); return; }
+        if (P.GlobalPosition.DistanceTo(Main.World.SpawnPoint) > 1.5f) { _errors++; Log("ERRO: jogador não voltou ao elevador"); }
+        _days++;
+        if (_days <= 2 || _days % 3 == 0) Log($"Dia {GS.Data.Day} começou (saldo {GameState.FormatMoney(GS.Data.Money)})");
+    }
+
     async Task SellTrip()
     {
-        var region = BestRegion();
+        var region = GameData.Regions[0]; // única Estação de Venda, no acampamento
         if (!await UseStation<SellStation>(region)) return;
         var sell = Main.GetChildren().OfType<SellScreen>().First();
         if (!sell.IsOpen) { _errors++; Log("ERRO: tela de venda não abriu"); return; }
@@ -318,7 +377,11 @@ public partial class PlaythroughBot : Node
         shopTab.EmitSignal(BaseButton.SignalName.Pressed);
         await Frames(2);
         var shopScr = Main.GetChildren().OfType<ShopScreen>().First();
-        if (!shopScr.IsOpen || sell.IsOpen) { _errors++; Log("ERRO: troca de aba para Melhorias falhou"); }
+        if (GS.DayOver)
+        {
+            if (shopScr.IsOpen || !sell.IsOpen) { _errors++; Log("ERRO: Melhorias abriu depois do fim do turno"); }
+        }
+        else if (!shopScr.IsOpen || sell.IsOpen) { _errors++; Log("ERRO: troca de aba para Melhorias falhou"); }
         PressAction("pause"); // fecha
         await Frames(3);
         if (sell.IsOpen || shopScr.IsOpen) { _errors++; Log("ERRO: Esc não fechou o terminal"); }
@@ -327,6 +390,7 @@ public partial class PlaythroughBot : Node
 
     async Task SpendTrip()
     {
+        if (!GS.CanWork) return;
         var next = GS.NextLockedRegion();
         if (next != null && GS.CanUnlock(next))
         {
@@ -358,8 +422,10 @@ public partial class PlaythroughBot : Node
         if (next != null && GS.Data.Money > next.UnlockCost * 0.6) return;
 
         var region = BestRegion();
+        if (!GS.CanWork) return;
         if (!await UseStation<ShopTerminal>(region)) return;
         var shop = Main.GetChildren().OfType<ShopScreen>().First();
+        if (!shop.IsOpen && GS.DayOver) return; // o turno acabou no caminho
         if (!shop.IsOpen) { _errors++; Log("ERRO: loja não abriu"); return; }
         for (int i = 0; i < 40; i++)
         {

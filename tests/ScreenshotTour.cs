@@ -51,6 +51,10 @@ public partial class ScreenshotTour : Node
         p.SetLook(1.9f, -0.05f);
         await Wait(0.4f);
         await Shot("02e_props");
+        p.GlobalPosition = new Vector3(2.5f, 0.1f, 13.2f);
+        p.SetLook(2.72f, 0.12f);
+        await Wait(0.4f);
+        await Shot("02f_elevator");
         p.GlobalPosition = Main.World.SpawnPoint;
         p.SetLook(0, 0);
 
@@ -197,6 +201,24 @@ public partial class ScreenshotTour : Node
         Main.OpenCompletionForTour();
         await Wait(0.6f);
         await Shot("15_completion");
+
+        // fim do turno e casa
+        Main.CloseAllForTour();
+        p.GlobalPosition = new Vector3(3f, 0.1f, 8f);
+        p.SetLook(2.9f, 0.05f);
+        gs.AddItem("quartz", 12);
+        gs.Data.DayTimeSeconds = gs.DayLength - 50;
+        await Wait(0.8f);
+        await Shot("15a_clock_late");
+        gs.EndDay();
+        await Wait(1.0f);
+        await Shot("15b_day_over");
+        gs.SellAll();
+        UiBus.RequestHome();
+        await Wait(0.8f);
+        await Shot("15c_home");
+        Main.CloseAllForTour();
+        gs.StartNewDay();
 
         await OreGallery(p);
 

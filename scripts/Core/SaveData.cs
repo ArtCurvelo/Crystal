@@ -27,6 +27,12 @@ public sealed class SaveData
     public int Essence { get; set; }
     public int PrestigeCount { get; set; }
     public double CompletedAtSeconds { get; set; }
+    // ciclo de trabalho (turnos)
+    public int Day { get; set; } = 1;
+    public double DayTimeSeconds { get; set; }
+    public bool DayOver { get; set; }
+    public long DayEarned { get; set; }
+    public long DayCrystals { get; set; }
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
     public float PlayerZ { get; set; } = 14f;
@@ -53,6 +59,10 @@ public sealed class SaveData
         PrestigeCount = System.Math.Max(0, PrestigeCount);
         if (ShardsSold < 0) ShardsSold = 0;
         if (PlayTimeSeconds < 0 || double.IsNaN(PlayTimeSeconds)) PlayTimeSeconds = 0;
+        if (Day < 1) Day = 1;
+        if (DayTimeSeconds < 0 || double.IsNaN(DayTimeSeconds)) DayTimeSeconds = 0;
+        if (DayEarned < 0) DayEarned = 0;
+        if (DayCrystals < 0) DayCrystals = 0;
 
         // upgrades: remove desconhecidos e limita níveis
         foreach (var key in Upgrades.Keys.ToList())

@@ -141,6 +141,71 @@ public partial class SellStation : StationBase
     public override void Interact(PlayerController player) => UiBus.RequestSell();
 }
 
+/// <summary>Elevador da mina: leva o jogador para casa e encerra o dia.</summary>
+public partial class MineElevator : StationBase
+{
+    MeshInstance3D _lamp;
+    StandardMaterial3D _lampMat;
+
+    public override void _Ready()
+    {
+        SetupBody(new Vector3(3.4f, 4.2f, 1.8f));
+        var steel = new StandardMaterial3D { AlbedoColor = new Color(0.34f, 0.35f, 0.4f), Roughness = 0.55f, Metallic = 0.35f };
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.12f, 0.15f), Roughness = 0.8f };
+        var yellow = new StandardMaterial3D { AlbedoColor = new Color(0.95f, 0.72f, 0.12f), Roughness = 0.7f };
+        var orange = new Color(1f, 0.55f, 0.18f);
+        var trim = MeshFactory.Emissive(orange, orange, 1.4f);
+        // poço (fundo escuro) e piso da cabine
+        AddMesh(new BoxMesh { Size = new Vector3(3.0f, 4.0f, 0.2f) }, dark, new Vector3(0, 2.0f, -0.8f));
+        AddMesh(new BoxMesh { Size = new Vector3(2.8f, 0.12f, 1.5f) }, steel, new Vector3(0, 0.06f, 0));
+        // pilares e viga superior com faixas de alerta
+        foreach (float x in new[] { -1.55f, 1.55f })
+        {
+            AddMesh(new BoxMesh { Size = new Vector3(0.3f, 4.2f, 0.4f) }, steel, new Vector3(x, 2.1f, 0.6f));
+            for (int i = 0; i < 5; i++)
+                AddMesh(new BoxMesh { Size = new Vector3(0.31f, 0.18f, 0.41f) }, i % 2 == 0 ? yellow : dark, new Vector3(x, 0.3f + i * 0.36f, 0.6f));
+        }
+        AddMesh(new BoxMesh { Size = new Vector3(3.5f, 0.45f, 0.5f) }, steel, new Vector3(0, 4.2f, 0.6f));
+        for (int i = 0; i < 9; i++)
+            AddMesh(new BoxMesh { Size = new Vector3(0.36f, 0.3f, 0.02f) }, i % 2 == 0 ? yellow : dark, new Vector3(-1.45f + i * 0.36f, 4.2f, 0.86f)).Rotation = new Vector3(0, 0, 0.5f);
+        // grade da porta (meio aberta)
+        for (int i = 0; i < 6; i++)
+            AddMesh(new BoxMesh { Size = new Vector3(0.05f, 3.6f, 0.05f) }, steel, new Vector3(-1.35f + i * 0.14f, 1.9f, 0.75f));
+        AddMesh(new BoxMesh { Size = new Vector3(0.8f, 0.06f, 0.06f) }, steel, new Vector3(-1.0f, 3.6f, 0.75f));
+        AddMesh(new BoxMesh { Size = new Vector3(0.8f, 0.06f, 0.06f) }, steel, new Vector3(-1.0f, 0.4f, 0.75f));
+        // cabos
+        foreach (float x in new[] { -0.4f, 0.4f })
+            AddMesh(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.03f, Height = 3.8f, RadialSegments = 6, Rings = 1 }, dark, new Vector3(x, 2.1f, -0.5f));
+        // painel com botão e lâmpada de status
+        AddMesh(new BoxMesh { Size = new Vector3(0.36f, 0.6f, 0.12f) }, dark, new Vector3(1.95f, 1.3f, 0.7f));
+        AddMesh(new BoxMesh { Size = new Vector3(0.3f, 0.04f, 0.13f) }, trim, new Vector3(1.95f, 1.62f, 0.7f));
+        _lampMat = new StandardMaterial3D { AlbedoColor = new Color(0.3f, 1f, 0.5f), EmissionEnabled = true, Emission = new Color(0.3f, 1f, 0.5f), EmissionEnergyMultiplier = 2f };
+        _lamp = AddMesh(new SphereMesh { Radius = 0.09f, Height = 0.18f, RadialSegments = 10, Rings = 5 }, _lampMat, new Vector3(1.95f, 1.35f, 0.78f));
+        AddMesh(new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.06f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, MeshFactory.Emissive(orange, orange, 2f), new Vector3(1.95f, 1.12f, 0.78f)).Rotation = new Vector3(Mathf.Pi / 2, 0, 0);
+        var light = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.1f, OmniRange = 6f, Position = new Vector3(0, 3.6f, 1.2f) };
+        AddChild(light);
+        Label = MakeLabel("ELEVADOR · CASA", new Color(1f, 0.82f, 0.4f), 5.25f);
+        StaticBatcher.Batch(this);
+    }
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        var gs = GameState.Instance;
+        if (gs == null || _lampMat == null) return;
+        // verde durante o turno, âmbar piscando quando é hora de voltar
+        var c = gs.DayOver ? new Color(1f, 0.6f, 0.15f) * (0.6f + 0.4f * Mathf.Abs(Mathf.Sin(Time * 4f))) : new Color(0.3f, 1f, 0.5f);
+        _lampMat.Emission = c;
+        _lampMat.AlbedoColor = c;
+    }
+
+    public override string GetPrompt() => GameState.Instance.DayOver
+        ? $"{InputHints.Interact} Subir para casa (fim do turno)"
+        : $"{InputHints.Interact} Elevador: encerrar o dia e ir para casa";
+
+    public override void Interact(PlayerController player) => UiBus.RequestHome();
+}
+
 /// <summary>Terminal de upgrades e desbloqueios.</summary>
 public partial class ShopTerminal : StationBase
 {

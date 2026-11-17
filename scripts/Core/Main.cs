@@ -86,7 +86,7 @@ public partial class Main : Node
         _sell.Closed += ReturnToGameplay;
         AddChild(_sell);
         _shop.SwitchToSell = () => { _shop.CloseSilently(); _sell.Open(); };
-        _sell.SwitchToShop = () => { _sell.CloseSilently(); _shop.Open(); };
+        _sell.SwitchToShop = () => { if (!GameState.Instance.RequireWork()) return; _sell.CloseSilently(); _shop.Open(); };
         _pause = new PauseScreen
         {
             OnResume = Resume,
@@ -127,6 +127,9 @@ public partial class Main : Node
                 }
             });
         AddChild(_backups);
+        _home = new HomeScreen { OnSleep = SleepAtHome };
+        AddChild(_home);
+        _confirm.Closed += ReturnToGameplay;
         _completion = new CompletionScreen();
         _completion.Closed += ReturnToGameplay;
         AddChild(_completion);
@@ -135,6 +138,7 @@ public partial class Main : Node
         UiBus.OpenShop += OpenShop;
         UiBus.PrestigeRequested += AskPrestige;
         UiBus.OpenSell += OpenSell;
+        UiBus.OpenHome += OpenHome;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         GameState.Instance.BeforeSave = WritePlayerToSave;
         GameState.Instance.RegionsChanged += UpdateRegionCulling;
@@ -271,6 +275,7 @@ public partial class Main : Node
         UiBus.PrestigeRequested -= AskPrestige;
         Settings.Changed -= ApplyLightQuality;
         UiBus.OpenSell -= OpenSell;
+        UiBus.OpenHome -= OpenHome;
         if (GameState.Instance != null)
         {
             GameState.Instance.RegionsChanged -= UpdateRegionCulling;
@@ -388,6 +393,7 @@ public partial class Main : Node
     void OpenShop()
     {
         if (CurrentMode != Mode.Playing || AnyModal()) return;
+        if (!GameState.Instance.RequireWork()) return;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         Player.InputEnabled = false;
         _shop.Open();
@@ -401,9 +407,54 @@ public partial class Main : Node
         _sell.Open();
     }
 
+    // ======================= Casa / ciclo do dia =======================
+    HomeScreen _home;
+
+    void OpenHome()
+    {
+        if (CurrentMode != Mode.Playing || AnyModal()) return;
+        var gs = GameState.Instance;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        Player.InputEnabled = false;
+        AudioManager.Instance?.SetBeam(false);
+        if (gs.DayOver) GoHome();
+        else _confirm.Ask($"Encerrar o turno agora ({gs.ClockText}) e subir para casa? O dia termina mais cedo.", GoHome);
+    }
+
+    void GoHome()
+    {
+        var gs = GameState.Instance;
+        if (CurrentMode != Mode.Playing) return;
+        gs.EndDay(early: true);
+        _shards.ClearAll();
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        Player.InputEnabled = false;
+        AudioManager.Instance?.SetBeam(false);
+        _home.Open();
+    }
+
+    void SleepAtHome()
+    {
+        var gs = GameState.Instance;
+        _home.CloseSilently();
+        gs.StartNewDay();
+        Events.ResetAll();
+        Player.GlobalPosition = World.SpawnPoint;
+        Player.Velocity = Vector3.Zero;
+        Player.SetLook(0);
+        _currentRegion = null;
+        UpdateRegion(true);
+        UpdateRegionCulling();
+        ReturnToGameplay();
+        Hud.ShowBigMessage($"DIA {gs.Data.Day}");
+    }
+
+    public bool HomeOpen => _home.IsOpen;
+
     void ReturnToGameplay()
     {
         if (CurrentMode != Mode.Playing) return;
+        if (AnyModal()) return; // outra janela ainda aberta (ex.: confirmação sobre a loja)
         if (_pendingCompletion && !AnyModal())
         {
             _pendingCompletion = false;
@@ -422,13 +473,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
+    bool AnyModal() => _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -438,6 +489,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) { _confirm.Close(); return; }
+            if (_home.IsOpen) return; // em casa só se sai dormindo
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
@@ -454,6 +506,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) _confirm.Close();
+            else if (_home.IsOpen) { }
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
             else if (_help.IsOpen) _help.Close();

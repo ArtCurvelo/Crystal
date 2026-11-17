@@ -20,6 +20,27 @@ public partial class Hud : CanvasLayer
     public World.RegionEvents Events;
 
     Control _root;
+    PanelContainer _clockPanel;
+    HudIcon _clockIcon;
+    Label _clock;
+    ProgressBar _clockBar;
+    string _clockText;
+    bool _clockOver;
+
+    void UpdateClock()
+    {
+        var gs = GameState.Instance;
+        bool over = gs.DayOver;
+        string t = over ? $"Dia {gs.Data.Day} · TURNO ENCERRADO" : $"Dia {gs.Data.Day} · {gs.ClockText}";
+        if (t != _clockText) { _clockText = t; _clock.Text = t; }
+        _clockBar.Value = gs.DayProgress;
+        bool late = !over && gs.DayRemaining <= GameState.DayWarningSeconds;
+        if (over != _clockOver) { _clockOver = over; RefreshObjective(); }
+        var col = over ? UiTheme.Danger : late ? new Color(1f, 0.6f, 0.25f) : UiTheme.Text;
+        _clock.Modulate = (over || late) ? new Color(1, 1, 1, 0.75f + 0.25f * Mathf.Abs(Mathf.Sin(Time.GetTicksMsec() / 250f))) : Colors.White;
+        _clock.AddThemeColorOverride("font_color", col);
+    }
+
     Label _money, _moneyGain, _capLabel, _prompt, _regionName, _regionSub, _fps, _objective, _keys;
     ProgressBar _capBar;
     PanelContainer _promptPanel, _objectivePanel, _regionTag, _capPanel;
@@ -197,6 +218,23 @@ public partial class Hud : CanvasLayer
         cv.AddChild(_capLabel);
         _capBar = UiTheme.Bar(UiTheme.Cyan, 210, 9);
         cv.AddChild(_capBar);
+
+        // relógio do turno
+        _clockPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _clockPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 6));
+        col.AddChild(_clockPanel);
+        var kh = new HBoxContainer();
+        kh.AddThemeConstantOverride("separation", 10);
+        _clockPanel.AddChild(kh);
+        _clockIcon = HudIcon.Make(HudIcon.Kind.Clock, UiTheme.Gold, 30);
+        kh.AddChild(_clockIcon);
+        var kv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        kv.AddThemeConstantOverride("separation", 4);
+        kh.AddChild(kv);
+        _clock = UiTheme.Label("", 18, UiTheme.Text, true);
+        kv.AddChild(_clock);
+        _clockBar = UiTheme.Bar(UiTheme.Gold, 210, 7);
+        kv.AddChild(_clockBar);
 
         _notifs = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         _notifs.AddThemeConstantOverride("separation", 8);
@@ -420,7 +458,11 @@ public partial class Hud : CanvasLayer
         var gs = GameState.Instance;
         string text;
         var d = gs.Data;
-        if (d.CrystalsMined == 0) text = "OBJETIVO\nMire em um cristal e segure o botão esquerdo para minerar.";
+        if (gs.DayOver)
+            text = gs.InventoryCount > 0
+                ? "FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento e pegue o ELEVADOR para casa."
+                : "FIM DO TURNO\nPegue o ELEVADOR no acampamento para ir para casa.";
+        else if (d.CrystalsMined == 0) text = "OBJETIVO\nMire em um cristal e segure o botão esquerdo para minerar.";
         else if (d.ShardsSold == 0 && gs.InventoryCount < 8) text = "OBJETIVO\nColete os fragmentos. Eles são atraídos até você.";
         else if (d.ShardsSold == 0) text = "OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.";
         else if (d.Upgrades.Count == 0) text = "OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).";
@@ -490,6 +532,7 @@ public partial class Hud : CanvasLayer
         Pop(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", UiTheme.Gold, 30, 60);
 
     void OnBigMessage(string text) => Pop(text, UiTheme.Cyan, 40, -260, 2.2f);
+    public void ShowBigMessage(string text) => OnBigMessage(text);
 
     void Pop(string text, Color color, int size, float y, float hold = 0.5f)
     {
@@ -558,6 +601,7 @@ public partial class Hud : CanvasLayer
             : Colors.White;
 
         UpdateEventPanel();
+        UpdateClock();
         _fps.Visible = Settings.Data.ShowFps;
         if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS · 3D {GetViewport().Scaling3DScale * 100:0}%";
 

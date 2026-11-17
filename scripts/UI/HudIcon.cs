@@ -5,7 +5,7 @@ namespace CrystalExcavator.UI;
 /// <summary>Ícones vetoriais desenhados por código (sem imagens): moeda, mochila, gema, raio, picareta, região.</summary>
 public partial class HudIcon : Control
 {
-    public enum Kind { Coin, Bag, Gem, Bolt, Pick, Region, Star, Nugget, Orb, Banded, Shard, Ember }
+    public enum Kind { Coin, Bag, Gem, Bolt, Pick, Region, Star, Nugget, Orb, Banded, Shard, Ember, Clock }
 
     /// <summary>Ícone conforme o formato do minério (cristal, pepita, esfera, faixas, lasca, brasa).</summary>
     public static Kind KindFor(Data.MaterialDef m) => m.Archetype switch
@@ -92,6 +92,12 @@ public partial class HudIcon : Control
                 DrawPolyline(new[] { c, c + new Vector2(0.55f, -0.45f) * r }, Color, r * 0.12f, true);
                 break;
             }
+            case Kind.Clock:
+                DrawCircle(c, r * 0.9f, Color);
+                DrawCircle(c, r * 0.72f, new Color(0.05f, 0.06f, 0.1f));
+                DrawLine(c, c + new Vector2(0, -r * 0.55f), Color, r * 0.14f, true);
+                DrawLine(c, c + new Vector2(r * 0.4f, 0), Color, r * 0.14f, true);
+                break;
             case Kind.Bolt:
                 var pts = new Vector2[]
                 {

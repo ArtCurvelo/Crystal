@@ -84,13 +84,19 @@ public partial class ObjectiveMarker : Node3D
         var root = World.RegionRoots[region.Index];
         _target = null;
         _targetHeight = 2.2f;
-        if (d.CrystalsMined == 0)
+        if (gs.DayOver)
+        {
+            // fim do turno: vender (se houver o que vender) e voltar ao elevador
+            _target = gs.InventoryCount > 0 ? World.SellStation : World.Elevator;
+            _targetHeight = 4.2f;
+        }
+        else if (d.CrystalsMined == 0)
         {
             _target = Nearest(root);
             _targetHeight = 2.0f;
         }
         else if (gs.InventoryFull || (d.ShardsSold == 0 && gs.InventoryCount >= 8))
-            _target = Station<SellStation>(root);
+            _target = World.SellStation;
         else if (d.Upgrades.Count == 0 && d.ShardsSold > 0)
             _target = Station<ShopTerminal>(root);
         else
@@ -106,6 +112,12 @@ public partial class ObjectiveMarker : Node3D
                 foreach (var c in World.Crystals) if (c.Material.Special) _target = c;
                 _targetHeight = 7.5f;
             }
+        }
+        // alvo no acampamento visto de uma região mais funda: aponta o caminho de volta (portão do túnel)
+        if (_target != null && region.Index > 0 && (_target == World.SellStation || _target == World.Elevator))
+        {
+            _target = World.Gates[region.Index - 1];
+            _targetHeight = 6f;
         }
     }
 

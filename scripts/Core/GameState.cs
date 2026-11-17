@@ -50,6 +50,7 @@ public partial class GameState : Node
     {
         if (!IsPlaying || GetTree().Paused) return;
         Data.PlayTimeSeconds += delta;
+        TickDay(delta);
         _autosaveTimer += (float)delta;
         if (_autosaveTimer >= AutosaveInterval)
         {
@@ -129,6 +130,7 @@ public partial class GameState : Node
         if (count == 0) return 0;
         Data.Inventory.Clear();
         Data.ShardsSold += count;
+        Data.DayEarned += total;
         AddMoney(total);
         InventoryChanged?.Invoke();
         Sold?.Invoke(total);
@@ -152,6 +154,7 @@ public partial class GameState : Node
     public bool TryBuyUpgrade(string id)
     {
         if (!GameData.Upgrades.ContainsKey(id) || IsMaxed(id)) return false;
+        if (!RequireWork()) return false;
         long cost = UpgradeCost(id);
         if (!CanAfford(cost)) return false;
         int prevTier = ToolTier;
@@ -185,6 +188,7 @@ public partial class GameState : Node
     {
         var r = GameData.Region(regionId);
         if (!CanUnlock(r)) return false;
+        if (!RequireWork()) return false;
         Data.Money -= r.UnlockCost;
         Data.UnlockedRegions.Add(r.Id);
         MoneyChanged?.Invoke();
@@ -193,6 +197,79 @@ public partial class GameState : Node
         BigMessage?.Invoke("NOVA REGIÃO: " + r.Name.ToUpper());
         SaveGame(true);
         return true;
+    }
+
+    // ================= Turno (ciclo do dia) =================
+    /// <summary>Duração do turno em segundos reais (06:00 → 18:00 no relógio do jogo).</summary>
+    public const float DefaultDayLength = 600f;
+    /// <summary>Permite a testes/bot encurtar o dia.</summary>
+    public static float? DayLengthOverride;
+    public float DayLength => DayLengthOverride ?? DefaultDayLength;
+    public const float DayWarningSeconds = 60f;
+    public bool DayOver => Data.DayOver;
+    /// <summary>Fora do turno o jogador só pode vender e voltar para casa.</summary>
+    public bool CanWork => !Data.DayOver;
+    public float DayProgress => Math.Clamp((float)(Data.DayTimeSeconds / DayLength), 0f, 1f);
+    public float DayRemaining => Math.Max(0f, DayLength - (float)Data.DayTimeSeconds);
+    public event Action DayEnded;
+    public event Action DayStarted;
+    public const int DayStartHour = 6, DayEndHour = 18;
+
+    /// <summary>Relógio do jogo (HH:MM), de 06:00 a 18:00 ao longo do turno.</summary>
+    public string ClockText
+    {
+        get
+        {
+            int minutes = (int)(DayStartHour * 60 + DayProgress * (DayEndHour - DayStartHour) * 60);
+            minutes -= minutes % 10;
+            return $"{minutes / 60:00}:{minutes % 60:00}";
+        }
+    }
+
+    public void TickDay(double delta)
+    {
+        if (Data.DayOver) return;
+        double before = Data.DayTimeSeconds;
+        Data.DayTimeSeconds += delta;
+        double warnAt = DayLength - DayWarningSeconds;
+        if (before < warnAt && Data.DayTimeSeconds >= warnAt && DayLength > DayWarningSeconds * 2)
+            Notify("O turno está acabando", "Falta 1 minuto. Leve os minérios à Estação de Venda no acampamento.", NotifyKind.Warning);
+        if (Data.DayTimeSeconds >= DayLength) EndDay();
+    }
+
+    /// <summary>Encerra o turno: a mineração, a loja e os portões ficam bloqueados até o próximo dia.</summary>
+    public void EndDay(bool early = false)
+    {
+        if (Data.DayOver) return;
+        Data.DayOver = true;
+        if (!early)
+        {
+            Data.DayTimeSeconds = Math.Max(Data.DayTimeSeconds, DayLength);
+            BigMessage?.Invoke("FIM DO TURNO");
+            Notify("Turno encerrado", "Venda seus minérios e pegue o elevador para casa.", NotifyKind.Warning);
+        }
+        DayEnded?.Invoke();
+        SaveGame(true);
+    }
+
+    /// <summary>Começa um novo dia (depois de dormir em casa).</summary>
+    public void StartNewDay()
+    {
+        Data.Day++;
+        Data.DayTimeSeconds = 0;
+        Data.DayOver = false;
+        Data.DayEarned = 0;
+        Data.DayCrystals = 0;
+        DayStarted?.Invoke();
+        SaveGame(true);
+    }
+
+    /// <summary>Avisa e devolve false quando a ação exige o turno aberto.</summary>
+    public bool RequireWork()
+    {
+        if (CanWork) return true;
+        Notify("Turno encerrado", "Agora você só pode vender e voltar para casa pelo elevador.", NotifyKind.Warning);
+        return false;
     }
 
     // ================= Sessão / Save =================
@@ -267,7 +344,7 @@ public partial class GameState : Node
         RegionsChanged?.Invoke();
     }
 
-    public void RecordCrystalMined() => Data.CrystalsMined++;
+    public void RecordCrystalMined() { Data.CrystalsMined++; Data.DayCrystals++; }
 
     /// <summary>Jornada concluída: todas as regiões liberadas e o Coração Ancestral destruído.</summary>
     public bool JourneyComplete => GameData.Regions.All(r => IsUnlocked(r.Id)) && Data.Discovered.Contains("heart");

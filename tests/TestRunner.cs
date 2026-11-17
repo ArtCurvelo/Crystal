@@ -45,6 +45,7 @@ public partial class TestRunner : Node
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
             Run("Proteção do save (regressão do bug da atualização)", TestSaveProtection);
+            Run("Ciclo do dia (turno, fim do dia, novo dia)", TestDayCycle);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -88,6 +89,60 @@ public partial class TestRunner : Node
     static GameState GS => GameState.Instance;
 
     void Fresh() { GS.NewGame(); }
+
+    // ---------------------------------------------------------------
+    void TestDayCycle()
+    {
+        Fresh();
+        var d = GS.Data;
+        Check(d.Day == 1 && !GS.DayOver && GS.CanWork, "novo jogo começa no Dia 1 com o turno aberto");
+        Check(GS.ClockText == "06:00", $"relógio começa às 06:00 (está {GS.ClockText})");
+        d.DayTimeSeconds = GS.DayLength / 2;
+        Check(GS.ClockText == "12:00", $"metade do turno = 12:00 (está {GS.ClockText})");
+        int warns = 0, ended = 0, started = 0;
+        void OnN(string t, string b, NotifyKind k) { if (t.Contains("acabando")) warns++; }
+        GS.Notified += OnN;
+        GS.DayEnded += () => ended++;
+        d.DayTimeSeconds = GS.DayLength - GameState.DayWarningSeconds - 1;
+        GS.TickDay(2);
+        Check(warns == 1 && !GS.DayOver, "aviso de 1 minuto antes do fim do turno");
+        GS.TickDay(GameState.DayWarningSeconds + 5);
+        GS.Notified -= OnN;
+        Check(GS.DayOver && !GS.CanWork && ended == 1, "turno termina ao fim do tempo");
+        Check(GS.ClockText == "18:00", $"relógio para às 18:00 (está {GS.ClockText})");
+        double t = d.DayTimeSeconds;
+        GS.TickDay(30);
+        Check(d.DayTimeSeconds == t, "tempo não corre depois do fim do turno");
+        // fora do turno: só vender
+        GS.AddMoney(10_000_000);
+        Check(!GS.TryBuyUpgrade(UpgradeIds.Damage), "não compra melhorias fora do turno");
+        Check(!GS.TryUnlockRegion("depths"), "não desbloqueia regiões fora do turno");
+        GS.AddItem("quartz", 5);
+        long gained = GS.SellAll();
+        Check(gained > 0 && d.DayEarned == gained, "venda continua funcionando e soma no ganho do dia");
+        // novo dia
+        GS.DayStarted += () => started++;
+        GS.StartNewDay();
+        Check(d.Day == 2 && !GS.DayOver && d.DayTimeSeconds == 0 && d.DayEarned == 0 && started == 1, "dormir começa o Dia 2 zerado");
+        Check(GS.TryBuyUpgrade(UpgradeIds.Damage), "no novo dia volta a comprar");
+        // encerrar mais cedo (elevador) não mostra a mensagem de fim de turno
+        int big = 0;
+        void OnBig(string m) => big++;
+        GS.BigMessage += OnBig;
+        d.DayTimeSeconds = 100;
+        GS.EndDay(early: true);
+        GS.BigMessage -= OnBig;
+        Check(GS.DayOver && big == 0 && d.DayTimeSeconds == 100, "volta antecipada encerra o dia sem alarde");
+        // persistência e saneamento
+        d.Day = 5;
+        GS.SaveGame(true);
+        GS.LoadGame();
+        Check(GS.Data.Day == 5 && GS.Data.DayOver, "dia e estado do turno são salvos");
+        var bad = new SaveData { Day = -3, DayTimeSeconds = double.NaN, DayEarned = -5 };
+        bad.Sanitize();
+        Check(bad.Day == 1 && bad.DayTimeSeconds == 0 && bad.DayEarned == 0, "valores inválidos do dia são corrigidos");
+        Fresh();
+    }
 
     // ---------------------------------------------------------------
     void TestDefinitions()
@@ -698,7 +753,8 @@ public partial class TestRunner : Node
         var world = new WorldBuilder();
         root.AddChild(world);
         var pos = world.SpawnPoint;
-        var marker = new ObjectiveMarker { World = world, PlayerPos = () => pos, CurrentRegion = () => GameData.Regions[0] };
+        var curRegion = GameData.Regions[0];
+        var marker = new ObjectiveMarker { World = world, PlayerPos = () => pos, CurrentRegion = () => curRegion };
         root.AddChild(marker);
         GS.IsPlaying = true;
         await Frames(40);
@@ -716,6 +772,23 @@ public partial class TestRunner : Node
         GS.AddMoney(GameData.Regions[1].UnlockCost);
         await Frames(40);
         Check(marker.TargetPosition == world.Gates[0].GlobalPosition, "com dinheiro: marcador aponta para o portão");
+        // estação de venda única e elevador
+        int sellCount = world.RegionRoots.Sum(r => r.GetChildren().OfType<SellStation>().Count());
+        Check(sellCount == 1 && world.SellStation != null, $"deve haver exatamente 1 Estação de Venda no mapa (há {sellCount})");
+        Check(world.Elevator != null && world.Elevator.GetParent() == world.RegionRoots[0], "elevador fica no acampamento");
+        Check(world.Elevator.GlobalPosition.DistanceTo(world.SpawnPoint) < 4f, "jogador começa o dia na frente do elevador");
+        GS.AddItem("quartz", 3);
+        GS.EndDay();
+        await Frames(40);
+        Check(marker.TargetPosition == sell.GlobalPosition, "fim do turno com minérios: marcador aponta para a venda");
+        GS.SellAll();
+        await Frames(40);
+        Check(marker.TargetPosition == world.Elevator.GlobalPosition, "fim do turno sem minérios: marcador aponta para o elevador");
+        curRegion = GameData.Regions[2];
+        await Frames(40);
+        Check(marker.TargetPosition == world.Gates[1].GlobalPosition, "em região funda: marcador mostra o caminho de volta (portão)");
+        curRegion = GameData.Regions[0];
+        GS.StartNewDay();
         GS.IsPlaying = false;
         root.QueueFree();
         await Frames(2);

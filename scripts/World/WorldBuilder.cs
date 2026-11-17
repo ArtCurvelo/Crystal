@@ -21,6 +21,8 @@ public partial class WorldBuilder : Node3D
     public readonly List<Crystal> Crystals = new();
     public readonly List<RegionGate> Gates = new();
     public Vector3 SpawnPoint = new(0, 0.1f, 15f);
+    public MineElevator Elevator;
+    public SellStation SellStation;
 
     public override void _Ready()
     {
@@ -112,11 +114,20 @@ public partial class WorldBuilder : Node3D
 
         // estações próximas da entrada da região
         float entranceZ = index == 0 ? cz + hz - 6f : cz + hz - 5f;
-        var sell = new SellStation { Name = "SellStation" };
-        root.AddChild(sell);
-        sell.Position = new Vector3(-5.5f, 0, entranceZ);
-        sell.LookAt(new Vector3(0, 0, entranceZ - 4f), Vector3.Up);
-        sell.RotateY(Mathf.Pi);
+        if (index == 0)
+        {
+            // única Estação de Venda do mapa: no acampamento, ao lado do elevador
+            var sell = new SellStation { Name = "SellStation" };
+            root.AddChild(sell);
+            sell.Position = new Vector3(-5.5f, 0, entranceZ);
+            sell.LookAt(new Vector3(0, 0, entranceZ - 4f), Vector3.Up);
+            sell.RotateY(Mathf.Pi);
+            Elevator = new MineElevator { Name = "MineElevator" };
+            root.AddChild(Elevator);
+            Elevator.Position = new Vector3(0, 0, cz + hz - 0.95f);
+            Elevator.Rotation = new Vector3(0, Mathf.Pi, 0); // frente (+Z local) voltada para dentro da caverna
+            SellStation = sell;
+        }
         var shop = new ShopTerminal { Name = "ShopTerminal" };
         root.AddChild(shop);
         shop.Position = new Vector3(5.5f, 0, entranceZ);

@@ -37,7 +37,8 @@ public partial class PlayerController : CharacterBody3D
     const float EyeHeight = 1.55f;
 
     public event Action<Crystal, bool> CrystalHit; // (cristal, quebrou)
-    public event Action<int> ResonancePulse;        // (cristais atingidos)
+    public event Action<int> ResonancePulse;
+    float _workNotice;        // (cristais atingidos)
 
     /// <summary>Carga de ressonância (0..1). Golpes em ritmo carregam; pausa longa descarrega.</summary>
     public float Resonance01 => Mathf.Clamp(_resonance / Data.GameData.ResonanceHits, 0, 1);
@@ -158,14 +159,22 @@ public partial class PlayerController : CharacterBody3D
         _sinceLastHit += dt;
         float window = Mathf.Max(Data.GameData.ResonanceWindow, _swingInterval * 2.5f);
         if (_sinceLastHit > window && _resonance > 0) _resonance = Mathf.Max(0, _resonance - dt * 3f);
-        if (active && Input.IsActionPressed("mine") && _swingTimer <= 0 && TargetInteractable == null)
+        bool wantMine = active && Input.IsActionPressed("mine") && TargetInteractable == null;
+        if (_workNotice > 0) _workNotice -= dt;
+        if (wantMine && !gs.CanWork)
+        {
+            // fora do turno: só vender e voltar para casa
+            if (_workNotice <= 0) { gs.RequireWork(); _workNotice = 4f; }
+            wantMine = false;
+        }
+        if (wantMine && _swingTimer <= 0)
         {
             _swingTimer = _swingInterval;
             Tool.Swing(_swingInterval);
             AudioManager.Instance?.Play("swing", -16f, 1f, 0.1f);
             _pendingHit = Mathf.Min(_swingInterval * 0.45f, 0.12f);
         }
-        UpdateBeam(gs, active && Input.IsActionPressed("mine") && TargetInteractable == null);
+        UpdateBeam(gs, wantMine);
         if (_pendingHit >= 0)
         {
             _pendingHit -= dt;
