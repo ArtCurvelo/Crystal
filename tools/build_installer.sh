@@ -10,4 +10,5 @@ rm -rf build/windows && mkdir -p build/windows
 "$GODOT" --headless --path . --export-release "Windows Desktop" build/windows/CrystalExcavator.exe 2>&1 | grep -E "^ERROR" || true
 cp README.md build/windows/LEIA-ME.md
 "$NSIS_ROOT/usr/bin/makensis" -V2 -DVERSION="$VERSION" installer/CrystalExcavator.nsi
-ls -la build/CrystalExcavator-Setup.exe
+mkdir -p dist && cp build/CrystalExcavator-Setup.exe dist/
+ls -la dist/CrystalExcavator-Setup.exe

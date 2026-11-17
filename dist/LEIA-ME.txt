@@ -1,0 +1,11 @@
+Crystal Excavator - instalador para Windows
+
+1. Dê dois cliques em CrystalExcavator-Setup.exe.
+2. Se aparecer "O Windows protegeu o computador": Mais informações > Executar assim mesmo
+   (o instalador não tem assinatura digital).
+3. Avançar > Instalar > Concluir. Não é preciso ser administrador.
+4. Atalhos são criados na Área de Trabalho e no Menu Iniciar.
+   Para desinstalar: Configurações do Windows > Aplicativos > Crystal Excavator.
+
+Os saves ficam em %APPDATA%\CrystalExcavator e são mantidos ao desinstalar.
+Para regenerar este instalador: tools/build_installer.sh (no ambiente de desenvolvimento).
