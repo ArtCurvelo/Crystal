@@ -161,3 +161,6 @@ Polimento visual (ferramenta, números de dano, iluminação da região 3), revi
 - Entregue neste período: tela de conclusão, ícone embutido no `.exe`, pré-aquecimento de shaders com tela de carregamento, correção do menu a 720p, suporte a controle, instalador Windows (NSIS) versionado em `dist/`.
 - **Desenvolvimento pausado** pelo diretor. Retomar somente após a instrução "Pode continuar".
 - Pendente com o diretor: resultado de FPS no Windows real (720p, qualidade Baixa) e o conteúdo de `git diff project.godot` no clone local (o Godot alterou o arquivo ao abrir).
+
+## Retomada ("Pode continuar")
+- `project.godot` regravado pelo próprio Godot (`ProjectSettings.save()`) no formato oficial: cabeçalho, ordem das chaves e remoção de valores iguais ao padrão. Isso evita que o editor do diretor altere o arquivo ao abrir/salvar, o que causou o conflito no `git pull`.
