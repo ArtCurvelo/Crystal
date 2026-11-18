@@ -405,8 +405,9 @@ public partial class GameState : Node
     public long GoblinStashValue(string id) => GoblinData(id).Stash.Sum(kv => GameData.Mat(kv.Key) is { } m ? SellPrice(m) * kv.Value : 0);
 
     /// <summary>Taxa do dia: um quarto do que ele minerou (com mínimo por goblin).</summary>
-    public long GoblinFee(string id) => Goblin(id) == GoblinMood.Working ? Math.Max(Data_.Of(id).MinFee, GoblinData(id).DayValue / 4) : 0;
-    public bool GoblinFeeDue(string id) => Goblin(id) == GoblinMood.Working && GoblinData(id).ChargedDay != Data.Day;
+    public long GoblinFee(string id) => Goblin(id) == GoblinMood.Working && GoblinData(id).HutBuilt ? Math.Max(Data_.Of(id).MinFee, GoblinData(id).DayValue / 4) : 0;
+    /// <summary>Só cobra depois que a cabana está pronta (enquanto monta, não trabalha).</summary>
+    public bool GoblinFeeDue(string id) => Goblin(id) == GoblinMood.Working && GoblinData(id).HutBuilt && GoblinData(id).ChargedDay != Data.Day;
     public bool CanRehireGoblin(string id) => Goblin(id) == GoblinMood.Fled && Data.Day >= GoblinData(id).FledDay + GoblinRehireDays;
     public long GoblinHirePrice(string id) => Goblin(id) == GoblinMood.Fled ? Data_.Of(id).RehireCost : Data_.Of(id).HireCost;
     /// <summary>Goblins com taxa a cobrar hoje (na ordem das regiões).</summary>
@@ -436,9 +437,82 @@ public partial class GameState : Node
         g.Strikes = 0;
         g.DayValue = 0;
         g.ChargedDay = 0;
+        if (!g.HutBuilt) g.HireDay = Data.Day;
         MoneyChanged?.Invoke();
         GoblinChanged?.Invoke();
-        Notify(Loc.F("{0} contratado!", def.Name), "Ele vai montar acampamento perto da entrada da região, minerar e guardar tudo no baú. Cobra uma taxa no fim do dia.", NotifyKind.Success);
+        if (g.HutBuilt) Notify(Loc.F("{0} contratado!", def.Name), "Ele volta para a cabana e recomeça a minerar.", NotifyKind.Success);
+        else Notify(Loc.F("{0} contratado!", def.Name), "Primeiro ele precisa montar a cabana perto da entrada da região (cerca de um dia e meio). Depois minera e guarda tudo no baú; cobra uma taxa no fim do dia.", NotifyKind.Success);
+        return true;
+    }
+
+    // ---------------- cabana e melhorias do goblin ----------------
+    /// <summary>Tempo para montar a cabana (em dias de trabalho).</summary>
+    public const float GoblinBuildDays = 1.5f;
+    public const int GoblinMaxLevel = 4;
+    public static readonly float[] GoblinWorkFractions = { 0.3f, 0.45f, 0.6f, 0.8f, 1f };
+    public static readonly int[] GoblinCarryLevels = { 8, 12, 16, 22, 30 };
+    public static readonly float[] GoblinSpeedLevels = { 1f, 1.35f, 1.8f, 2.4f, 3.2f };
+    public enum GoblinUpgrade { Hut, Carry, Speed }
+
+    /// <summary>Progresso da montagem da cabana (0..1). Fica pronta sozinha com o passar dos dias.</summary>
+    public float GoblinBuildProgress(string id)
+    {
+        var g = GoblinData(id);
+        if (g.HutBuilt) return 1f;
+        if (Goblin(id) != GoblinMood.Working) return 0f;
+        float p = ((Data.Day - g.HireDay) + DayProgress) / GoblinBuildDays;
+        if (p >= 1f)
+        {
+            g.HutBuilt = true;
+            Notify(Loc.F("A cabana de {0} está pronta!", Data_.Of(id).Name), "Agora ele começa a minerar e guardar tudo no baú.", NotifyKind.Success);
+            GoblinChanged?.Invoke();
+            return 1f;
+        }
+        return Math.Clamp(p, 0f, 0.999f);
+    }
+
+    public bool GoblinBuilt(string id) => GoblinBuildProgress(id) >= 1f;
+    public float GoblinWorkFraction(string id) => GoblinWorkFractions[GoblinData(id).HutLevel];
+    public int GoblinCarryMax(string id) => GoblinCarryLevels[GoblinData(id).CarryLevel];
+    public float GoblinDps(string id) => Data_.Of(id).MineDps * GoblinSpeedLevels[GoblinData(id).SpeedLevel];
+    /// <summary>Está no horário de trabalho dele agora? (a cabana define quanto do dia ele trabalha)</summary>
+    public bool GoblinOnShift(string id) => Goblin(id) == GoblinMood.Working && GoblinBuilt(id) && !DayOver && DayProgress < GoblinWorkFraction(id);
+
+    public int GoblinLevel(string id, GoblinUpgrade u) => u switch
+    {
+        GoblinUpgrade.Hut => GoblinData(id).HutLevel,
+        GoblinUpgrade.Carry => GoblinData(id).CarryLevel,
+        _ => GoblinData(id).SpeedLevel,
+    };
+
+    public long GoblinUpgradeCost(string id, GoblinUpgrade u)
+    {
+        int l = GoblinLevel(id, u);
+        if (l >= GoblinMaxLevel) return long.MaxValue;
+        double[] mul = u switch
+        {
+            GoblinUpgrade.Hut => new[] { 1.5, 3, 6, 12 },
+            GoblinUpgrade.Carry => new[] { 1.0, 2, 4, 8 },
+            _ => new[] { 1.2, 2.5, 5, 10 },
+        };
+        return (long)(Data_.Of(id).HireCost * mul[l]);
+    }
+
+    public bool TryUpgradeGoblin(string id, GoblinUpgrade u)
+    {
+        if (Goblin(id) != GoblinMood.Working || !GoblinBuilt(id)) return false;
+        long cost = GoblinUpgradeCost(id, u);
+        if (!CanAfford(cost)) return false;
+        Data.Money -= cost;
+        var g = GoblinData(id);
+        switch (u)
+        {
+            case GoblinUpgrade.Hut: g.HutLevel++; break;
+            case GoblinUpgrade.Carry: g.CarryLevel++; break;
+            default: g.SpeedLevel++; break;
+        }
+        MoneyChanged?.Invoke();
+        GoblinChanged?.Invoke();
         return true;
     }
 

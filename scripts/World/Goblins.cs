@@ -17,7 +17,7 @@ namespace CrystalExcavator.World;
 /// </summary>
 public partial class GoblinNpc : StaticBody3D, IInteractable
 {
-    public enum Mode { Idle, ToCrystal, Mining, ToChest, Sleeping, Chasing, Attacking, Stunned, Defeated }
+    public enum Mode { Idle, ToCrystal, Mining, ToChest, Sleeping, Chasing, Attacking, Stunned, Defeated, Building, ToHome }
     public Mode State = Mode.Idle;
     public GoblinCamp Camp;
     public bool IsGrub;
@@ -36,6 +36,9 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
     int _pathIdx;
     float _t, _swing, _stun, _attackCd, _repath;
     Node3D _rig, _armR, _pick;
+    MeshInstance3D _sack, _pickHead;
+    float _buildTimer;
+    int _buildSpot;
     StandardMaterial3D _eyeMat, _skinMat;
     Label3D _label;
 
@@ -88,10 +91,30 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
         _pick = new Node3D { Position = new Vector3(0, -0.32f, -0.05f) };
         _armR.AddChild(_pick);
         M(new BoxMesh { Size = new Vector3(0.04f, 0.04f, 0.55f) }, vest, new Vector3(0, 0, -0.25f), _pick);
-        M(new BoxMesh { Size = new Vector3(0.36f, 0.05f, 0.06f) }, new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.62f, 0.66f), Metallic = 0.6f, Roughness = 0.4f }, new Vector3(0, 0, -0.52f), _pick);
+        _pickHead = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.36f, 0.05f, 0.06f) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.62f, 0.66f), Metallic = 0.6f, Roughness = 0.4f }, Position = new Vector3(0, 0, -0.52f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _pick.AddChild(_pickHead);
         M(new CapsuleMesh { Radius = 0.07f, Height = 0.4f }, _skinMat, new Vector3(-0.32f, 0.63f, 0));
         // saco de minério nas costas
-        M(new SphereMesh { Radius = 0.18f, Height = 0.3f, RadialSegments = 8, Rings = 4 }, new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.45f, 0.3f) }, new Vector3(0, 0.75f, 0.28f));
+        _sack = new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.18f, Height = 0.3f, RadialSegments = 8, Rings = 4 }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.45f, 0.3f) }, Position = new Vector3(0, 0.75f, 0.28f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _rig.AddChild(_sack);
+    }
+
+    /// <summary>Equipamento evolui com as melhorias: mochila maior e picareta melhor (até neon).</summary>
+    public void SetGear(int carryLevel, int speedLevel)
+    {
+        if (_sack == null) return;
+        float s = 1f + carryLevel * 0.22f;
+        _sack.Scale = new Vector3(s, s, s);
+        _sack.Position = new Vector3(0, 0.75f + carryLevel * 0.03f, 0.28f + carryLevel * 0.03f);
+        var sackColors = new[] { new Color(0.55f, 0.45f, 0.3f), new Color(0.5f, 0.4f, 0.28f), new Color(0.35f, 0.38f, 0.42f), new Color(0.25f, 0.28f, 0.33f), new Color(0.18f, 0.2f, 0.25f) };
+        ((StandardMaterial3D)_sack.MaterialOverride).AlbedoColor = sackColors[carryLevel];
+        Color[] heads = { new(0.6f, 0.62f, 0.66f), new(0.45f, 0.47f, 0.52f), new(1f, 0.8f, 0.3f), new(0.3f, 1f, 0.9f), new(1f, 0.35f, 0.9f) };
+        var m = (StandardMaterial3D)_pickHead.MaterialOverride;
+        m.AlbedoColor = heads[speedLevel];
+        m.EmissionEnabled = speedLevel >= 3;
+        m.Emission = heads[speedLevel];
+        m.EmissionEnergyMultiplier = speedLevel >= 3 ? 1.8f : 0f;
+        _pickHead.Scale = Vector3.One * (1f + speedLevel * 0.08f);
     }
 
     public void SetHostile(bool hostile)
@@ -196,9 +219,9 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
                 {
                     _swing = 0;
                     var gob = this;
-                    Target.Hit(Camp.Def?.MineDps ?? MineDps, Target.Center, (GlobalPosition - Target.Center).Normalized(), true,
+                    Target.Hit(Camp.Dps, Target.Center, (GlobalPosition - Target.Center).Normalized(), true,
                         (m, n) => { gob.Carrying += n; gob.Camp.Deliver(m, n); });
-                    if (!Target.IsMineable) { Target = null; State = Carrying >= CarryMax ? Mode.ToChest : Mode.Idle; if (State == Mode.ToChest) GoTo(Camp.ChestPos); }
+                    if (!Target.IsMineable) { Target = null; State = Carrying >= Camp.CarryMax ? Mode.ToChest : Mode.Idle; if (State == Mode.ToChest) GoTo(Camp.ChestPos); }
                 }
                 break;
             case Mode.ToChest:
@@ -223,6 +246,25 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
                 break;
             case Mode.Idle:
                 _armR.Rotation = Vector3.Zero;
+                break;
+            case Mode.ToHome:
+                walking = true;
+                if (FollowPath(WalkSpeed, dt)) State = Mode.Idle;
+                break;
+            case Mode.Building:
+                // montando a cabana: anda entre pontos ao redor do terreno e martela
+                if (_path != null && _pathIdx < _path.Count) { walking = true; FollowPath(WalkSpeed, dt); break; }
+                Face(Camp.HutPos - GlobalPosition);
+                _swing += dt;
+                _armR.Rotation = new Vector3(-Mathf.Abs(Mathf.Sin(_swing * 6f)) * 1.8f, 0, 0);
+                _buildTimer -= dt;
+                if (_buildTimer <= 0)
+                {
+                    _buildTimer = 2.5f + (float)GD.RandRange(0.0, 1.5);
+                    _buildSpot++;
+                    GoTo(Camp.BuildSpot(_buildSpot));
+                    if ((_buildSpot & 1) == 0) AudioManager.Instance?.Play3D("thud", GlobalPosition, -10f, 1.5f);
+                }
                 break;
         }
         // balanço da caminhada
@@ -300,8 +342,20 @@ public partial class GoblinCamp : Node3D
     public Vector3 HutPos, ChestPos, BedPos, GrubHome, HideoutPos;
     public GoblinNpc Grub;
     public GoblinChest Chest;
-    Node3D _hut;
+    Node3D _hut, _hutVisual;
     StaticBody3D _hutBody;
+    Label3D _hutLabel;
+    int _hutShown = -99;
+    float _yaw;
+    public float Dps => GameState.Instance.GoblinDps(RegionId);
+    public int CarryMax => GameState.Instance.GoblinCarryMax(RegionId);
+    /// <summary>Pontos ao redor do terreno onde ele trabalha montando a cabana.</summary>
+    public Vector3 BuildSpot(int i)
+    {
+        float a = _yaw + i * 2.1f;
+        var p = HutPos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 2.2f;
+        return L.Reachable(p.X, p.Z) ? L.OnGround(p.X, p.Z) : GrubHome;
+    }
     public readonly List<GoblinNpc> Rebels = new();
     public Func<Vector3> PlayerPos = () => Vector3.Zero;
     public Action<float, Vector3> DamagePlayer;
@@ -326,6 +380,7 @@ public partial class GoblinCamp : Node3D
         ChestPos = L.OnGround(hut.X + right.X * 2.2f + fwd.X * 1.4f, hut.Z + right.Z * 2.2f + fwd.Z * 1.4f);
         BedPos = L.OnGround(hut.X + fwd.X * 1.5f, hut.Z + fwd.Z * 1.5f, 0.05f);
         GrubHome = L.OnGround(hut.X + fwd.X * 2.4f, hut.Z + fwd.Z * 2.4f);
+        _yaw = yaw;
         BuildHut(hut, yaw);
         Chest = new GoblinChest { Name = "GoblinChest", Def = def };
         AddChild(Chest);
@@ -356,38 +411,146 @@ public partial class GoblinCamp : Node3D
         AddChild(_hut);
         _hut.GlobalPosition = p;
         _hut.Rotation = new Vector3(0, yaw, 0);
-        var cloth = new StandardMaterial3D { AlbedoColor = Def.Skin.Darkened(0.35f).Lerp(new Color(0.45f, 0.42f, 0.3f), 0.5f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
-        var pole = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.2f, 0.12f) };
-        _hut.AddChild(new MeshInstance3D { Mesh = new PrismMesh { Size = new Vector3(2.4f, 1.7f, 2.4f) }, MaterialOverride = cloth, Position = new Vector3(0, 0.85f, 0.4f) });
-        _hut.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.5f, 0.5f, 0.02f) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.35f, 0.2f) }, Position = new Vector3(0.4f, 0.7f, -0.82f) });
-        foreach (float x in new[] { -1.1f, 1.1f })
-            _hut.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.04f, Height = 1.9f, RadialSegments = 6, Rings = 1 }, MaterialOverride = pole, Position = new Vector3(x * 0.05f, 0.95f, x > 0 ? 1.55f : -0.75f) });
-        var fire = MeshFactory.Emissive(new Color(1f, 0.5f, 0.15f), new Color(1f, 0.45f, 0.1f), 2.5f);
-        _hut.AddChild(new MeshInstance3D { Mesh = MeshFactory.Spike(5, 0.25f, 0.45f), MaterialOverride = fire, Position = new Vector3(-1.9f, 0.05f, -1.2f) });
-        for (int i = 0; i < 6; i++)
-        {
-            float a = Mathf.Tau * i / 6;
-            _hut.AddChild(new MeshInstance3D { Mesh = MeshFactory.Rock(40 + i, 0.3f), MaterialOverride = MeshFactory.RockMaterial(new Color(0.35f, 0.32f, 0.3f)), Position = new Vector3(-1.9f + Mathf.Cos(a) * 0.45f, 0.05f, -1.2f + Mathf.Sin(a) * 0.45f), Scale = Vector3.One * 0.16f });
-        }
-        _hut.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.6f, 0.3f), LightEnergy = 1.2f, OmniRange = 6f, Position = new Vector3(-1.9f, 0.9f, -1.2f) });
         _hutBody = new StaticBody3D { CollisionLayer = PlayerController.WorldLayer, CollisionMask = 0, Position = new Vector3(0, 0.8f, 0.4f) };
         _hutBody.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(2.2f, 1.6f, 2.2f) } });
         _hut.AddChild(_hutBody);
-        _hut.AddChild(new Label3D
+        _hutLabel = new Label3D
         {
-            Text = Loc.F("BARRACA DO {0}", Def.Name.ToUpperInvariant()), FontSize = 44, PixelSize = 0.006f, OutlineSize = 10,
-            Billboard = BaseMaterial3D.BillboardModeEnum.FixedY, Position = new Vector3(0, 2.3f, 0.4f),
+            FontSize = 44, PixelSize = 0.006f, OutlineSize = 10,
+            Billboard = BaseMaterial3D.BillboardModeEnum.FixedY, Position = new Vector3(0, 2.5f, 0.4f),
             Modulate = Def.Skin.Lightened(0.4f), OutlineModulate = new Color(0, 0, 0, 0.8f), VisibilityRangeEnd = 30f,
-        });
+        };
+        _hut.AddChild(_hutLabel);
+    }
+
+    /// <summary>
+    /// Visual da cabana: estágios da montagem (estacas → estrutura → lona) e, pronta, 5 níveis
+    /// (barraca → barraca equipada → cabana de madeira → cabana com chaminé → cabana neon).
+    /// </summary>
+    void RefreshHut()
+    {
+        var gs = GameState.Instance;
+        float prog = gs.GoblinBuildProgress(RegionId);
+        int stage = prog < 1f ? (int)(prog * 3f) - 10 : gs.GoblinData(RegionId).HutLevel; // -10..-8 = montando
+        if (stage == _hutShown) { if (prog < 1f) _hutLabel.Text = Loc.F("{0} MONTANDO A CABANA · {1:0}%", Def.Name.ToUpperInvariant(), prog * 100f); return; }
+        _hutShown = stage;
+        _hutVisual?.QueueFree();
+        _hutVisual = new Node3D();
+        _hut.AddChild(_hutVisual);
+        var cloth = new StandardMaterial3D { AlbedoColor = Def.Skin.Darkened(0.35f).Lerp(new Color(0.45f, 0.42f, 0.3f), 0.5f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        var wood = new StandardMaterial3D { AlbedoColor = new Color(0.38f, 0.25f, 0.14f), Roughness = 0.9f };
+        var darkWood = new StandardMaterial3D { AlbedoColor = new Color(0.26f, 0.17f, 0.1f), Roughness = 0.9f };
+        var metal = MeshFactory.Metal(new Color(0.3f, 0.32f, 0.36f), 0.35f);
+        var neon = MeshFactory.Emissive(Def.Skin.Lightened(0.3f), Def.Skin.Lightened(0.2f), 2f);
+        void M(Mesh mesh, Material mat, Vector3 pos, Vector3? rot = null, Vector3? scale = null)
+            => _hutVisual.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = mat, Position = pos, Rotation = rot ?? Vector3.Zero, Scale = scale ?? Vector3.One, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        void Fire(Vector3 at)
+        {
+            M(MeshFactory.Spike(5, 0.25f, 0.45f), MeshFactory.Emissive(new Color(1f, 0.5f, 0.15f), new Color(1f, 0.45f, 0.1f), 2.5f), at);
+            for (int i = 0; i < 6; i++)
+            {
+                float a = Mathf.Tau * i / 6;
+                M(MeshFactory.Rock(40 + i, 0.3f), MeshFactory.RockMaterial(new Color(0.35f, 0.32f, 0.3f)), at + new Vector3(Mathf.Cos(a) * 0.45f, 0, Mathf.Sin(a) * 0.45f), null, Vector3.One * 0.16f);
+            }
+            _hutVisual.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.6f, 0.3f), LightEnergy = 1.2f, OmniRange = 6f, Position = at + Vector3.Up * 0.9f });
+        }
+        void Planks(Vector3 at)
+        {
+            for (int i = 0; i < 4; i++) M(new BoxMesh { Size = new Vector3(1.4f, 0.06f, 0.18f) }, wood, at + new Vector3(0, 0.04f + i * 0.07f, i * 0.05f), new Vector3(0, i * 0.15f, 0));
+        }
+        var fireAt = new Vector3(-1.9f, 0.05f, -1.2f);
+        bool solid = stage >= 0;
+        _hutBody.CollisionLayer = solid ? PlayerController.WorldLayer : 0;
+        if (stage < 0)
+        {
+            // montando: 0 = estacas e corda no chão; 1 = estrutura; 2 = quase pronta
+            int st = stage + 10;
+            foreach (var (x, z) in new[] { (-1.1f, -0.8f), (1.1f, -0.8f), (-1.1f, 1.6f), (1.1f, 1.6f) })
+                M(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.05f, Height = 0.5f, RadialSegments = 6 }, wood, new Vector3(x, 0.25f, z));
+            M(new BoxMesh { Size = new Vector3(2.3f, 0.01f, 0.02f) }, cloth, new Vector3(0, 0.45f, -0.8f));
+            M(new BoxMesh { Size = new Vector3(2.3f, 0.01f, 0.02f) }, cloth, new Vector3(0, 0.45f, 1.6f));
+            Planks(new Vector3(1.9f, 0, 0.6f));
+            M(new BoxMesh { Size = new Vector3(0.7f, 0.4f, 0.5f) }, cloth, new Vector3(1.8f, 0.2f, -1.1f), new Vector3(0, 0.4f, 0)); // fardo de lona
+            if (st >= 1)
+            {
+                foreach (float x in new[] { -1.05f, 1.05f })
+                    M(new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.05f, Height = 1.9f, RadialSegments = 6 }, wood, new Vector3(x, 0.95f, 0.4f), new Vector3(0, 0, x > 0 ? -0.55f : 0.55f));
+                M(new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.04f, Height = 2.5f, RadialSegments = 6 }, wood, new Vector3(0, 1.62f, 0.4f), new Vector3(Mathf.Pi / 2, 0, 0));
+            }
+            if (st >= 2) M(new PrismMesh { Size = new Vector3(2.4f, 1.7f, 1.3f) }, cloth, new Vector3(0, 0.85f, 1.0f));
+            _hutLabel.Text = Loc.F("{0} MONTANDO A CABANA · {1:0}%", Def.Name.ToUpperInvariant(), prog * 100f);
+            return;
+        }
+        int lv = stage;
+        _hutLabel.Text = lv >= 2 ? Loc.F("CABANA DO {0}", Def.Name.ToUpperInvariant()) : Loc.F("BARRACA DO {0}", Def.Name.ToUpperInvariant());
+        _hutLabel.Position = new Vector3(0, lv >= 2 ? (lv >= 3 ? 4.3f : 3.2f) : 2.3f, 0.4f);
+        if (lv <= 1)
+        {
+            M(new PrismMesh { Size = new Vector3(2.4f, 1.7f, 2.4f) }, cloth, new Vector3(0, 0.85f, 0.4f));
+            M(new BoxMesh { Size = new Vector3(0.5f, 0.5f, 0.02f) }, new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.35f, 0.2f) }, new Vector3(0.4f, 0.7f, -0.82f));
+            Fire(fireAt);
+            if (lv == 1)
+            {
+                // tapete, caixote e lampião
+                M(new BoxMesh { Size = new Vector3(1.3f, 0.02f, 0.9f) }, new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.2f, 0.18f) }, new Vector3(0, 0.02f, -1.4f));
+                M(new BoxMesh { Size = new Vector3(0.6f, 0.5f, 0.6f) }, wood, new Vector3(1.6f, 0.25f, -0.6f), new Vector3(0, 0.3f, 0));
+                M(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.04f, Height = 1.6f, RadialSegments = 6 }, darkWood, new Vector3(1.5f, 0.8f, 1.6f));
+                M(new SphereMesh { Radius = 0.1f, Height = 0.2f }, MeshFactory.Emissive(new Color(1f, 0.8f, 0.4f), new Color(1f, 0.75f, 0.35f), 3f), new Vector3(1.5f, 1.65f, 1.6f));
+                _hutVisual.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.75f, 0.4f), LightEnergy = 0.9f, OmniRange = 5f, Position = new Vector3(1.5f, 1.6f, 1.6f) });
+            }
+            return;
+        }
+        // cabanas (nível 2+): paredes, telhado, porta, janela acesa
+        var wallMat = lv >= 4 ? metal : wood;
+        M(new BoxMesh { Size = new Vector3(2.6f, 1.8f, 2.4f) }, wallMat, new Vector3(0, 0.9f, 0.4f));
+        M(new PrismMesh { Size = new Vector3(3.0f, 1.0f, 2.8f) }, lv >= 4 ? MeshFactory.Metal(new Color(0.18f, 0.2f, 0.24f), 0.4f) : darkWood, new Vector3(0, 2.3f, 0.4f));
+        M(new BoxMesh { Size = new Vector3(0.7f, 1.3f, 0.04f) }, darkWood, new Vector3(0.5f, 0.65f, -0.82f));
+        M(new BoxMesh { Size = new Vector3(0.5f, 0.4f, 0.04f) }, MeshFactory.Emissive(new Color(1f, 0.8f, 0.45f), new Color(1f, 0.75f, 0.4f), 2f), new Vector3(-0.6f, 1.1f, -0.82f));
+        _hutVisual.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.75f, 0.45f), LightEnergy = 1.0f, OmniRange = 6f, Position = new Vector3(-0.6f, 1.2f, -1.5f) });
+        Fire(fireAt);
+        if (lv >= 3)
+        {
+            // chaminé com fumaça, placa e bancada
+            M(new BoxMesh { Size = new Vector3(0.4f, 1.2f, 0.4f) }, MeshFactory.RockMaterial(new Color(0.4f, 0.37f, 0.34f)), new Vector3(1.0f, 2.6f, 1.3f));
+            var fade = new Gradient();
+            fade.SetColor(0, new Color(0.7f, 0.7f, 0.72f, 0.35f));
+            fade.SetColor(1, new Color(0.7f, 0.7f, 0.72f, 0f));
+            var smoke = new CpuParticles3D
+            {
+                Amount = 14, Lifetime = 3.5f, Mesh = new SphereMesh { Radius = 0.18f, Height = 0.36f, RadialSegments = 8, Rings = 4 }, Direction = Vector3.Up, Spread = 12,
+                Gravity = new Vector3(0.12f, 0.35f, 0), InitialVelocityMin = 0.25f, InitialVelocityMax = 0.5f,
+                ScaleAmountMin = 0.6f, ScaleAmountMax = 1.6f, ColorRamp = fade, Position = new Vector3(1.0f, 3.25f, 1.3f),
+                MaterialOverride = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, VertexColorUseAsAlbedo = true },
+            };
+            _hutVisual.AddChild(smoke);
+            M(new BoxMesh { Size = new Vector3(1.2f, 0.08f, 0.6f) }, wood, new Vector3(1.9f, 0.8f, -0.4f));
+            M(new BoxMesh { Size = new Vector3(0.08f, 0.8f, 0.08f) }, wood, new Vector3(1.4f, 0.4f, -0.4f));
+            M(new BoxMesh { Size = new Vector3(0.08f, 0.8f, 0.08f) }, wood, new Vector3(2.4f, 0.4f, -0.4f));
+            M(new BoxMesh { Size = new Vector3(1.0f, 0.35f, 0.05f) }, darkWood, new Vector3(0, 2.0f, -0.86f));
+        }
+        if (lv >= 4)
+        {
+            // neon: contorno do telhado, antena piscando e letreiro
+            M(new BoxMesh { Size = new Vector3(3.05f, 0.05f, 0.05f) }, neon, new Vector3(0, 1.82f, -1.0f));
+            M(new BoxMesh { Size = new Vector3(3.05f, 0.05f, 0.05f) }, neon, new Vector3(0, 1.82f, 1.8f));
+            M(new BoxMesh { Size = new Vector3(0.05f, 0.05f, 2.85f) }, neon, new Vector3(-1.52f, 1.82f, 0.4f));
+            M(new BoxMesh { Size = new Vector3(0.05f, 0.05f, 2.85f) }, neon, new Vector3(1.52f, 1.82f, 0.4f));
+            M(new CylinderMesh { TopRadius = 0.02f, BottomRadius = 0.04f, Height = 1.4f, RadialSegments = 6 }, metal, new Vector3(-0.9f, 3.3f, 1.2f));
+            M(new SphereMesh { Radius = 0.08f, Height = 0.16f }, MeshFactory.Emissive(new Color(1f, 0.2f, 0.3f), new Color(1f, 0.2f, 0.3f), 3f), new Vector3(-0.9f, 4.05f, 1.2f));
+            _hutVisual.AddChild(new OmniLight3D { LightColor = Def.Skin.Lightened(0.3f), LightEnergy = 1.2f, OmniRange = 7f, Position = new Vector3(0, 2.2f, -1.4f) });
+        }
     }
 
     /// <summary>O acampamento (barraca + baú) só existe depois de contratado.</summary>
     void SetCampVisible(bool on)
     {
         if (_hut.Visible != on) _hut.Visible = on;
-        _hutBody.CollisionLayer = on ? PlayerController.WorldLayer : 0;
-        Chest.Visible = on;
-        Chest.CollisionLayer = on ? PlayerController.WorldLayer | PlayerController.InteractLayer : 0;
+        if (on) RefreshHut();
+        else _hutBody.CollisionLayer = 0;
+        // o baú só aparece com a cabana pronta (ou se ainda tem coisa guardada)
+        bool chest = on && (GameState.Instance.GoblinBuilt(RegionId) || GameState.Instance.GoblinStashCount(RegionId) > 0);
+        Chest.Visible = chest;
+        Chest.CollisionLayer = chest ? PlayerController.WorldLayer | PlayerController.InteractLayer : 0;
     }
 
     /// <summary>Ajusta presença e comportamento ao estado salvo e ao horário.</summary>
@@ -414,6 +577,7 @@ public partial class GoblinCamp : Node3D
             return;
         }
         if (!hired) return;
+        Grub.SetGear(gs.GoblinData(RegionId).CarryLevel, gs.GoblinData(RegionId).SpeedLevel);
         if (gs.DayOver) Grub.Sleep(BedPos);
         else if (Grub.State == GoblinNpc.Mode.Sleeping || Grub.GlobalPosition.DistanceTo(HideoutPos) < 1f) { Grub.WakeUp(); Grub.GlobalPosition = GrubHome; }
     }
@@ -443,9 +607,30 @@ public partial class GoblinCamp : Node3D
             return;
         }
         if (mood != GameState.GoblinMood.Working || gs.DayOver || !gs.IsPlaying) return;
+        // cabana: estágios da montagem e nível
+        bool built = gs.GoblinBuilt(RegionId);
+        if (_hut.Visible) SetCampVisible(true);
+        if (!built)
+        {
+            if (Grub.State != GoblinNpc.Mode.Building) { Grub.Target = null; Grub.State = GoblinNpc.Mode.Building; }
+            return;
+        }
+        if (Grub.State == GoblinNpc.Mode.Building) Grub.State = GoblinNpc.Mode.Idle;
+        // fora do horário de trabalho (a cabana define quanto do dia ele trabalha): volta e descansa
+        if (!gs.GoblinOnShift(RegionId))
+        {
+            if (Grub.State is GoblinNpc.Mode.ToCrystal or GoblinNpc.Mode.Mining)
+            {
+                Grub.Target = null;
+                if (Grub.Carrying > 0) { Grub.State = GoblinNpc.Mode.ToChest; Grub.GoTo(ChestPos); }
+                else { Grub.State = GoblinNpc.Mode.ToHome; Grub.GoTo(GrubHome); }
+            }
+            else if (Grub.State == GoblinNpc.Mode.Idle && Grub.GlobalPosition.DistanceTo(GrubHome) > 1.5f) { Grub.State = GoblinNpc.Mode.ToHome; Grub.GoTo(GrubHome); }
+            return;
+        }
         if (Grub.State == GoblinNpc.Mode.Idle)
         {
-            if (Grub.Carrying >= GoblinNpc.CarryMax) { Grub.State = GoblinNpc.Mode.ToChest; Grub.GoTo(ChestPos); return; }
+            if (Grub.Carrying >= CarryMax) { Grub.State = GoblinNpc.Mode.ToChest; Grub.GoTo(ChestPos); return; }
             var target = PickCrystal(Grub.GlobalPosition);
             if (target == null) return;
             Grub.Target = target;
@@ -481,7 +666,9 @@ public partial class GoblinCamp : Node3D
         {
             GameState.GoblinMood.Available => Loc.F("{0} Contratar {1}, {2} ({3})", i, Def.Name, Def.Title, price),
             GameState.GoblinMood.Fled when gs.CanRehireGoblin(RegionId) => Loc.F("{0} {1} voltou ao esconderijo, desconfiado. Recontratar ({2})", i, Def.Name, price),
-            GameState.GoblinMood.Working => gs.DayOver ? Loc.F("{0} está dormindo (zzz)", Def.Name) : Loc.F("{0} Falar com {1} (hoje: {2} minerados)", i, Def.Name, GameState.FormatMoney(gs.GoblinData(RegionId).DayValue)),
+            GameState.GoblinMood.Working => gs.DayOver ? Loc.F("{0} está dormindo (zzz)", Def.Name)
+                : !gs.GoblinBuilt(RegionId) ? Loc.F("{0} Falar com {1} (montando a cabana: {2:0}%)", i, Def.Name, gs.GoblinBuildProgress(RegionId) * 100f)
+                : Loc.F("{0} Falar com {1} (hoje: {2} minerados)", i, Def.Name, GameState.FormatMoney(gs.GoblinData(RegionId).DayValue)),
             _ => null,
         };
     }
@@ -498,13 +685,8 @@ public partial class GoblinCamp : Node3D
         }
         if (gs.Goblin(RegionId) == GameState.GoblinMood.Working)
         {
-            string mood = gs.GoblinData(RegionId).Strikes switch
-            {
-                0 => Loc.F("\"Pedra boa hoje, chefe! {0} trabalha, chefe paga.\"", Def.Name),
-                1 => Loc.F("\"Chefe esqueceu de pagar {0} ontem... {1} lembra.\"", Def.Name, Def.Name),
-                _ => Loc.F("\"{0} está de olho, chefe. Mais um dia sem moeda e... hmm.\"", Def.Name),
-            };
-            gs.Notify(Def.Name, mood + Loc.F(" Baú: {0} fragmentos.", gs.GoblinStashCount(RegionId)), NotifyKind.Info);
+            // conversa: painel com a cabana, o horário e as melhorias
+            UiBus.RequestGoblin(this);
         }
     }
 

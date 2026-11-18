@@ -369,3 +369,11 @@ Pedido do diretor: mapa colossal com muitos túneis, buracos e decoração, mas 
 - Painel de admin: "Ir: poço".
 - **Desempenho**: depósitos parados não rodam mais lógica a cada quadro (cortou mais da metade do tempo de scripts com ~1.730 depósitos); `--perf` imprime os tempos por sistema. Scripts do jogo ~0,6 ms/quadro em média.
 - Testes 590/590. Bot: jornada completa no mapa maior (Coração aos 64,7 min de jogo, caminhada real até o Reservatório), funil, drone e painel de admin; a conta da taxa do goblin agora desconta o que a esteira vende sozinha no meio da checagem.
+
+## Goblins com cabana e melhorias; casa que evolui (para a v0.8.0)
+Pedido do diretor: nada de cabana/baú antes de contratar (spoiler); contratado, o goblin leva 1–2 dias montando a cabana antes de trabalhar; melhorias da cabana (mais tempo de trabalho no dia — base 3 de 10 min), do quanto ele carrega e da velocidade; visual sempre evoluindo. E a casa do jogador também precisa evoluir.
+- **Montagem da cabana**: ~1,5 dia de turno, em 3 estágios visíveis (estacas e corda → estrutura → lona), com o goblin indo e voltando martelando; placa "MONTANDO A CABANA · X%". Sem trabalho e sem taxa enquanto monta. O baú só aparece com a cabana pronta. Saves antigos: quem já trabalhava fica com a cabana pronta.
+- **Turno do goblin**: cabana nível 1 = 30% do turno (3 de 10 min); fora do horário ele volta e descansa.
+- **Melhorias** (tela ao falar com ele, funciona com controle): Cabana (30% → 45% → 60% → 80% → 100% do turno), Mochila do goblin (8 → 30 fragmentos por viagem), Picareta (×1 → ×3,2 de dano). 5 níveis visuais da cabana: barraca → barraca com tapete/caixote/lampião → cabana de madeira com janela acesa → cabana com chaminé fumegante, bancada e placa → cabana neon (metal, contorno neon, antena piscando). A mochila cresce e a picareta vai de ferro a ouro e neon.
+- **Casa**: além dos móveis por melhoria, o cômodo inteiro evolui em 5 patamares pelo total de melhorias (manchas e balde → rodapé, cortinas, planta → livros, quadros, arandelas → papel de parede, sofá, neon no teto → telão holográfico, aquário, lustre de cristal, frisos dourados).
+- Testes: regras completas (montagem, sem taxa, turno 30%, melhorias, custos, save) e integração (goblin vai ao terreno, monta, baú aparece). Bot compra melhorias do goblin pela tela.

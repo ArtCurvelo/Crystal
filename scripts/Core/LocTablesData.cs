@@ -7,6 +7,25 @@ public static partial class LocTables
 {
     static partial void Fill(List<(string pt, string en, string es)> list)
     {
+        list.Add(("Ele volta para a cabana e recomeça a minerar.", "They go back to their hut and start mining again.", "Vuelve a su cabaña y empieza a minar de nuevo."));
+        list.Add(("Primeiro ele precisa montar a cabana perto da entrada da região (cerca de um dia e meio). Depois minera e guarda tudo no baú; cobra uma taxa no fim do dia.", "First they need to build their hut near the region entrance (about a day and a half). Then they mine and keep everything in their chest; they charge a fee at the end of the day.", "Primero tiene que montar su cabaña cerca de la entrada de la región (cerca de un día y medio). Después mina y guarda todo en su cofre; cobra una tarifa al final del día."));
+        list.Add(("A cabana de {0} está pronta!", "{0}\'s hut is ready!", "¡La cabaña de {0} está lista!"));
+        list.Add(("Agora ele começa a minerar e guardar tudo no baú.", "Now they start mining and keeping everything in the chest.", "Ahora empieza a minar y a guardar todo en el cofre."));
+        list.Add(("{0} MONTANDO A CABANA · {1:0}%", "{0} BUILDING THE HUT · {1:0}%", "{0} MONTANDO LA CABAÑA · {1:0}%"));
+        list.Add(("CABANA DO {0}", "{0}\'S HUT", "CABAÑA DE {0}"));
+        list.Add(("{0} Falar com {1} (montando a cabana: {2:0}%)", "{0} Talk to {1} (building the hut: {2:0}%)", "{0} Hablar con {1} (montando la cabaña: {2:0}%)"));
+        list.Add(("GOBLIN", "GOBLIN", "GOBLIN"));
+        list.Add(("Montando a cabana: {0:0}% (começa a minerar quando terminar).", "Building the hut: {0:0}% (starts mining when it is done).", "Montando la cabaña: {0:0}% (empieza a minar cuando termine)."));
+        list.Add(("Cabana nível {0}: trabalha {1:0}% do turno ({2:0.#} de {3} min).", "Hut level {0}: works {1:0}% of the shift ({2:0.#} of {3} min).", "Cabaña nivel {0}: trabaja el {1:0}% del turno ({2:0.#} de {3} min)."));
+        list.Add(("Hoje: {0} minerados · baú: {1} fragmentos · taxa do dia: {2}", "Today: {0} mined · chest: {1} shards · today\'s fee: {2}", "Hoy: {0} minados · cofre: {1} fragmentos · tarifa del día: {2}"));
+        list.Add(("Cabana", "Hut", "Cabaña"));
+        list.Add(("Trabalha mais tempo por dia: {0:0}% → {1:0}% do turno", "Works longer each day: {0:0}% → {1:0}% of the shift", "Trabaja más tiempo al día: {0:0}% → {1:0}% del turno"));
+        list.Add(("Mochila do goblin", "Goblin\'s backpack", "Mochila del goblin"));
+        list.Add(("Carrega mais por viagem: {0} → {1} fragmentos", "Carries more per trip: {0} → {1} shards", "Carga más por viaje: {0} → {1} fragmentos"));
+        list.Add(("Picareta", "Pickaxe", "Pico"));
+        list.Add(("Quebra mais rápido: {0:0} → {1:0} de dano/s", "Breaks faster: {0:0} → {1:0} damage/s", "Rompe más rápido: {0:0} → {1:0} de daño/s"));
+        list.Add(("Nível máximo", "Max level", "Nivel máximo"));
+        list.Add(("Cabana em montagem", "Hut being built", "Cabaña en montaje"));
         list.Add(("Corda", "Rope", "Cuerda"));
         list.Add(("Mire na beira de um buraco para descer, ou numa borda acima para subir. Depois é só usar (E).", "Aim at the edge of a hole to go down, or at a ledge above to go up. Then just use it (E).", "Apunta al borde de un agujero para bajar, o a una cornisa arriba para subir. Luego úsala (E)."));
         list.Add(("Mire na beira de um buraco ou numa borda acima", "Aim at the edge of a hole or at a ledge above", "Apunta al borde de un agujero o a una cornisa arriba"));
@@ -400,7 +419,6 @@ public static partial class LocTables
         list.Add(("Ferramenta evoluiu!", "Tool upgraded!", "¡La herramienta evolucionó!"));
         list.Add(("Ferramenta: {0}", "Tool: {0}", "Herramienta: {0}"));
         list.Add(("Fim do Dia {0}", "End of Day {0}", "Fin del Día {0}"));
-        list.Add(("GOBLIN", "GOBLIN", "GOBLIN"));
         list.Add(("GOBLIN ENCONTRADO!", "GOBLIN FOUND!", "¡GOBLIN ENCONTRADO!"));
         list.Add(("Ganho no dia: {0}", "Earned today: {0}", "Ganado hoy: {0}"));
         list.Add(("Geral", "General", "General"));

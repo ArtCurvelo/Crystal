@@ -202,6 +202,33 @@ public partial class TestRunner : Node
         Check(GS.MarkGoblinFound(id) && !GS.MarkGoblinFound(id), "encontrar marca uma vez só");
         Check(GS.TryHireGoblin(id) && GS.Goblin(id) == GameState.GoblinMood.Working && d.Money == 500, "contratar o Grub custa ◈ 500");
         Check(GS.Goblin("depths") == GameState.GoblinMood.Available && !GS.TryHireGoblin("depths"), "cada goblin é independente");
+        // primeiro ele monta a cabana: não trabalha nem cobra
+        Check(!GS.GoblinBuilt(id) && !GS.GoblinOnShift(id) && GS.GoblinFee(id) == 0 && GS.DueGoblins().Count == 0, "recém-contratado: montando a cabana, sem trabalhar nem cobrar");
+        Check(!GS.TryUpgradeGoblin(id, GameState.GoblinUpgrade.Hut), "sem cabana pronta não dá para melhorar");
+        d.DayTimeSeconds = GS.DayLength * 0.9;
+        Check(!GS.GoblinBuilt(id) && GS.GoblinBuildProgress(id) > 0.5f, $"no fim do 1º dia ainda está montando ({GS.GoblinBuildProgress(id) * 100:0}%)");
+        GS.StartNewDay();
+        d.DayTimeSeconds = GS.DayLength * 0.55;
+        Check(GS.GoblinBuilt(id) && GS.GoblinData(id).HutBuilt, "no meio do 2º dia a cabana fica pronta");
+        d.DayTimeSeconds = GS.DayLength * 0.1;
+        Check(GS.GoblinOnShift(id), "trabalha no começo do turno");
+        d.DayTimeSeconds = GS.DayLength * 0.5;
+        Check(!GS.GoblinOnShift(id) && Math.Abs(GS.GoblinWorkFraction(id) - 0.3f) < 0.01f, "cabana básica: trabalha só 30% do turno (3 de 10 min)");
+        // melhorias
+        GS.AddMoney(1_000_000);
+        long c0 = GS.GoblinUpgradeCost(id, GameState.GoblinUpgrade.Hut);
+        float dps0 = GS.GoblinDps(id); int carry0 = GS.GoblinCarryMax(id);
+        d.DayTimeSeconds = GS.DayLength * 0.4;
+        Check(!GS.GoblinOnShift(id) && GS.TryUpgradeGoblin(id, GameState.GoblinUpgrade.Hut) && GS.GoblinWorkFraction(id) > 0.3f && GS.GoblinOnShift(id), "melhorar a cabana aumenta o tempo de trabalho");
+        Check(GS.GoblinUpgradeCost(id, GameState.GoblinUpgrade.Hut) > c0, "a próxima melhoria custa mais");
+        Check(GS.TryUpgradeGoblin(id, GameState.GoblinUpgrade.Speed) && GS.GoblinDps(id) > dps0, "picareta melhor: quebra mais rápido");
+        Check(GS.TryUpgradeGoblin(id, GameState.GoblinUpgrade.Carry) && GS.GoblinCarryMax(id) > carry0, "mochila melhor: carrega mais");
+        for (int k = 0; k < 6; k++) GS.TryUpgradeGoblin(id, GameState.GoblinUpgrade.Hut);
+        Check(GS.GoblinData(id).HutLevel == GameState.GoblinMaxLevel && Math.Abs(GS.GoblinWorkFraction(id) - 1f) < 0.01f && GS.GoblinUpgradeCost(id, GameState.GoblinUpgrade.Hut) == long.MaxValue, "cabana no máximo: trabalha o turno inteiro");
+        var json = System.Text.Json.JsonSerializer.Serialize(GS.Data);
+        Check(SaveSystem.TryParse(json, out var dd) && dd.Goblins[id].HutBuilt && dd.Goblins[id].HutLevel == GameState.GoblinMaxLevel && dd.Goblins[id].SpeedLevel == 1, "cabana e melhorias salvas");
+        d.DayTimeSeconds = 0;
+        d.Money = 500;
         var q = GameData.Mat("quartz");
         GS.GoblinMined(id, q, 40);
         long val = GS.SellPrice(q) * 40;
@@ -291,7 +318,16 @@ public partial class TestRunner : Node
         GS.AddMoney(1000);
         camp.TalkToGrub();
         await Frames(3);
-        Check(GS.Goblin("caves") == GameState.GoblinMood.Working && camp.Chest.Visible, "contratado: monta o acampamento com o baú");
+        Check(GS.Goblin("caves") == GameState.GoblinMood.Working && !camp.Chest.Visible && !GS.GoblinBuilt("caves"), "contratado: começa a montar a cabana (sem baú ainda)");
+        await Frames(40);
+        Check(camp.Grub.State == GoblinNpc.Mode.Building && camp.Grub.GlobalPosition.DistanceTo(camp.HideoutPos) > 3f, "vai até o terreno e trabalha na cabana");
+        // a montagem termina com o passar do tempo (simulado: meio do dia seguinte)
+        GS.StartNewDay();
+        GS.Data.DayTimeSeconds = GS.DayLength * 0.55;
+        await Frames(40);
+        GS.Data.DayTimeSeconds = 0;
+        await Frames(40);
+        Check(GS.GoblinBuilt("caves") && camp.Chest.Visible, "cabana pronta: aparece o baú");
         Engine.TimeScale = 6;
         var grubStart = camp.Grub.GlobalPosition;
         for (int i = 0; i < 1800 && GS.GoblinStashCount("caves") == 0; i++) await Frames(1);

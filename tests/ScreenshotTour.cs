@@ -49,6 +49,70 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-house"))
+        {
+            gs.AddMoney(1_000_000_000);
+            gs.EndDay();
+            UiBus.RequestHome();
+            await Wait(1.8f);
+            Main.CloseAllForTour();
+            p.Tool.Visible = false;
+            // 5 patamares: compra as melhorias aos poucos e fotografa o cômodo
+            var ids = new[] { "bed", "workbench", "wardrobe", "kitchen", "trophies" };
+            for (int tier = 0; tier <= 4; tier++)
+            {
+                while (World.HouseDiorama.HouseTier(gs) < tier)
+                    foreach (var id in ids) { gs.TryBuyHouse(id); if (World.HouseDiorama.HouseTier(gs) >= tier) break; }
+                Main.World.House.Room.Rebuild();
+                p.GlobalPosition = World.PlayerHouse.Origin + new Vector3(2.3f, 0.1f, 2.0f);
+                p.SetLook(Mathf.Atan2(2.3f + 0.4f, 2.0f + 0.6f), -0.12f);
+                p.Camera.Fov = 95;
+                await Wait(0.8f);
+                await Shot($"26_house_tier_{tier}");
+            }
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-goblin"))
+        {
+            var camp = Main.World.Goblins;
+            var g = gs.GoblinData("caves");
+            g.Found = true;
+            gs.AddMoney(10_000_000);
+            gs.TryHireGoblin("caves");
+            var view = camp.HutPos + new Vector3(4.5f, 0.1f, -4.5f);
+            var Lg = Main.World.Layouts[0];
+            view = Lg.OnGround(view.X, view.Z, 0.1f);
+            int k = 0;
+            foreach (float prog in new[] { 0.15f, 0.5f, 0.85f })
+            {
+                g.HireDay = gs.Data.Day;
+                gs.Data.DayTimeSeconds = gs.DayLength * prog * GameState.GoblinBuildDays;
+                if (prog * GameState.GoblinBuildDays >= 1f) { g.HireDay = gs.Data.Day - 1; gs.Data.DayTimeSeconds = gs.DayLength * (prog * GameState.GoblinBuildDays - 1f); }
+                camp.SyncState();
+                LookAtPoint(p, view, camp.HutPos + Vector3.Up * 1f);
+                await Wait(1.2f);
+                await Shot($"25_build_{k++}");
+            }
+            g.HutBuilt = true;
+            gs.Data.DayTimeSeconds = 20;
+            for (int lv = 0; lv <= 4; lv++)
+            {
+                g.HutLevel = lv; g.CarryLevel = lv; g.SpeedLevel = lv;
+                camp.SyncState();
+                camp.Grub.GlobalPosition = camp.GrubHome;
+                LookAtPoint(p, view, camp.HutPos + Vector3.Up * 1.2f);
+                await Wait(1.0f);
+                await Shot($"25_hut_level_{lv}");
+            }
+            UiBus.RequestGoblin(camp);
+            await Wait(0.6f);
+            await Shot("25_goblin_panel");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-ropes"))
         {
             var L = Main.World.Layouts[0];

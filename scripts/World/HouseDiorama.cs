@@ -132,6 +132,7 @@ public partial class HouseDiorama : Node3D
         int kitchen = gs?.HouseLevel(HouseIds.Kitchen) ?? 0;
         int trophies = gs?.HouseLevel(HouseIds.Trophies) ?? 0;
         var p = _props;
+        BuildTier(p, HouseTier(gs));
 
         // ---- cama (canto do fundo à esquerda)
         var bp = new Vector3(-1.9f, 0, -1.3f);
@@ -234,6 +235,86 @@ public partial class HouseDiorama : Node3D
                 p.AddChild(prism);
                 i++;
             }
+        }
+    }
+
+    /// <summary>Patamar da casa (0..4) pelo total de melhorias compradas: o cômodo inteiro evolui.</summary>
+    public static int HouseTier(GameState gs)
+    {
+        if (gs == null) return 0;
+        int total = 0, max = 0;
+        foreach (var h in HomeData.House) { total += gs.HouseLevel(h.Id); max += h.MaxLevel; }
+        return Mathf.Clamp((int)(total / (float)max * 4.99f), 0, 4);
+    }
+
+    /// <summary>Acabamento do cômodo por patamar: paredes, iluminação, decoração.</summary>
+    void BuildTier(Node3D p, int tier)
+    {
+        var green = new Color(0.25f, 0.55f, 0.3f);
+        if (tier == 0)
+        {
+            // casa simples: manchas de umidade, balde, caixotes empilhados
+            Box(p, new Vector3(0.9f, 0.6f, 0.02f), new Vector3(-1.2f, 2.4f, -2.39f), Wall.Darkened(0.3f));
+            Box(p, new Vector3(0.02f, 0.7f, 1.1f), new Vector3(-2.99f, 2.2f, -1.0f), Wall.Darkened(0.28f));
+            Cyl(p, 0.16f, 0.3f, new Vector3(0.9f, 0.15f, 0.2f), Metal);
+            Box(p, new Vector3(0.5f, 0.4f, 0.5f), new Vector3(-2.6f, 0.2f, -0.9f) + new Vector3(0, 0, 2.2f), WoodDark);
+            return;
+        }
+        // 1+: rodapé alto de madeira, cortina na janela, planta
+        Box(p, new Vector3(6.2f, 0.9f, 0.04f), new Vector3(0, 0.45f, -2.38f), Wood.Darkened(0.1f));
+        Box(p, new Vector3(0.04f, 0.9f, 5.0f), new Vector3(-2.98f, 0.45f, 0), Wood.Darkened(0.1f));
+        foreach (float x in new[] { 0.3f, 2.1f })
+            Box(p, new Vector3(0.35f, 1.4f, 0.05f), new Vector3(x, 1.9f, -2.32f), new Color(0.6f, 0.2f, 0.22f));
+        Cyl(p, 0.18f, 0.35f, new Vector3(-0.6f, 0.18f, -2.1f), new Color(0.55f, 0.35f, 0.25f));
+        Sphere(p, 0.3f, new Vector3(-0.6f, 0.55f, -2.1f), green, null, 0);
+        if (tier >= 2)
+        {
+            // prateleira com livros, quadros e arandelas
+            Box(p, new Vector3(0.3f, 0.05f, 1.4f), new Vector3(-2.85f, 1.9f, -1.0f), WoodDark);
+            for (int i = 0; i < 7; i++)
+                Box(p, new Vector3(0.18f, 0.28f, 0.08f), new Vector3(-2.85f, 2.07f, -1.6f + i * 0.17f), Color.FromHsv(i * 0.14f, 0.5f, 0.6f));
+            Box(p, new Vector3(0.02f, 0.6f, 0.8f), new Vector3(-2.98f, 2.4f, 0.4f), WoodDark);
+            Box(p, new Vector3(0.01f, 0.5f, 0.7f), new Vector3(-2.97f, 2.4f, 0.4f), new Color(0.3f, 0.45f, 0.6f));
+            foreach (float z in new[] { -1.8f, 1.0f })
+            {
+                Box(p, new Vector3(0.08f, 0.2f, 0.12f), new Vector3(-2.95f, 2.5f, z), Metal);
+                Sphere(p, 0.07f, new Vector3(-2.88f, 2.6f, z), Lamp, Lamp, 2.5f);
+                var l = new OmniLight3D { LightColor = Lamp, LightEnergy = 0.5f, OmniRange = 3f, Position = new Vector3(-2.75f, 2.6f, z) };
+                p.AddChild(l);
+            }
+        }
+        if (tier >= 3)
+        {
+            // papel de parede de destaque, sofá, neon no teto
+            Box(p, new Vector3(6.2f, 2.0f, 0.02f), new Vector3(0, 1.95f, -2.37f), new Color(0.2f, 0.22f, 0.32f));
+            var sofa = new Vector3(2.7f, 0, 0.45f);
+            Box(p, new Vector3(0.75f, 0.4f, 1.5f), sofa + new Vector3(0, 0.2f, 0), new Color(0.35f, 0.25f, 0.55f));
+            Box(p, new Vector3(0.2f, 0.75f, 1.5f), sofa + new Vector3(0.3f, 0.45f, 0), new Color(0.3f, 0.2f, 0.48f));
+            Box(p, new Vector3(0.5f, 0.3f, 0.7f), new Vector3(1.85f, 0.15f, 0.45f), WoodDark);
+            var neon = new Color(0.3f, 0.95f, 1f);
+            if (Interior)
+                foreach (float z in new[] { -2.35f, 2.35f })
+                    Box(p, new Vector3(6.0f, 0.04f, 0.04f), new Vector3(0, 3.15f, z), neon, neon, 2.2f);
+        }
+        if (tier >= 4)
+        {
+            // casa cyber: telão holográfico, aquário iluminado, lustre de cristal, frisos dourados no piso
+            var gold = new Color(1f, 0.8f, 0.35f);
+            Box(p, new Vector3(6.2f, 0.02f, 0.06f), new Vector3(0, 0.02f, -2.33f), gold, gold, 1.5f);
+            Box(p, new Vector3(0.06f, 0.02f, 5.0f), new Vector3(-2.93f, 0.02f, 0), gold, gold, 1.5f);
+            if (Interior)
+            {
+                Box(p, new Vector3(1.4f, 0.8f, 0.04f), new Vector3(-0.1f, 2.65f, 2.37f), new Color(0.05f, 0.08f, 0.12f), new Color(0.2f, 0.6f, 1f), 1.6f);
+                Box(p, new Vector3(1.3f, 0.06f, 0.02f), new Vector3(-0.1f, 2.75f, 2.35f), new Color(1f, 0.4f, 0.9f), new Color(1f, 0.4f, 0.9f), 2.5f);
+            }
+            // aquário embutido na parede, acima do sofá
+            Box(p, new Vector3(0.18f, 0.6f, 1.1f), new Vector3(2.98f, 1.75f, 0.45f), WoodDark);
+            Box(p, new Vector3(0.12f, 0.5f, 1.0f), new Vector3(2.92f, 1.75f, 0.45f), new Color(0.1f, 0.4f, 0.6f), new Color(0.15f, 0.6f, 0.9f), 1.2f);
+            for (int i = 0; i < 3; i++)
+                Box(p, new Vector3(0.03f, 0.04f, 0.09f), new Vector3(2.85f, 1.62f + i * 0.12f, 0.2f + i * 0.22f), new Color(1f, 0.5f, 0.2f), new Color(1f, 0.5f, 0.2f), 2f);
+            var chand = new MeshInstance3D { Mesh = MeshFactory.CrystalPrism(6, 0.18f, 0.6f, 0.2f), MaterialOverride = MeshFactory.Emissive(new Color(0.8f, 0.9f, 1f), new Color(0.6f, 0.85f, 1f), 0.9f), Position = new Vector3(0.3f, 2.25f, 0.6f), Rotation = new Vector3(Mathf.Pi, 0, 0) };
+            p.AddChild(chand);
+            p.AddChild(new OmniLight3D { LightColor = new Color(0.7f, 0.85f, 1f), LightEnergy = 0.5f, OmniRange = 6f, Position = new Vector3(0.3f, 2.0f, 0.6f) });
         }
     }
 

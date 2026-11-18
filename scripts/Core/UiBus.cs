@@ -22,4 +22,6 @@ public static class UiBus
     public static event Action PrestigeRequested;
     public static void RequestPrestige() => PrestigeRequested?.Invoke();
     public static void EnterRegion(string id) => RegionEntered?.Invoke(id);
+    public static event Action<World.GoblinCamp> OpenGoblin;
+    public static void RequestGoblin(World.GoblinCamp camp) => OpenGoblin?.Invoke(camp);
 }

@@ -34,6 +34,7 @@ public partial class Main : Node
     CodexScreen _codex;
     ObjectiveMarker _marker;
     DebugScreen _debug;
+    GoblinScreen _goblin;
     public BuildingManager Buildings { get; private set; }
     HelpScreen _help;
     CompletionScreen _completion;
@@ -113,6 +114,17 @@ public partial class Main : Node
         AddChild(_codex);
         _help = new HelpScreen();
         AddChild(_help);
+        _goblin = new GoblinScreen();
+        AddChild(_goblin);
+        _goblin.Closed += ReturnToGameplay;
+        UiBus.OpenGoblin += camp =>
+        {
+            if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+            Player.InputEnabled = false;
+            AudioManager.Instance?.SetBeam(false);
+            _goblin.Show(camp);
+        };
         _debug = new DebugScreen { Run = RunDebug };
         AddChild(_debug);
         _debug.Closed += () => { GetTree().Paused = false; ReturnToGameplay(); };
@@ -655,13 +667,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _debug, _choice, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false);
+    bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -684,6 +696,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_debug.IsOpen) { _debug.Close(); return; }
+            if (_goblin.IsOpen) { _goblin.Close(); return; }
             if (_confirm.IsOpen) { _confirm.Close(); return; }
             if (_choice.IsOpen) { _choice.Decline(); return; }
             if (_home.IsOpen) { _home.Close(); return; }
@@ -703,6 +716,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_debug.IsOpen) _debug.Close();
+            else if (_goblin.IsOpen) _goblin.Close();
             else if (_confirm.IsOpen) _confirm.Close();
             else if (_choice.IsOpen) _choice.Decline();
             else if (_home.IsOpen) _home.Close();

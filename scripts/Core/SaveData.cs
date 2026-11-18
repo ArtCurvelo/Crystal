@@ -163,10 +163,22 @@ public sealed class GoblinSave
     public int ChargedDay { get; set; }
     public int FledDay { get; set; }
     public Dictionary<string, int> Stash { get; set; } = new();
+    /// <summary>Dia em que foi contratado (a cabana leva um tempo para ficar pronta).</summary>
+    public int HireDay { get; set; }
+    public bool HutBuilt { get; set; }
+    /// <summary>Melhorias: cabana (tempo de trabalho no dia), mochila e picareta.</summary>
+    public int HutLevel { get; set; }
+    public int CarryLevel { get; set; }
+    public int SpeedLevel { get; set; }
 
     public void Sanitize()
     {
         State = System.Math.Clamp(State, 0, 3);
+        // saves antigos: quem já trabalhava tem a barraca pronta
+        if ((State == 1 || State == 3) && HireDay <= 0) HutBuilt = true;
+        HutLevel = System.Math.Clamp(HutLevel, 0, 4);
+        CarryLevel = System.Math.Clamp(CarryLevel, 0, 4);
+        SpeedLevel = System.Math.Clamp(SpeedLevel, 0, 4);
         Strikes = System.Math.Clamp(Strikes, 0, 10);
         if (DayValue < 0) DayValue = 0;
         Stash ??= new();

@@ -121,7 +121,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
         GD.Print($"Goblin: contratado={_hired} | taxas pagas {_feesPaid}, não pagas {_feesSkipped} | fragmentos do baú {_stashTaken}");
-        if (!_hired || _feesPaid == 0 || _stashTaken == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
+        GD.Print($"Goblin: melhorias compradas {_goblinUps} | cabana pronta={GS.GoblinBuilt("caves")}");
+        if (!_hired || _feesPaid == 0 || _stashTaken == 0 || _goblinUps == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
         GD.Print($"Construções: funil={(_hopperId != 0 || _beltSold > 0)} | vendido pela esteira ◈ {_beltSold} | drone={GS.Data.DroneOwned}");
         if (_beltSold <= 0) { _errors++; GD.Print("ERRO: a esteira não vendeu nada"); }
         if (!GS.Data.DroneOwned) { _errors++; GD.Print("ERRO: drone não comprado"); }
@@ -526,6 +527,34 @@ public partial class PlaythroughBot : Node
         Log("Contratou o Grub, o goblin minerador");
     }
 
+    int _goblinUps;
+
+    /// <summary>Com a cabana pronta: conversa com o Grub e compra melhorias pela tela dele.</summary>
+    async Task UpgradeGoblin()
+    {
+        var camp = Main.World.Goblins;
+        if (!_hired || GS.Goblin("caves") != GameState.GoblinMood.Working || !GS.GoblinBuilt("caves") || !GS.CanWork) return;
+        var cheapest = new[] { GameState.GoblinUpgrade.Hut, GameState.GoblinUpgrade.Carry, GameState.GoblinUpgrade.Speed }.Min(u => GS.GoblinUpgradeCost("caves", u));
+        if (cheapest == long.MaxValue || GS.Data.Money < cheapest * 6) return;
+        var g = camp.Grub;
+        P.GlobalPosition = camp.GrubHome + (camp.HutPos - camp.GrubHome).Normalized() * -1.8f + Vector3.Up * 0.1f;
+        g.GlobalPosition = camp.GrubHome;
+        await Frames(3);
+        camp.TalkToGrub();
+        await Frames(4);
+        var scr = Main.GetChildren().OfType<GoblinScreen>().First();
+        if (!scr.IsOpen) { _errors++; Log("ERRO: a tela do goblin não abriu"); return; }
+        int lv0 = GS.GoblinData("caves").HutLevel + GS.GoblinData("caves").CarryLevel + GS.GoblinData("caves").SpeedLevel;
+        var btn = FindButtons(scr).Where(b => !b.Disabled && b.Text.StartsWith("◈")).OrderBy(b => ParseCost(b.Text)).FirstOrDefault();
+        if (btn != null) { btn.EmitSignal(BaseButton.SignalName.Pressed); await Frames(3); }
+        int lv1 = GS.GoblinData("caves").HutLevel + GS.GoblinData("caves").CarryLevel + GS.GoblinData("caves").SpeedLevel;
+        if (btn != null && lv1 != lv0 + 1) { _errors++; Log("ERRO: melhoria do goblin não aplicou"); }
+        else if (btn != null) { _goblinUps++; if (_goblinUps <= 3) Log($"Melhorou o Grub (cabana {GS.GoblinData("caves").HutLevel + 1}, mochila {GS.GoblinData("caves").CarryLevel + 1}, picareta {GS.GoblinData("caves").SpeedLevel + 1})"); }
+        PressAction("pause");
+        await Frames(3);
+        if (scr.IsOpen) { _errors++; Log("ERRO: Esc não fechou a tela do goblin"); }
+    }
+
     /// <summary>Pega o que o Grub guardou no baú.</summary>
     async Task TakeFromChest()
     {
@@ -616,6 +645,7 @@ public partial class PlaythroughBot : Node
     {
         var region = GameData.Regions[0]; // única Estação de Venda, no acampamento
         await TryHireGoblin();
+        await UpgradeGoblin();
         await TryBuild();
         // de vez em quando esvazia a mochila no funil em vez de vender no balcão
         if (_hopperId != 0 && GS.CanWork && ++_hopperTrips % 3 == 0 && Main.Buildings.NodeOf(_hopperId) is Hopper hop)
