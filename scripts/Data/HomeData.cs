@@ -130,6 +130,8 @@ public static class GoblinData
         new() { RegionId = "depths", Name = "Frizz", Title = "o goblin do gelo", HireCost = 6000, RehireCost = 20000, MineDps = 35f, Comrades = new[] { "Pingo", "Geada" }, Skin = new Godot.Color(0.45f, 0.65f, 0.85f) },
         new() { RegionId = "core", Name = "Krag", Title = "o goblin da forja", HireCost = 60000, RehireCost = 200000, MineDps = 300f, Comrades = new[] { "Brasa", "Fuligem" }, Skin = new Godot.Color(0.75f, 0.35f, 0.25f) },
         new() { RegionId = "abyss", Name = "Nixa", Title = "a goblin abissal", HireCost = 250000, RehireCost = 800000, MineDps = 1500f, Comrades = new[] { "Lodo", "Concha" }, Skin = new Godot.Color(0.3f, 0.7f, 0.65f) },
+        new() { RegionId = "spore", Name = "Musgo", Title = "o goblin dos cogumelos", HireCost = 1_200_000, RehireCost = 4_000_000, MineDps = 7000f, Comrades = new[] { "Bolor", "Fungo" }, Skin = new Godot.Color(0.55f, 0.75f, 0.35f) },
+        new() { RegionId = "cathedral", Name = "Zirko", Title = "o goblin lapidador", HireCost = 6_000_000, RehireCost = 20_000_000, MineDps = 40000f, Comrades = new[] { "Lasca", "Quilate" }, Skin = new Godot.Color(0.6f, 0.55f, 0.8f) },
     };
 
     public static GoblinDef Of(string regionId) => All.Find(g => g.RegionId == regionId);

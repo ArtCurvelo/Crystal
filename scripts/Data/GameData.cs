@@ -404,6 +404,80 @@ public static class GameData
             ShardsMin = 3, ShardsMax = 4, RespawnSeconds = 36
         });
 
+        // ---------------- Jardim Fúngico (região 5) ----------------
+        Add(new MaterialDef
+        {
+            Id = "sporite", Rarity = Rarity.Incomum, Archetype = OreArchetype.Coral, Name = "Esporita", Value = 1500, Hp = 18000,
+            Description = "Cristal poroso que solta esporos luminosos a cada golpe.",
+            Color = new Color(0.55f, 1.0f, 0.35f), Glow = new Color(0.45f, 1.0f, 0.25f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 26
+        });
+        Add(new MaterialDef
+        {
+            Id = "jade", Rarity = Rarity.Raro, Archetype = OreArchetype.Crystal, Name = "Jade Vivo", Value = 1900, Hp = 22000,
+            Description = "Verde profundo e frio; dizem que cresce devagar, como uma planta.",
+            Color = new Color(0.2f, 0.75f, 0.45f), Glow = new Color(0.15f, 1.0f, 0.55f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 28
+        });
+        Add(new MaterialDef
+        {
+            Id = "amber", Rarity = Rarity.Raro, Archetype = OreArchetype.Banded, Name = "Âmbar Fóssil", Value = 2600, Hp = 28000,
+            Description = "Resina de florestas extintas, com insetos presos há milhões de anos.",
+            Color = new Color(1.0f, 0.6f, 0.12f), Glow = new Color(1.0f, 0.55f, 0.1f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "moonstone", Rarity = Rarity.Epico, Archetype = OreArchetype.Pearl, Name = "Pedra da Lua", Value = 4400, Hp = 42000,
+            Description = "Brilho azulado que flutua dentro da pedra, como luar na água.",
+            Color = new Color(0.85f, 0.9f, 1.0f), Glow = new Color(0.55f, 0.75f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 36
+        });
+        Add(new MaterialDef
+        {
+            Id = "primalseed", Rarity = Rarity.Lendario, Archetype = OreArchetype.Geode, GeodeSpheres = true, Name = "Semente Primordial", Value = 18000, Hp = 70000, Rare = true,
+            Description = "Um geodo que pulsa como se respirasse. O jardim inteiro nasceu dela.",
+            Color = new Color(0.95f, 0.4f, 0.85f), Glow = new Color(1.0f, 0.3f, 0.8f),
+            ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 60
+        });
+
+        // ---------------- Catedral de Cristal (região 6) ----------------
+        Add(new MaterialDef
+        {
+            Id = "smokyquartz", Rarity = Rarity.Incomum, Archetype = OreArchetype.Crystal, Name = "Quartzo Fumê", Value = 5000, Hp = 60000,
+            Description = "Quartzo escuro como fumaça, que acende por dentro quando atingido.",
+            Color = new Color(0.45f, 0.38f, 0.32f), Glow = new Color(1.0f, 0.75f, 0.45f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 28
+        });
+        Add(new MaterialDef
+        {
+            Id = "tanzanite", Rarity = Rarity.Raro, Archetype = OreArchetype.Shards, Name = "Tanzanita", Value = 8200, Hp = 90000,
+            Description = "Lâminas violeta-azuladas que mudam de tom conforme o ângulo.",
+            Color = new Color(0.4f, 0.35f, 1.0f), Glow = new Color(0.45f, 0.35f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 30
+        });
+        Add(new MaterialDef
+        {
+            Id = "alexandrite", Rarity = Rarity.Epico, Archetype = OreArchetype.Crystal, Name = "Alexandrita", Value = 15000, Hp = 140000,
+            Description = "Verde sob a luz fria, vermelha sob a luz quente. Raríssima.",
+            Color = new Color(0.25f, 0.8f, 0.55f), Glow = new Color(1.0f, 0.25f, 0.45f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 36
+        });
+        Add(new MaterialDef
+        {
+            Id = "diamond", Rarity = Rarity.Epico, Archetype = OreArchetype.Geode, Name = "Diamante Bruto", Value = 22000, Hp = 180000,
+            Description = "O material mais duro das cavernas. Só um feixe muito forte o corta.",
+            Color = new Color(0.92f, 0.97f, 1.0f), Glow = new Color(0.75f, 0.9f, 1.0f),
+            ShardsMin = 3, ShardsMax = 5, RespawnSeconds = 40
+        });
+        Add(new MaterialDef
+        {
+            Id = "eternaldiamond", Rarity = Rarity.Lendario, Name = "Diamante Eterno", Value = 90000, Hp = 320000, Rare = true,
+            Description = "Um diamante que nunca perde o brilho, nem no escuro absoluto.",
+            Color = new Color(1.0f, 0.97f, 0.9f), Glow = new Color(1.0f, 0.85f, 0.55f),
+            ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 70
+        });
+
         // ---------------- Regiões ----------------
         var r1 = new RegionDef
         {
@@ -492,6 +566,46 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
         r4.Wings.Add(new WingDef { Id = "opal_well", Name = "Poço de Opalas", Side = 1, ZOffset = 6, FeaturedMaterialId = "opal", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r4);
 
+        var r5 = new RegionDef
+        {
+            Id = "spore", Index = 4, Name = "Jardim Fúngico",
+            Subtitle = "Cogumelos gigantes e esporos que brilham no escuro.", UnlockCost = 8_000_000,
+            AmbientColor = new Color(0.35f, 0.8f, 0.45f), AmbientEnergy = 0.7f,
+            FogColor = new Color(0.04f, 0.1f, 0.05f), FogDensity = 0.024f,
+            RockColor = new Color(0.3f, 0.3f, 0.26f), AccentColor = new Color(0.55f, 1.0f, 0.3f),
+            LightColor = new Color(1.0f, 0.35f, 0.85f),
+            RareMaterialId = "primalseed", RareChance = 0.05f, CrystalSlots = 175,
+            CenterZ = -876, HalfX = 120, HalfZ = 110, Height = 30
+        };
+        r5.Spawns.Add(new SpawnEntry("sporite", 0.32f));
+        r5.Spawns.Add(new SpawnEntry("jade", 0.26f));
+        r5.Spawns.Add(new SpawnEntry("amber", 0.24f));
+        r5.Spawns.Add(new SpawnEntry("moonstone", 0.12f));
+        r5.Spawns.Add(new SpawnEntry("blackpearl", 0.06f));
+        r5.Wings.Add(new WingDef { Id = "spore_grove", Name = "Bosque de Esporos", Side = -1, ZOffset = 2, FeaturedMaterialId = "sporite", Slots = 10, HalfX = 14, HalfZ = 13 });
+        r5.Wings.Add(new WingDef { Id = "amber_cave", Name = "Caverna de Âmbar", Side = 1, ZOffset = -6, FeaturedMaterialId = "amber", Slots = 10, HalfX = 14, HalfZ = 13 });
+        Regions.Add(r5);
+
+        var r6 = new RegionDef
+        {
+            Id = "cathedral", Index = 5, Name = "Catedral de Cristal",
+            Subtitle = "Formações colossais e os minérios mais duros do mundo.", UnlockCost = 40_000_000,
+            AmbientColor = new Color(0.65f, 0.6f, 1.0f), AmbientEnergy = 0.75f,
+            FogColor = new Color(0.07f, 0.05f, 0.14f), FogDensity = 0.02f,
+            RockColor = new Color(0.36f, 0.34f, 0.4f), AccentColor = new Color(0.85f, 0.75f, 1.0f),
+            LightColor = new Color(1.0f, 0.8f, 0.45f),
+            RareMaterialId = "eternaldiamond", RareChance = 0.05f, CrystalSlots = 180,
+            CenterZ = -1115, HalfX = 125, HalfZ = 115, Height = 38
+        };
+        r6.Spawns.Add(new SpawnEntry("smokyquartz", 0.32f));
+        r6.Spawns.Add(new SpawnEntry("tanzanite", 0.26f));
+        r6.Spawns.Add(new SpawnEntry("alexandrite", 0.18f));
+        r6.Spawns.Add(new SpawnEntry("diamond", 0.14f));
+        r6.Spawns.Add(new SpawnEntry("opal", 0.1f));
+        r6.Wings.Add(new WingDef { Id = "prism_nave", Name = "Nave dos Prismas", Side = -1, ZOffset = -4, FeaturedMaterialId = "tanzanite", Slots = 11, HalfX = 15, HalfZ = 14 });
+        r6.Wings.Add(new WingDef { Id = "diamond_crypt", Name = "Cripta dos Diamantes", Side = 1, ZOffset = 4, FeaturedMaterialId = "diamond", Slots = 11, HalfX = 15, HalfZ = 14 });
+        Regions.Add(r6);
+
         // ---------------- Upgrades ----------------
         AddUp(new UpgradeDef
         {
@@ -563,4 +677,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
 
     public static MaterialDef Mat(string id) => Materials.TryGetValue(id, out var m) ? m : null;
     public static RegionDef Region(string id) => Regions.Find(r => r.Id == id);
+
+    /// <summary>A jornada principal são as 4 primeiras regiões + Coração; as seguintes são de fim de jogo.</summary>
+    public const int JourneyRegions = 4;
 }

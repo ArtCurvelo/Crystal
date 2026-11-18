@@ -27,6 +27,8 @@ public partial class WorldBuilder : Node3D
     public PlayerHouse House;
     public GoblinCamp Goblins;
     public SellStation SellStation;
+    /// <summary>Pontos com água (cachoeiras, poças, lago) — para capturas e testes.</summary>
+    public static readonly List<Vector3> WaterSpots = new();
     int _tick;
 
     public override void _Ready()
@@ -91,6 +93,7 @@ public partial class WorldBuilder : Node3D
 
     void Build()
     {
+        WaterSpots.Clear();
         ulong t0 = Time.GetTicksMsec();
         var regions = GameData.Regions;
         for (int i = 0; i < regions.Count; i++)
@@ -231,7 +234,7 @@ public partial class WorldBuilder : Node3D
         // quantidades proporcionais à área da caverna
         float af = L.Nx * L.Nz / 8000f;
         int N(int n) => Mathf.Max(n, (int)(n * af));
-        int falls = N(r.Id switch { "caves" => 2, "depths" => 3, "abyss" => 4, _ => 0 });
+        int falls = N(r.Id switch { "caves" => 2, "depths" => 3, "abyss" => 4, "spore" => 2, _ => 0 });
         for (int i = 0; i < falls; i++) Waterfall(root, L, rng, water);
         switch (r.Id)
         {
@@ -249,11 +252,23 @@ public partial class WorldBuilder : Node3D
                 if (L.Lake != null)
                 {
                     var lc = L.Lake;
-                    var center = new Vector3(lc.A.X, lc.Level + 0.22f, lc.A.Y);
+                    var center = new Vector3(lc.A.X, lc.Level + 0.6f, lc.A.Y);
                     Decor.Lake(root, center, lc.Radius + 3f, r.AccentColor);
+                    WaterSpots.Add(center);
                     Decor.Jellyfish(root, center, lc.Radius, lc.HA, rng, 12);
                 }
                 Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, r.Height, FreeSpot, Solid);
+                break;
+            case "spore":
+                Decor.GiantMushrooms(root, L, rng, N(26), new[] { new Color(0.45f, 1f, 0.3f), new Color(1f, 0.3f, 0.8f), new Color(0.3f, 0.9f, 1f) }, FreeSpot, Solid);
+                Decor.Mushrooms(root, L, rng, N(30), new Color(0.6f, 1f, 0.35f));
+                Decor.Mushrooms(root, L, rng, N(20), new Color(1f, 0.35f, 0.85f));
+                Decor.Ferns(root, L, rng, N(30), new Color(0.35f, 0.75f, 0.3f));
+                break;
+            case "cathedral":
+                // formações colossais: prismas muito altos ao longo das paredes
+                Decor.GiantClusters(root, L, rng, N(12), new[] { new Color(0.85f, 0.8f, 1f), new Color(0.6f, 0.45f, 1f), new Color(1f, 0.8f, 0.45f) }, r.Height * 1.6f, FreeSpot, Solid);
+                Decor.GiantClusters(root, L, rng, N(8), new[] { new Color(0.5f, 0.85f, 1f) }, r.Height, FreeSpot, Solid);
                 break;
             case "core":
                 if (L.Heart != null) Decor.AncientRuins(root, L, L.OnGround(L.Heart.A.X, L.Heart.A.Y), rng);
@@ -270,6 +285,7 @@ public partial class WorldBuilder : Node3D
         if (h < 5f) return;
         var foot = p - inward * 0.6f;
         foot.Y = p.Y;
+        WaterSpots.Add(foot);
         Decor.Waterfall(root, foot, h + 0.5f, 2f + (float)rng.NextDouble() * 1.5f, Mathf.Atan2(inward.X, inward.Z), color);
     }
 
@@ -722,18 +738,14 @@ public partial class WorldBuilder : Node3D
         // marcas especiais por região
         if (r.Id == "depths")
         {
-            var pool = new StandardMaterial3D
-            {
-                AlbedoColor = new Color(0.1f, 0.5f, 0.6f, 0.6f),
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                EmissionEnabled = true, Emission = new Color(0.1f, 0.6f, 0.7f), EmissionEnergyMultiplier = 0.8f,
-                Metallic = 0.6f, Roughness = 0.05f,
-            };
+            var pool = Decor.Water(new Color(0.2f, 0.9f, 0.8f), new Color(0.01f, 0.07f, 0.09f), new Color(0.05f, 0.35f, 0.4f));
+            pool.SetShaderParameter("puddle", 1f);
             for (int i = 0; i < 12; i++)
             {
                 if (!L.RandomFloor(rng, 4f, 0.08f, out var p)) continue;
                 float rad = 1.2f + (float)rng.NextDouble() * 2f;
-                AddMeshOnly(root, new CylinderMesh { TopRadius = rad, BottomRadius = rad, Height = 0.02f, RadialSegments = 14, Rings = 1 }, pool, p + Vector3.Up * 0.04f);
+                AddMeshOnly(root, new CylinderMesh { TopRadius = 1, BottomRadius = 1, Height = 0.01f, RadialSegments = 32, Rings = 1 }, pool, p + Vector3.Up * 0.05f).Scale = new Vector3(rad, 1, rad);
+                WaterSpots.Add(p);
             }
         }
         else if (r.Id == "core")
@@ -844,6 +856,22 @@ public partial class WorldBuilder : Node3D
             p.Gravity = new Vector3(0, 0.5f, 0);
             p.Color = new Color(0.5f, 0.95f, 1f);
             p.Mesh = new SphereMesh { Radius = 0.04f, Height = 0.08f, RadialSegments = 6, Rings = 3 };
+        }
+        else if (r.Id == "spore")
+        {
+            // esporos luminosos flutuando devagar
+            p.Gravity = new Vector3(0, 0.12f, 0);
+            p.Color = new Color(0.6f, 1f, 0.4f);
+            p.InitialVelocityMax = 0.25f;
+            p.Mesh = new SphereMesh { Radius = 0.035f, Height = 0.07f, RadialSegments = 6, Rings = 3 };
+        }
+        else if (r.Id == "cathedral")
+        {
+            // poeira de cristal cintilante caindo
+            p.Gravity = new Vector3(0, -0.15f, 0);
+            p.Color = new Color(1f, 0.92f, 0.75f);
+            p.InitialVelocityMax = 0.1f;
+            p.Mesh = new QuadMesh { Size = new Vector2(0.04f, 0.04f) };
         }
         else if (r.Id == "core")
         {

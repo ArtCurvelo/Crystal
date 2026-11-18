@@ -136,7 +136,7 @@ public partial class PlaythroughBot : Node
 
     double GameMinutes => GS.Data.PlayTimeSeconds / 60.0;
 
-    void Log(string msg) => _log.Add($"[{GameMinutes,6:0.0} min] {msg}");
+    void Log(string msg) { var l = $"[{GameMinutes,6:0.0} min] {msg}"; _log.Add(l); GD.Print("BOT> " + l); }
 
     RegionDef BestRegion() => GameData.Regions.Last(r => GS.IsUnlocked(r.Id));
 
@@ -454,6 +454,7 @@ public partial class PlaythroughBot : Node
     async Task BuyAtHome(HomeScreen home)
     {
         var next = GS.NextLockedRegion();
+        if (next != null && next.Index >= GameData.JourneyRegions) next = null;
         bool Cheap(long cost) => cost <= GS.Data.Money * (next == null ? 0.6 : 0.2);
         home.ShowHouseTab();
         await Frames(2);
@@ -653,6 +654,8 @@ public partial class PlaythroughBot : Node
     {
         if (!GS.CanWork) return;
         var next = GS.NextLockedRegion();
+        // o bot testa a jornada principal; as regiões de fim de jogo têm teste próprio
+        if (next != null && next.Index >= GameData.JourneyRegions) next = null;
         if (next != null && GS.CanUnlock(next))
         {
             var gate = Main.World.Gates.First(g => g.Region == next);
@@ -703,6 +706,7 @@ public partial class PlaythroughBot : Node
             int lv = GS.Data.Upgrades.Values.Sum();
             btn.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames(2);
+            if (GS.DayOver) break; // o turno acabou durante as compras (a loja recusa, como deve)
             if (GS.Data.Upgrades.Values.Sum() != lv + 1) { _errors++; Log("ERRO: compra não aplicou"); break; }
             _buys++;
         }

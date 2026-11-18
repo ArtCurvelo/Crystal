@@ -51,6 +51,7 @@ public partial class TestRunner : Node
             Run("Casa e árvore de habilidades", TestHomeAndSkills);
             Run("Áudio sem saturação", TestAudio);
             Run("Idiomas, remapeamento e acessibilidade", TestLocAndBindings);
+            Run("Regiões de fim de jogo: balanceamento", TestEndgameRegions);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
@@ -632,6 +633,34 @@ public partial class TestRunner : Node
         Check(true, "filtro de daltonismo aplicado sem erro");
         d.Narration = true; Accessibility.Speak("teste"); d.Narration = false;
         Check(true, "narração não falha sem voz no sistema");
+    }
+
+    void TestEndgameRegions()
+    {
+        Check(GameData.Regions.Count >= 6 && GameData.JourneyRegions == 4, $"6 regiões, jornada = 4 primeiras ({GameData.Regions.Count})");
+        // jornada concluída sem as regiões novas
+        Fresh();
+        for (int i = 0; i < GameData.JourneyRegions; i++) if (!GS.IsUnlocked(GameData.Regions[i].Id)) GS.Data.UnlockedRegions.Add(GameData.Regions[i].Id);
+        GS.AddItem("heart", 1);
+        Check(GS.JourneyComplete, "jornada conclui sem as regiões de fim de jogo");
+        var dmg = GameData.Upgrades[UpgradeIds.Damage];
+        float maxDmg = dmg.ValueAt(dmg.MaxLevel), midDmg = dmg.ValueAt(20);
+        for (int i = GameData.JourneyRegions; i < GameData.Regions.Count; i++)
+        {
+            var r = GameData.Regions[i];
+            Check(r.UnlockCost > GameData.Regions[i - 1].UnlockCost, $"{r.NamePt} custa mais que a anterior");
+            Check(GoblinData.Of(r.Id) != null, $"{r.NamePt} tem goblin");
+            Check(RegionEvents.For(r.Id) != null, $"{r.NamePt} tem evento");
+            float total = r.Spawns.Sum(sp => sp.Weight);
+            Check(Math.Abs(total - 1f) < 0.02f, $"{r.NamePt}: chances de minério somam 1 ({total:0.00})");
+            foreach (var sp in r.Spawns.Select(x => GameData.Mat(x.MaterialId)).Append(GameData.Mat(r.RareMaterialId)))
+            {
+                float hitsMax = sp.Hp / maxDmg, hitsMid = sp.Hp / midDmg;
+                Check(hitsMax <= 25f && hitsMid >= 3f, $"{sp.NamePt}: {hitsMid:0} golpes no nível 20, {hitsMax:0.0} no máximo");
+                Check(sp.Value / (float)sp.Hp is > 0.05f and < 0.4f, $"{sp.NamePt}: valor por resistência coerente");
+            }
+        }
+        Fresh();
     }
 
     void TestSettings()

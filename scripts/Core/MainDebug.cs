@@ -15,7 +15,7 @@ public partial class Main
 {
     public static readonly string DebugHelp =
         "dinheiro N · tudo · regioes · melhorias · habilidades · casa · mochila · goblins · drone · curar\n" +
-        "ir 1-4 · ir coracao · ir acampamento · ir goblin · hora HH · fimdia · novodia · velocidade N\n" +
+        "ir 1-6 · ir coracao · ir acampamento · ir goblin · hora HH · fimdia · novodia · velocidade N\n" +
         "rebeliao · evento · renascer · construcoes (◈ para testar) · ajuda";
 
     /// <summary>Executa um comando de admin e devolve o resultado (texto).</summary>
@@ -93,7 +93,7 @@ public partial class Main
                     to = e;
                     if (!gs.IsUnlocked(GameData.Regions[n - 1].Id)) RunDebug("regioes");
                 }
-                else return "Use: ir 1-4 · ir coracao · ir acampamento · ir goblin";
+                else return "Use: ir 1-6 · ir coracao · ir acampamento · ir goblin";
                 Player.GlobalPosition = to + Vector3.Up * 0.2f;
                 Player.Velocity = Vector3.Zero;
                 UpdateRegion(true);

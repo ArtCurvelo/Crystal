@@ -199,10 +199,25 @@ public static class Decor
     /// <summary>Lago luminoso cobrindo o piso (o jogador caminha pela água rasa).</summary>
     public static void Lake(Node3D root, Vector3 center, float radius, Color glow)
     {
-        var mat = new ShaderMaterial { Shader = GD.Load<Shader>("res://shaders/lake.gdshader") };
-        mat.SetShaderParameter("glow_color", glow);
-        // disco de água: a borda fica escondida sob as paredes e o relevo
-        Mesh(root, new CylinderMesh { TopRadius = radius, BottomRadius = radius, Height = 0.02f, RadialSegments = 40, Rings = 1 }, mat, center);
+        var mat = Water(glow, new Color(0.01f, 0.06f, 0.1f), new Color(0.06f, 0.35f, 0.45f));
+        mat.SetShaderParameter("depth_fade", 0.7f);
+        mat.SetShaderParameter("foam_width", 0.12f);
+        // superfície subdividida (marolas); a borda fica escondida sob as paredes e o relevo
+        Mesh(root, new PlaneMesh { Size = new Vector2(radius * 2, radius * 2), SubdivideWidth = 48, SubdivideDepth = 48 }, mat, center);
+    }
+
+    static Shader _water;
+
+    /// <summary>Material de água (reflexo, refração, profundidade, espuma, cáusticas).</summary>
+    public static ShaderMaterial Water(Color glow, Color deep, Color shallow)
+    {
+        _water ??= GD.Load<Shader>("res://shaders/water.gdshader");
+        var m = new ShaderMaterial { Shader = _water };
+        m.SetShaderParameter("glow_color", glow);
+        m.SetShaderParameter("deep_color", deep);
+        m.SetShaderParameter("shallow_color", shallow);
+        m.SetShaderParameter("noise_tex", CaveTerrain.NoiseTexture);
+        return m;
     }
 
     /// <summary>Águas-vivas luminosas flutuando no ar úmido do reservatório.</summary>
@@ -252,14 +267,10 @@ public static class Decor
         root.AddChild(node);
         Mesh(node, new QuadMesh { Size = new Vector2(width, height) }, mat, new Vector3(0, height / 2, 0));
         Mesh(node, new QuadMesh { Size = new Vector2(width * 0.6f, height) }, mat, new Vector3(0, height / 2, 0.15f));
-        var pool = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(color.R * 0.4f, color.G * 0.6f, color.B * 0.8f, 0.75f),
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            EmissionEnabled = true, Emission = color * 0.5f, EmissionEnergyMultiplier = 0.9f,
-            Roughness = 0.05f, Metallic = 0.5f,
-        };
-        Mesh(node, new CylinderMesh { TopRadius = width * 1.1f, BottomRadius = width * 1.1f, Height = 0.03f, RadialSegments = 16, Rings = 1 }, pool, new Vector3(0, 0.02f, width * 0.8f));
+        var pool = Water(color, new Color(0.02f, 0.08f, 0.12f), new Color(color.R * 0.3f, color.G * 0.5f, color.B * 0.6f));
+        pool.SetShaderParameter("puddle", 1f);
+        pool.SetShaderParameter("wave_speed", 1.4f);
+        Mesh(node, new CylinderMesh { TopRadius = 1, BottomRadius = 1, Height = 0.01f, RadialSegments = 32, Rings = 1 }, pool, new Vector3(0, 0.06f, width * 0.8f), null, new Vector3(width * 1.3f, 1, width * 1.3f));
         var mist = new CpuParticles3D
         {
             Amount = Settings.Quality == GraphicsQuality.Low ? 8 : 18,
@@ -425,6 +436,64 @@ public static class Decor
                 }
             }
             AddMulti(root, mesh, mat, xf);
+        }
+    }
+
+    /// <summary>Cogumelos gigantes bioluminescentes (Jardim Fúngico): caule, chapéu brilhante e lamelas, com colisão no caule.</summary>
+    public static void GiantMushrooms(Node3D root, CaveLayout L, Random rng, int count, Color[] capColors,
+        Func<Vector3, float, bool> free = null, Action<Shape3D, Transform3D, Vector3, float> solid = null)
+    {
+        var stems = new List<Transform3D>();
+        var gillsBy = new List<Transform3D>[capColors.Length];
+        for (int k = 0; k < capColors.Length; k++) gillsBy[k] = new List<Transform3D>();
+        var capsBy = new List<Transform3D>[capColors.Length];
+        for (int k = 0; k < capColors.Length; k++) capsBy[k] = new List<Transform3D>();
+        for (int c = 0, tries = 0; c < count && tries < count * 8; tries++)
+        {
+            if (!L.RandomFloor(rng, 4f, 0.25f, out var p)) continue;
+            float clearance = L.Ceiling(p.X, p.Z) - p.Y;
+            if (clearance < 6f) continue;
+            float h = Mathf.Min(clearance - 1.5f, 4f + (float)rng.NextDouble() * 7f);
+            float capR = 1.6f + h * 0.28f + (float)rng.NextDouble() * 1.2f;
+            if (free != null && !free(p, 1.4f)) continue;
+            c++;
+            float stemR = 0.35f + h * 0.04f;
+            var lean = new Basis(new Vector3((float)rng.NextDouble() - 0.5f, 0, (float)rng.NextDouble() - 0.5f).Normalized(), (float)rng.NextDouble() * 0.18f);
+            var up = lean * Vector3.Up;
+            stems.Add(new Transform3D(lean.ScaleLocal(new Vector3(stemR, h, stemR)), p + up * h * 0.5f));
+            var top = p + up * h;
+            int ci = rng.Next(capColors.Length);
+            capsBy[ci].Add(new Transform3D(lean.ScaleLocal(new Vector3(capR, capR * 0.55f, capR)), top - up * 0.15f));
+            gillsBy[ci].Add(new Transform3D(lean.ScaleLocal(new Vector3(capR * 0.95f, 0.06f, capR * 0.95f)), top - up * 0.18f));
+            solid?.Invoke(new CylinderShape3D { Radius = stemR * 1.05f, Height = h }, new Transform3D(lean, p + up * h * 0.5f), p, 1.2f);
+            // cogumelos menores em volta da base
+            int small = rng.Next(2, 5);
+            for (int i = 0; i < small; i++)
+            {
+                float a = (float)rng.NextDouble() * Mathf.Tau, d = 1.2f + (float)rng.NextDouble() * 1.6f;
+                var q = new Vector3(p.X + Mathf.Cos(a) * d, 0, p.Z + Mathf.Sin(a) * d);
+                q.Y = L.Ground(q.X, q.Z) - 0.05f;
+                float sh = 0.5f + (float)rng.NextDouble() * 1.2f, sr = 0.3f + (float)rng.NextDouble() * 0.4f;
+                stems.Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(0.09f, sh, 0.09f)), q + Vector3.Up * sh * 0.5f));
+                capsBy[rng.Next(capColors.Length)].Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(sr, sr * 0.55f, sr)), q + Vector3.Up * sh));
+            }
+        }
+        AddMulti(root, new CylinderMesh { TopRadius = 0.8f, BottomRadius = 1.2f, Height = 1, RadialSegments = 10, Rings = 2 }, Lit(new Color(0.82f, 0.8f, 0.72f), 0.85f), stems, 1f);
+        for (int k = 0; k < capColors.Length; k++)
+        {
+            // lamelas: escuras, com um brilho fraco da cor do chapéu
+            var gillMat = new StandardMaterial3D
+            {
+                AlbedoColor = capColors[k].Darkened(0.75f), EmissionEnabled = true, Emission = capColors[k], EmissionEnergyMultiplier = 0.18f,
+                Roughness = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            };
+            AddMulti(root, new CylinderMesh { TopRadius = 1, BottomRadius = 1, Height = 1, RadialSegments = 20, Rings = 1 }, gillMat, gillsBy[k], 1f);
+            var capMat = new StandardMaterial3D
+            {
+                AlbedoColor = capColors[k].Darkened(0.35f), EmissionEnabled = true, Emission = capColors[k], EmissionEnergyMultiplier = 0.75f,
+                Roughness = 0.5f, RimEnabled = true, Rim = 0.5f,
+            };
+            AddMulti(root, new SphereMesh { Radius = 1, Height = 1, IsHemisphere = true, RadialSegments = 20, Rings = 6 }, capMat, capsBy[k], 1f);
         }
     }
 

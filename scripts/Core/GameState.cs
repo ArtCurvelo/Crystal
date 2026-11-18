@@ -651,7 +651,7 @@ public partial class GameState : Node
     public void RecordCrystalMined() { Data.CrystalsMined++; Data.DayCrystals++; }
 
     /// <summary>Jornada concluída: todas as regiões liberadas e o Coração Ancestral destruído.</summary>
-    public bool JourneyComplete => GameData.Regions.All(r => IsUnlocked(r.Id)) && Data.Discovered.Contains("heart");
+    public bool JourneyComplete => GameData.Regions.Take(GameData.JourneyRegions).All(r => IsUnlocked(r.Id)) && Data.Discovered.Contains("heart");
 
     public event Action Completed;
     public event Action Prestiged;

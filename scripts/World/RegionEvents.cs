@@ -26,6 +26,8 @@ public partial class RegionEvents : Node
         "caves" => new EventDef { Name = "Eco Luminoso", Description = "Todos os cristais da caverna renascem!", Color = new Color(0.4f, 0.95f, 1f), Duration = 6f },
         "depths" => new EventDef { Name = "Maré Gélida", Description = "O frio fragmenta os cristais: fragmentos x2", Color = new Color(0.75f, 0.92f, 1f), Duration = 22f },
         "abyss" => new EventDef { Name = "Maré Luminosa", Description = "A maré sobe: fragmentos x1,5 e dano +25%", Color = new Color(0.3f, 0.95f, 1f), Duration = 20f },
+        "spore" => new EventDef { Name = "Chuva de Esporos", Description = "Esporos fertilizam a caverna: fragmentos x2 e dano +20%", Color = new Color(0.55f, 1f, 0.35f), Duration = 22f },
+        "cathedral" => new EventDef { Name = "Ressonância da Catedral", Description = "Os cristais vibram juntos: dano x2", Color = new Color(0.9f, 0.8f, 1f), Duration = 16f },
         "core" => new EventDef { Name = "Surto do Núcleo", Description = "Energia do núcleo: dano +50%", Color = new Color(1f, 0.45f, 0.2f), Duration = 18f },
         _ => null,
     };
@@ -95,6 +97,15 @@ public partial class RegionEvents : Node
                 gs.EventShardMultiplier = 1.5f;
                 gs.EventDamageMultiplier = 1.25f;
                 Env.OverlayFog = new Color(0.1f, 0.4f, 0.5f); Env.OverlayFogDensity = 0.035f; Env.OverlayAmbient = new Color(0.4f, 0.9f, 1f);
+                break;
+            case "spore":
+                gs.EventShardMultiplier = 2f;
+                gs.EventDamageMultiplier = 1.2f;
+                Env.OverlayFog = new Color(0.15f, 0.35f, 0.1f); Env.OverlayFogDensity = 0.04f; Env.OverlayAmbient = new Color(0.6f, 1f, 0.45f);
+                break;
+            case "cathedral":
+                gs.EventDamageMultiplier = 2f;
+                Env.OverlayFog = new Color(0.3f, 0.25f, 0.45f); Env.OverlayFogDensity = 0.02f; Env.OverlayAmbient = new Color(0.95f, 0.85f, 1f);
                 break;
             case "core":
                 gs.EventDamageMultiplier = 1.5f;

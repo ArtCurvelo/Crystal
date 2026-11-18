@@ -435,6 +435,10 @@ public partial class AudioManager : Node
             1 => new[] { new[] { 155.6f, 185f, 233.1f }, new[] { 138.6f, 174.6f, 207.7f }, new[] { 146.8f, 185f, 220f }, new[] { 130.8f, 164.8f, 196f } },
             2 => new[] { new[] { 110f, 130.8f, 164.8f }, new[] { 116.5f, 146.8f, 174.6f }, new[] { 103.8f, 130.8f, 155.6f }, new[] { 110f, 138.6f, 164.8f } },
             3 => new[] { new[] { 293.7f, 370f, 440f }, new[] { 246.9f, 311.1f, 370f }, new[] { 277.2f, 349.2f, 415.3f }, new[] { 220f, 277.2f, 329.6f } },
+            // Jardim Fúngico: modal, misterioso (Ré dórico)
+            4 => new[] { new[] { 146.8f, 220f, 261.6f }, new[] { 164.8f, 196f, 246.9f }, new[] { 130.8f, 196f, 246.9f }, new[] { 146.8f, 174.6f, 220f } },
+            // Catedral de Cristal: acordes abertos e agudos, como um órgão de vidro
+            5 => new[] { new[] { 261.6f, 392f, 523.3f }, new[] { 220f, 329.6f, 440f }, new[] { 233.1f, 349.2f, 466.2f }, new[] { 196f, 293.7f, 392f } },
             _ => new[] { new[] { 261.6f, 329.6f, 392f }, new[] { 220f, 261.6f, 329.6f }, new[] { 174.6f, 220f, 261.6f }, new[] { 196f, 246.9f, 293.7f } },
         };
         float chordLen = 4f;

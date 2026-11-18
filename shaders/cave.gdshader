@@ -9,6 +9,7 @@ uniform vec3 rock_color : source_color = vec3(0.36, 0.3, 0.32);
 uniform vec3 floor_color : source_color = vec3(0.28, 0.24, 0.22);
 uniform vec3 accent : source_color = vec3(0.35, 0.9, 1.0);
 uniform float speckle = 1.0;
+uniform float wetness = 1.0;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D cell_tex : filter_linear_mipmap, repeat_enable;
 
@@ -53,9 +54,13 @@ void fragment() {
 	float crack = 1.0 - smoothstep(0.015, 0.06, cells);
 	col *= 1.0 - crack * 0.6;
 	col *= 0.88 + 0.24 * fine;
+	// poças e rocha molhada no chão: escurece e fica lisa (reflete com o SSR)
+	float wet = smoothstep(0.62, 0.7, tri(noise_tex, p * 0.6 + vec3(13.0), w, 0.05)) * up * wetness;
+	float film = smoothstep(0.45, 0.6, big) * up * wetness * 0.6;
+	col = mix(col, col * 0.55, max(wet, film * 0.5));
 	ALBEDO = col;
-	ROUGHNESS = mix(0.95, 0.7, smoothstep(0.65, 0.9, fine));
-	SPECULAR = 0.35;
+	ROUGHNESS = mix(mix(0.95, 0.7, smoothstep(0.65, 0.9, fine)), 0.06, max(wet, film * 0.6));
+	SPECULAR = mix(0.35, 0.6, wet);
 
 	// minerais: pontinhos raros e veios finos só em algumas manchas
 	float sp = smoothstep(0.86, 0.9, tri(noise_tex, p, w, 1.17)) * (1.0 - up * 0.8);

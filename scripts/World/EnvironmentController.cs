@@ -66,6 +66,12 @@ public partial class EnvironmentController : WorldEnvironment
         e.SsaoEnabled = adv && q != GraphicsQuality.Low;
         e.SsaoRadius = 1.6f;
         e.SsaoIntensity = 2.2f;
+        // reflexos em tempo real (água, poças e rocha molhada)
+        e.SsrEnabled = adv && q != GraphicsQuality.Low;
+        e.SsrMaxSteps = q == GraphicsQuality.High ? 96 : 48;
+        e.SsrFadeIn = 0.15f;
+        e.SsrFadeOut = 2.0f;
+        e.SsrDepthTolerance = 0.3f;
         e.SsilEnabled = adv && q == GraphicsQuality.High;
         e.SsilIntensity = 1.2f;
     }

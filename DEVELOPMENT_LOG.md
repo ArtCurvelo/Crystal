@@ -345,3 +345,15 @@ Pedido do diretor: construções (esteira, drone, poste de luz). Durante o traba
 - Renascimento remove as construções (o drone fica). Textos em PT/EN/ES; ajuda e rodapé mostram a tecla B.
 - **Painel de admin** (F9 / Back no controle): botões para dinheiro, liberar tudo, melhorias/habilidades/casa no máximo, encher mochila, teleporte (regiões, Coração, goblin), achar goblins, rebelião, hora/fim do dia/novo dia, evento, velocidade do tempo, drone, curar, renascimento pronto; e campo de comando (`ajuda` lista tudo). Altera o save atual.
 - Testes: integração das construções (regras de posição, custos, esteira na região 1 e do Núcleo até o acampamento, venda automática, funil puxando fragmentos, save com itens na esteira, desmontar, drone buscando fragmentos, renascimento). Bot: abre/fecha o modo construção pelos botões, constrói funil e drone, usa o funil; testa o painel de admin pelo atalho.
+
+## v0.8.0 — duas regiões novas (fim de jogo)
+Pedido do diretor: mais regiões (o mapa cresce a cada atualização).
+- **Jardim Fúngico** (região 5, ◈ 8 mi): cogumelos gigantes bioluminescentes (caule com colisão, chapéus verde/magenta/ciano, lamelas), esporos flutuando, cachoeiras. Minérios: Esporita, Jade Vivo, Âmbar Fóssil, Pedra da Lua e a lendária **Semente Primordial**. Câmaras: Bosque de Esporos e Caverna de Âmbar. Goblin **Musgo** (◈ 1,2 mi). Evento **Chuva de Esporos** (fragmentos x2, dano +20%). Música própria.
+- **Catedral de Cristal** (região 6, ◈ 40 mi): formações de cristal colossais (até ~60 m) com colisão, poeira de cristal. Minérios: Quartzo Fumê, Tanzanita, Alexandrita, Diamante Bruto e o lendário **Diamante Eterno**. Câmaras: Nave dos Prismas e Cripta dos Diamantes. Goblin **Zirko** (◈ 6 mi). Evento **Ressonância da Catedral** (dano x2). Música própria.
+- A jornada principal continua sendo as 4 primeiras regiões + Coração (conclusão e Renascimento não mudam); as novas são conteúdo de fim de jogo.
+- O Reservatório agora tem saída para a região seguinte (o mapa dele mudou um pouco). Construções salvas que ficarem em lugar inválido são removidas com reembolso total.
+- Painel de admin: "Ir: Jardim Fúngico" / "Ir: Catedral" (`ir 5`, `ir 6`).
+- Testes 515 (os testes de caverna, mira, câmaras secretas e goblins cobrem as regiões novas). Capturas das duas regiões conferidas.
+- **Reflexos e água** (pedido do diretor): reflexos em tempo real (SSR) nas qualidades Média/Alta; chão das cavernas com poças e manchas molhadas que refletem; água nova (refração do fundo, cor pela profundidade, fresnel, ondulações, cáusticas, espuma nas bordas) no lago do Reservatório, nas poças das cachoeiras e das Profundezas.
+- Bot: fica na jornada principal (as regiões de fim de jogo têm teste próprio de balanceamento); não acusa erro quando o turno acaba no meio das compras.
+- Testes 549/549.

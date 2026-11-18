@@ -15,7 +15,7 @@ public partial class DebugScreen : ModalScreen
         ("+◈ 100 mil", "dinheiro 100000"), ("+◈ 10 mi", "dinheiro 10000000"), ("Liberar tudo", "tudo"), ("Regiões", "regioes"),
         ("Melhorias máx.", "melhorias"), ("Habilidades", "habilidades"), ("Casa máx.", "casa"), ("Encher mochila", "mochila"),
         ("Ir: Cavernas", "ir 1"), ("Ir: Profundezas", "ir 2"), ("Ir: Núcleo", "ir 3"), ("Ir: Reservatório", "ir 4"),
-        ("Ir: Coração", "ir coracao"), ("Ir: goblin", "ir goblin"), ("Achar goblins", "goblins"), ("Rebelião", "rebeliao"),
+        ("Ir: Jardim Fúngico", "ir 5"), ("Ir: Catedral", "ir 6"), ("Ir: Coração", "ir coracao"), ("Ir: goblin", "ir goblin"), ("Achar goblins", "goblins"), ("Rebelião", "rebeliao"),
         ("Hora 17h", "hora 17"), ("Fim do dia", "fimdia"), ("Novo dia", "novodia"), ("Evento", "evento"),
         ("Tempo x1", "velocidade 1"), ("Tempo x5", "velocidade 5"), ("Drone", "drone"), ("Curar", "curar"),
         ("Renascer pronto", "renascer"),

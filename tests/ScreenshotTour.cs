@@ -42,6 +42,30 @@ public partial class ScreenshotTour : Node
         p.SimulateCapturedMouse = true;
         await Wait(1.2f);
         await Shot("02_spawn");
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-regions"))
+        {
+            await NewRegionsTour(p, gs);
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-water"))
+        {
+            foreach (var r in GameData.Regions) if (!gs.IsUnlocked(r.Id)) gs.Data.UnlockedRegions.Add(r.Id);
+            int k = 0;
+            foreach (var w in World.WorldBuilder.WaterSpots.Where((_, i) => i % 3 == 0).Take(8))
+            {
+                var L = Main.World.LayoutAt(w);
+                var from = w + new Vector3(4f, 0, 4f);
+                if (L.InGrid(from.X, from.Z)) from.Y = L.Ground(from.X, from.Z) + 0.1f;
+                LookAtPoint(p, from, w + Vector3.Up * 0.3f);
+                await Wait(1.0f);
+                await Shot($"23_water_{k++}");
+            }
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-build"))
         {
             // só a parte das construções (iteração rápida)
@@ -370,6 +394,40 @@ public partial class ScreenshotTour : Node
         await Shot("19_admin");
         Input.ParseInputEvent(new InputEventAction { Action = "debug_panel", Pressed = true });
         await Wait(0.3f);
+    }
+
+    /// <summary>Regiões de fim de jogo: vistas do caminho, das câmaras com minério em destaque e do goblin.</summary>
+    async Task NewRegionsTour(Player.PlayerController p, GameState gs)
+    {
+        foreach (var r in GameData.Regions) if (!gs.IsUnlocked(r.Id)) gs.Data.UnlockedRegions.Add(r.Id);
+        gs.Data.DayTimeSeconds = 30;
+        for (int ri = GameData.JourneyRegions; ri < GameData.Regions.Count; ri++)
+        {
+            var L = Main.World.Layouts[ri];
+            string id = GameData.Regions[ri].Id;
+            foreach (var t in new[] { 0.2f, 0.45f, 0.75f })
+            {
+                LookAtPoint(p, PathAt(ri, t) + Vector3.Up * 0.1f, PathAt(ri, t + 0.08f) + Vector3.Up * 2.5f);
+                await Wait(1.0f);
+                await Shot($"20_{id}_{t * 100:0}");
+            }
+            foreach (var c in L.Chambers)
+            {
+                if (c.Wing == null) continue;
+                var from = L.OnGround(c.A.X + (c.B.X - c.A.X) * 0.1f, c.A.Y);
+                var toward = L.Inward(from.X, from.Z);
+                LookAtPoint(p, from + Vector3.Up * 0.1f - toward * 2f, from + toward * 8f + Vector3.Up * 2f);
+                await Wait(0.8f);
+                await Shot($"21_{id}_{c.Wing.Id}");
+            }
+            var camp = Main.World.GoblinCamps.FirstOrDefault(gc => gc.RegionIndex == ri);
+            if (camp != null)
+            {
+                LookAtPoint(p, camp.HideoutPos + new Vector3(3f, 0.1f, 0), camp.HideoutPos + Vector3.Up * 0.8f);
+                await Wait(0.8f);
+                await Shot($"22_{id}_goblin");
+            }
+        }
     }
 
     static string DrawStats()

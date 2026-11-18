@@ -41,7 +41,25 @@ public partial class BuildingManager : Node3D
         foreach (var b in _belts.Values) b.QueueFree();
         _belts.Clear();
         var gs = GameState.Instance;
-        foreach (var b in gs.Data.Buildings.ToList()) Spawn(b);
+        long refund = 0;
+        foreach (var b in gs.Data.Buildings.ToList())
+        {
+            // o mapa pode mudar entre versões: construção que ficou dentro da rocha é devolvida
+            if (!World.IsSafeSpot(new Vector3(b.X, b.Y, b.Z)))
+            {
+                foreach (var kv in b.Queue)
+                    if (GameData.Mat(kv.Key) is { } m) gs.SellFromBelt(m, kv.Value);
+                gs.Data.Buildings.Remove(b);
+                refund += b.Paid;
+                continue;
+            }
+            Spawn(b);
+        }
+        if (refund > 0)
+        {
+            gs.AddMoney(refund);
+            gs.Notify("Construções devolvidas", Loc.F("O mapa mudou nesta versão; o valor foi devolvido: {0}", GameState.FormatMoney(refund)), NotifyKind.Info);
+        }
         SyncDrone();
     }
 

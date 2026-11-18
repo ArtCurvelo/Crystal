@@ -17,7 +17,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - Ao retomar num container novo: clonar o repositório e reinstalar as ferramentas (ver "Comandos").
 
 ## Conteúdo do jogo
-- **4 regiões** em sequência no eixo −Z: Cavernas Luminosas (z≈0), Profundezas Prismáticas (z≈−58, ◈ 6.000), Núcleo Ancestral (z≈−124, ◈ 400.000) e Reservatório Abissal (bônus, z≈−194, ◈ 1,5 mi).
+- **6 regiões** em sequência no eixo −Z: Cavernas Luminosas (z≈0), Profundezas Prismáticas (◈ 6.000), Núcleo Ancestral (◈ 400 mil), Reservatório Abissal (◈ 1,5 mi), Jardim Fúngico (◈ 8 mi) e Catedral de Cristal (◈ 40 mi). Jornada principal = 4 primeiras + Coração (`GameData.JourneyRegions`); as outras são fim de jogo.
 - **13 materiais** com raridade (Comum → Lendário), incluindo a formação especial Coração Ancestral.
 - **7 upgrades**: Potência do Feixe, Ritmo de Extração, Mochila Reforçada, Botas, Lapidação Fina, Ímã de Coleta e Amplificador de Ressonância.
 - **6 ferramentas visuais** conforme o nível de Potência: 0, 3, 7, 12, 18 e 24.

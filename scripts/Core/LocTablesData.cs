@@ -7,6 +7,42 @@ public static partial class LocTables
 {
     static partial void Fill(List<(string pt, string en, string es)> list)
     {
+        list.Add(("Esporita", "Sporite", "Esporita"));
+        list.Add(("Cristal poroso que solta esporos luminosos a cada golpe.", "A porous crystal that releases glowing spores with every hit.", "Cristal poroso que suelta esporas luminosas con cada golpe."));
+        list.Add(("Jade Vivo", "Living Jade", "Jade Vivo"));
+        list.Add(("Verde profundo e frio; dizem que cresce devagar, como uma planta.", "Deep, cold green; they say it grows slowly, like a plant.", "Verde profundo y frío; dicen que crece despacio, como una planta."));
+        list.Add(("Âmbar Fóssil", "Fossil Amber", "Ámbar Fósil"));
+        list.Add(("Resina de florestas extintas, com insetos presos há milhões de anos.", "Resin from extinct forests, with insects trapped for millions of years.", "Resina de bosques extintos, con insectos atrapados hace millones de años."));
+        list.Add(("Pedra da Lua", "Moonstone", "Piedra Lunar"));
+        list.Add(("Brilho azulado que flutua dentro da pedra, como luar na água.", "A bluish glow that floats inside the stone, like moonlight on water.", "Un brillo azulado que flota dentro de la piedra, como luz de luna en el agua."));
+        list.Add(("Semente Primordial", "Primordial Seed", "Semilla Primordial"));
+        list.Add(("Um geodo que pulsa como se respirasse. O jardim inteiro nasceu dela.", "A geode that pulses as if it were breathing. The whole garden grew from it.", "Una geoda que late como si respirara. Todo el jardín nació de ella."));
+        list.Add(("Quartzo Fumê", "Smoky Quartz", "Cuarzo Ahumado"));
+        list.Add(("Quartzo escuro como fumaça, que acende por dentro quando atingido.", "Quartz as dark as smoke that lights up inside when struck.", "Cuarzo oscuro como el humo que se enciende por dentro al ser golpeado."));
+        list.Add(("Tanzanita", "Tanzanite", "Tanzanita"));
+        list.Add(("Lâminas violeta-azuladas que mudam de tom conforme o ângulo.", "Violet-blue blades that change hue with the angle.", "Láminas azul violeta que cambian de tono según el ángulo."));
+        list.Add(("Alexandrita", "Alexandrite", "Alejandrita"));
+        list.Add(("Verde sob a luz fria, vermelha sob a luz quente. Raríssima.", "Green under cold light, red under warm light. Extremely rare.", "Verde bajo la luz fría, roja bajo la luz cálida. Rarísima."));
+        list.Add(("Diamante Bruto", "Rough Diamond", "Diamante en Bruto"));
+        list.Add(("O material mais duro das cavernas. Só um feixe muito forte o corta.", "The hardest material in the caves. Only a very strong beam can cut it.", "El material más duro de las cuevas. Solo un haz muy fuerte lo corta."));
+        list.Add(("Diamante Eterno", "Eternal Diamond", "Diamante Eterno"));
+        list.Add(("Um diamante que nunca perde o brilho, nem no escuro absoluto.", "A diamond that never loses its shine, not even in absolute darkness.", "Un diamante que nunca pierde el brillo, ni en la oscuridad absoluta."));
+        list.Add(("Jardim Fúngico", "Fungal Garden", "Jardín Fúngico"));
+        list.Add(("Cogumelos gigantes e esporos que brilham no escuro.", "Giant mushrooms and spores that glow in the dark.", "Hongos gigantes y esporas que brillan en la oscuridad."));
+        list.Add(("Bosque de Esporos", "Spore Grove", "Bosque de Esporas"));
+        list.Add(("Caverna de Âmbar", "Amber Cave", "Cueva de Ámbar"));
+        list.Add(("Catedral de Cristal", "Crystal Cathedral", "Catedral de Cristal"));
+        list.Add(("Formações colossais e os minérios mais duros do mundo.", "Colossal formations and the hardest ores in the world.", "Formaciones colosales y los minerales más duros del mundo."));
+        list.Add(("Nave dos Prismas", "Prism Nave", "Nave de los Prismas"));
+        list.Add(("Cripta dos Diamantes", "Diamond Crypt", "Cripta de los Diamantes"));
+        list.Add(("o goblin dos cogumelos", "the mushroom goblin", "el goblin de los hongos"));
+        list.Add(("o goblin lapidador", "the gem-cutter goblin", "el goblin tallador"));
+        list.Add(("Chuva de Esporos", "Spore Rain", "Lluvia de Esporas"));
+        list.Add(("Esporos fertilizam a caverna: fragmentos x2 e dano +20%", "Spores fertilize the cave: shards x2 and damage +20%", "Las esporas fertilizan la cueva: fragmentos x2 y daño +20%"));
+        list.Add(("Ressonância da Catedral", "Cathedral Resonance", "Resonancia de la Catedral"));
+        list.Add(("Os cristais vibram juntos: dano x2", "The crystals vibrate together: damage x2", "Los cristales vibran juntos: daño x2"));
+        list.Add(("Construções devolvidas", "Buildings refunded", "Construcciones devueltas"));
+        list.Add(("O mapa mudou nesta versão; o valor foi devolvido: {0}", "The map changed in this version; the cost was refunded: {0}", "El mapa cambió en esta versión; se devolvió el valor: {0}"));
         list.Add(("Modo construção", "Build mode", "Modo construcción"));
         list.Add(("MODO CONSTRUÇÃO", "BUILD MODE", "MODO CONSTRUCCIÓN"));
         list.Add(("Construção anterior", "Previous building", "Construcción anterior"));
