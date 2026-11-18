@@ -96,7 +96,7 @@ public partial class BuildingManager : Node3D
             var route = RouteToSell(pos);
             if (route != null)
             {
-                var belt = new Belt { BuildingId = b.Id, Accent = new Color(0.3f, 1f, 0.8f) };
+                var belt = new Belt { BuildingId = b.Id, Accent = new Color(0.3f, 1f, 0.8f), GroundAt = World.GroundAt };
                 AddChild(belt);
                 belt.Build(route);
                 _belts[b.Id] = belt;
@@ -187,17 +187,17 @@ public partial class BuildingManager : Node3D
             var L = World.Layouts[r];
             if (!L.InGrid(cur.X, cur.Z)) return null;
             Vector3 goal = r == 0 ? SellIntake : L.Entrance;
-            var path = L.FindPath(cur, goal, 120000);
+            var occupied = Occupied(L, cur, goal);
+            var path = L.FindClearPath(cur, goal, id => occupied.Contains(id));
             if (path == null) return null;
-            pts.Add(L.OnGround(cur.X, cur.Z));
-            pts.AddRange(path);
+            pts.AddRange(Straighten(L, path, occupied));
             if (r > 0)
             {
                 var prev = World.Layouts[r - 1];
                 // túnel reto entre a entrada desta região e a saída da anterior (chão em y = 0)
                 pts.Add(new Vector3(0, L.Ground(0, L.Entrance.Z), L.Entrance.Z));
-                pts.Add(new Vector3(0, 0, L.Z0 - 0.5f));
-                pts.Add(new Vector3(0, 0, prev.Z0 + prev.Nz - 0.5f));
+                pts.Add(new Vector3(0, 0, L.Z0 + L.Nz - 0.5f));
+                pts.Add(new Vector3(0, 0, prev.Z0 + 0.5f));
                 cur = prev.Exit;
                 pts.Add(prev.OnGround(cur.X, cur.Z));
             }
@@ -206,6 +206,75 @@ public partial class BuildingManager : Node3D
         pts.Add(new Vector3(SellIntake.X, World.Layouts[0].Ground(SellIntake.X, SellIntake.Z), SellIntake.Z));
         pts.Add(station + World.SellStation.GlobalBasis.X * 1.25f);
         return Simplify(pts);
+    }
+
+    /// <summary>Células ocupadas para a esteira: depósitos, construções, estações e acampamentos (menos perto das pontas).</summary>
+    HashSet<int> Occupied(CaveLayout L, Vector3 start, Vector3 goal)
+    {
+        var set = new HashSet<int>();
+        void Mark(Vector3 p, float rad)
+        {
+            if (!L.InGrid(p.X, p.Z)) return;
+            int r = Mathf.CeilToInt(rad);
+            int ci = Mathf.RoundToInt(p.X - L.X0), cj = Mathf.RoundToInt(p.Z - L.Z0);
+            for (int j = cj - r; j <= cj + r; j++)
+                for (int i = ci - r; i <= ci + r; i++)
+                {
+                    if (i < 0 || j < 0 || i >= L.Nx || j >= L.Nz) continue;
+                    var c = new Vector3(L.X0 + i, 0, L.Z0 + j);
+                    if (new Vector2(c.X - p.X, c.Z - p.Z).Length() > rad) continue;
+                    if (new Vector2(c.X - start.X, c.Z - start.Z).Length() < 1.6f || new Vector2(c.X - goal.X, c.Z - goal.Z).Length() < 1.6f) continue;
+                    set.Add(L.Idx(i, j));
+                }
+        }
+        foreach (var c in World.Crystals) Mark(c.GlobalPosition, c.Material.Special ? c.Material.SpecialScale * 0.6f + 1f : 1.3f);
+        foreach (var n in _nodes.Values) Mark(PosOf(n), 1.6f);
+        foreach (var st in new Node3D[] { World.SellStation, World.Elevator }) if (st != null) Mark(st.GlobalPosition, 2.2f);
+        foreach (var camp in World.GoblinCamps) { Mark(camp.HutPos, 2.6f); Mark(camp.ChestPos, 1.4f); }
+        if (L.Blocked != null)
+            for (int id = 0; id < L.Blocked.Length; id++)
+                if (L.Blocked[id])
+                {
+                    // obstáculo do cenário: folga extra em volta
+                    int i = id % L.Nx, j = id / L.Nx;
+                    for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++)
+                    {
+                        int ni = i + di, nj = j + dj;
+                        if (ni >= 0 && nj >= 0 && ni < L.Nx && nj < L.Nz) set.Add(L.Idx(ni, nj));
+                    }
+                }
+        return set;
+    }
+
+    /// <summary>Junta pontos em retas só quando a reta inteira está livre (sem cortar quinas, obstáculos ou relevo).</summary>
+    static List<Vector3> Straighten(CaveLayout L, List<Vector3> path, HashSet<int> occupied)
+    {
+        bool Clear(Vector3 a, Vector3 b)
+        {
+            float len = a.DistanceTo(b);
+            for (float t = 0; t <= len; t += 0.25f)
+            {
+                var q = a.Lerp(b, len < 0.01f ? 0 : t / len);
+                if (L.WallDist(q.X, q.Z) > -0.9f) return false;
+                int ci = Mathf.RoundToInt(q.X - L.X0), cj = Mathf.RoundToInt(q.Z - L.Z0);
+                if (ci < 0 || cj < 0 || ci >= L.Nx || cj >= L.Nz) return false;
+                int id = L.Idx(ci, cj);
+                if (!L.Reach[id] || occupied.Contains(id)) return false;
+                if (Mathf.Abs(L.Ground(q.X, q.Z) - q.Y) > 0.3f) return false; // a reta não pode entrar no chão nem flutuar
+            }
+            return true;
+        }
+        var outp = new List<Vector3> { path[0] };
+        int i0 = 0;
+        while (i0 < path.Count - 1)
+        {
+            int best = i0 + 1;
+            for (int j = Mathf.Min(path.Count - 1, i0 + 24); j > i0 + 1; j--)
+                if (Clear(path[i0], path[j])) { best = j; break; }
+            outp.Add(path[best]);
+            i0 = best;
+        }
+        return outp;
     }
 
     /// <summary>Ponto ao lado da Estação de Venda onde a esteira chega.</summary>
@@ -803,8 +872,30 @@ public partial class Belt : Node3D
 
     static Shader _beltShader, _itemShader;
 
+    /// <summary>Altura do chão (para a esteira acompanhar o relevo entre os pontos).</summary>
+    public System.Func<float, float, float> GroundAt;
+
     public void Build(List<Vector3> pts)
     {
+        // acompanha o relevo: um ponto a cada 0,5 m na altura do chão
+        if (GroundAt != null && pts.Count >= 2)
+        {
+            var dense = new List<Vector3> { pts[0] };
+            for (int i = 1; i < pts.Count; i++)
+            {
+                var a = pts[i - 1]; var b = pts[i];
+                float len = new Vector2(b.X - a.X, b.Z - a.Z).Length();
+                int n = Mathf.Max(1, Mathf.CeilToInt(len / 0.5f));
+                for (int k = 1; k <= n; k++)
+                {
+                    var q = a.Lerp(b, k / (float)n);
+                    bool last = i == pts.Count - 1 && k == n;
+                    if (!last) q.Y = GroundAt(q.X, q.Z);
+                    dense.Add(q);
+                }
+            }
+            pts = dense;
+        }
         _pts = pts;
         _cum = new float[pts.Count];
         for (int i = 1; i < pts.Count; i++) _cum[i] = _cum[i - 1] + pts[i - 1].DistanceTo(pts[i]);

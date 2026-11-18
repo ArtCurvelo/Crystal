@@ -801,6 +801,60 @@ public sealed class CaveLayout
         return path;
     }
 
+    /// <summary>
+    /// Caminho para a esteira: só por células alcançáveis, longe das paredes (folga), sem obstáculos
+    /// (blocked: células extras ocupadas, ex.: depósitos e construções), com degraus suaves.
+    /// Devolve um ponto por célula (o chamador simplifica com linha de visão).
+    /// </summary>
+    public List<Vector3> FindClearPath(Vector3 from, Vector3 to, System.Func<int, bool> blocked, float clearance = 1.1f, int maxExpand = 150000)
+    {
+        int s0 = NearestReach(from.X, from.Z), g0 = NearestReach(to.X, to.Z);
+        if (s0 < 0 || g0 < 0) return null;
+        bool Free(int id) => Reach[id] && (blocked == null || !blocked(id));
+        var open = new PriorityQueue<int, float>();
+        var came = new Dictionary<int, int>();
+        var cost = new Dictionary<int, float> { [s0] = 0 };
+        int gi = g0 % Nx, gj = g0 / Nx;
+        open.Enqueue(s0, 0);
+        int[] di = { 1, -1, 0, 0, 1, 1, -1, -1 }, dj = { 0, 0, 1, -1, 1, -1, 1, -1 };
+        int expanded = 0;
+        while (open.Count > 0 && expanded++ < maxExpand)
+        {
+            int cur = open.Dequeue();
+            if (cur == g0) break;
+            int ci = cur % Nx, cj = cur / Nx;
+            for (int k = 0; k < 8; k++)
+            {
+                int ni = ci + di[k], nj = cj + dj[k];
+                if (ni < 1 || nj < 1 || ni >= Nx - 1 || nj >= Nz - 1) continue;
+                int nid = Idx(ni, nj);
+                bool nearEnd = nid == g0 || cur == s0;
+                if (!Free(nid) && !nearEnd) continue;
+                if (Mathf.Abs(F[nid] - F[cur]) > 0.5f) continue;              // esteira não sobe degrau
+                if (C[nid] - F[nid] < 2.2f) continue;
+                // folga da parede (perto do começo/fim pode encostar)
+                float d = D[nid];
+                if (d > -clearance && !nearEnd && cost[cur] > 3f) continue;
+                if (k >= 4 && (!Free(Idx(ci + di[k], cj)) || !Free(Idx(ci, cj + dj[k])))) continue;
+                float step = (k < 4 ? 1f : 1.414f) + Mathf.Max(0f, d + 2.5f) * 0.8f; // prefere o meio da passagem
+                float nc = cost[cur] + step;
+                if (cost.TryGetValue(nid, out float old) && old <= nc) continue;
+                cost[nid] = nc;
+                came[nid] = cur;
+                float h = Mathf.Sqrt((ni - gi) * (ni - gi) + (nj - gj) * (nj - gj));
+                open.Enqueue(nid, nc + h);
+            }
+        }
+        if (!came.ContainsKey(g0) && g0 != s0) return null;
+        var cells = new List<int>();
+        for (int c = g0; c != s0; c = came[c]) cells.Add(c);
+        cells.Add(s0);
+        cells.Reverse();
+        var path = new List<Vector3>();
+        foreach (int c in cells) path.Add(new Vector3(X0 + c % Nx, F[c], Z0 + c / Nx));
+        return path;
+    }
+
     public int NearestReach(float x, float z)
     {
         int ci = Mathf.Clamp(Mathf.RoundToInt(x - X0), 0, Nx - 1), cj = Mathf.Clamp(Mathf.RoundToInt(z - Z0), 0, Nz - 1);

@@ -388,3 +388,9 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - **Loja (urgente, relato do diretor)**: comprar uma melhoria fazia a tela rolar até a área das regiões (com mouse e controle). Causa: a lista era recriada e os cartões antigos só sumiam no fim do quadro; o foco ia para o cartão novo, ainda posicionado embaixo de tudo, e a rolagem seguia. Agora os cartões antigos saem na hora, a rolagem é preservada e, no mouse, o foco não é puxado. Teste reproduz o bug no código antigo (rolagem 152 → 958) e passa com a correção.
 - **Corda (relato do diretor)**: as mãos estavam presas à câmera (olhando para cima, a "corda" ia para o céu) e a escalada era automática. Agora as mãos ficam presas na corda de verdade, no mundo; o jogador controla com W/S ou analógico (sem apertar fica pendurado), pula para soltar, vira de frente para a corda ao começar, e a dica aparece na tela.
 - Testes 637/637.
+
+## Esteira sem atravessar paredes (pós v0.9.0)
+- Rota da esteira refeita: A* com folga das paredes (`CaveLayout.FindClearPath`), desviando de depósitos, construções, estações, acampamentos e decoração bloqueante; trechos retos só onde a linha inteira é livre.
+- A esteira acompanha o relevo (pontos a cada 0,5 m na altura do chão).
+- Bug grave corrigido: a ligação entre regiões usava o fundo da região atual e o topo da anterior (invertido), e a esteira cruzava a região inteira em linha reta por dentro da rocha.
+- Teste novo `RouteIsClean` (região 1 e Núcleo → acampamento): sem parede, obstáculo, depósito ou desnível. 641/641 testes.

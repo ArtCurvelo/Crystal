@@ -1381,6 +1381,33 @@ public partial class TestRunner : Node
         return false;
     }
 
+    /// <summary>A esteira não pode atravessar parede, obstáculo do cenário nem depósito, nem entrar no chão.</summary>
+    void RouteIsClean(WorldBuilder world, List<Vector3> route, string name)
+    {
+        int walls = 0, blocked = 0, crystals = 0, ground = 0;
+        float total = BuildingManager.PathLength(route);
+        float acc = 0;
+        for (int i = 1; i < route.Count; i++)
+        {
+            var a = route[i - 1]; var b = route[i];
+            float len = a.DistanceTo(b);
+            for (float t = 0; t < len; t += 0.25f, acc += 0.25f)
+            {
+                if (acc < 2.5f || acc > total - 3.5f) continue; // pontas: funil e estação
+                var q = a.Lerp(b, t / Mathf.Max(len, 0.001f));
+                var L = world.LayoutAt(q);
+                if (!L.InGrid(q.X, q.Z)) continue; // túnel entre regiões
+                if (L.WallDist(q.X, q.Z) > -0.5f) walls++;
+                int id = L.Idx(Mathf.RoundToInt(q.X - L.X0), Mathf.RoundToInt(q.Z - L.Z0));
+                if (L.Blocked != null && L.Blocked[id]) blocked++;
+                if (world.Crystals.Any(c => !c.Material.Special && new Vector2(c.GlobalPosition.X - q.X, c.GlobalPosition.Z - q.Z).Length() < 0.8f)) crystals++;
+                if (Mathf.Abs(L.Ground(q.X, q.Z) - q.Y) > 0.6f) ground++;
+            }
+        }
+        Check(walls == 0 && blocked == 0 && crystals == 0, $"esteira ({name}) não atravessa parede/obstáculo/depósito (parede {walls}, obstáculo {blocked}, depósito {crystals})");
+        Check(ground == 0, $"esteira ({name}) acompanha o chão ({ground} pontos fora)");
+    }
+
     async Task TestBuildings()
     {
         Fresh();
@@ -1425,6 +1452,7 @@ public partial class TestRunner : Node
         float len = BuildingManager.PathLength(route);
         Check(route[^1].DistanceTo(world.SellStation.GlobalPosition) < 3f && len >= hp.DistanceTo(world.SellStation.GlobalPosition) * 0.9f,
             $"esteira termina na Estação de Venda ({len:0} m)");
+        RouteIsClean(world, route, "região 1");
         before = GS.Data.Money;
         var hop = bm.Place(BuildIds.Hopper, hp, 0, route);
         await Frames(2);
@@ -1473,6 +1501,7 @@ public partial class TestRunner : Node
         Check(deepRoute != null && deepRoute[^1].DistanceTo(world.SellStation.GlobalPosition) < 3f, "esteira do Núcleo chega à Estação de Venda passando pelas outras regiões");
         if (deepRoute != null)
         {
+            RouteIsClean(world, deepRoute, "Núcleo → acampamento");
             bool crosses = deepRoute.Any(p => WorldBuilder.RegionAt(p).Index == 1);
             Check(crosses && BuildingManager.PathLength(deepRoute) > 300f, $"esteira longa atravessa as Profundezas ({BuildingManager.PathLength(deepRoute):0} m)");
         }
