@@ -461,6 +461,70 @@ public sealed class CaveLayout
         return false;
     }
 
+    /// <summary>
+    /// Caminho a pé (A* no grid de 1 m, 8 vizinhos, só células alcançáveis, degraus ≤ 0,85 m,
+    /// teto ≥ 1,3 m). Devolve pontos no chão, ou null se não houver caminho.
+    /// </summary>
+    public List<Vector3> FindPath(Vector3 from, Vector3 to, int maxExpand = 9000)
+    {
+        int s0 = NearestReach(from.X, from.Z), g0 = NearestReach(to.X, to.Z);
+        if (s0 < 0 || g0 < 0) return null;
+        var open = new PriorityQueue<int, float>();
+        var came = new Dictionary<int, int>();
+        var cost = new Dictionary<int, float> { [s0] = 0 };
+        int gi = g0 % Nx, gj = g0 / Nx;
+        open.Enqueue(s0, 0);
+        int[] di = { 1, -1, 0, 0, 1, 1, -1, -1 }, dj = { 0, 0, 1, -1, 1, -1, 1, -1 };
+        int expanded = 0;
+        while (open.Count > 0 && expanded++ < maxExpand)
+        {
+            int cur = open.Dequeue();
+            if (cur == g0) break;
+            int ci = cur % Nx, cj = cur / Nx;
+            for (int k = 0; k < 8; k++)
+            {
+                int ni = ci + di[k], nj = cj + dj[k];
+                if (ni < 0 || nj < 0 || ni >= Nx || nj >= Nz) continue;
+                int nid = Idx(ni, nj);
+                if (!Reach[nid] || Mathf.Abs(F[nid] - F[cur]) > 0.85f || C[nid] - F[nid] < 1.3f) continue;
+                if (k >= 4 && (!Reach[Idx(ci + di[k], cj)] || !Reach[Idx(ci, cj + dj[k])])) continue; // não corta quinas
+                float step = k < 4 ? 1f : 1.414f;
+                step += Mathf.Max(0f, -0.9f - D[nid]) < 0.01f ? 1.5f : 0f; // prefere longe das paredes
+                float nc = cost[cur] + step;
+                if (cost.TryGetValue(nid, out float old) && old <= nc) continue;
+                cost[nid] = nc;
+                came[nid] = cur;
+                float h = Mathf.Sqrt((ni - gi) * (ni - gi) + (nj - gj) * (nj - gj));
+                open.Enqueue(nid, nc + h);
+            }
+        }
+        if (!came.ContainsKey(g0) && g0 != s0) return null;
+        var cells = new List<int>();
+        for (int c = g0; c != s0; c = came[c]) cells.Add(c);
+        cells.Reverse();
+        var path = new List<Vector3>();
+        for (int k = 0; k < cells.Count; k++)
+            if (k % 2 == 1 || k == cells.Count - 1)
+            {
+                int c = cells[k];
+                path.Add(new Vector3(X0 + c % Nx, F[c], Z0 + c / Nx));
+            }
+        return path;
+    }
+
+    public int NearestReach(float x, float z)
+    {
+        int ci = Mathf.Clamp(Mathf.RoundToInt(x - X0), 0, Nx - 1), cj = Mathf.Clamp(Mathf.RoundToInt(z - Z0), 0, Nz - 1);
+        for (int rad = 0; rad < 6; rad++)
+            for (int j = cj - rad; j <= cj + rad; j++)
+                for (int i = ci - rad; i <= ci + rad; i++)
+                {
+                    if (i < 0 || j < 0 || i >= Nx || j >= Nz) continue;
+                    if (Reach[Idx(i, j)]) return Idx(i, j);
+                }
+        return -1;
+    }
+
     /// <summary>Fração de células livres alcançáveis (diagnóstico/testes).</summary>
     public float ReachableArea()
     {

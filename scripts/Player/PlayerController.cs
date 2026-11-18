@@ -12,7 +12,29 @@ namespace CrystalExcavator.Player;
 /// </summary>
 public partial class PlayerController : CharacterBody3D
 {
-    public const uint WorldLayer = 1, PlayerLayer = 2, CrystalLayer = 4, InteractLayer = 8;
+    public const uint WorldLayer = 1, PlayerLayer = 2, CrystalLayer = 4, InteractLayer = 8, GoblinLayer = 16;
+
+    // ---------- vida (só importa quando goblins se rebelam) ----------
+    public const float MaxHp = 100f;
+    public float Hp { get; private set; } = MaxHp;
+    float _sinceDamage = 99f;
+    public event Action<float> Damaged;
+    public event Action Fainted;
+
+    public void TakeDamage(float amount, Vector3 from)
+    {
+        if (Hp <= 0 || amount <= 0) return;
+        Hp = Mathf.Max(0, Hp - amount);
+        _sinceDamage = 0;
+        _shakeAmount = Mathf.Min(2f, _shakeAmount + 0.9f);
+        var push = GlobalPosition - from; push.Y = 0;
+        if (push.LengthSquared() > 0.01f) Velocity += push.Normalized() * 4f + Vector3.Up * 2f;
+        AudioManager.Instance?.Play("thud", -2f, 0.7f, 0.1f);
+        Damaged?.Invoke(amount);
+        if (Hp <= 0) Fainted?.Invoke();
+    }
+
+    public void RestoreHp() { Hp = MaxHp; _sinceDamage = 99f; }
 
     public Camera3D Camera { get; private set; }
     public ToolView Tool { get; private set; }
@@ -58,7 +80,7 @@ public partial class PlayerController : CharacterBody3D
     public override void _Ready()
     {
         CollisionLayer = PlayerLayer;
-        CollisionMask = WorldLayer | CrystalLayer | InteractLayer;
+        CollisionMask = WorldLayer | CrystalLayer | InteractLayer | GoblinLayer;
         FloorMaxAngle = Mathf.DegToRad(50);
         _capsule = new CapsuleShape3D { Radius = 0.35f, Height = StandHeight };
         _bodyShape = new CollisionShape3D { Shape = _capsule, Position = new Vector3(0, StandHeight / 2, 0) };
@@ -130,6 +152,10 @@ public partial class PlayerController : CharacterBody3D
                 _head.Rotation = new Vector3(_pitch, 0, 0);
             }
         }
+
+        // regeneração depois de alguns segundos sem levar dano
+        _sinceDamage += dt;
+        if (_sinceDamage > 4f && Hp < MaxHp && Hp > 0) Hp = Mathf.Min(MaxHp, Hp + 6f * dt);
 
         // ---------- Movimento ----------
         var vel = Velocity;
@@ -241,11 +267,19 @@ public partial class PlayerController : CharacterBody3D
 
     void ResolveHit(GameState gs)
     {
-        var hit = RayCast(gs.MiningReach + 0.6f, WorldLayer | CrystalLayer);
+        var hit = RayCast(gs.MiningReach + 0.6f, WorldLayer | CrystalLayer | GoblinLayer);
         if (hit.Count == 0) return;
         var collider = hit["collider"].AsGodotObject();
         var pos = hit["position"].AsVector3();
         var normal = hit["normal"].AsVector3();
+        if (collider is World.GoblinNpc gob && gob.Hostile)
+        {
+            // o feixe atordoa e empurra goblins rebelados
+            gob.TakeHit(GlobalPosition, 1);
+            Effects.Instance?.Hit(pos, normal, new Color(1f, 0.9f, 0.4f));
+            _shakeAmount = Mathf.Min(1.2f, _shakeAmount + 0.4f);
+            return;
+        }
         if (collider is Crystal c && c.IsMineable)
         {
             _sinceLastHit = 0;
@@ -295,6 +329,7 @@ public partial class PlayerController : CharacterBody3D
             c.Hit(dmg, hitPos, (BodyCenter - hitPos).Normalized(), true);
             count++;
         }
+        World.GoblinCamp.Instance?.PulseHit(center, radius, GlobalPosition);
         Effects.Instance?.Shockwave(center + Vector3.Up * 0.3f, radius, origin.Material.Glow);
         AudioManager.Instance?.Play("pulse", -1f);
         _shakeAmount = Mathf.Min(2f, _shakeAmount + 1.4f);
@@ -309,7 +344,7 @@ public partial class PlayerController : CharacterBody3D
         AudioManager.Instance?.SetBeam(firing, TargetCrystal != null ? 1f - TargetCrystal.HpRatio : 0f);
         if (!firing) return;
         float reach = gs.MiningReach + 0.6f;
-        var hit = RayCast(reach, WorldLayer | CrystalLayer);
+        var hit = RayCast(reach, WorldLayer | CrystalLayer | GoblinLayer);
         if (hit.Count > 0)
         {
             Tool.BeamEnd = hit["position"].AsVector3();

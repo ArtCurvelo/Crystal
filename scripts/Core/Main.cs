@@ -127,6 +127,9 @@ public partial class Main : Node
                 }
             });
         AddChild(_backups);
+        _choice = new ChoiceScreen();
+        _choice.Closed += ReturnToGameplay;
+        AddChild(_choice);
         _home = new HomeScreen { OnSleep = () => { _home.CloseSilently(); SleepAtHome(); } };
         _home.Closed += ReturnToGameplay;
         AddChild(_home);
@@ -328,12 +331,21 @@ public partial class Main : Node
 
         _shards.ClearAll();
         Events.ResetAll();
+        World.Goblins?.SyncState();
         if (Player == null)
         {
             Player = new PlayerController { Name = "Player" };
             World.GetParent().AddChild(Player);
             Player.CrystalHit += OnCrystalHit;
             Player.ResonancePulse += n => Hud.ShowPulse(n);
+            Player.Damaged += _ => Hud.FlashDamage();
+            Player.Fainted += OnFainted;
+            if (World.Goblins != null)
+            {
+                World.Goblins.PlayerPos = () => Player.GlobalPosition;
+                World.Goblins.DamagePlayer = (d, from) => { if (CurrentMode == Mode.Playing && !_fading) Player.TakeDamage(d, from); };
+                World.Goblins.PlayerInMine = () => CurrentMode == Mode.Playing && !PlayerInHouse && !_fading;
+            }
             _shards.PlayerPosition = () => Player.BodyCenter;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
@@ -462,11 +474,41 @@ public partial class Main : Node
         UpdateRegionCulling();
     }
 
-    /// <summary>Elevador da mina → casa (encerra o dia).</summary>
+    ChoiceScreen _choice;
+
+    /// <summary>Elevador da mina → casa (encerra o dia). Antes, o goblin cobra a taxa do dia.</summary>
     void GoHome()
     {
         var gs = GameState.Instance;
         if (CurrentMode != Mode.Playing) return;
+        if (gs.GoblinFeeDue)
+        {
+            long fee = gs.GoblinFee;
+            string threat = gs.Data.GoblinStrikes switch
+            {
+                0 => "Ele está de bom humor.",
+                1 => "Ele lembra que você não pagou da última vez.",
+                _ => "Ele está furioso. Se não pagar de novo, pode fugir ou se rebelar!",
+            };
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+            Player.InputEnabled = false;
+            _choice.Ask("GRUB QUER SEU PAGAMENTO",
+                $"Grub, o goblin, minerou {GameState.FormatMoney(gs.Data.GoblinDayValue)} hoje (está no baú do acampamento). A taxa dele é {GameState.FormatMoney(fee)}. {threat}",
+                $"Pagar {GameState.FormatMoney(fee)}", "Não pagar", gs.CanAfford(fee), pay =>
+                {
+                    var r = gs.SettleGoblinFee(pay);
+                    switch (r)
+                    {
+                        case GameState.FeeOutcome.Paid: gs.Notify("Grub", "\"Negócio justo, chefe!\"", NotifyKind.Success); break;
+                        case GameState.FeeOutcome.Forgiven: gs.Notify("Grub", "\"Hmpf. Grub releva... desta vez.\"", NotifyKind.Info); break;
+                        case GameState.FeeOutcome.Warned: gs.Notify("Grub está irritado", "\"Mais uma vez, e Grub não responde por Grub!\"", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Fled: gs.Notify("Grub fugiu!", "Cansado de trabalhar de graça, ele sumiu. Talvez volte em alguns dias.", NotifyKind.Warning); World.Goblins?.SyncState(); break;
+                        case GameState.FeeOutcome.Rebel: gs.Notify("Grub jurou vingança!", "Amanhã ele e os comparsas vão cobrar à força no acampamento. Prepare o feixe!", NotifyKind.Warning); break;
+                    }
+                    GoHome();
+                });
+            return;
+        }
         gs.EndDay(early: true);
         long bonus = gs.PayShiftBonus();
         _shards.ClearAll();
@@ -517,6 +559,23 @@ public partial class Main : Node
         FadeThrough(() => PlaceTo(World.SpawnPoint, 0));
     }
 
+    /// <summary>Desmaio (rebelião goblin): perde parte da mochila e o resto do dia; acorda em casa.</summary>
+    void OnFainted()
+    {
+        var gs = GameState.Instance;
+        int stolen = gs.StealFromInventory(0.25f);
+        World.Goblins?.EndRebellion(false);
+        gs.EndDay(early: true);
+        AudioManager.Instance?.SetBeam(false);
+        FadeThrough(() =>
+        {
+            Player.RestoreHp();
+            PlaceTo(World.House.WakePoint, Mathf.Pi);
+            Hud.ShowBigMessage("VOCÊ DESMAIOU");
+            gs.Notify("Você desmaiou", $"Os goblins levaram {stolen} fragmentos. Você acordou em casa; durma para começar outro dia.", NotifyKind.Warning);
+        });
+    }
+
     public bool PlayerInHouse => Player != null && PlayerHouse.Contains(Player.GlobalPosition);
 
     public bool HomeOpen => _home.IsOpen;
@@ -544,13 +603,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _choice, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
+    bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -560,6 +619,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) { _confirm.Close(); return; }
+            if (_choice.IsOpen) { _choice.Decline(); return; }
             if (_home.IsOpen) { _home.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }

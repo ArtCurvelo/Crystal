@@ -46,6 +46,7 @@ public partial class TestRunner : Node
             Run("Atualização automática", TestUpdater);
             Run("Proteção do save (regressão do bug da atualização)", TestSaveProtection);
             Run("Ciclo do dia (turno, fim do dia, novo dia)", TestDayCycle);
+            Run("Goblin minerador: regras", TestGoblinRules);
             Run("Casa e árvore de habilidades", TestHomeAndSkills);
             Run("Áudio sem saturação", TestAudio);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
@@ -56,6 +57,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
             await RunAsync("Integração: cavernas, relevo e túneis secretos", TestWings);
             await RunAsync("Integração: coleta direta", TestDirectCollect);
+            await RunAsync("Integração: goblin minerador e rebelião", TestGoblins);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -171,6 +173,122 @@ public partial class TestRunner : Node
         var bad = new SaveData { House = new() { ["bed"] = 99, ["nada"] = 2 }, Skills = new() { "magnet", "magnet", "inexistente" } };
         bad.Sanitize();
         Check(bad.House["bed"] == 3 && !bad.House.ContainsKey("nada") && bad.Skills.Count == 1, "casa/habilidades inválidas são saneadas");
+        Fresh();
+    }
+
+    // ---------------------------------------------------------------
+    void TestGoblinRules()
+    {
+        Fresh();
+        var d = GS.Data;
+        Check(GS.Goblin == GameState.GoblinMood.Available && !GS.TryHireGoblin(), "sem dinheiro não contrata o goblin");
+        GS.AddMoney(1000);
+        Check(GS.TryHireGoblin() && GS.Goblin == GameState.GoblinMood.Working && d.Money == 500, "contratar custa ◈ 500");
+        var q = GameData.Mat("quartz");
+        GS.GoblinMined(q, 40);
+        long val = GS.SellPrice(q) * 40;
+        Check(GS.GoblinStashCount == 40 && d.GoblinDayValue == val, "o que ele minera vai para o baú e conta no dia");
+        Check(GS.GoblinFee == Math.Max(30, val / 4), "taxa = 1/4 do dia (mínimo 30)");
+        int cap = GS.FreeSpace;
+        int got = GS.CollectGoblinStash();
+        Check(got == Math.Min(40, cap) && GS.InventoryCount == got, "pegar do baú enche a mochila");
+        long money = d.Money, fee = GS.GoblinFee;
+        Check(GS.GoblinFeeDue && GS.SettleGoblinFee(true) == GameState.FeeOutcome.Paid && d.Money == money - fee && !GS.GoblinFeeDue, "pagar a taxa");
+        Check(GS.SettleGoblinFee(true) == GameState.FeeOutcome.NoFee, "só cobra uma vez por dia");
+        GS.StartNewDay();
+        Check(GS.SettleGoblinFee(false) == GameState.FeeOutcome.Forgiven, "1ª falta: perdoa");
+        GS.StartNewDay();
+        Check(GS.SettleGoblinFee(false) == GameState.FeeOutcome.Warned, "2ª falta: avisa");
+        GS.StartNewDay();
+        Check(GS.SettleGoblinFee(false, forceRebel: true) == GameState.FeeOutcome.Rebel && GS.Goblin == GameState.GoblinMood.Rebel, "3ª falta: rebelião");
+        GS.EndGoblinRebellion(true);
+        Check(GS.Goblin == GameState.GoblinMood.Working && d.GoblinStrikes == 0, "rebelião vencida: Grub volta ao trabalho");
+        GS.StartNewDay();
+        GS.SettleGoblinFee(true);
+        Check(d.GoblinStrikes == 0, "pagar zera as faltas");
+        for (int i = 0; i < 2; i++) { GS.StartNewDay(); GS.SettleGoblinFee(false); }
+        GS.StartNewDay();
+        Check(GS.SettleGoblinFee(false, forceRebel: false) == GameState.FeeOutcome.Fled && GS.Goblin == GameState.GoblinMood.Fled, "ou ele foge");
+        Check(!GS.CanRehireGoblin && !GS.TryHireGoblin(), "não volta logo depois de fugir");
+        for (int i = 0; i < GameState.GoblinRehireDays; i++) GS.StartNewDay();
+        GS.AddMoney(5000);
+        long before = d.Money;
+        Check(GS.CanRehireGoblin && GS.TryHireGoblin() && before - d.Money == GameState.GoblinRehireCost, "volta dias depois, por ◈ 2.000");
+        GS.Data.Inventory.Clear();
+        GS.AddItem("quartz", 20);
+        int stolen = GS.StealFromInventory(0.25f);
+        Check(stolen == 5 && GS.InventoryCount == 15, "desmaio: goblins levam 25% da mochila");
+        GS.SaveGame(true);
+        GS.LoadGame();
+        Check(GS.Goblin == GameState.GoblinMood.Working, "estado do goblin é salvo");
+        var bad = new SaveData { GoblinState = 9, GoblinStrikes = -3, GoblinStash = new() { ["nada"] = 4, ["quartz"] = -1 } };
+        bad.Sanitize();
+        Check(bad.GoblinState == 3 && bad.GoblinStrikes == 0 && bad.GoblinStash.Count == 0, "dados do goblin saneados");
+        Fresh();
+    }
+
+    async Task TestGoblins()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        player.SimulateCapturedMouse = true;
+        player.GlobalPosition = world.SpawnPoint;
+        await Frames(3);
+        var camp = world.Goblins;
+        Check(camp != null && camp.Grub != null && camp.Chest != null, "acampamento do goblin com barraca, baú e Grub");
+        camp.PlayerPos = () => player.GlobalPosition;
+        camp.DamagePlayer = (dmg, from) => player.TakeDamage(dmg, from);
+        camp.PlayerInMine = () => true;
+        Check(world.Layouts[0].Reachable(camp.GrubHome.X, camp.GrubHome.Z) && world.Layouts[0].Reachable(camp.ChestPos.X, camp.ChestPos.Z + 1f) || world.Layouts[0].NearestReach(camp.ChestPos.X, camp.ChestPos.Z) >= 0, "Grub e o baú ficam em lugar alcançável");
+        GS.AddMoney(1000);
+        GS.TryHireGoblin();
+        camp.SyncState();
+        GS.IsPlaying = true;
+        Engine.TimeScale = 6;
+        var grubStart = camp.Grub.GlobalPosition;
+        for (int i = 0; i < 1500 && GS.GoblinStashCount == 0; i++) await Frames(1);
+        Check(camp.Grub.GlobalPosition.DistanceTo(grubStart) > 1f, "Grub anda até um depósito");
+        Check(GS.GoblinStashCount > 0 && GS.Data.GoblinDayValue > 0, $"Grub minera e guarda no baú ({GS.GoblinStashCount} fragmentos)");
+        Check(GS.Data.CrystalsMined == 0, "o que o goblin quebra não conta como do jogador");
+        Engine.TimeScale = 1;
+
+        // rebelião: perseguem e atacam; o feixe atordoa
+        GS.Data.GoblinState = (int)GameState.GoblinMood.Rebel;
+        camp.StartRebellion();
+        Check(camp.Rebels.Count == 3 && camp.Rebels.All(g => g.Hostile), "rebelião: Grub e 2 comparsas hostis");
+        player.GlobalPosition = world.Layouts[0].OnGround(camp.GrubHome.X - 4f, camp.GrubHome.Z, 0.1f);
+        float hp0 = player.Hp;
+        for (int i = 0; i < 600 && player.Hp >= hp0; i++) await Frames(1);
+        Check(player.Hp < hp0, $"goblins rebelados atacam o jogador (vida {player.Hp:0})");
+        // feixe real contra o goblin mais próximo
+        var g0 = camp.Rebels.OrderBy(g => g.GlobalPosition.DistanceTo(player.GlobalPosition)).First();
+        int h0 = g0.HitsLeft;
+        for (int tries = 0; tries < 20 && g0.HitsLeft == h0; tries++)
+        {
+            var eye = player.GlobalPosition + Vector3.Up * 1.55f;
+            var dir = g0.GlobalPosition + Vector3.Up * 0.7f - eye;
+            player.SetLook(Mathf.Atan2(-dir.X, -dir.Z), Mathf.Atan2(dir.Y, new Vector2(dir.X, dir.Z).Length()));
+            Input.ActionPress("mine");
+            await Frames(6);
+            Input.ActionRelease("mine");
+            await Frames(2);
+        }
+        Check(g0.HitsLeft < h0, "o feixe acerta e atordoa o goblin rebelado");
+        bool won = false;
+        camp.RebellionWon += () => won = true;
+        foreach (var g in camp.Rebels.ToList()) while (g.State != GoblinNpc.Mode.Defeated) g.TakeHit(player.GlobalPosition, 1);
+        await Frames(3);
+        Check(won && GS.Goblin == GameState.GoblinMood.Working && camp.Rebels.Count == 0 && !camp.Grub.Hostile, "todos atordoados: rebelião vencida, Grub volta ao trabalho");
+        GS.IsPlaying = false;
+        root.QueueFree();
+        await Frames(2);
         Fresh();
     }
 

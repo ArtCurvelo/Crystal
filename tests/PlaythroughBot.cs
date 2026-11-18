@@ -114,6 +114,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Renascimento: {(_prestiged ? "sim" : "não")} | Região 2 na 2ª jornada: {(_secondR2 > 0 ? $"{_secondR2:0.0} min" : "não alcançada")}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
+        GD.Print($"Goblin: contratado={_hired} | taxas pagas {_feesPaid}, não pagas {_feesSkipped} | fragmentos do baú {_stashTaken}");
+        if (!_hired || _feesPaid == 0 || _stashTaken == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
         GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
@@ -355,6 +357,24 @@ public partial class PlaythroughBot : Node
             FindButtons(confirm).First(b => b.Text == "Confirmar").EmitSignal(BaseButton.SignalName.Pressed);
             _earlyHome++;
         }
+        await Frames(3);
+        // o goblin cobra a taxa antes de subir: na primeira vez o bot não paga (testa o perdão), depois paga
+        var choice = Main.GetChildren().OfType<ChoiceScreen>().First();
+        if (GS.Goblin == GameState.GoblinMood.Working && GS.Data.GoblinChargedDay != GS.Data.Day)
+        {
+            if (!choice.IsOpen) { _errors++; Log("ERRO: Grub não cobrou a taxa ao subir"); return; }
+            bool pay = _feesSkipped >= 1;
+            int strikes = GS.Data.GoblinStrikes;
+            var btn = FindButtons(choice).First(b => pay ? b.Text.StartsWith("Pagar") : b.Text == "Não pagar");
+            if (pay && btn.Disabled) btn = FindButtons(choice).First(b => b.Text == "Não pagar");
+            bool paying = !btn.Text.StartsWith("Não");
+            long money = GS.Data.Money, fee = GS.GoblinFee;
+            btn.EmitSignal(BaseButton.SignalName.Pressed);
+            await Frames(3);
+            // depois da cobrança o dia termina e pode entrar o "Bônus do turno" (habilidade)
+            if (paying) { _feesPaid++; if (GS.Data.GoblinStrikes != 0 || GS.Data.Money != money - fee + GS.Data.DayBonus) { _errors++; Log($"ERRO: pagamento ao goblin não aplicou ({money} - {fee} + {GS.Data.DayBonus} ≠ {GS.Data.Money})"); } }
+            else { _feesSkipped++; if (GS.Data.GoblinStrikes != strikes + 1) { _errors++; Log("ERRO: falta de pagamento não contou"); } else if (_feesSkipped == 1) Log("Não pagou o Grub (ele perdoou a 1ª vez)"); }
+        }
         await Frames(60); // transição
         var house = Main.World.House;
         if (!PlayerHouse.Contains(P.GlobalPosition) || !GS.DayOver || !P.InputEnabled) { _errors++; Log("ERRO: elevador não levou o jogador para casa"); return; }
@@ -458,9 +478,44 @@ public partial class PlaythroughBot : Node
         home.ShowHouseTab();
     }
 
+    int _feesPaid, _feesSkipped, _stashTaken;
+    bool _hired;
+
+    /// <summary>Contrata o Grub falando com ele (mira e E), quando sobra dinheiro.</summary>
+    async Task TryHireGoblin()
+    {
+        var camp = Main.World.Goblins;
+        if (_hired || GS.Goblin != GameState.GoblinMood.Available || GS.Data.Money < 1500 || !GS.CanWork) return;
+        var g = camp.Grub;
+        var dir = (camp.HutPos - g.GlobalPosition); dir.Y = 0;
+        var stand = g.GlobalPosition - dir.Normalized() * 2f;
+        P.GlobalPosition = Main.World.Layouts[0].OnGround(stand.X, stand.Z, 0.1f);
+        P.Velocity = Vector3.Zero;
+        await Frames(2);
+        AimAt(g.GlobalPosition + Vector3.Up * 0.8f);
+        await Frames(3);
+        if (P.TargetInteractable != g) { _errors++; Log($"ERRO: não mirou o Grub (alvo {P.TargetInteractable})"); return; }
+        PressAction("interact");
+        await Frames(3);
+        if (GS.Goblin != GameState.GoblinMood.Working) { _errors++; Log("ERRO: contratar o Grub falhou"); return; }
+        _hired = true;
+        Log("Contratou o Grub, o goblin minerador");
+    }
+
+    /// <summary>Pega o que o Grub guardou no baú.</summary>
+    async Task TakeFromChest()
+    {
+        if (GS.GoblinStashCount < 6 || GS.FreeSpace < 6) return;
+        int before = GS.InventoryCount;
+        if (!await UseStationNode(Main.World.Goblins.Chest)) return;
+        if (GS.InventoryCount <= before) { _errors++; Log("ERRO: baú do Grub não entregou fragmentos"); return; }
+        _stashTaken += GS.InventoryCount - before;
+    }
+
     async Task SellTrip()
     {
         var region = GameData.Regions[0]; // única Estação de Venda, no acampamento
+        await TryHireGoblin();
         if (!await UseStation<SellStation>(region)) return;
         var sell = Main.GetChildren().OfType<SellScreen>().First();
         if (!sell.IsOpen) { _errors++; Log("ERRO: tela de venda não abriu"); return; }
@@ -485,6 +540,7 @@ public partial class PlaythroughBot : Node
         await Frames(3);
         if (sell.IsOpen || shopScr.IsOpen) { _errors++; Log("ERRO: Esc não fechou o terminal"); }
         if (_sells % 5 == 1) Log($"Venda #{_sells}: +{gained} (saldo {GS.Data.Money})");
+        await TakeFromChest(); // o que o Grub minerou entra na mochila e é vendido na próxima viagem
     }
 
     async Task SpendTrip()

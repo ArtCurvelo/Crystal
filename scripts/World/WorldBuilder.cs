@@ -25,6 +25,7 @@ public partial class WorldBuilder : Node3D
     public Vector3 SpawnPoint = new(0, 0.1f, 15f);
     public MineElevator Elevator;
     public PlayerHouse House;
+    public GoblinCamp Goblins;
     public SellStation SellStation;
     int _tick;
 
@@ -145,6 +146,12 @@ public partial class WorldBuilder : Node3D
             Elevator.Rotation = new Vector3(0, Mathf.Pi, 0); // frente (+Z local) voltada para dentro da caverna
             SpawnPoint = L.OnGround(cc.X, cc.Z + 8.6f, 0.1f);
             AddPlatform(root, cc, r);
+            // barraca do goblin minerador na borda leste do acampamento
+            var hut = L.OnGround(cc.X + 9.6f, cc.Z - 3.5f);
+            Goblins = new GoblinCamp { Name = "GoblinCamp", World = this };
+            AddChild(Goblins);
+            Goblins.Setup(L, hut, Mathf.Pi / 2);
+            reserved.Add(hut); reserved.Add(Goblins.ChestPos); reserved.Add(Goblins.GrubHome);
             reserved.Add(sell.Position); reserved.Add(shop.Position); reserved.Add(Elevator.Position); reserved.Add(cc);
         }
         else

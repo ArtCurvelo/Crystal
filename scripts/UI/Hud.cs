@@ -20,7 +20,35 @@ public partial class Hud : CanvasLayer
     public World.RegionEvents Events;
 
     Control _root;
-    PanelContainer _clockPanel;
+    PanelContainer _clockPanel, _hpPanel;
+    Label _hpLabel;
+    ProgressBar _hpBar;
+    ColorRect _damageFlash;
+
+    /// <summary>Clarão vermelho nas bordas ao levar dano.</summary>
+    public void FlashDamage()
+    {
+        if (_damageFlash == null)
+        {
+            _damageFlash = new ColorRect { Color = new Color(0.9f, 0.05f, 0.05f, 0f), MouseFilter = Control.MouseFilterEnum.Ignore };
+            _damageFlash.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+            _root.AddChild(_damageFlash);
+        }
+        _damageFlash.Color = new Color(0.9f, 0.05f, 0.05f, 0.35f);
+        var tw = _damageFlash.CreateTween();
+        tw.TweenProperty(_damageFlash, "color:a", 0f, 0.5f);
+    }
+
+    void UpdateHp()
+    {
+        if (Player == null || !IsInstanceValid(Player)) return;
+        bool danger = World.GoblinCamp.Instance != null && World.GoblinCamp.Instance.Rebels.Count > 0;
+        bool show = danger || Player.Hp < PlayerController.MaxHp - 0.5f;
+        if (_hpPanel.Visible != show) _hpPanel.Visible = show;
+        if (!show) return;
+        _hpBar.Value = Player.Hp / PlayerController.MaxHp;
+        _hpLabel.Text = $"Vida: {Player.Hp:0} / {PlayerController.MaxHp:0}" + (danger ? "   ⚠ REBELIÃO" : "");
+    }
     HudIcon _clockIcon;
     Label _clock;
     ProgressBar _clockBar;
@@ -236,6 +264,18 @@ public partial class Hud : CanvasLayer
         kv.AddChild(_clock);
         _clockBar = UiTheme.Bar(UiTheme.Gold, 210, 7);
         kv.AddChild(_clockBar);
+
+        // vida (aparece quando há perigo ou dano)
+        _hpPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        _hpPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, new Color(UiTheme.Danger, 0.8f), 12, 2, 16, 6));
+        col.AddChild(_hpPanel);
+        var hv = new VBoxContainer();
+        hv.AddThemeConstantOverride("separation", 4);
+        _hpPanel.AddChild(hv);
+        _hpLabel = UiTheme.Label("Vida", 16, UiTheme.Text, true);
+        hv.AddChild(_hpLabel);
+        _hpBar = UiTheme.Bar(UiTheme.Danger, 250, 9);
+        hv.AddChild(_hpBar);
 
         _notifs = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         _notifs.AddThemeConstantOverride("separation", 8);
@@ -615,6 +655,7 @@ public partial class Hud : CanvasLayer
 
         UpdateEventPanel();
         UpdateClock();
+        UpdateHp();
         _fps.Visible = Settings.Data.ShowFps;
         if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS · 3D {GetViewport().Scaling3DScale * 100:0}%";
 

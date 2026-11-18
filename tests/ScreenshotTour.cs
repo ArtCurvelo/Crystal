@@ -53,6 +53,10 @@ public partial class ScreenshotTour : Node
         LookAtPoint(p, L0.OnGround(cc.X + 2.5f, cc.Z + 4f, 0.1f), Main.World.Elevator.GlobalPosition + Vector3.Up * 2.5f);
         await Wait(0.4f);
         await Shot("02f_elevator");
+        var camp = Main.World.Goblins;
+        LookAtPoint(p, L0.OnGround(camp.GrubHome.X - 3.5f, camp.GrubHome.Z + 1.5f, 0.1f), camp.HutPos + Vector3.Up * 1.0f);
+        await Wait(0.5f);
+        await Shot("02g_goblin_camp");
         p.GlobalPosition = Main.World.SpawnPoint;
         p.SetLook(0, 0);
 
@@ -237,6 +241,16 @@ public partial class ScreenshotTour : Node
         await Shot("15d_skills");
         Main.CloseAllForTour();
         gs.StartNewDay();
+
+        // rebelião goblin
+        Main.CloseAllForTour();
+        gs.Data.GoblinState = (int)GameState.GoblinMood.Rebel;
+        var gc = Main.World.Goblins;
+        gc.StartRebellion();
+        LookAtPoint(p, L0.OnGround(gc.GrubHome.X - 5f, gc.GrubHome.Z, 0.1f), gc.GrubHome + Vector3.Up * 0.8f);
+        await Wait(1.6f);
+        await Shot("15g_rebellion");
+        gc.EndRebellion(true);
 
         await OreGallery(p);
 

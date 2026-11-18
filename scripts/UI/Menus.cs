@@ -476,6 +476,56 @@ public partial class CompletionScreen : ModalScreen
 }
 
 // =====================================================================
+/// <summary>Pergunta com duas escolhas (ex.: pagar o goblin). Esc conta como a segunda opção.</summary>
+public partial class ChoiceScreen : ModalScreen
+{
+    Label _title, _text;
+    Button _yes, _no;
+    Action<bool> _cb;
+
+    public override void _Ready()
+    {
+        BuildFrame("", new Vector2(560, 0), new Color(0.6f, 1f, 0.5f));
+        Layer = 31;
+        _title = UiTheme.Label("", 26, new Color(0.6f, 1f, 0.5f), true);
+        Body.AddChild(_title);
+        _text = UiTheme.Label("", 18);
+        _text.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _text.CustomMinimumSize = new Vector2(500, 0);
+        Body.AddChild(_text);
+        var h = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        h.AddThemeConstantOverride("separation", 10);
+        Body.AddChild(h);
+        _no = UiTheme.Button("", () => Choose(false), 200);
+        _yes = UiTheme.Button("", () => Choose(true), 220);
+        _yes.AddThemeColorOverride("font_color", UiTheme.Gold);
+        h.AddChild(_no);
+        h.AddChild(_yes);
+    }
+
+    void Choose(bool yes)
+    {
+        var cb = _cb;
+        _cb = null;
+        CloseSilently();
+        cb?.Invoke(yes);
+    }
+
+    public void Ask(string title, string text, string yes, string no, bool yesEnabled, Action<bool> cb)
+    {
+        _title.Text = title;
+        _text.Text = text;
+        _yes.Text = yes;
+        _no.Text = no;
+        _yes.Disabled = !yesEnabled;
+        _cb = cb;
+        Open();
+    }
+
+    public void Decline() => Choose(false);
+}
+
+// =====================================================================
 /// <summary>Aviso de nova versão com download e aplicação automáticos.</summary>
 public partial class UpdateScreen : ModalScreen
 {

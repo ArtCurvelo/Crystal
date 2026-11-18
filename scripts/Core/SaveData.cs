@@ -38,6 +38,13 @@ public sealed class SaveData
     public Dictionary<string, int> House { get; set; } = new();
     public List<string> Skills { get; set; } = new();
     public List<string> Secrets { get; set; } = new();
+    // goblin minerador (Grub)
+    public int GoblinState { get; set; }             // 0 disponível, 1 trabalhando, 2 fugiu, 3 rebelado
+    public int GoblinStrikes { get; set; }           // dias seguidos sem pagar
+    public long GoblinDayValue { get; set; }         // valor minerado por ele hoje
+    public int GoblinChargedDay { get; set; }
+    public int GoblinFledDay { get; set; }
+    public Dictionary<string, int> GoblinStash { get; set; } = new();
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
     public float PlayerZ { get; set; } = 14f;
@@ -72,6 +79,12 @@ public sealed class SaveData
         House ??= new();
         Skills ??= new();
         Secrets ??= new();
+        GoblinStash ??= new();
+        foreach (var key in GoblinStash.Keys.ToList())
+            if (GameData.Mat(key) == null || GoblinStash[key] <= 0) GoblinStash.Remove(key);
+        GoblinState = System.Math.Clamp(GoblinState, 0, 3);
+        GoblinStrikes = System.Math.Clamp(GoblinStrikes, 0, 10);
+        if (GoblinDayValue < 0) GoblinDayValue = 0;
         Secrets = Secrets.Where(k => !string.IsNullOrEmpty(k)).Distinct().ToList();
         foreach (var key in House.Keys.ToList())
         {

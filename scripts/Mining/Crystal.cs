@@ -180,8 +180,12 @@ public partial class Crystal : StaticBody3D
     }
 
     /// <summary>Aplica dano. Retorna true se este golpe quebrou o cristal.</summary>
-    public bool Hit(float damage, Vector3 point, Vector3 normal, bool quiet = false)
+    /// <summary>Quem quebrar com um destino (ex.: goblin) recebe os fragmentos direto, sem espalhar no chão.</summary>
+    System.Action<MaterialDef, int> _sink;
+
+    public bool Hit(float damage, Vector3 point, Vector3 normal, bool quiet = false, System.Action<MaterialDef, int> sink = null)
     {
+        _sink = sink;
         if (State != CrystalState.Active) return false;
         Hp -= damage;
         _flash = 1f;
@@ -218,8 +222,13 @@ public partial class Crystal : StaticBody3D
         int shards = _rng.Next(Material.ShardsMin, Material.ShardsMax + 1);
         if (!Material.Special) shards = Math.Max(1, (int)MathF.Round(shards * SizeScale));
         shards = (int)MathF.Round(shards * (GameState.Instance?.EventShardMultiplier ?? 1f));
-        ShardManager.Instance?.SpawnShards(Material, center, shards);
-        GameState.Instance?.RecordCrystalMined();
+        if (_sink != null) _sink(Material, shards);
+        else
+        {
+            ShardManager.Instance?.SpawnShards(Material, center, shards);
+            GameState.Instance?.RecordCrystalMined();
+        }
+        _sink = null;
 
         _visual.Visible = false;
         _shape.SetDeferred(CollisionShape3D.PropertyName.Disabled, true);

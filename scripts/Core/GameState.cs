@@ -284,6 +284,123 @@ public partial class GameState : Node
         return bonus;
     }
 
+    // ================= Goblin minerador (Grub) =================
+    public enum GoblinMood { Available = 0, Working = 1, Fled = 2, Rebel = 3 }
+    public enum FeeOutcome { Paid, Forgiven, Warned, Fled, Rebel, NoFee }
+    public const long GoblinHireCost = 500, GoblinRehireCost = 2000;
+    public const int GoblinRehireDays = 3;
+    public event Action GoblinChanged;
+    public GoblinMood Goblin => (GoblinMood)Data.GoblinState;
+    public int GoblinStashCount => Data.GoblinStash.Values.Sum();
+    public long GoblinStashValue => Data.GoblinStash.Sum(kv => GameData.Mat(kv.Key) is { } m ? SellPrice(m) * kv.Value : 0);
+
+    /// <summary>Taxa do dia: um quarto do que ele minerou (mínimo ◈ 30 por dia de trabalho).</summary>
+    public long GoblinFee => Goblin == GoblinMood.Working ? Math.Max(30, Data.GoblinDayValue / 4) : 0;
+    public bool GoblinFeeDue => Goblin == GoblinMood.Working && Data.GoblinChargedDay != Data.Day;
+    public bool CanRehireGoblin => Goblin == GoblinMood.Fled && Data.Day >= Data.GoblinFledDay + GoblinRehireDays;
+    public long GoblinHirePrice => Goblin == GoblinMood.Fled ? GoblinRehireCost : GoblinHireCost;
+
+    public bool TryHireGoblin()
+    {
+        bool ok = Goblin == GoblinMood.Available || CanRehireGoblin;
+        if (!ok || !CanAfford(GoblinHirePrice)) return false;
+        Data.Money -= GoblinHirePrice;
+        Data.GoblinState = (int)GoblinMood.Working;
+        Data.GoblinStrikes = 0;
+        Data.GoblinDayValue = 0;
+        Data.GoblinChargedDay = 0;
+        MoneyChanged?.Invoke();
+        GoblinChanged?.Invoke();
+        Notify("Grub contratado!", "Ele minera na caverna inicial e guarda tudo no baú. Cobra uma taxa no fim do dia.", NotifyKind.Success);
+        return true;
+    }
+
+    /// <summary>O goblin quebrou um depósito: os fragmentos vão para o baú dele.</summary>
+    public void GoblinMined(MaterialDef m, int count)
+    {
+        if (count <= 0) return;
+        Data.GoblinStash[m.Id] = (Data.GoblinStash.TryGetValue(m.Id, out int n) ? n : 0) + count;
+        Data.GoblinDayValue += SellPrice(m) * count;
+        GoblinChanged?.Invoke();
+    }
+
+    /// <summary>Passa o conteúdo do baú para a mochila (até encher). Devolve quantos foram pegos.</summary>
+    public int CollectGoblinStash()
+    {
+        int moved = 0;
+        foreach (var key in Data.GoblinStash.Keys.ToList())
+        {
+            int take = Math.Min(Data.GoblinStash[key], FreeSpace);
+            if (take <= 0) break;
+            int added = AddItem(key, take);
+            moved += added;
+            Data.GoblinStash[key] -= added;
+            if (Data.GoblinStash[key] <= 0) Data.GoblinStash.Remove(key);
+        }
+        if (moved > 0) GoblinChanged?.Invoke();
+        return moved;
+    }
+
+    /// <summary>
+    /// Cobrança do fim do dia. Pagar zera as faltas. Sem pagar: 1ª falta ele perdoa, 2ª avisa,
+    /// a partir da 3ª ele foge ou se rebela (sorteio estável pelo dia; forceRebel para testes).
+    /// </summary>
+    public FeeOutcome SettleGoblinFee(bool pay, bool? forceRebel = null)
+    {
+        if (!GoblinFeeDue) return FeeOutcome.NoFee;
+        long fee = GoblinFee;
+        Data.GoblinChargedDay = Data.Day;
+        Data.GoblinDayValue = 0;
+        FeeOutcome result;
+        if (pay && CanAfford(fee))
+        {
+            Data.Money -= fee;
+            Data.GoblinStrikes = 0;
+            MoneyChanged?.Invoke();
+            result = FeeOutcome.Paid;
+        }
+        else
+        {
+            Data.GoblinStrikes++;
+            if (Data.GoblinStrikes == 1) result = FeeOutcome.Forgiven;
+            else if (Data.GoblinStrikes == 2) result = FeeOutcome.Warned;
+            else
+            {
+                bool rebel = forceRebel ?? (new Random(Data.Day * 7919 + Data.PrestigeCount).NextDouble() < 0.5);
+                if (rebel) { Data.GoblinState = (int)GoblinMood.Rebel; result = FeeOutcome.Rebel; }
+                else { Data.GoblinState = (int)GoblinMood.Fled; Data.GoblinFledDay = Data.Day; result = FeeOutcome.Fled; }
+            }
+        }
+        GoblinChanged?.Invoke();
+        return result;
+    }
+
+    /// <summary>Fim da rebelião: vencida → Grub volta a trabalhar envergonhado; perdida → os goblins fogem.</summary>
+    public void EndGoblinRebellion(bool playerWon)
+    {
+        if (Goblin != GoblinMood.Rebel) return;
+        Data.GoblinStrikes = 0;
+        if (playerWon) Data.GoblinState = (int)GoblinMood.Working;
+        else { Data.GoblinState = (int)GoblinMood.Fled; Data.GoblinFledDay = Data.Day; Data.GoblinStash.Clear(); }
+        GoblinChanged?.Invoke();
+    }
+
+    /// <summary>Goblins roubam parte da mochila (quando o jogador desmaia).</summary>
+    public int StealFromInventory(float fraction)
+    {
+        int stolen = 0;
+        foreach (var key in Data.Inventory.Keys.ToList())
+        {
+            int n = (int)Math.Ceiling(Data.Inventory[key] * fraction);
+            n = Math.Min(n, Data.Inventory[key]);
+            Data.Inventory[key] -= n;
+            stolen += n;
+            if (Data.Inventory[key] <= 0) Data.Inventory.Remove(key);
+        }
+        if (stolen > 0) InventoryChanged?.Invoke();
+        return stolen;
+    }
+
     // ================= Casa e habilidades =================
     public event Action HomeChanged;
     public int HouseLevel(string id) => Data.House.TryGetValue(id, out int l) ? l : 0;
