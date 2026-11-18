@@ -161,7 +161,8 @@ public partial class PlayerController : CharacterBody3D
     {
         float dt = (float)delta;
         var gs = GameState.Instance;
-        bool active = InputEnabled && MouseCaptured;
+        if (_suppress > 0) _suppress -= dt;
+        bool active = InputEnabled && MouseCaptured && _suppress <= 0;
 
         // ---------- Olhar com o controle (analógico direito) ----------
         if (active)
@@ -171,7 +172,7 @@ public partial class PlayerController : CharacterBody3D
             {
                 // curva quadrática: precisão perto do centro, rapidez nas bordas
                 look *= look.Length();
-                float lookSpeed = 3.2f * (Settings.Data.MouseSensitivity / 0.22f);
+                float lookSpeed = 3.2f * Settings.Data.PadLookSensitivity;
                 RotateY(-look.X * lookSpeed * dt);
                 float dy = look.Y * lookSpeed * 0.75f * dt * (Settings.Data.InvertY ? -1 : 1);
                 _pitch = Mathf.Clamp(_pitch - dy, Mathf.DegToRad(-88), Mathf.DegToRad(88));
@@ -254,10 +255,10 @@ public partial class PlayerController : CharacterBody3D
         // ---------- Câmera (tremor e FOV) ----------
         _shakeAmount = Mathf.Max(0, _shakeAmount - dt * 4f);
         _fovKick = Mathf.Max(0, _fovKick - dt * 6f);
-        var rng = new Vector3((float)GD.RandRange(-1.0, 1.0), (float)GD.RandRange(-1.0, 1.0), 0) * _shakeAmount * 0.02f;
+        var rng = new Vector3((float)GD.RandRange(-1.0, 1.0), (float)GD.RandRange(-1.0, 1.0), 0) * _shakeAmount * 0.02f * (Settings.Data.ReduceShake ? 0.15f : 1f);
         Camera.Position = rng;
         float sprintFov = active && Input.IsActionPressed("sprint") && hs > 1f ? 4f : 0f;
-        Camera.Fov = Mathf.Lerp(Camera.Fov, Settings.Data.Fov + sprintFov - _fovKick, Mathf.Min(1, dt * 8f));
+        Camera.Fov = Mathf.Lerp(Camera.Fov, Settings.Data.Fov + sprintFov - _fovKick * (Settings.Data.ReduceShake ? 0.2f : 1f), Mathf.Min(1, dt * 8f));
         Tool.UpdateView(dt, Mathf.Clamp(hs / Mathf.Max(1, gs.MoveSpeed), 0, 1.5f), IsOnFloor());
     }
 
@@ -330,7 +331,7 @@ public partial class PlayerController : CharacterBody3D
             if (crit)
             {
                 dmg *= GameState.CritMultiplier;
-                Effects.Instance?.FloatText(pos + Vector3.Up * 0.4f, "CRÍTICO!", new Color(1f, 0.85f, 0.3f), 1.1f);
+                Effects.Instance?.FloatText(pos + Vector3.Up * 0.4f, Core.Loc.T("CRÍTICO!"), new Color(1f, 0.85f, 0.3f), 1.1f);
             }
             bool broke = c.IsMineable && c.Hit(dmg, pos, normal);
             _shakeAmount = Mathf.Min(1.5f, _shakeAmount + (broke ? 1.2f : 0.45f));
@@ -414,6 +415,10 @@ public partial class PlayerController : CharacterBody3D
         _standQuery.Transform = new Transform3D(Basis.Identity, GlobalPosition + Vector3.Up * (StandHeight / 2 + 0.06f));
         return space.IntersectShape(_standQuery, 1).Count == 0;
     }
+
+    float _suppress;
+    /// <summary>Ignora a entrada por um instante (o botão que fechou um menu não deve pular/agachar).</summary>
+    public void SuppressInput(float seconds = 0.2f) => _suppress = seconds;
 
     public void AddShake(float amount) => _shakeAmount = Mathf.Min(2f, _shakeAmount + amount);
 

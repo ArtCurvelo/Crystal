@@ -26,7 +26,7 @@ public abstract partial class StationBase : StaticBody3D, IInteractable
     {
         var l = new Label3D
         {
-            Text = text,
+            Text = Core.Loc.T(text),
             FontSize = size,
             OutlineSize = 14,
             PixelSize = 0.005f,
@@ -134,8 +134,8 @@ public partial class SellStation : StationBase
     {
         var gs = GameState.Instance;
         return gs.InventoryCount > 0
-            ? $"{InputHints.Interact} Vender {gs.InventoryCount} fragmentos  ({GameState.FormatMoney(gs.InventoryValue())})"
-            : $"{InputHints.Interact} Estação de Venda";
+            ? Loc.F("{0} Vender {1} fragmentos  ({2})", InputHints.Interact, gs.InventoryCount, GameState.FormatMoney(gs.InventoryValue()))
+            : Loc.F("{0} Estação de Venda", InputHints.Interact);
     }
 
     public override void Interact(PlayerController player) => UiBus.RequestSell();
@@ -186,7 +186,7 @@ public partial class MineElevator : StationBase
         AddMesh(new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.06f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, MeshFactory.Emissive(orange, orange, 2f), new Vector3(1.95f, 1.12f, 0.78f)).Rotation = new Vector3(Mathf.Pi / 2, 0, 0);
         var light = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.1f, OmniRange = 6f, Position = new Vector3(0, 3.6f, 1.2f) };
         AddChild(light);
-        Label = MakeLabel(GoesDown ? "ELEVADOR · MINA" : "ELEVADOR · CASA", new Color(1f, 0.82f, 0.4f), GoesDown ? 3.75f : 5.25f);
+        Label = MakeLabel(GoesDown ? Loc.T("ELEVADOR · MINA") : Loc.T("ELEVADOR · CASA"), new Color(1f, 0.82f, 0.4f), GoesDown ? 3.75f : 5.25f);
         StaticBatcher.Batch(this);
     }
 
@@ -206,10 +206,10 @@ public partial class MineElevator : StationBase
     {
         var gs = GameState.Instance;
         if (GoesDown)
-            return gs.DayOver ? "Durma antes de descer para a mina." : $"{InputHints.Interact} Descer para a mina (Dia {gs.Data.Day})";
+            return gs.DayOver ? Loc.T("Durma antes de descer para a mina.") : Loc.F("{0} Descer para a mina (Dia {1})", InputHints.Interact, gs.Data.Day);
         return gs.DayOver
-            ? $"{InputHints.Interact} Subir para casa (fim do turno)"
-            : $"{InputHints.Interact} Elevador: encerrar o dia e ir para casa";
+            ? Loc.F("{0} Subir para casa (fim do turno)", InputHints.Interact)
+            : Loc.F("{0} Elevador: encerrar o dia e ir para casa", InputHints.Interact);
     }
 
     public override void Interact(PlayerController player)
@@ -278,7 +278,7 @@ public partial class ShopTerminal : StationBase
         StaticBatcher.Batch(this);
     }
 
-    public override string GetPrompt() => $"{InputHints.Interact} Terminal de Melhorias";
+    public override string GetPrompt() => Loc.F("{0} Terminal de Melhorias", InputHints.Interact);
     public override void Interact(PlayerController player) => UiBus.RequestShop();
 }
 
@@ -490,9 +490,9 @@ public partial class RegionGate : StationBase
     {
         if (_open) return null;
         var gs = GameState.Instance;
-        if (gs.CanUnlock(Region)) return $"{InputHints.Interact} Desbloquear {Region.Name}  ({GameState.FormatMoney(Region.UnlockCost)})";
+        if (gs.CanUnlock(Region)) return Loc.F("{0} Desbloquear {1}  ({2})", InputHints.Interact, Region.Name, GameState.FormatMoney(Region.UnlockCost));
         long missing = Region.UnlockCost - gs.Data.Money;
-        return $"Bloqueado: {Region.Name} — faltam {GameState.FormatMoney(missing)}";
+        return Loc.F("Bloqueado: {0} — faltam {1}", Region.Name, GameState.FormatMoney(missing));
     }
 
     public override void Interact(PlayerController player)
@@ -506,7 +506,7 @@ public partial class RegionGate : StationBase
         else
         {
             AudioManager.Instance?.Play("error", -6f);
-            gs.Notify("Moeda insuficiente", $"{Region.Name} custa {GameState.FormatMoney(Region.UnlockCost)}.", NotifyKind.Warning);
+            gs.Notify("Moeda insuficiente", Loc.F("{0} custa {1}.", Region.Name, GameState.FormatMoney(Region.UnlockCost)), NotifyKind.Warning);
         }
     }
 

@@ -12,10 +12,10 @@ public enum Rarity { Comum, Incomum, Raro, Epico, Lendario }
 
 public static class RarityInfo
 {
-    public static string Name(Rarity r) => r switch
+    public static string Name(Rarity r) => Core.Loc.T(r switch
     {
         Rarity.Comum => "Comum", Rarity.Incomum => "Incomum", Rarity.Raro => "Raro", Rarity.Epico => "Épico", _ => "Lendário",
-    };
+    });
 
     public static Color Color(Rarity r) => r switch
     {
@@ -33,8 +33,16 @@ public static class RarityInfo
 public sealed class MaterialDef
 {
     public string Id;
-    public string Name;
-    public string Description;
+    string _name;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Name { get => Core.Loc.T(_name); set => _name = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string NamePt => _name;
+    string _description;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Description { get => Core.Loc.T(_description); set => _description = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string DescriptionPt => _description;
     public int Value;          // valor base de venda por fragmento
     public float Hp;           // resistência da formação
     public Color Color;        // cor principal
@@ -62,8 +70,16 @@ public sealed class RegionDef
 {
     public string Id;
     public int Index;
-    public string Name;
-    public string Subtitle;
+    string _name;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Name { get => Core.Loc.T(_name); set => _name = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string NamePt => _name;
+    string _subtitle;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Subtitle { get => Core.Loc.T(_subtitle); set => _subtitle = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string SubtitlePt => _subtitle;
     public long UnlockCost;
     public Color AmbientColor;
     public float AmbientEnergy;
@@ -91,7 +107,11 @@ public sealed class RegionDef
 public sealed class WingDef
 {
     public string Id;
-    public string Name;
+    string _name;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Name { get => Core.Loc.T(_name); set => _name = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string NamePt => _name;
     /// <summary>-1 = oeste, +1 = leste.</summary>
     public int Side;
     /// <summary>Deslocamento em Z da abertura em relação ao centro da região.</summary>
@@ -105,8 +125,16 @@ public sealed class WingDef
 public sealed class UpgradeDef
 {
     public string Id;
-    public string Name;
-    public string Description;
+    string _name;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Name { get => Core.Loc.T(_name); set => _name = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string NamePt => _name;
+    string _description;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Description { get => Core.Loc.T(_description); set => _description = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string DescriptionPt => _description;
     public string Icon;          // caractere de ícone simples
     public long BaseCost;
     public double CostGrowth;
@@ -471,7 +499,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             Description = "Aumenta o dano de cada pulso do feixe.",
             BaseCost = 20, CostGrowth = 1.55, MaxLevel = 30,
             ValueAt = l => 4f * MathF.Pow(1.32f, l) + l * 2f,
-            Format = v => $"{v:0} dano"
+            Format = v => Core.Loc.F("{0:0} dano", v)
         });
         AddUp(new UpgradeDef
         {
@@ -479,7 +507,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             Description = "Golpes mais rápidos por segundo.",
             BaseCost = 35, CostGrowth = 1.62, MaxLevel = 15,
             ValueAt = l => 1f / MathF.Max(0.11f, 0.5f * MathF.Pow(0.9f, l)),
-            Format = v => $"{v:0.0} golpes/s"
+            Format = v => Core.Loc.F("{0:0.0} golpes/s", v)
         });
         AddUp(new UpgradeDef
         {
@@ -487,7 +515,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             Description = "Carrega mais fragmentos antes de vender.",
             BaseCost = 30, CostGrowth = 1.56, MaxLevel = 20,
             ValueAt = l => 30 + l * 15 + l * l * 2,
-            Format = v => $"{v:0} fragmentos"
+            Format = v => Core.Loc.F("{0:0} fragmentos", v)
         });
         AddUp(new UpgradeDef
         {
@@ -503,7 +531,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             Description = "Cada fragmento vale mais na venda.",
             BaseCost = 90, CostGrowth = 1.7, MaxLevel = 25,
             ValueAt = l => 1f + l * 0.12f + l * l * 0.004f,
-            Format = v => $"x{v:0.00} valor"
+            Format = v => Core.Loc.F("x{0:0.00} valor", v)
         });
         AddUp(new UpgradeDef
         {
@@ -511,7 +539,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             Description = "Alcance de mineração e raio de atração de fragmentos.",
             BaseCost = 55, CostGrowth = 1.6, MaxLevel = 12,
             ValueAt = l => 2.5f + l * 0.9f,
-            Format = v => $"{v:0.0} m de atração"
+            Format = v => Core.Loc.F("{0:0.0} m de atração", v)
         });
         AddUp(new UpgradeDef
         {
@@ -519,7 +547,7 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             Description = "Golpes em ritmo carregam um pulso que atinge todos os cristais próximos.",
             BaseCost = 400, CostGrowth = 1.9, MaxLevel = 12,
             ValueAt = l => 1.5f + l * 0.5f,
-            Format = v => $"pulso x{v:0.0} · raio {ResonanceRadius(v):0.0} m"
+            Format = v => Core.Loc.F("pulso x{0:0.0} · raio {1:0.0} m", v, ResonanceRadius(v))
         });
     }
 

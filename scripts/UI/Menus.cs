@@ -51,6 +51,16 @@ public abstract partial class ModalScreen : CanvasLayer
 
     protected virtual void HeaderExtra(HBoxContainer header) { }
 
+    /// <summary>LB/RB (ou Q/R) trocam de aba nas telas que têm abas.</summary>
+    protected virtual void OnTab(int dir) { }
+
+    public override void _UnhandledInput(InputEvent e)
+    {
+        if (!Visible) return;
+        if (e.IsActionPressed("ui_tab_next")) { OnTab(1); GetViewport().SetInputAsHandled(); }
+        else if (e.IsActionPressed("ui_tab_prev")) { OnTab(-1); GetViewport().SetInputAsHandled(); }
+    }
+
     public virtual void Open()
     {
         Visible = true;
@@ -97,81 +107,156 @@ public abstract partial class ModalScreen : CanvasLayer
 /// <summary>Painel de configurações (usado no menu principal e na pausa).</summary>
 public partial class SettingsScreen : ModalScreen
 {
+    static readonly string[] TabNames = { "Geral", "Vídeo", "Áudio", "Teclado e mouse", "Controle", "Acessibilidade" };
+    int _tab;
+    HBoxContainer _tabs;
+    ScrollContainer _scroll;
+    Button _reset;
+    // captura de tecla/botão para remapear
+    string _capturing;
+    bool _capturingPad;
+    Button _captureBtn;
+
     public override void _Ready()
     {
-        BuildFrame("CONFIGURAÇÕES", new Vector2(620, 0), UiTheme.Cyan);
+        BuildFrame(Loc.T("CONFIGURAÇÕES"), new Vector2(800, 0), UiTheme.Cyan);
         Layer = 20;
-        var d = Settings.Data;
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 520), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
-        Body.AddChild(scroll);
-        var grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        grid.AddThemeConstantOverride("h_separation", 24);
-        grid.AddThemeConstantOverride("v_separation", 3);
-        scroll.AddChild(grid);
-
-        AddSlider(grid, "Sensibilidade do mouse", 0.02f, 1.0f, 0.01f, d.MouseSensitivity, v => d.MouseSensitivity = v, v => $"{v * 100:0}");
-        AddSlider(grid, "Campo de visão", 60, 100, 1, d.Fov, v => d.Fov = v, v => $"{v:0}°");
-        AddSlider(grid, "Volume geral", 0, 1, 0.01f, d.MasterVolume, v => d.MasterVolume = v, v => $"{v * 100:0}%");
-        AddSlider(grid, "Música", 0, 1, 0.01f, d.MusicVolume, v => d.MusicVolume = v, v => $"{v * 100:0}%");
-        AddSlider(grid, "Efeitos", 0, 1, 0.01f, d.SfxVolume, v => d.SfxVolume = v, v => $"{v * 100:0}%");
-        _scale = AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v =>
-        {
-            d.RenderScale = v;
-            // escolha manual: desliga a resolução dinâmica para respeitar o valor escolhido
-            if (d.DynamicResolution) { d.DynamicResolution = false; _dyn?.SetPressedNoSignal(false); }
-        }, v => $"{v * 100:0}%");
-
-        grid.AddChild(UiTheme.Label("Qualidade gráfica", 18));
-        var q = new OptionButton { CustomMinimumSize = new Vector2(260, 30) };
-        q.AddItem("Baixa (PCs modestos)", 0);
-        q.AddItem("Média", 1);
-        q.AddItem("Alta", 2);
-        q.Selected = d.Quality;
-        q.ItemSelected += i =>
-        {
-            // o preset ajusta escala 3D e resolução dinâmica juntos (podem ser alterados depois)
-            d.Quality = (int)i;
-            bool low = i == 0;
-            d.RenderScale = low ? 0.75f : 1f;
-            d.DynamicResolution = low;
-            _scale.SetValueNoSignal(d.RenderScale);
-            _scaleLabel.Text = $"{d.RenderScale * 100:0}%";
-            _dyn.SetPressedNoSignal(d.DynamicResolution);
-            Changed();
-            GameState.Instance.Notify("Qualidade aplicada", $"{q.GetItemText((int)i)} · 3D {d.RenderScale * 100:0}% · resolução dinâmica {(low ? "ligada" : "desligada")}", NotifyKind.Info);
-        };
-        grid.AddChild(q);
-
-        grid.AddChild(UiTheme.Label("Resolução da janela", 18));
-        var res = new OptionButton { CustomMinimumSize = new Vector2(260, 30) };
-        foreach (var sz in Settings.WindowSizes) res.AddItem($"{sz.X} × {sz.Y}" + (sz.Y == 720 ? " (recomendado)" : ""));
-        res.Selected = d.WindowSize;
-        res.ItemSelected += i => { d.WindowSize = (int)i; Changed(); };
-        grid.AddChild(res);
-
-        grid.AddChild(UiTheme.Label("Limite de FPS", 18));
-        var fps = new OptionButton { CustomMinimumSize = new Vector2(260, 30) };
-        int[] fpsVals = { 30, 60, 120, 0 };
-        foreach (var f in fpsVals) fps.AddItem(f == 0 ? "Ilimitado" : f.ToString());
-        fps.Selected = Math.Max(0, Array.IndexOf(fpsVals, d.MaxFps));
-        fps.ItemSelected += i => { d.MaxFps = fpsVals[i]; Changed(); };
-        grid.AddChild(fps);
-
-        AddCheck(grid, "Tela cheia", d.Fullscreen, v => d.Fullscreen = v);
-        AddCheck(grid, "Sincronização vertical (VSync)", d.VSync, v => d.VSync = v);
-        AddCheck(grid, "Inverter eixo Y", d.InvertY, v => d.InvertY = v);
-        AddCheck(grid, "Mostrar FPS (F3)", d.ShowFps, v => d.ShowFps = v);
-        _dyn = AddCheck(grid, "Resolução dinâmica (~30 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
-        AddCheck(grid, "Atualizações automáticas", d.CheckUpdates, v => d.CheckUpdates = v);
-
+        _tabs = new HBoxContainer();
+        _tabs.AddThemeConstantOverride("separation", 6);
+        Body.AddChild(_tabs);
+        _scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 450), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        Body.AddChild(_scroll);
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        footer.AddThemeConstantOverride("separation", 10);
         Body.AddChild(footer);
-        footer.AddChild(UiTheme.Button("Voltar", Close, 180));
+        footer.AddChild(UiTheme.Label(Loc.T("LB/RB ou Q/R: trocar de aba"), 14, UiTheme.Muted));
+        var sp = new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        footer.AddChild(sp);
+        _reset = UiTheme.Button(Loc.T("Restaurar padrões"), ResetBindings, 220, 18);
+        footer.AddChild(_reset);
+        footer.AddChild(UiTheme.Button(Loc.T("Voltar"), Close, 160));
     }
 
-    HSlider _scale;
-    Label _scaleLabel;
-    CheckButton _dyn;
+    bool PadTabVisible => Input.GetConnectedJoypads().Count > 0 || InputHints.UsingPad;
+
+    public override void Open()
+    {
+        if (_tab == 4 && !PadTabVisible) _tab = 0;
+        BuildTabs();
+        BuildContent();
+        base.Open();
+    }
+
+    protected override void OnTab(int dir)
+    {
+        if (_capturing != null) return;
+        int n = TabNames.Length;
+        do { _tab = (_tab + dir + n) % n; } while (_tab == 4 && !PadTabVisible);
+        BuildTabs();
+        BuildContent();
+        Callable.From(FocusFirst).CallDeferred();
+    }
+
+    void BuildTabs()
+    {
+        foreach (Node c in _tabs.GetChildren()) c.QueueFree();
+        for (int i = 0; i < TabNames.Length; i++)
+        {
+            if (i == 4 && !PadTabVisible) continue;
+            int idx = i;
+            var b = UiTheme.Button(Loc.T(TabNames[i]), () => { _tab = idx; BuildTabs(); BuildContent(); }, 0, 16);
+            b.CustomMinimumSize = new Vector2(0, 40);
+            if (i == _tab) b.AddThemeColorOverride("font_color", UiTheme.Gold);
+            _tabs.AddChild(b);
+        }
+        _reset.Visible = _tab == 3 || _tab == 4;
+    }
+
+    GridContainer NewGrid()
+    {
+        foreach (Node c in _scroll.GetChildren()) c.QueueFree();
+        var grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        grid.AddThemeConstantOverride("h_separation", 24);
+        grid.AddThemeConstantOverride("v_separation", 6);
+        _scroll.AddChild(grid);
+        return grid;
+    }
+
+    void BuildContent()
+    {
+        var d = Settings.Data;
+        var grid = NewGrid();
+        switch (_tab)
+        {
+            case 0: // Geral
+            {
+                AddOption(grid, "Idioma / Language / Idioma", Loc.LanguageNames, Array.IndexOf(Loc.Languages, d.Language), i =>
+                {
+                    d.Language = Loc.Languages[i];
+                    Changed();
+                    BuildTabs(); BuildContent();
+                    GameState.Instance?.Notify(Loc.T("Idioma alterado"), Loc.T("Alguns textos só mudam depois de reiniciar o jogo."), NotifyKind.Info);
+                }, false);
+                AddCheck(grid, "Atualizações automáticas", d.CheckUpdates, v => d.CheckUpdates = v);
+                AddCheck(grid, "Mostrar FPS (F3)", d.ShowFps, v => d.ShowFps = v);
+                break;
+            }
+            case 1: // Vídeo
+            {
+                AddOption(grid, "Qualidade gráfica", new[] { "Baixa (PCs modestos)", "Média", "Alta" }, d.Quality, i =>
+                {
+                    d.Quality = i;
+                    bool low = i == 0;
+                    d.RenderScale = low ? 0.75f : 1f;
+                    d.DynamicResolution = low;
+                    Changed();
+                    BuildContent();
+                });
+                AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v => { d.RenderScale = v; d.DynamicResolution = false; }, v => $"{v * 100:0}%");
+                AddCheck(grid, "Resolução dinâmica (~30 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
+                var sizes = new string[Settings.WindowSizes.Length];
+                for (int i = 0; i < sizes.Length; i++) sizes[i] = $"{Settings.WindowSizes[i].X} × {Settings.WindowSizes[i].Y}";
+                AddOption(grid, "Resolução da janela", sizes, d.WindowSize, i => { d.WindowSize = i; Changed(); }, false);
+                AddCheck(grid, "Tela cheia", d.Fullscreen, v => d.Fullscreen = v);
+                AddCheck(grid, "Sincronização vertical (VSync)", d.VSync, v => d.VSync = v);
+                int[] fpsVals = { 30, 60, 120, 144, 0 };
+                AddOption(grid, "Limite de FPS", new[] { "30", "60", "120", "144", Loc.T("Ilimitado") }, Math.Max(0, Array.IndexOf(fpsVals, d.MaxFps)), i => { d.MaxFps = fpsVals[i]; Changed(); }, false);
+                AddSlider(grid, "Campo de visão", 60, 100, 1, d.Fov, v => d.Fov = v, v => $"{v:0}°");
+                AddSlider(grid, "Brilho", 0.6f, 1.8f, 0.05f, d.Brightness, v => d.Brightness = v, v => $"{v * 100:0}%");
+                AddSlider(grid, "Escala da interface", 0.8f, 1.5f, 0.05f, d.UiScale, v => d.UiScale = v, v => $"{v * 100:0}%");
+                break;
+            }
+            case 2: // Áudio
+                AddSlider(grid, "Volume geral", 0, 1, 0.01f, d.MasterVolume, v => d.MasterVolume = v, v => $"{v * 100:0}%");
+                AddSlider(grid, "Música", 0, 1, 0.01f, d.MusicVolume, v => d.MusicVolume = v, v => $"{v * 100:0}%");
+                AddSlider(grid, "Efeitos", 0, 1, 0.01f, d.SfxVolume, v => d.SfxVolume = v, v => $"{v * 100:0}%");
+                break;
+            case 3: // Teclado e mouse
+                AddSlider(grid, "Sensibilidade do mouse", 0.02f, 1.0f, 0.01f, d.MouseSensitivity, v => d.MouseSensitivity = v, v => $"{v * 100:0}");
+                AddCheck(grid, "Inverter eixo Y", d.InvertY, v => d.InvertY = v);
+                foreach (var (id, name) in InputSetup.KeyActions) AddBind(grid, id, name, false);
+                break;
+            case 4: // Controle
+                AddSlider(grid, "Sensibilidade do analógico", 0.3f, 3f, 0.05f, d.PadLookSensitivity, v => d.PadLookSensitivity = v, v => $"{v * 100:0}%");
+                AddCheck(grid, "Inverter eixo Y", d.InvertY, v => d.InvertY = v);
+                foreach (var (id, name) in InputSetup.PadActions) AddBind(grid, id, name, true);
+                grid.AddChild(UiTheme.Label(Loc.T("Movimento e câmera"), 16, UiTheme.Muted));
+                grid.AddChild(UiTheme.Label(Loc.T("Analógicos esquerdo e direito"), 16, UiTheme.Muted));
+                break;
+            case 5: // Acessibilidade
+                AddOption(grid, "Modo para daltonismo", new[] { "Desligado", "Protanopia (vermelho)", "Deuteranopia (verde)", "Tritanopia (azul)" }, d.Colorblind, i => { d.Colorblind = i; Changed(); });
+                AddSlider(grid, "Intensidade da correção de cor", 0f, 1f, 0.05f, d.ColorblindStrength, v => d.ColorblindStrength = v, v => $"{v * 100:0}%");
+                AddCheck(grid, "Sons-guia (sonar de minérios e tom de mira)", d.AudioCues, v => d.AudioCues = v);
+                AddCheck(grid, "Narração por voz (menus, mira e avisos)", d.Narration, v => { d.Narration = v; if (v) Accessibility.Speak(Loc.T("Narração ligada"), true); });
+                AddCheck(grid, "Reduzir tremor da câmera", d.ReduceShake, v => d.ReduceShake = v);
+                AddSlider(grid, "Escala da interface", 0.8f, 1.5f, 0.05f, d.UiScale, v => d.UiScale = v, v => $"{v * 100:0}%");
+                var note = UiTheme.Label(Loc.T("Sons-guia: um \"ping\" vem da direção do minério mais próximo e acelera quando você se aproxima; um tom confirma quando a mira está num minério. Com a narração, o jogo lê os botões, o que está na mira e os avisos."), 14, UiTheme.Muted);
+                note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+                note.CustomMinimumSize = new Vector2(360, 0);
+                grid.AddChild(note);
+                break;
+        }
+    }
 
     void Changed()
     {
@@ -179,30 +264,106 @@ public partial class SettingsScreen : ModalScreen
         Settings.Save();
     }
 
+    void AddOption(GridContainer g, string label, string[] items, int selected, Action<int> onSelect, bool translate = true)
+    {
+        g.AddChild(UiTheme.Label(Loc.T(label), 18));
+        var o = new OptionButton { CustomMinimumSize = new Vector2(300, 34), FocusMode = Control.FocusModeEnum.All };
+        foreach (var it in items) o.AddItem(translate ? Loc.T(it) : it);
+        o.Selected = Math.Max(0, selected);
+        o.ItemSelected += i => onSelect((int)i);
+        g.AddChild(o);
+    }
+
     HSlider AddSlider(GridContainer g, string label, float min, float max, float step, float value, Action<float> set, Func<float, string> fmt)
     {
-        g.AddChild(UiTheme.Label(label, 18));
-        var h = new HBoxContainer { CustomMinimumSize = new Vector2(260, 0) };
-        var s = new HSlider { MinValue = min, MaxValue = max, Step = step, Value = value, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+        g.AddChild(UiTheme.Label(Loc.T(label), 18));
+        var h = new HBoxContainer { CustomMinimumSize = new Vector2(300, 0) };
+        var s = new HSlider { MinValue = min, MaxValue = max, Step = step, Value = value, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter, FocusMode = Control.FocusModeEnum.All };
         var v = UiTheme.Label(fmt(value), 16, UiTheme.Cyan, false, HorizontalAlignment.Right);
-        v.CustomMinimumSize = new Vector2(56, 0);
+        v.CustomMinimumSize = new Vector2(64, 0);
         s.ValueChanged += x => { set((float)x); v.Text = fmt((float)x); Changed(); };
         h.AddChild(s);
         h.AddChild(v);
         g.AddChild(h);
-        _scaleLabel = v; // o último criado é o da escala 3D (usado pelo preset)
         return s;
     }
 
     CheckButton AddCheck(GridContainer g, string label, bool value, Action<bool> set)
     {
-        g.AddChild(UiTheme.Label(label, 18));
-        var c = new CheckButton { ButtonPressed = value, SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin };
-        foreach (var st in new[] { "normal", "hover", "pressed", "hover_pressed", "focus", "disabled" })
+        g.AddChild(UiTheme.Label(Loc.T(label), 18));
+        var c = new CheckButton { ButtonPressed = value, SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin, FocusMode = Control.FocusModeEnum.All };
+        foreach (var st in new[] { "normal", "hover", "pressed", "hover_pressed", "disabled" })
             c.AddThemeStyleboxOverride(st, new StyleBoxEmpty());
+        // foco visível para quem navega com controle/teclado
+        c.AddThemeStyleboxOverride("focus", UiTheme.Chamfer(null, UiTheme.Gold, 6, 2, 6, 4));
         c.Toggled += x => { set(x); AudioManager.Instance?.Play("click", -6f); Changed(); };
         g.AddChild(c);
         return c;
+    }
+
+    void AddBind(GridContainer g, string action, string name, bool pad)
+    {
+        g.AddChild(UiTheme.Label(Loc.T(name), 18));
+        Button b = null;
+        b = UiTheme.Button(InputSetup.Describe(action, pad), () => BeginCapture(action, pad, b), 300, 17);
+        g.AddChild(b);
+    }
+
+    void BeginCapture(string action, bool pad, Button b)
+    {
+        _capturing = action;
+        _capturingPad = pad;
+        _captureBtn = b;
+        b.Text = pad ? Loc.T("Aperte um botão do controle…") : Loc.T("Aperte uma tecla ou botão do mouse…");
+        Accessibility.Speak(b.Text, true);
+    }
+
+    public override void _Input(InputEvent e)
+    {
+        if (_capturing == null || !Visible) return;
+        if (!e.IsPressed() || e.IsEcho()) return;
+        bool done = false;
+        if (_capturingPad && e is InputEventJoypadButton jb)
+        {
+            InputSetup.BindPad(_capturing, jb.ButtonIndex);
+            done = true;
+        }
+        else if (!_capturingPad && e is InputEventKey k)
+        {
+            // Esc cancela, a não ser que a ação seja a própria pausa
+            if (k.PhysicalKeycode == Godot.Key.Escape && _capturing != "pause") { EndCapture(); GetViewport().SetInputAsHandled(); return; }
+            InputSetup.BindKey(_capturing, k);
+            done = true;
+        }
+        else if (!_capturingPad && e is InputEventMouseButton mb && mb.ButtonIndex != MouseButton.WheelUp && mb.ButtonIndex != MouseButton.WheelDown)
+        {
+            InputSetup.BindKey(_capturing, mb);
+            done = true;
+        }
+        if (!done) return;
+        GetViewport().SetInputAsHandled();
+        Settings.Save();
+        AudioManager.Instance?.Play("buy", -6f);
+        EndCapture();
+    }
+
+    void EndCapture()
+    {
+        var b = _captureBtn;
+        string a = _capturing;
+        bool pad = _capturingPad;
+        _capturing = null;
+        if (b != null && IsInstanceValid(b)) { b.Text = InputSetup.Describe(a, pad); b.GrabFocus(); }
+        InputHints.Refresh();
+    }
+
+    void ResetBindings()
+    {
+        InputSetup.ResetBindings();
+        Settings.Save();
+        BuildContent();
+        InputHints.Refresh();
+        GameState.Instance?.Notify(Loc.T("Controles restaurados"), Loc.T("Teclado, mouse e controle voltaram ao padrão."), NotifyKind.Info);
     }
 }
 
@@ -241,9 +402,9 @@ public partial class PauseScreen : ModalScreen
     {
         var d = GameState.Instance.Data;
         var t = TimeSpan.FromSeconds(d.PlayTimeSeconds);
-        _stats.Text = $"Tempo de jogo: {(int)t.TotalHours}h {t.Minutes:00}m   ·   Cristais minerados: {d.CrystalsMined}\n" +
-                      $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}   ·   Materiais: {d.Discovered.Count}/{GameData.Materials.Count}" +
-                      (d.PrestigeCount > 0 ? $"\nRenascimentos: {d.PrestigeCount}   ·   Essência: ✦{d.Essence} (x{GameState.Instance.EssenceMultiplier:0.0})" : "");
+        _stats.Text = Loc.F("Tempo de jogo: {0}h {1:00}m   ·   Cristais minerados: {2}\n", (int)t.TotalHours, t.Minutes, d.CrystalsMined) +
+                      Loc.F("Total ganho: {0}   ·   Materiais: {1}/{2}", GameState.FormatMoney(d.TotalEarned), d.Discovered.Count, GameData.Materials.Count) +
+                      (d.PrestigeCount > 0 ? Loc.F("\nRenascimentos: {0}   ·   Essência: ✦{1} (x{2:0.0})", d.PrestigeCount, d.Essence, GameState.Instance.EssenceMultiplier) : "");
     }
 }
 
@@ -292,7 +453,7 @@ public partial class CodexScreen : ModalScreen
         Layer = 20;
         _progress = UiTheme.Label("", 16, UiTheme.Muted);
         Body.AddChild(_progress);
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 400), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 400), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         Body.AddChild(scroll);
         _grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _grid.AddThemeConstantOverride("h_separation", 10);
@@ -320,7 +481,7 @@ public partial class CodexScreen : ModalScreen
                 _grid.AddChild(Card(m, r, known));
             }
         }
-        _progress.Text = $"Descobertos: {found}/{GameData.Materials.Count}   ·   Cristais minerados: {gs.Data.CrystalsMined}   ·   Fragmentos vendidos: {gs.Data.ShardsSold}";
+        _progress.Text = Loc.F("Descobertos: {0}/{1}   ·   Cristais minerados: {2}   ·   Fragmentos vendidos: {3}", found, GameData.Materials.Count, gs.Data.CrystalsMined, gs.Data.ShardsSold);
     }
 
     Control Card(MaterialDef m, RegionDef r, bool known)
@@ -346,12 +507,12 @@ public partial class CodexScreen : ModalScreen
         badge.AddChild(UiTheme.Label(RarityInfo.Badge(m.Rarity), 12, RarityInfo.Color(m.Rarity), true));
         badge.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         titleRow.AddChild(badge);
-        var desc = UiTheme.Label(known ? m.Description : $"Encontrado em: {r.Name}", 14, UiTheme.Muted);
+        var desc = UiTheme.Label(known ? m.Description : Loc.F("Encontrado em: {0}", r.Name), 14, UiTheme.Muted);
         desc.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         desc.CustomMinimumSize = new Vector2(320, 0);
         v.AddChild(desc);
         if (known)
-            v.AddChild(UiTheme.Label($"{GameState.FormatMoney(gs.SellPrice(m))}/frag  ·  resistência {GameState.FormatNumber(m.Hp)}  ·  {r.Name}", 14, UiTheme.Cyan));
+            v.AddChild(UiTheme.Label(Loc.F("{0}/frag  ·  resistência {1}  ·  {2}", GameState.FormatMoney(gs.SellPrice(m)), GameState.FormatNumber(m.Hp), r.Name), 14, UiTheme.Cyan));
         return card;
     }
 }
@@ -464,14 +625,14 @@ public partial class CompletionScreen : ModalScreen
         var d = GameState.Instance.Data;
         var t = TimeSpan.FromSeconds(d.CompletedAtSeconds > 0 ? d.CompletedAtSeconds : d.PlayTimeSeconds);
         int maxed = UpgradeIds.All.Count(id => GameState.Instance.IsMaxed(id));
-        _prestigeBtn.Text = $"Renascer (+{GameState.Instance.PendingEssence} Essência)";
+        _prestigeBtn.Text = Loc.F("Renascer (+{0} Essência)", GameState.Instance.PendingEssence);
         _prestigeBtn.Disabled = !GameState.Instance.CanPrestige;
         _stats.Text =
-            $"Tempo de jornada: {(int)t.TotalHours}h {t.Minutes:00}min\n" +
-            $"Cristais minerados: {GameState.FormatNumber(d.CrystalsMined)}   ·   Fragmentos vendidos: {GameState.FormatNumber(d.ShardsSold)}\n" +
-            $"Total ganho: {GameState.FormatMoney(d.TotalEarned)}\n" +
-            $"Materiais descobertos: {d.Discovered.Count}/{GameData.Materials.Count}   ·   Melhorias no máximo: {maxed}/{UpgradeIds.All.Length}\n" +
-            $"Ferramenta: {GameState.ToolTierNames[GameState.Instance.ToolTier]}";
+            Loc.F("Tempo de jornada: {0}h {1:00}min\n", (int)t.TotalHours, t.Minutes) +
+            Loc.F("Cristais minerados: {0}   ·   Fragmentos vendidos: {1}\n", GameState.FormatNumber(d.CrystalsMined), GameState.FormatNumber(d.ShardsSold)) +
+            Loc.F("Total ganho: {0}\n", GameState.FormatMoney(d.TotalEarned)) +
+            Loc.F("Materiais descobertos: {0}/{1}   ·   Melhorias no máximo: {2}/{3}\n", d.Discovered.Count, GameData.Materials.Count, maxed, UpgradeIds.All.Length) +
+            Loc.F("Ferramenta: {0}", GameState.ToolName(GameState.Instance.ToolTier));
     }
 }
 
@@ -565,17 +726,17 @@ public partial class UpdateScreen : ModalScreen
     public void Show(UpdateManifest m)
     {
         string notes = string.IsNullOrWhiteSpace(m.Notes) ? "" : "\n\n" + m.Notes;
-        _notes.Text = $"Versão instalada: v{UpdateManager.CurrentVersion}   →   nova: v{m.Version}{notes}";
+        _notes.Text = Loc.F("Versão instalada: v{0}   →   nova: v{1}{2}", UpdateManager.CurrentVersion, m.Version, notes);
         if (Updater.NeedsFullInstaller)
         {
-            _status.Text = "Esta versão usa um motor novo e precisa do instalador completo.";
-            _updateBtn.Text = "Baixar instalador";
+            _status.Text = Loc.T("Esta versão usa um motor novo e precisa do instalador completo.");
+            _updateBtn.Text = Loc.T("Baixar instalador");
         }
         else
         {
             long total = 0; foreach (var f in m.Files) total += f.Size;
-            _status.Text = $"Download de {total / 1048576.0:0.0} MB. O jogo fecha, atualiza e reabre sozinho. Seus saves são mantidos.";
-            _updateBtn.Text = "Atualizar agora";
+            _status.Text = Loc.F("Download de {0:0.0} MB. O jogo fecha, atualiza e reabre sozinho. Seus saves são mantidos.", total / 1048576.0);
+            _updateBtn.Text = Loc.T("Atualizar agora");
         }
         _bar.Visible = false;
         _updateBtn.Disabled = false;
@@ -605,7 +766,7 @@ public partial class UpdateScreen : ModalScreen
         _status.AddThemeColorOverride("font_color", UiTheme.Danger);
         _updateBtn.Disabled = false;
         _laterBtn.Disabled = false;
-        _updateBtn.Text = "Tentar de novo";
+        _updateBtn.Text = Loc.T("Tentar de novo");
     }
 }
 
@@ -624,7 +785,7 @@ public partial class BackupScreen : ModalScreen
         info.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         info.CustomMinimumSize = new Vector2(700, 0);
         Body.AddChild(info);
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 380), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 380), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         Body.AddChild(scroll);
         _list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _list.AddThemeConstantOverride("separation", 8);
@@ -649,9 +810,9 @@ public partial class BackupScreen : ModalScreen
             var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
             h.AddChild(v);
             var t = TimeSpan.FromSeconds(s.Data.PlayTimeSeconds);
-            string when = s.When == default ? "data desconhecida" : s.When.ToString("dd/MM/yyyy HH:mm");
+            string when = s.When == default ? Loc.T("data desconhecida") : s.When.ToString("dd/MM/yyyy HH:mm");
             v.AddChild(UiTheme.Label($"{when}   ·   {s.Reason.Replace('-', ' ')}", 16, UiTheme.Text, true));
-            v.AddChild(UiTheme.Label($"{GameState.FormatMoney(s.Data.Money)}   ·   {(int)t.TotalHours}h{t.Minutes:00} de jogo   ·   {s.Data.UnlockedRegions.Count}/{GameData.Regions.Count} regiões   ·   ✦{s.Data.Essence}", 14, UiTheme.Muted));
+            v.AddChild(UiTheme.Label(Loc.F("{0}   ·   {1}h{2:00} de jogo   ·   {3}/{4} regiões   ·   ✦{5}", GameState.FormatMoney(s.Data.Money), (int)t.TotalHours, t.Minutes, s.Data.UnlockedRegions.Count, GameData.Regions.Count, s.Data.Essence), 14, UiTheme.Muted));
             var snap = s;
             var b = UiTheme.Button("Restaurar", () => OnRestore?.Invoke(snap), 150, 17);
             b.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;

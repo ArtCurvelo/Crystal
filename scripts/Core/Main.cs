@@ -116,7 +116,7 @@ public partial class Main : Node
         _updater.Status += t => _menu.SetUpdateStatus(t);
         _backups = new BackupScreen();
         _backups.OnRestore = snap => _confirm.Ask(
-            $"Restaurar o backup de {(snap.When == default ? "data desconhecida" : snap.When.ToString("dd/MM/yyyy HH:mm"))} ({GameState.FormatMoney(snap.Data.Money)})? O progresso atual também é guardado como backup antes.",
+            Loc.F("Restaurar o backup de {0} ({1})? O progresso atual também é guardado como backup antes.", (snap.When == default ? Loc.T("data desconhecida") : snap.When.ToString("dd/MM/yyyy HH:mm")), GameState.FormatMoney(snap.Data.Money)),
             () =>
             {
                 if (SaveSystem.Restore(snap.Path))
@@ -319,7 +319,7 @@ public partial class Main : Node
     void AskNewGame()
     {
         if (SaveSystem.HasSave())
-            _confirm.Ask("Iniciar um novo jogo apagará o progresso salvo atual. Deseja continuar?", () => StartGame(false));
+            _confirm.Ask(Loc.T("Iniciar um novo jogo apagará o progresso salvo atual. Deseja continuar?"), () => StartGame(false));
         else StartGame(false);
     }
 
@@ -448,7 +448,7 @@ public partial class Main : Node
         Player.InputEnabled = false;
         AudioManager.Instance?.SetBeam(false);
         if (gs.DayOver) GoHome();
-        else _confirm.Ask($"Encerrar o turno agora ({gs.ClockText}) e subir para casa? O dia termina mais cedo.", GoHome);
+        else _confirm.Ask(Loc.F("Encerrar o turno agora ({0}) e subir para casa? O dia termina mais cedo.", gs.ClockText), GoHome);
     }
 
     CanvasLayer _fade;
@@ -493,24 +493,24 @@ public partial class Main : Node
             long fee = gs.GoblinFee(id);
             string threat = gs.GoblinData(id).Strikes switch
             {
-                0 => "Ele está de bom humor.",
-                1 => "Ele lembra que você não pagou da última vez.",
-                _ => "Ele está furioso. Se não pagar de novo, pode fugir ou se rebelar!",
+                0 => Loc.T("Ele está de bom humor."),
+                1 => Loc.T("Ele lembra que você não pagou da última vez."),
+                _ => Loc.T("Ele está furioso. Se não pagar de novo, pode fugir ou se rebelar!"),
             };
             Input.MouseMode = Input.MouseModeEnum.Visible;
             Player.InputEnabled = false;
-            _choice.Ask($"{def.Name.ToUpperInvariant()} QUER SEU PAGAMENTO",
-                $"{def.Name}, {def.Title}, minerou {GameState.FormatMoney(gs.GoblinData(id).DayValue)} hoje (está no baú dele). A taxa é {GameState.FormatMoney(fee)}. {threat}",
-                $"Pagar {GameState.FormatMoney(fee)}", "Não pagar", gs.CanAfford(fee), pay =>
+            _choice.Ask(Loc.F("{0} QUER SEU PAGAMENTO", def.Name.ToUpperInvariant()),
+                Loc.F("{0}, {1}, minerou {2} hoje (está no baú dele). A taxa é {3}. {4}", def.Name, def.Title, GameState.FormatMoney(gs.GoblinData(id).DayValue), GameState.FormatMoney(fee), threat),
+                Loc.F("Pagar {0}", GameState.FormatMoney(fee)), "Não pagar", gs.CanAfford(fee), pay =>
                 {
                     var r = gs.SettleGoblinFee(id, pay);
                     switch (r)
                     {
                         case GameState.FeeOutcome.Paid: gs.Notify(def.Name, "\"Negócio justo, chefe!\"", NotifyKind.Success); break;
                         case GameState.FeeOutcome.Forgiven: gs.Notify(def.Name, "\"Hmpf. Releva... desta vez.\"", NotifyKind.Info); break;
-                        case GameState.FeeOutcome.Warned: gs.Notify($"{def.Name} está irritado", "\"Mais uma vez, e ninguém responde por mim!\"", NotifyKind.Warning); break;
-                        case GameState.FeeOutcome.Fled: gs.Notify($"{def.Name} fugiu!", "Cansado de trabalhar de graça, ele sumiu. Talvez volte ao esconderijo em alguns dias.", NotifyKind.Warning); break;
-                        case GameState.FeeOutcome.Rebel: gs.Notify($"{def.Name} jurou vingança!", "Quando você voltar à região dele, ele e os comparsas vão cobrar à força. Prepare o feixe!", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Warned: gs.Notify(Loc.F("{0} está irritado", def.Name), "\"Mais uma vez, e ninguém responde por mim!\"", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Fled: gs.Notify(Loc.F("{0} fugiu!", def.Name), "Cansado de trabalhar de graça, ele sumiu. Talvez volte ao esconderijo em alguns dias.", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Rebel: gs.Notify(Loc.F("{0} jurou vingança!", def.Name), "Quando você voltar à região dele, ele e os comparsas vão cobrar à força. Prepare o feixe!", NotifyKind.Warning); break;
                     }
                     foreach (var c in World.GoblinCamps) c.SyncState();
                     GoHome();
@@ -526,9 +526,9 @@ public partial class Main : Node
         {
             PlaceTo(World.House.ArrivePoint, 0);
             Hud.ShowBigMessage("CASA");
-            gs.Notify($"Fim do Dia {gs.Data.Day}",
-                $"Ganho no dia: {GameState.FormatMoney(gs.Data.DayEarned)}" + (bonus > 0 ? $" (+{GameState.FormatMoney(bonus)} de bônus)" : "") +
-                ". Use o PAINEL para melhorias e a CAMA para dormir.", NotifyKind.Success);
+            gs.Notify(Loc.F("Fim do Dia {0}", gs.Data.Day),
+                Loc.F("Ganho no dia: {0}", GameState.FormatMoney(gs.Data.DayEarned)) + (bonus > 0 ? Loc.F(" (+{0} de bônus)", GameState.FormatMoney(bonus)) : "") +
+                Loc.T(". Use o PAINEL para melhorias e a CAMA para dormir."), NotifyKind.Success);
         });
     }
 
@@ -553,7 +553,7 @@ public partial class Main : Node
             gs.StartNewDay();
             Events.ResetAll();
             PlaceTo(World.House.WakePoint, Mathf.Pi);
-            Hud.ShowBigMessage($"DIA {gs.Data.Day}");
+            Hud.ShowBigMessage(Loc.F("DIA {0}", gs.Data.Day));
             gs.Notify("Bom dia!", "Desça pelo ELEVADOR para voltar à mina.", NotifyKind.Info);
         });
     }
@@ -580,7 +580,7 @@ public partial class Main : Node
             Player.RestoreHp();
             PlaceTo(World.House.WakePoint, Mathf.Pi);
             Hud.ShowBigMessage("VOCÊ DESMAIOU");
-            gs.Notify("Você desmaiou", $"Os goblins levaram {stolen} fragmentos. Você acordou em casa; durma para começar outro dia.", NotifyKind.Warning);
+            gs.Notify("Você desmaiou", Loc.F("Os goblins levaram {0} fragmentos. Você acordou em casa; durma para começar outro dia.", stolen), NotifyKind.Warning);
         });
     }
 
@@ -599,7 +599,7 @@ public partial class Main : Node
             return;
         }
         if (_fading) return;
-        if (Player != null) Player.InputEnabled = true;
+        if (Player != null) { Player.InputEnabled = true; Player.SuppressInput(); }
         if (!_pause.IsOpen) Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
@@ -645,6 +645,7 @@ public partial class Main : Node
         {
             GetViewport().SetInputAsHandled();
             if (_confirm.IsOpen) _confirm.Close();
+            else if (_choice.IsOpen) _choice.Decline();
             else if (_home.IsOpen) _home.Close();
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
@@ -698,11 +699,64 @@ public partial class Main : Node
         }
         UpdateRegion(false);
         UpdateDynamicResolution((float)delta);
+        UpdateAccessibilityCues((float)delta);
         _cullTimer -= (float)delta;
         if (_cullTimer <= 0) { _cullTimer = 0.5f; UpdateRegionCulling(); CheckSecrets(); }
     }
 
     bool _bannerHouse;
+
+    // ---------------- acessibilidade: sons-guia e narração do que a mira encontra ----------------
+    AudioStreamPlayer3D _cuePlayer;
+    float _cueTimer;
+    Mining.Crystal _lastAimed;
+    Player.IInteractable _lastPrompt;
+
+    void UpdateAccessibilityCues(float dt)
+    {
+        if (Player == null || CurrentMode != Mode.Playing || AnyModal()) return;
+        var d = Settings.Data;
+        // narração: minério ou estação na mira
+        if (d.Narration || d.AudioCues)
+        {
+            if (Player.TargetCrystal != _lastAimed)
+            {
+                _lastAimed = Player.TargetCrystal;
+                if (_lastAimed != null)
+                {
+                    if (d.AudioCues) AudioManager.Instance?.Play("cue_aim", -4f, 1f + (_lastAimed.Material.Rare ? 0.3f : 0f));
+                    Accessibility.Speak(Loc.T(_lastAimed.Material.Name), true);
+                }
+            }
+            if (Player.TargetInteractable != _lastPrompt)
+            {
+                _lastPrompt = Player.TargetInteractable;
+                if (_lastPrompt != null) Accessibility.Speak(_lastPrompt.GetPrompt(), true);
+            }
+        }
+        if (!d.AudioCues) return;
+        // sonar: ping 3D vindo do minério mineável mais próximo (mais rápido quando perto)
+        _cueTimer -= dt;
+        if (_cueTimer > 0) return;
+        Mining.Crystal best = null; float bd = 25f;
+        var p = Player.GlobalPosition;
+        foreach (var c in World.Crystals)
+        {
+            if (!c.IsMineable) continue;
+            float dist = c.GlobalPosition.DistanceTo(p);
+            if (dist < bd) { bd = dist; best = c; }
+        }
+        if (best == null) { _cueTimer = 1.5f; return; }
+        if (_cuePlayer == null)
+        {
+            _cuePlayer = new AudioStreamPlayer3D { Bus = "SFX", UnitSize = 6f, MaxDistance = 40f, Stream = AudioManager.Instance?.GetStream("cue_ping") };
+            World.GetParent().AddChild(_cuePlayer);
+        }
+        _cuePlayer.GlobalPosition = best.Center;
+        _cuePlayer.PitchScale = 0.8f + (1f - bd / 25f) * 0.7f;
+        _cuePlayer.Play();
+        _cueTimer = Mathf.Lerp(0.18f, 1.3f, bd / 25f);
+    }
 
     /// <summary>Descoberta de câmaras secretas (uma vez por save).</summary>
     void CheckSecrets()
@@ -715,7 +769,7 @@ public partial class Main : Node
         int total = 0;
         foreach (var L in World.Layouts) total += L.Secrets.Count;
         Hud.ShowBigMessage("PASSAGEM SECRETA!");
-        gs.Notify("Câmara secreta encontrada", $"Depósitos raros escondidos aqui. Câmaras secretas: {gs.Data.Secrets.Count}/{total}", NotifyKind.Rare);
+        gs.Notify("Câmara secreta encontrada", Loc.F("Depósitos raros escondidos aqui. Câmaras secretas: {0}/{1}", gs.Data.Secrets.Count, total), NotifyKind.Rare);
         AudioManager.Instance?.Play("rare", -2f);
         gs.SaveGame(true);
     }
@@ -761,9 +815,9 @@ public partial class Main : Node
     {
         var gs = GameState.Instance;
         if (!gs.CanPrestige) return;
-        _confirm.Ask($"Renascer recomeça a jornada: dinheiro, melhorias, mochila e regiões voltam ao início. " +
-                     $"Você recebe +{gs.PendingEssence} Essência Ancestral (bônus permanente de +10% em dano e venda por ponto). " +
-                     "A Coleção e as estatísticas são mantidas. Continuar?", DoPrestige);
+        _confirm.Ask(Loc.F("Renascer recomeça a jornada: dinheiro, melhorias, mochila e regiões voltam ao início. ") +
+                     Loc.F("Você recebe +{0} Essência Ancestral (bônus permanente de +10% em dano e venda por ponto). ", gs.PendingEssence) +
+                     Loc.T("A Coleção e as estatísticas são mantidas. Continuar?"), DoPrestige);
     }
 
     void DoPrestige()

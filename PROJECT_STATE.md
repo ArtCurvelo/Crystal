@@ -25,6 +25,8 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Eventos por região**: Eco Luminoso, Maré Gélida, Surto do Núcleo e Maré Luminosa.
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
+- **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
+- **Acessibilidade** (`Core/Accessibility.cs`): filtro de daltonismo, narração (TTS do sistema), sons-guia, reduzir tremor. Remapeamento de teclado/mouse/controle em `InputSetup`.
 
 ## Arquitetura
 ```

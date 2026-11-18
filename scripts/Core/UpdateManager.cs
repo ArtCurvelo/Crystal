@@ -61,12 +61,12 @@ public partial class UpdateManager : Node
     public async void CheckForUpdates()
     {
         if (!Supported || !Settings.Data.CheckUpdates) return;
-        Status?.Invoke("Procurando atualizações…");
+        Status?.Invoke(Loc.T("Procurando atualizações…"));
         var bytes = await Fetch(ManifestUrl + "?t=" + Time.GetUnixTimeFromSystem());
-        if (bytes == null) { Status?.Invoke("Sem conexão para verificar atualizações"); return; }
+        if (bytes == null) { Status?.Invoke(Loc.T("Sem conexão para verificar atualizações")); return; }
         var m = ParseManifest(System.Text.Encoding.UTF8.GetString(bytes));
-        if (m == null || !IsNewer(m.Version, CurrentVersion)) { Status?.Invoke("✓ Jogo atualizado"); return; }
-        Status?.Invoke($"Nova versão v{m.Version} disponível");
+        if (m == null || !IsNewer(m.Version, CurrentVersion)) { Status?.Invoke(Loc.T("✓ Jogo atualizado")); return; }
+        Status?.Invoke(Loc.F("Nova versão v{0} disponível", m.Version));
         Available = m;
         NeedsFullInstaller = !string.IsNullOrEmpty(m.Engine) && m.Engine != EngineVersion;
         UpdateFound?.Invoke(m);
@@ -129,19 +129,19 @@ public partial class UpdateManager : Node
             for (int i = 0; i < m.Files.Count; i++)
             {
                 var f = m.Files[i];
-                Progress?.Invoke((float)i / m.Files.Count, $"Baixando {System.IO.Path.GetFileName(f.Path)}…");
+                Progress?.Invoke((float)i / m.Files.Count, Loc.F("Baixando {0}…", System.IO.Path.GetFileName(f.Path)));
                 var data = await Fetch(f.Url);
-                if (data == null) { Failed?.Invoke("Falha no download. Verifique a conexão e tente de novo."); return; }
+                if (data == null) { Failed?.Invoke(Loc.T("Falha no download. Verifique a conexão e tente de novo.")); return; }
                 string dst = System.IO.Path.Combine(staging, f.Path.Replace('/', System.IO.Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dst));
                 File.WriteAllBytes(dst, data);
                 if (!string.Equals(Sha256Of(dst), f.Sha256, StringComparison.OrdinalIgnoreCase))
                 {
-                    Failed?.Invoke($"Arquivo corrompido no download ({f.Path}). Tente de novo.");
+                    Failed?.Invoke(Loc.F("Arquivo corrompido no download ({0}). Tente de novo.", f.Path));
                     return;
                 }
             }
-            Progress?.Invoke(1f, "Aplicando atualização…");
+            Progress?.Invoke(1f, Loc.T("Aplicando atualização…"));
             string gameDir = System.IO.Path.GetDirectoryName(OS.GetExecutablePath());
             string script = WriteApplyScript(staging, gameDir, OS.GetExecutablePath(), m.Files, OS.GetProcessId());
             // só salva se houver partida em andamento; e guarda um backup antes de atualizar
@@ -152,7 +152,7 @@ public partial class UpdateManager : Node
         }
         catch (Exception e)
         {
-            Failed?.Invoke("Erro ao atualizar: " + e.Message);
+            Failed?.Invoke(Loc.T("Erro ao atualizar: ") + e.Message);
         }
     }
 
@@ -164,13 +164,13 @@ public partial class UpdateManager : Node
         sb.AppendLine("chcp 65001 >nul");
         sb.AppendLine("title Atualizando Crystal Excavator");
         sb.AppendLine(":wait");
-        sb.AppendLine($"tasklist /FI \"PID eq {pid}\" 2>nul | find \"{pid}\" >nul && (timeout /t 1 /nobreak >nul & goto wait)");
+        sb.AppendLine(string.Format("tasklist /FI \"PID eq {0}\" 2>nul | find \"{1}\" >nul && (timeout /t 1 /nobreak >nul & goto wait)", pid, pid));
         foreach (var f in files)
         {
             string rel = f.Path.Replace('/', '\\');
-            sb.AppendLine($"copy /Y \"{staging}\\{rel}\" \"{gameDir}\\{rel}\" >nul");
+            sb.AppendLine(string.Format("copy /Y \"{0}\\{1}\" \"{2}\\{3}\" >nul", staging, rel, gameDir, rel));
         }
-        sb.AppendLine($"start \"\" \"{exePath}\"");
+        sb.AppendLine(string.Format("start \"\" \"{0}\"", exePath));
         string path = System.IO.Path.Combine(staging, "aplicar_atualizacao.bat");
         File.WriteAllText(path, sb.ToString().Replace("\n", "\r\n").Replace("\r\r\n", "\r\n"));
         return path;

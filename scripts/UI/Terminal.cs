@@ -91,7 +91,7 @@ public abstract partial class TerminalScreen : ModalScreen
         ih.AddChild(HudIcon.Make(HudIcon.Kind.Bag, new Color(0.75f, 0.85f, 0.95f), 26));
         ih.AddChild(UiTheme.Label("Inventário", 22, UiTheme.Text, true));
         iv.AddChild(new ColorRect { Color = new Color(UiTheme.Cyan, 0.3f), CustomMinimumSize = new Vector2(0, 2) });
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 250), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 250), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
         iv.AddChild(scroll);
         InvList = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         InvList.AddThemeConstantOverride("separation", 6);
@@ -154,6 +154,12 @@ public abstract partial class TerminalScreen : ModalScreen
         InvSell.Disabled = gs.InventoryCount == 0;
     }
 
+    protected override void OnTab(int dir)
+    {
+        if (IsShopTab && AtSellStation) SwitchToSell?.Invoke();
+        else if (!IsShopTab) SwitchToShop?.Invoke();
+    }
+
     public override void Open()
     {
         base.Open();
@@ -169,7 +175,7 @@ public abstract partial class TerminalScreen : ModalScreen
         long earned = gs.SellAll();
         if (earned <= 0) { AudioManager.Instance?.Play("error", -6f); return; }
         AudioManager.Instance?.Play("sell", -2f);
-        gs.Notify("Venda concluída", $"{count} fragmentos por {GameState.FormatMoney(earned)}", NotifyKind.Success);
+        gs.Notify("Venda concluída", Loc.F("{0} fragmentos por {1}", count, GameState.FormatMoney(earned)), NotifyKind.Success);
         Refresh();
         InvTotal.Text = "+" + GameState.FormatMoney(earned);
         InvTotal.PivotOffset = InvTotal.Size / 2;
@@ -197,7 +203,7 @@ public partial class ShopScreen : TerminalScreen
         var right = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         right.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.04f, 0.07f, 0.12f, 0.9f), new Color(UiTheme.Cyan, 0.4f), 14, 2, 12, 10));
         Content.AddChild(right);
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 440), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 440), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         right.AddChild(scroll);
         var inner = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         inner.AddThemeConstantOverride("separation", 10);
@@ -237,8 +243,26 @@ public partial class ShopScreen : TerminalScreen
 
     void OnChanged() { if (Visible) Refresh(); }
 
+    string _focusId;
+    bool _focusOnOpen;
+
+    public override void Open()
+    {
+        _focusOnOpen = true;
+        base.Open();
+    }
+
     public override void Refresh()
     {
+        // controle: guarda qual melhoria estava em foco para reencontrá-la depois da reconstrução
+        var owner = GetViewport()?.GuiGetFocusOwner();
+        if (owner != null && owner.HasMeta("uid")) _focusId = (string)owner.GetMeta("uid");
+        if (_focusOnOpen)
+        {
+            _focusOnOpen = false;
+            var gs = GameState.Instance;
+            _focusId = UpgradeIds.All.FirstOrDefault(id => !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? UpgradeIds.All[0];
+        }
         RefreshInventory();
         foreach (Node c in _grid.GetChildren()) c.QueueFree();
         foreach (var id in UpgradeIds.All) _grid.AddChild(BuildCard(GameData.Upgrades[id]));
@@ -274,12 +298,12 @@ public partial class ShopScreen : TerminalScreen
         string now = u.Format(u.ValueAt(lvl));
         v.AddChild(UiTheme.Label(maxed ? now : $"{now}  →  {u.Format(u.ValueAt(lvl + 1))}", 14, UiTheme.Muted));
 
-        var lv = UiTheme.Label(maxed ? "MÁX" : $"Nv {lvl}  ▶  Nv {lvl + 1}", 16, maxed ? UiTheme.Success : UiTheme.Text, true);
+        var lv = UiTheme.Label(maxed ? Loc.T("MÁX") : Loc.F("Nv {0}  ▶  Nv {1}", lvl, lvl + 1), 16, maxed ? UiTheme.Success : UiTheme.Text, true);
         lv.CustomMinimumSize = new Vector2(130, 0);
         lv.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         h.AddChild(lv);
 
-        var btn = UiTheme.Button(maxed ? "Máximo" : GameState.FormatMoney(cost), () => Buy(u.Id), 150, 18);
+        var btn = UiTheme.Button(maxed ? Loc.T("Máximo") : GameState.FormatMoney(cost), () => Buy(u.Id), 150, 18);
         btn.Disabled = maxed || !afford;
         btn.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         var pill = UiTheme.Chamfer(new Color(0.12f, 0.1f, 0.04f, 0.95f), afford && !maxed ? UiTheme.Gold : new Color(UiTheme.Gold, 0.3f), 8, 2, 12, 6);
@@ -288,6 +312,8 @@ public partial class ShopScreen : TerminalScreen
         btn.AddThemeStyleboxOverride("disabled", UiTheme.Chamfer(new Color(0.06f, 0.06f, 0.08f, 0.8f), new Color(1, 1, 1, 0.1f), 8, 2, 12, 6));
         if (afford && !maxed) btn.AddThemeColorOverride("font_color", UiTheme.Gold);
         h.AddChild(btn);
+        btn.SetMeta("uid", u.Id);
+        if (u.Id == _focusId) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
         if (u.Id == _lastBought)
         {
             _lastBought = null;
@@ -306,7 +332,7 @@ public partial class ShopScreen : TerminalScreen
         {
             AudioManager.Instance?.Play("buy", -3f);
             var u = GameData.Upgrades[id];
-            gs.Notify("Melhoria adquirida", $"{u.Name} — Nível {gs.Data.Level(id)}", NotifyKind.Success);
+            gs.Notify("Melhoria adquirida", Loc.F("{0} — Nível {1}", u.Name, gs.Data.Level(id)), NotifyKind.Success);
         }
         else AudioManager.Instance?.Play("error", -6f);
     }
@@ -322,15 +348,15 @@ public partial class ShopScreen : TerminalScreen
         h.AddChild(HudIcon.Make(HudIcon.Kind.Star, UiTheme.Gold, 34));
         var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         h.AddChild(v);
-        v.AddChild(UiTheme.Label($"Essência Ancestral: {gs.Data.Essence}   ·   bônus x{gs.EssenceMultiplier:0.0} em dano e venda", 17, UiTheme.Gold, true));
+        v.AddChild(UiTheme.Label(Loc.F("Essência Ancestral: {0}   ·   bônus x{1:0.0} em dano e venda", gs.Data.Essence, gs.EssenceMultiplier), 17, UiTheme.Gold, true));
         string info = gs.Data.GameCompleted
-            ? $"Renascer recomeça a jornada e concede +{gs.PendingEssence} Essência (+10% permanente por ponto). Coleção e estatísticas são mantidas."
-            : "Disponível após concluir a jornada (4 regiões + Coração Ancestral).";
+            ? Loc.F("Renascer recomeça a jornada e concede +{0} Essência (+10% permanente por ponto). Coleção e estatísticas são mantidas.", gs.PendingEssence)
+            : Loc.T("Disponível após concluir a jornada (4 regiões + Coração Ancestral).");
         var l = UiTheme.Label(info, 13, UiTheme.Muted);
         l.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         l.CustomMinimumSize = new Vector2(380, 0);
         v.AddChild(l);
-        var btn = UiTheme.Button(gs.CanPrestige ? $"Renascer (+{gs.PendingEssence})" : "Bloqueado", () => UiBus.RequestPrestige(), 200, 17);
+        var btn = UiTheme.Button(gs.CanPrestige ? Loc.F("Renascer (+{0})", gs.PendingEssence) : Loc.T("Bloqueado"), () => UiBus.RequestPrestige(), 200, 17);
         btn.Disabled = !gs.CanPrestige;
         btn.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         h.AddChild(btn);
@@ -352,12 +378,12 @@ public partial class ShopScreen : TerminalScreen
         var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         h.AddChild(v);
         v.AddChild(UiTheme.Label(r.Name, 19, r.AccentColor.Lightened(0.25f), true));
-        var mats = string.Join(", ", r.Spawns.Select(s => GameData.Mat(s.MaterialId).Name)) + $" · raro: {GameData.Mat(r.RareMaterialId).Name}";
+        var mats = string.Join(", ", r.Spawns.Select(s => GameData.Mat(s.MaterialId).Name)) + Loc.F(" · raro: {0}", GameData.Mat(r.RareMaterialId).Name);
         var ml = UiTheme.Label(r.Subtitle + "  " + mats, 13, UiTheme.Muted);
         ml.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         ml.CustomMinimumSize = new Vector2(380, 0);
         v.AddChild(ml);
-        string label = unlocked ? "Desbloqueada" : !prev ? "Requer região anterior" : GameState.FormatMoney(r.UnlockCost);
+        string label = unlocked ? Loc.T("Desbloqueada") : !prev ? Loc.T("Requer região anterior") : GameState.FormatMoney(r.UnlockCost);
         var btn = UiTheme.Button(label, () =>
         {
             if (gs.TryUnlockRegion(r.Id)) AudioManager.Instance?.Play("buy", -3f);
@@ -391,7 +417,7 @@ public partial class SellScreen : TerminalScreen
         v.AddChild(UiTheme.Label("ESTAÇÃO DE VENDA", 24, UiTheme.Success, true));
         _mult = UiTheme.Label("", 15, UiTheme.Muted);
         v.AddChild(_mult);
-        var scroll = new ScrollContainer { CustomMinimumSize = new Vector2(0, 280), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 280), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         v.AddChild(scroll);
         _list = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _list.AddThemeConstantOverride("separation", 6);
@@ -425,7 +451,7 @@ public partial class SellScreen : TerminalScreen
         RefreshInventory();
         var gs = GameState.Instance;
         foreach (Node c in _list.GetChildren()) c.QueueFree();
-        _mult.Text = $"Multiplicador de lapidação: x{gs.ValueMultiplier:0.00}   ·   Mochila {gs.InventoryCount}/{gs.Capacity}";
+        _mult.Text = Loc.F("Multiplicador de lapidação: x{0:0.00}   ·   Mochila {1}/{2}", gs.ValueMultiplier, gs.InventoryCount, gs.Capacity);
         if (gs.InventoryCount == 0)
             _list.AddChild(UiTheme.Label("Sua mochila está vazia. Minere cristais e volte aqui!", 17, UiTheme.Muted));
         foreach (var kv in gs.Data.Inventory.OrderByDescending(k => GameData.Mat(k.Key)?.Value ?? 0))

@@ -198,6 +198,8 @@ public partial class HomeScreen : ModalScreen
         if (GameState.Instance.TryBuySkill(_selectedSkill)) Audio.AudioManager.Instance?.Play("unlock", -4f);
     }
 
+    protected override void OnTab(int dir) => SetTab(!_showSkills);
+
     void SetTab(bool skills)
     {
         _showSkills = skills;
@@ -223,16 +225,16 @@ public partial class HomeScreen : ModalScreen
     {
         var gs = GameState.Instance;
         var d = gs.Data;
-        _title.Text = gs.DayOver ? $"FIM DO DIA {d.Day}" : $"DIA {d.Day}";
+        _title.Text = gs.DayOver ? Loc.F("FIM DO DIA {0}", d.Day) : Loc.F("DIA {0}", d.Day);
         _sleep.Visible = gs.DayOver;
         _money.Text = GameState.FormatNumber(d.Money);
         _stats.Text =
-            $"Ganho no dia: {GameState.FormatMoney(d.DayEarned)}" +
-            (d.DayBonus > 0 ? $"   ·   Prêmio do turno: +{GameState.FormatMoney(d.DayBonus)}" : "") +
-            $"\nDepósitos quebrados: {GameState.FormatNumber(d.DayCrystals)}   ·   Turno: {gs.DayLength / 60f:0.#} min";
-        _warn.Text = gs.InventoryCount > 0 ? $"Você trouxe {gs.InventoryCount} fragmentos sem vender. Eles ficam na mochila para amanhã." : "";
+            Loc.F("Ganho no dia: {0}", GameState.FormatMoney(d.DayEarned)) +
+            (d.DayBonus > 0 ? Loc.F("   ·   Prêmio do turno: +{0}", GameState.FormatMoney(d.DayBonus)) : "") +
+            Loc.F("\nDepósitos quebrados: {0}   ·   Turno: {1:0.#} min", GameState.FormatNumber(d.DayCrystals), gs.DayLength / 60f);
+        _warn.Text = gs.InventoryCount > 0 ? Loc.F("Você trouxe {0} fragmentos sem vender. Eles ficam na mochila para amanhã.", gs.InventoryCount) : "";
         _warn.Visible = gs.InventoryCount > 0;
-        _sleep.Text = $"Dormir e começar o Dia {d.Day + 1}";
+        _sleep.Text = Loc.F("Dormir e começar o Dia {0}", d.Day + 1);
 
         _housePane.Visible = !_showSkills;
         _skillPane.Visible = _showSkills;
@@ -243,10 +245,10 @@ public partial class HomeScreen : ModalScreen
         {
             int lv = gs.HouseLevel(def.Id);
             level.Text = "   " + new string('●', lv) + new string('○', def.MaxLevel - lv);
-            effect.Text = lv == 0 ? "Ainda não construído" : "Atual: " + HouseEffect(def, lv);
+            effect.Text = lv == 0 ? Loc.T("Ainda não construído") : Loc.T("Atual: ") + HouseEffect(def, lv);
             bool maxed = gs.HouseMaxed(def.Id);
             long cost = gs.HouseCost(def.Id);
-            buy.Text = maxed ? "MÁXIMO" : (lv == 0 ? "Construir " : "") + GameState.FormatMoney(cost);
+            buy.Text = maxed ? Loc.T("MÁXIMO") : (lv == 0 ? Loc.T("Construir ") : "") + GameState.FormatMoney(cost);
             buy.Disabled = maxed || !gs.CanAfford(cost);
         }
 
@@ -255,22 +257,22 @@ public partial class HomeScreen : ModalScreen
             var btn = _skillButtons[def.Id];
             bool owned = gs.HasSkill(def.Id);
             bool avail = gs.SkillAvailable(def.Id);
-            btn.Text = (owned ? "✓ " : "") + def.Name + "\n" + (owned ? "adquirida" : GameState.FormatMoney(def.Cost));
+            btn.Text = (owned ? "✓ " : "") + def.Name + "\n" + (owned ? Loc.T("adquirida") : GameState.FormatMoney(def.Cost));
             var col = owned ? UiTheme.Gold : avail ? (gs.CanAfford(def.Cost) ? UiTheme.Success : UiTheme.Text) : UiTheme.Muted;
             btn.AddThemeColorOverride("font_color", col);
             btn.Modulate = def.Id == _selectedSkill ? Colors.White : new Color(1, 1, 1, owned || avail ? 0.9f : 0.55f);
         }
         var sel = HomeData.Skill(_selectedSkill);
         _skillName.Text = sel.Name + (gs.HasSkill(sel.Id) ? "  ✓" : "");
-        string req = sel.Requires != null && !gs.HasSkill(sel.Requires) ? $"\nRequer: {HomeData.Skill(sel.Requires).Name}" : "";
+        string req = sel.Requires != null && !gs.HasSkill(sel.Requires) ? Loc.F("\nRequer: {0}", HomeData.Skill(sel.Requires).Name) : "";
         _skillDesc.Text = sel.Description + req;
-        _skillBuy.Text = gs.HasSkill(sel.Id) ? "ADQUIRIDA" : "Aprender " + GameState.FormatMoney(sel.Cost);
+        _skillBuy.Text = gs.HasSkill(sel.Id) ? Loc.T("ADQUIRIDA") : Loc.T("Aprender ") + GameState.FormatMoney(sel.Cost);
         _skillBuy.Disabled = !gs.SkillAvailable(sel.Id) || !gs.CanAfford(sel.Cost);
     }
 
     static string HouseEffect(HouseUpgradeDef def, int lv) => def.Id switch
     {
-        HouseIds.Bed => $"+{lv} min de turno",
+        HouseIds.Bed => Loc.F("+{0} min de turno", lv),
         _ => $"+{lv * def.PerLevel * 100:0}%",
     };
 

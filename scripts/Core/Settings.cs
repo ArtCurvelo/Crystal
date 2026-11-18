@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Godot;
 
@@ -25,6 +26,28 @@ public sealed class SettingsData
     public bool CheckUpdates { get; set; } = true;
     public int MaxFps { get; set; } = 60;
     public int WindowSize { get; set; } = 0; // índice em Settings.WindowSizes
+    // ---- geral
+    public string Language { get; set; } = "pt";
+    // ---- vídeo
+    /// <summary>Brilho geral (exposição), 0,6 … 1,8.</summary>
+    public float Brightness { get; set; } = 1f;
+    /// <summary>Escala da interface (textos e painéis), 0,8 … 1,5.</summary>
+    public float UiScale { get; set; } = 1f;
+    // ---- controle
+    public float PadLookSensitivity { get; set; } = 1f;
+    public bool PadVibration { get; set; } = true;
+    /// <summary>Teclas/mouse remapeados: ação → eventos ("k:código" ou "m:botão").</summary>
+    public Dictionary<string, List<string>> KeyBinds { get; set; } = new();
+    /// <summary>Botões do controle remapeados: ação → botões.</summary>
+    public Dictionary<string, List<int>> PadBinds { get; set; } = new();
+    // ---- acessibilidade
+    /// <summary>0 nenhum, 1 protanopia, 2 deuteranopia, 3 tritanopia.</summary>
+    public int Colorblind { get; set; }
+    public float ColorblindStrength { get; set; } = 1f;
+    public bool AudioCues { get; set; }
+    public bool Narration { get; set; }
+    public bool ReduceShake { get; set; }
+    public bool HighContrastHud { get; set; }
 
     public void Sanitize()
     {
@@ -39,6 +62,14 @@ public sealed class SettingsData
         Quality = Math.Clamp(Quality, 0, 2);
         WindowSize = Math.Clamp(WindowSize, 0, Settings.WindowSizes.Length - 1);
         if (MaxFps != 0) MaxFps = Math.Clamp(MaxFps, 30, 240);
+        if (Array.IndexOf(Loc.Languages, Language) < 0) Language = "pt";
+        Brightness = ok(Brightness, 0.6f, 1.8f, 1f);
+        UiScale = ok(UiScale, 0.8f, 1.5f, 1f);
+        PadLookSensitivity = ok(PadLookSensitivity, 0.3f, 3f, 1f);
+        ColorblindStrength = ok(ColorblindStrength, 0f, 1f, 1f);
+        Colorblind = Math.Clamp(Colorblind, 0, 3);
+        KeyBinds ??= new();
+        PadBinds ??= new();
     }
 }
 
@@ -84,6 +115,12 @@ public static class Settings
         {
             GD.PushWarning($"Configurações inválidas, usando padrões: {e.Message}");
             Data = new SettingsData();
+        }
+        // --lang=en / --colorblind=1 na linha de comando (capturas de tela e testes)
+        foreach (var a in OS.GetCmdlineUserArgs())
+        {
+            if (a.StartsWith("--lang=")) Data.Language = a.Substring(7);
+            else if (a.StartsWith("--colorblind=") && int.TryParse(a.Substring(13), out int cb)) Data.Colorblind = cb;
         }
         Data.Sanitize();
         // execuções headless (testes, exportação) não devem fixar configurações sem GPU real
@@ -147,7 +184,10 @@ public static class Settings
         if (tree?.Root != null)
         {
             tree.Root.Scaling3DScale = Data.RenderScale;
+            tree.Root.ContentScaleFactor = Data.UiScale;
         }
+        InputSetup.ApplyBindings();
+        Accessibility.Apply();
         Changed?.Invoke();
     }
 

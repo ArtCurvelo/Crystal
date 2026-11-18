@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace CrystalExcavator.Core;
@@ -41,12 +42,133 @@ public static class InputSetup
         Pad("pause", JoyButton.Start);
         Pad("crouch", JoyButton.B, JoyButton.RightStick);
         Pad("flashlight", JoyButton.DpadUp);
-        // navegação de menus com o analógico esquerdo, além do D-pad padrão
+        // menus com o controle: o Godot só mapeia teclado nas ações de interface.
+        // A confirma, B volta, direcional e analógico navegam, LB/RB trocam de aba.
+        Pad("ui_accept", JoyButton.A);
+        Pad("ui_cancel", JoyButton.B);
+        Pad("ui_up", JoyButton.DpadUp);
+        Pad("ui_down", JoyButton.DpadDown);
+        Pad("ui_left", JoyButton.DpadLeft);
+        Pad("ui_right", JoyButton.DpadRight);
+        Ensure("ui_tab_prev"); Key("ui_tab_prev", Godot.Key.Q); Pad("ui_tab_prev", JoyButton.LeftShoulder);
+        Ensure("ui_tab_next"); Key("ui_tab_next", Godot.Key.R); Pad("ui_tab_next", JoyButton.RightShoulder);
+        // navegação de menus com o analógico esquerdo, além do D-pad
         Axis("ui_up", JoyAxis.LeftY, -1, false);
         Axis("ui_down", JoyAxis.LeftY, 1, false);
         Axis("ui_left", JoyAxis.LeftX, -1, false);
         Axis("ui_right", JoyAxis.LeftX, 1, false);
     }
+
+    // ===================== Remapeamento =====================
+    /// <summary>Ações que o jogador pode remapear no teclado/mouse (id, nome em português).</summary>
+    public static readonly (string id, string name)[] KeyActions =
+    {
+        ("move_forward", "Andar para frente"), ("move_back", "Andar para trás"), ("move_left", "Andar para a esquerda"),
+        ("move_right", "Andar para a direita"), ("jump", "Pular"), ("sprint", "Correr"), ("crouch", "Agachar"),
+        ("interact", "Interagir"), ("mine", "Minerar"), ("flashlight", "Lanterna"), ("pause", "Pausa"),
+        ("quick_save", "Salvar rápido"), ("toggle_fps", "Mostrar FPS"),
+    };
+
+    /// <summary>Ações remapeáveis no controle (botões).</summary>
+    public static readonly (string id, string name)[] PadActions =
+    {
+        ("jump", "Pular"), ("sprint", "Correr"), ("crouch", "Agachar"), ("interact", "Interagir"),
+        ("mine", "Minerar"), ("flashlight", "Lanterna"), ("pause", "Pausa"),
+    };
+
+    static string Serialize(InputEvent e) => e switch
+    {
+        InputEventKey k => "k:" + (long)(k.PhysicalKeycode != Godot.Key.None ? k.PhysicalKeycode : k.Keycode),
+        InputEventMouseButton m => "m:" + (int)m.ButtonIndex,
+        _ => null,
+    };
+
+    static InputEvent Deserialize(string s)
+    {
+        if (s == null || s.Length < 3) return null;
+        if (!long.TryParse(s.Substring(2), out long v)) return null;
+        return s[0] switch
+        {
+            'k' => new InputEventKey { PhysicalKeycode = (Godot.Key)v },
+            'm' => new InputEventMouseButton { ButtonIndex = (MouseButton)v },
+            _ => null,
+        };
+    }
+
+    /// <summary>Aplica os remapeamentos salvos por cima dos padrões.</summary>
+    public static void ApplyBindings()
+    {
+        var d = Settings.Data;
+        if (d == null) return;
+        foreach (var (id, _) in KeyActions)
+        {
+            if (!d.KeyBinds.TryGetValue(id, out var list) || list == null || list.Count == 0) continue;
+            if (!InputMap.HasAction(id)) continue;
+            foreach (var e in InputMap.ActionGetEvents(id))
+                if (e is InputEventKey || e is InputEventMouseButton) InputMap.ActionEraseEvent(id, e);
+            foreach (var str in list) if (Deserialize(str) is { } ev) InputMap.ActionAddEvent(id, ev);
+        }
+        foreach (var (id, _) in PadActions)
+        {
+            if (!d.PadBinds.TryGetValue(id, out var list) || list == null || list.Count == 0) continue;
+            if (!InputMap.HasAction(id)) continue;
+            foreach (var e in InputMap.ActionGetEvents(id))
+                if (e is InputEventJoypadButton) InputMap.ActionEraseEvent(id, e);
+            foreach (int b in list) InputMap.ActionAddEvent(id, new InputEventJoypadButton { ButtonIndex = (JoyButton)b, Device = -1 });
+        }
+    }
+
+    /// <summary>Define uma tecla/botão do mouse para a ação (substitui as anteriores).</summary>
+    public static void BindKey(string action, InputEvent e)
+    {
+        var str = Serialize(e);
+        if (str == null) return;
+        Settings.Data.KeyBinds[action] = new List<string> { str };
+        ApplyBindings();
+    }
+
+    public static void BindPad(string action, JoyButton b)
+    {
+        Settings.Data.PadBinds[action] = new List<int> { (int)b };
+        ApplyBindings();
+    }
+
+    /// <summary>Volta tudo ao padrão.</summary>
+    public static void ResetBindings()
+    {
+        Settings.Data.KeyBinds.Clear();
+        Settings.Data.PadBinds.Clear();
+        Register();
+    }
+
+    /// <summary>Texto curto da tecla/botão atual de uma ação (teclado/mouse ou controle).</summary>
+    public static string Describe(string action, bool pad)
+    {
+        if (!InputMap.HasAction(action)) return "—";
+        var parts = new List<string>();
+        foreach (var e in InputMap.ActionGetEvents(action))
+        {
+            if (pad && e is InputEventJoypadButton jb) parts.Add(PadName(jb.ButtonIndex));
+            else if (pad && e is InputEventJoypadMotion jm && (jm.Axis == JoyAxis.TriggerLeft || jm.Axis == JoyAxis.TriggerRight)) parts.Add(jm.Axis == JoyAxis.TriggerRight ? "RT" : "LT");
+            else if (!pad && e is InputEventKey k) parts.Add(OS.GetKeycodeString(k.PhysicalKeycode != Godot.Key.None ? k.PhysicalKeycode : k.Keycode));
+            else if (!pad && e is InputEventMouseButton m) parts.Add(MouseName(m.ButtonIndex));
+        }
+        return parts.Count == 0 ? "—" : string.Join(" / ", parts);
+    }
+
+    public static string MouseName(MouseButton b) => b switch
+    {
+        MouseButton.Left => Loc.T("Botão esquerdo"), MouseButton.Right => Loc.T("Botão direito"), MouseButton.Middle => Loc.T("Botão do meio"),
+        MouseButton.Xbutton1 => "Mouse 4", MouseButton.Xbutton2 => "Mouse 5", _ => "Mouse " + (int)b,
+    };
+
+    public static string PadName(JoyButton b) => b switch
+    {
+        JoyButton.A => "A", JoyButton.B => "B", JoyButton.X => "X", JoyButton.Y => "Y",
+        JoyButton.LeftShoulder => "LB", JoyButton.RightShoulder => "RB", JoyButton.LeftStick => "LS", JoyButton.RightStick => "RS",
+        JoyButton.Start => "Start", JoyButton.Back => "Back", JoyButton.DpadUp => "D-pad ↑", JoyButton.DpadDown => "D-pad ↓",
+        JoyButton.DpadLeft => "D-pad ←", JoyButton.DpadRight => "D-pad →", _ => Loc.T("Botão ") + (int)b,
+    };
 
     static void Ensure(string action)
     {
@@ -99,9 +221,20 @@ public static class InputHints
         else if (kbm && UsingPad) { UsingPad = false; Changed?.Invoke(); }
     }
 
-    public static string Interact => UsingPad ? "[X]" : "[E]";
+    /// <summary>Primeira tecla/botão da ação no dispositivo em uso (para dicas na tela).</summary>
+    public static string Key(string action)
+    {
+        var d = InputSetup.Describe(action, UsingPad);
+        int cut = d.IndexOf(" / ");
+        return cut > 0 ? d.Substring(0, cut) : d;
+    }
+
+    public static string Interact => $"[{Key("interact")}]";
     public static string Back => UsingPad ? "[B]" : "[Esc]";
-    public static string Footer => UsingPad
-        ? "[RT] Minerar   [X] Interagir   [LB] Correr   [A] Pular   [B] Agachar   [Start] Pausa"
-        : "[Botão esq.] Minerar   [E] Interagir   [Shift] Correr   [C] Agachar   [Esc] Pausa";
+    public static string Footer =>
+        $"[{Key("mine")}] {Loc.T("Minerar")}   [{Key("interact")}] {Loc.T("Interagir")}   [{Key("sprint")}] {Loc.T("Correr")}   " +
+        $"[{Key("crouch")}] {Loc.T("Agachar")}   [{Key("flashlight")}] {Loc.T("Lanterna")}   [{Key("pause")}] {Loc.T("Pausa")}";
+
+    /// <summary>Avisa que as dicas mudaram (ex.: remapeamento).</summary>
+    public static void Refresh() => Changed?.Invoke();
 }

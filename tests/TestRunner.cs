@@ -6,6 +6,7 @@ using CrystalExcavator.Core;
 using CrystalExcavator.Data;
 using CrystalExcavator.Mining;
 using CrystalExcavator.Player;
+using CrystalExcavator.UI;
 using CrystalExcavator.World;
 using Godot;
 
@@ -49,12 +50,14 @@ public partial class TestRunner : Node
             Run("Goblin minerador: regras", TestGoblinRules);
             Run("Casa e árvore de habilidades", TestHomeAndSkills);
             Run("Áudio sem saturação", TestAudio);
+            Run("Idiomas, remapeamento e acessibilidade", TestLocAndBindings);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
+            await RunAsync("Menus só com o controle", TestGamepadMenus);
             await RunAsync("Integração: cavernas, relevo e túneis secretos", TestWings);
             await RunAsync("Integração: coleta direta", TestDirectCollect);
             await RunAsync("Integração: goblin minerador e rebelião", TestGoblins);
@@ -71,8 +74,13 @@ public partial class TestRunner : Node
         GameState.Instance.QuitClean(_fail == 0 ? 0 : 1);
     }
 
+    /// <summary>--only=texto roda só os testes cujo nome contém o texto (depuração rápida).</summary>
+    static readonly string Only = System.Linq.Enumerable.FirstOrDefault(OS.GetCmdlineUserArgs(), a => a.StartsWith("--only="))?.Substring(7);
+    static bool Skip(string name) => Only != null && !name.Contains(Only, StringComparison.OrdinalIgnoreCase);
+
     void Run(string name, Action t)
     {
+        if (Skip(name)) return;
         int before = _fail;
         try { t(); }
         catch (Exception e) { Fail($"{name}: exceção {e.Message}\n{e.StackTrace}"); }
@@ -81,6 +89,7 @@ public partial class TestRunner : Node
 
     async Task RunAsync(string name, Func<Task> t)
     {
+        if (Skip(name)) return;
         int before = _fail;
         try { await t(); }
         catch (Exception e) { Fail($"{name}: exceção {e.Message}\n{e.StackTrace}"); }
@@ -573,6 +582,57 @@ public partial class TestRunner : Node
         Check(ok2 && d2.Money == 7, "save de versão futura com campos extras deve carregar");
     }
 
+    void TestLocAndBindings()
+    {
+        var d = Settings.Data;
+        string lang = d.Language;
+        // traduções: mesmo número de marcadores {n} em todos os idiomas
+        var rx = new System.Text.RegularExpressions.Regex(@"\{(\d+)[^}]*\}");
+        string Marks(string t) => string.Join(",", rx.Matches(t).Select(m => m.Groups[1].Value).Distinct().OrderBy(x => x));
+        int bad = 0;
+        foreach (var kv in LocTables.En)
+        {
+            string es = LocTables.Es[kv.Key];
+            if (Marks(kv.Key) != Marks(kv.Value) || Marks(kv.Key) != Marks(es)) { bad++; if (bad < 4) Fail("marcadores diferentes: " + kv.Key); }
+        }
+        Check(bad == 0 && LocTables.En.Count > 400, $"tabelas de tradução consistentes ({LocTables.En.Count} textos)");
+        d.Language = "en";
+        Check(Loc.T("Novo jogo") == "New game" && Loc.F("DIA {0}", 3) == "DAY 3", "inglês traduz textos e modelos");
+        Check(GameData.Regions[0].Name != "" && GameData.Regions[0].Name != GameData.Regions[0].NamePt, "nomes de regiões traduzidos");
+        d.Language = "es";
+        Check(Loc.T("Novo jogo") == "Nueva partida", "espanhol traduz");
+        Check(Loc.T("texto sem tradução xyz") == "texto sem tradução xyz", "texto sem tradução volta em português");
+        d.Language = "pt";
+        Check(Loc.T("Novo jogo") == "Novo jogo", "português usa o texto original");
+        d.Language = "xx"; d.Sanitize();
+        Check(d.Language == "pt", "idioma inválido volta para português");
+        d.Language = lang;
+        // remapeamento
+        InputSetup.BindKey("jump", new InputEventKey { PhysicalKeycode = Key.J });
+        Check(InputMap.ActionGetEvents("jump").Any(e => e is InputEventKey k && k.PhysicalKeycode == Key.J)
+              && !InputMap.ActionGetEvents("jump").Any(e => e is InputEventKey k && k.PhysicalKeycode == Key.Space), "tecla remapeada substitui a padrão");
+        Check(InputMap.ActionGetEvents("jump").Any(e => e is InputEventJoypadButton), "remapear teclado mantém o botão do controle");
+        InputSetup.BindKey("mine", new InputEventMouseButton { ButtonIndex = MouseButton.Right });
+        Check(InputMap.ActionGetEvents("mine").Any(e => e is InputEventMouseButton m && m.ButtonIndex == MouseButton.Right), "ação pode usar botão do mouse");
+        InputSetup.BindPad("jump", JoyButton.Y);
+        Check(InputMap.ActionGetEvents("jump").Any(e => e is InputEventJoypadButton b && b.ButtonIndex == JoyButton.Y)
+              && !InputMap.ActionGetEvents("jump").Any(e => e is InputEventJoypadButton b && b.ButtonIndex == JoyButton.A), "botão do controle remapeado");
+        var json = System.Text.Json.JsonSerializer.Serialize(d);
+        var back = System.Text.Json.JsonSerializer.Deserialize<SettingsData>(json);
+        Check(back.KeyBinds.ContainsKey("jump") && back.PadBinds["jump"][0] == (int)JoyButton.Y, "remapeamento salvo nas configurações");
+        InputSetup.ResetBindings();
+        Check(InputMap.ActionGetEvents("jump").Any(e => e is InputEventKey k && k.PhysicalKeycode == Key.Space)
+              && InputMap.ActionGetEvents("jump").Any(e => e is InputEventJoypadButton b && b.ButtonIndex == JoyButton.A)
+              && d.KeyBinds.Count == 0, "restaurar padrões");
+        // acessibilidade
+        d.Colorblind = 2; Accessibility.Apply();
+        var layer = GetTree().Root.GetNodeOrNull<CanvasLayer>("ColorblindFilter");
+        d.Colorblind = 0; Accessibility.Apply();
+        Check(true, "filtro de daltonismo aplicado sem erro");
+        d.Narration = true; Accessibility.Speak("teste"); d.Narration = false;
+        Check(true, "narração não falha sem voz no sistema");
+    }
+
     void TestSettings()
     {
         var s = new SettingsData { MouseSensitivity = float.NaN, Fov = 500, MasterVolume = -3, Quality = 9, RenderScale = 0, WindowSize = 42 };
@@ -854,6 +914,63 @@ public partial class TestRunner : Node
         Check(neighbors.Any(n => n.Hp < n.MaxHp), "vizinho deve receber dano do pulso");
         root.QueueFree();
         await Frames(2);
+    }
+
+    async Task PadPress(JoyButton b)
+    {
+        Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = b, Pressed = true, Device = 0 });
+        Input.FlushBufferedEvents();
+        await Frames(2);
+        Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = b, Pressed = false, Device = 0 });
+        Input.FlushBufferedEvents();
+        await Frames(2);
+    }
+
+    /// <summary>Diálogo, terminal de melhorias e troca de aba usando apenas eventos de controle.</summary>
+    async Task TestGamepadMenus()
+    {
+        Fresh();
+        Check(InputMap.ActionGetEvents("ui_accept").Any(e => e is InputEventJoypadButton jb && jb.ButtonIndex == JoyButton.A), "A confirma nos menus");
+        Check(InputMap.ActionGetEvents("ui_down").Any(e => e is InputEventJoypadButton jb && jb.ButtonIndex == JoyButton.DpadDown), "direcional navega nos menus");
+        // diálogo: o foco começa num botão; direcional troca; A confirma
+        var choice = new ChoiceScreen();
+        AddChild(choice);
+        await Frames(2);
+        bool? answer = null;
+        choice.Ask("Teste", "Pagar?", "Pagar", "Não pagar", true, yes => answer = yes);
+        await Frames(4);
+        await PadPress(JoyButton.DpadRight);
+        await PadPress(JoyButton.A);
+        Check(answer != null, $"A responde ao diálogo pelo controle (resposta: {answer})");
+        choice.QueueFree();
+        // terminal de melhorias: comprar só com o controle
+        GS.AddMoney(100000);
+        var shop = new ShopScreen();
+        AddChild(shop);
+        await Frames(2);
+        TerminalScreen.AtSellStation = true;
+        shop.Open();
+        await Frames(4);
+        int levels = GS.Data.Upgrades.Values.Sum();
+        for (int i = 0; i < 12 && GS.Data.Upgrades.Values.Sum() == levels; i++)
+        {
+            await PadPress(JoyButton.DpadDown);
+            await PadPress(JoyButton.A);
+        }
+        Check(GS.Data.Upgrades.Values.Sum() > levels, "comprar melhoria só com direcional + A");
+        bool switched = false;
+        shop.SwitchToSell = () => switched = true;
+        TerminalScreen.AtSellStation = true;
+        await PadPress(JoyButton.RightShoulder);
+        Check(switched, "RB troca para a aba Vender (na Estação de Venda)");
+        TerminalScreen.AtSellStation = false;
+        switched = false;
+        await PadPress(JoyButton.RightShoulder);
+        Check(!switched, "num terminal de melhorias o RB não abre a venda");
+        shop.CloseSilently();
+        shop.QueueFree();
+        await Frames(2);
+        Fresh();
     }
 
     async Task TestGamepad()

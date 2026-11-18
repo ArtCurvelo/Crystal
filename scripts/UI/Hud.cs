@@ -47,7 +47,7 @@ public partial class Hud : CanvasLayer
         if (_hpPanel.Visible != show) _hpPanel.Visible = show;
         if (!show) return;
         _hpBar.Value = Player.Hp / PlayerController.MaxHp;
-        _hpLabel.Text = $"Vida: {Player.Hp:0} / {PlayerController.MaxHp:0}" + (danger ? "   ⚠ REBELIÃO" : "");
+        _hpLabel.Text = Loc.F("Vida: {0:0} / {1:0}", Player.Hp, PlayerController.MaxHp) + (danger ? Loc.T("   ⚠ REBELIÃO") : "");
     }
     HudIcon _clockIcon;
     Label _clock;
@@ -59,7 +59,7 @@ public partial class Hud : CanvasLayer
     {
         var gs = GameState.Instance;
         bool over = gs.DayOver;
-        string t = over ? $"Dia {gs.Data.Day} · TURNO ENCERRADO" : $"Dia {gs.Data.Day} · {gs.ClockText}";
+        string t = over ? Loc.F("Dia {0} · TURNO ENCERRADO", gs.Data.Day) : Loc.F("Dia {0} · {1}", gs.Data.Day, gs.ClockText);
         if (t != _clockText) { _clockText = t; _clock.Text = t; }
         _clockBar.Value = gs.DayProgress;
         bool late = !over && gs.DayRemaining <= GameState.DayWarningSeconds;
@@ -455,7 +455,7 @@ public partial class Hud : CanvasLayer
         var gs = GameState.Instance;
         int cnt = gs.InventoryCount, cap = gs.Capacity;
         bool full = cnt >= cap;
-        _capLabel.Text = full ? $"Capacidade: {cnt} / {cap}  CHEIA" : $"Capacidade: {cnt} / {cap}";
+        _capLabel.Text = full ? Loc.F("Capacidade: {0} / {1}  CHEIA", cnt, cap) : Loc.F("Capacidade: {0} / {1}", cnt, cap);
         _capLabel.AddThemeColorOverride("font_color", full ? UiTheme.Danger : UiTheme.Text);
         _capBar.Value = cap > 0 ? (double)cnt / cap : 0;
         UiTheme.SetBarColor(_capBar, full ? UiTheme.Danger : cnt > cap * 0.75f ? UiTheme.Gold : UiTheme.Cyan);
@@ -488,9 +488,9 @@ public partial class Hud : CanvasLayer
     void RefreshStats()
     {
         var gs = GameState.Instance;
-        _toolName.Text = GameState.ToolTierNames[gs.ToolTier] + (gs.Data.Essence > 0 ? $"  ✦{gs.Data.Essence}" : "");
-        _toolStats.Text = $"{GameState.FormatNumber(gs.Damage)} dano · {gs.SwingsPerSecond:0.0}/s";
-        _pulseInfo.Text = $"Pulso x{gs.ResonanceMultiplier:0.0} do dano · raio {gs.ResonanceRadius:0.0} m";
+        _toolName.Text = GameState.ToolName(gs.ToolTier) + (gs.Data.Essence > 0 ? $"  ✦{gs.Data.Essence}" : "");
+        _toolStats.Text = Loc.F("{0} dano · {1:0.0}/s", GameState.FormatNumber(gs.Damage), gs.SwingsPerSecond);
+        _pulseInfo.Text = Loc.F("Pulso x{0:0.0} do dano · raio {1:0.0} m", gs.ResonanceMultiplier, gs.ResonanceRadius);
     }
 
     /// <summary>Guia de objetivos para a experiência inicial e metas de longo prazo.</summary>
@@ -502,18 +502,18 @@ public partial class Hud : CanvasLayer
         bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
         if (inHouse)
             text = gs.DayOver
-                ? "CASA\nUse o PAINEL para melhorias e habilidades. Durma na CAMA para começar o próximo dia."
-                : "NOVO DIA\nDesça pelo ELEVADOR para voltar à mina.";
+                ? Loc.T("CASA\nUse o PAINEL para melhorias e habilidades. Durma na CAMA para começar o próximo dia.")
+                : Loc.T("NOVO DIA\nDesça pelo ELEVADOR para voltar à mina.");
         else if (gs.DayOver)
             text = gs.InventoryCount > 0
-                ? "FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento e pegue o ELEVADOR para casa."
-                : "FIM DO TURNO\nPegue o ELEVADOR no acampamento para ir para casa.";
-        else if (d.CrystalsMined == 0) text = "OBJETIVO\nMire em um cristal e segure o botão esquerdo para minerar.";
-        else if (d.ShardsSold == 0 && gs.InventoryCount < 8) text = "OBJETIVO\nColete os fragmentos. Eles são atraídos até você.";
-        else if (d.ShardsSold == 0) text = "OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.";
-        else if (d.Upgrades.Count == 0) text = "OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).";
+                ? Loc.T("FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento e pegue o ELEVADOR para casa.")
+                : Loc.T("FIM DO TURNO\nPegue o ELEVADOR no acampamento para ir para casa.");
+        else if (d.CrystalsMined == 0) text = Loc.T("OBJETIVO\nMire em um cristal e segure o botão esquerdo para minerar.");
+        else if (d.ShardsSold == 0 && gs.InventoryCount < 8) text = Loc.T("OBJETIVO\nColete os fragmentos. Eles são atraídos até você.");
+        else if (d.ShardsSold == 0) text = Loc.T("OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.");
+        else if (d.Upgrades.Count == 0) text = Loc.T("OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).");
         else if (gs.IsUnlocked("core") && !d.Discovered.Contains("heart") && gs.Damage * gs.SwingsPerSecond * 120 > GameData.Mat("heart").Hp)
-            text = "META\nDestrua o Coração Ancestral no centro do Núcleo.";
+            text = Loc.T("META\nDestrua o Coração Ancestral no centro do Núcleo.");
         else
         {
             var next = gs.NextLockedRegion();
@@ -521,17 +521,18 @@ public partial class Hud : CanvasLayer
             {
                 long missing = Math.Max(0, next.UnlockCost - d.Money);
                 text = missing > 0
-                    ? $"PRÓXIMA META\nDesbloquear {next.Name}: faltam {GameState.FormatMoney(missing)}"
-                    : $"PRÓXIMA META\nVocê pode desbloquear {next.Name}! Vá até o portão.";
+                    ? Loc.F("PRÓXIMA META\nDesbloquear {0}: faltam {1}", next.Name, GameState.FormatMoney(missing))
+                    : Loc.F("PRÓXIMA META\nVocê pode desbloquear {0}! Vá até o portão.", next.Name);
             }
-            else if (!d.Discovered.Contains("heart")) text = "META FINAL\nDestrua o Coração Ancestral no centro do Núcleo.";
-            else text = "MESTRE ESCAVADOR\nMaximize suas melhorias e encontre todos os materiais raros.";
+            else if (!d.Discovered.Contains("heart")) text = Loc.T("META FINAL\nDestrua o Coração Ancestral no centro do Núcleo.");
+            else text = Loc.T("MESTRE ESCAVADOR\nMaximize suas melhorias e encontre todos os materiais raros.");
         }
         _objective.Text = text;
     }
 
     void OnNotified(string title, string body, NotifyKind kind)
     {
+        Accessibility.Speak($"{title}. {body}");
         if (_notifs.GetChildCount() >= 3) { _pending.Enqueue((title, body, kind)); return; }
         ShowNotification(title, body, kind);
     }
@@ -575,9 +576,9 @@ public partial class Hud : CanvasLayer
     }
 
     public void ShowPulse(int count) =>
-        Pop(count > 1 ? $"PULSO RESSONANTE ×{count}" : "PULSO RESSONANTE", UiTheme.Gold, 30, 60);
+        Pop(count > 1 ? Loc.F("PULSO RESSONANTE ×{0}", count) : Loc.T("PULSO RESSONANTE"), UiTheme.Gold, 30, 60);
 
-    void OnBigMessage(string text) => Pop(text, UiTheme.Cyan, 40, -260, 2.2f);
+    void OnBigMessage(string text) => Pop(Loc.T(text), UiTheme.Cyan, 40, -260, 2.2f);
     public void ShowBigMessage(string text) => OnBigMessage(text);
 
     void Pop(string text, Color color, int size, float y, float hold = 0.5f)
@@ -607,7 +608,7 @@ public partial class Hud : CanvasLayer
     public void ShowRegionBanner(RegionDef r)
     {
         _regionName.Text = r.Name;
-        _regionSub.Text = $"◇ Região {r.Index + 1} de {GameData.Regions.Count} · {r.Subtitle}";
+        _regionSub.Text = Loc.F("◇ Região {0} de {1} · {2}", r.Index + 1, GameData.Regions.Count, r.Subtitle);
         _regionIcon.Color = r.AccentColor;
         _regionIcon.QueueRedraw();
         _regionTag.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, new Color(r.AccentColor, 0.85f), 14, 2, 22, 6));
@@ -657,13 +658,13 @@ public partial class Hud : CanvasLayer
         UpdateClock();
         UpdateHp();
         _fps.Visible = Settings.Data.ShowFps;
-        if (_fps.Visible) _fps.Text = $"{Engine.GetFramesPerSecond():0} FPS · 3D {GetViewport().Scaling3DScale * 100:0}%";
+        if (_fps.Visible) _fps.Text = Loc.F("{0:0} FPS · 3D {1:0}%", Engine.GetFramesPerSecond(), GetViewport().Scaling3DScale * 100);
 
         if (Player == null || !IsInstanceValid(Player)) return;
         // ressonância
         float res = Player.Resonance01;
         _energyBar.Value = res;
-        _energyPct.Text = Player.ResonanceReady ? "PRONTO" : $"{res * 100:0}%";
+        _energyPct.Text = Player.ResonanceReady ? Loc.T("PRONTO") : $"{res * 100:0}%";
         UiTheme.SetBarColor(_energyBar, Player.ResonanceReady ? UiTheme.Gold : UiTheme.Cyan);
 
         // alvo
@@ -680,7 +681,7 @@ public partial class Hud : CanvasLayer
         {
             var m = c.Material;
             _targetName.Text = m.Name;
-            _targetRarity.Text = RarityInfo.Badge(m.Rarity) + (m.Special ? " · Formação Especial" : m.Rare ? " · Veio raro" : "");
+            _targetRarity.Text = RarityInfo.Badge(m.Rarity) + (m.Special ? Loc.T(" · Formação Especial") : m.Rare ? Loc.T(" · Veio raro") : "");
             _targetRarity.AddThemeColorOverride("font_color", RarityInfo.Color(m.Rarity));
             _brackets.Color = m.Glow.Lightened(0.3f);
             _brackets.QueueRedraw();
@@ -692,7 +693,7 @@ public partial class Hud : CanvasLayer
             float scale = m.Special ? 1f : c.SizeScale;
             int lo = Math.Max(1, (int)MathF.Round(m.ShardsMin * scale * gs.EventShardMultiplier));
             int hi = Math.Max(lo, (int)MathF.Round(m.ShardsMax * scale * gs.EventShardMultiplier));
-            _targetYield.Text = (lo == hi ? $"×{lo}" : $"×{lo}–{hi}") + $"   ·   {GameState.FormatMoney(gs.SellPrice(m))}/frag";
+            _targetYield.Text = (lo == hi ? $"×{lo}" : $"×{lo}–{hi}") + Loc.F("   ·   {0}/frag", GameState.FormatMoney(gs.SellPrice(m)));
         }
         // prompt
         string prompt = Player.TargetInteractable?.GetPrompt();
@@ -716,9 +717,9 @@ public partial class Hud : CanvasLayer
         {
             _shownEvent = a;
             _eventPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.85f), a.Color, 10, 2, 12, 6));
-            _eventTitle.Text = a.Name.ToUpper();
+            _eventTitle.Text = Loc.T(a.Name).ToUpper();
             _eventTitle.AddThemeColorOverride("font_color", a.Color);
-            _eventDesc.Text = a.Description;
+            _eventDesc.Text = Loc.T(a.Description);
             UiTheme.SetBarColor(_eventBar, a.Color);
             _eventPanel.Visible = true;
             UiTheme.PopIn(_eventPanel);

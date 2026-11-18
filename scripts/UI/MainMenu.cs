@@ -59,7 +59,7 @@ public partial class MainMenu : CanvasLayer
         Make("Configurações", () => OnSettings?.Invoke());
         Make("Sair", () => OnQuit?.Invoke());
 
-        _version = UiTheme.Shadowed(UiTheme.Label($"v{ProjectSettings.GetSetting("application/config/version")}  ·  Feito com Godot e C#", 14, UiTheme.Muted));
+        _version = UiTheme.Shadowed(UiTheme.Label(Loc.F("v{0}  ·  Feito com Godot e C#", ProjectSettings.GetSetting("application/config/version")), 14, UiTheme.Muted));
         UiTheme.Place(_version, Control.LayoutPreset.BottomLeft, new Vector2(24, -40));
         _root.AddChild(_version);
         _versionBase = _version.Text;
@@ -82,14 +82,14 @@ public partial class MainMenu : CanvasLayer
         Visible = true;
         _continue.Visible = hasSave;
         _backups.Visible = SaveSystem.ListSnapshots().Count > 0;
-        _continue.Text = "Continuar";
+        _continue.Text = Loc.T("Continuar");
         if (hasSave)
         {
             var d = SaveSystem.Load(out _);
             if (d != null)
             {
                 var t = TimeSpan.FromSeconds(d.PlayTimeSeconds);
-                _continue.Text = $"Continuar   ·   {GameState.FormatMoney(d.Money)}   ·   {(int)t.TotalHours}h{t.Minutes:00}";
+                _continue.Text = Loc.F("Continuar   ·   {0}   ·   {1}h{2:00}", GameState.FormatMoney(d.Money), (int)t.TotalHours, t.Minutes);
             }
         }
         _root.Modulate = new Color(1, 1, 1, 0);

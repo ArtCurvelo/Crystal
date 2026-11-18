@@ -127,7 +127,7 @@ public static class UiTheme
 
     public static Label Label(string text, int size = 18, Color? color = null, bool bold = false, HorizontalAlignment align = HorizontalAlignment.Left)
     {
-        var l = new Label { Text = text, HorizontalAlignment = align };
+        var l = new Label { Text = Core.Loc.T(text), HorizontalAlignment = align };
         l.AddThemeFontSizeOverride("font_size", size);
         if (color.HasValue) l.AddThemeColorOverride("font_color", color.Value);
         if (bold) l.AddThemeFontOverride("font", Bold);
@@ -143,7 +143,7 @@ public static class UiTheme
 
     public static Button Button(string text, System.Action onPressed, int minWidth = 0, int fontSize = 20)
     {
-        var b = new Button { Text = text, FocusMode = Control.FocusModeEnum.All };
+        var b = new Button { Text = Core.Loc.T(text), FocusMode = Control.FocusModeEnum.All };
         if (minWidth > 0) b.CustomMinimumSize = new Vector2(minWidth, 48);
         b.AddThemeFontSizeOverride("font_size", fontSize);
         b.Pressed += () => { AudioManager.Instance?.Play("click", -6f); onPressed?.Invoke(); };

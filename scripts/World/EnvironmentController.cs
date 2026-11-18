@@ -54,6 +54,7 @@ public partial class EnvironmentController : WorldEnvironment
         bool adv = Settings.Advanced;
         var e = Environment;
         e.GlowEnabled = true;
+        e.TonemapExposure = 1.15f * Settings.Data.Brightness;
         e.GlowIntensity = q == GraphicsQuality.Low ? 0.35f : 0.45f;
         // névoa volumétrica: feixes de luz da lanterna e brilho dos cristais no ar
         e.VolumetricFogEnabled = adv && q == GraphicsQuality.High;

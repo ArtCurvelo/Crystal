@@ -84,7 +84,7 @@ public partial class RegionEvents : Node
                 var root = World.RegionRoots[0];
                 foreach (var c in World.Crystals)
                     if (c.GetParent() == root && c.State == Crystal.CrystalState.Broken) { c.DebugRespawnNow(); n++; }
-                def.Description = n > 0 ? $"{n} cristais renascem de uma vez!" : "A caverna brilha intensamente!";
+                def.Description = n > 0 ? Loc.F("{0} cristais renascem de uma vez!", n) : Loc.T("A caverna brilha intensamente!");
                 Env.OverlayAmbient = def.Color; Env.OverlayFog = new Color(0.1f, 0.3f, 0.45f); Env.OverlayFogDensity = 0.012f;
                 break;
             case "depths":

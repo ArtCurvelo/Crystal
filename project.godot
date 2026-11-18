@@ -22,6 +22,10 @@ boot_splash/show_image=false
 config/icon="res://icon_512.png"
 config/windows_native_icon="res://icon.ico"
 
+[audio]
+
+general/text_to_speech=true
+
 [autoload]
 
 GameState="*res://scripts/Core/GameState.cs"

@@ -8,8 +8,16 @@ namespace CrystalExcavator.Data;
 public sealed class HouseUpgradeDef
 {
     public string Id;
-    public string Name;
-    public string Description;   // efeito por nível
+    string _name;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Name { get => Core.Loc.T(_name); set => _name = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string NamePt => _name;
+    string _description;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary> 
+    public string Description { get => Core.Loc.T(_description); set => _description = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string DescriptionPt => _description;
     public long BaseCost;
     public double CostGrowth;
     public int MaxLevel;
@@ -28,8 +36,16 @@ public sealed class HouseUpgradeDef
 public sealed class SkillDef
 {
     public string Id;
-    public string Name;
-    public string Description;
+    string _name;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Name { get => Core.Loc.T(_name); set => _name = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string NamePt => _name;
+    string _description;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary>
+    public string Description { get => Core.Loc.T(_description); set => _description = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string DescriptionPt => _description;
     public int Branch;           // coluna
     public int Tier;             // 1..3
     public long Cost;
@@ -94,7 +110,11 @@ public sealed class GoblinDef
 {
     public string RegionId;
     public string Name;
-    public string Title;          // "o goblin minerador", "o goblin do gelo"...
+    string _title;
+    /// <summary>Traduzido para o idioma escolhido (fonte em português).</summary> 
+    public string Title { get => Core.Loc.T(_title); set => _title = value; }
+    /// <summary>Texto original em português (chave estável).</summary>
+    public string TitlePt => _title;
     public long HireCost, RehireCost;
     public float MineDps;         // devagar em relação ao jogador naquela fase
     public string[] Comrades;     // comparsas na rebelião

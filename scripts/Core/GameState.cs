@@ -97,6 +97,8 @@ public partial class GameState : Node
         }
     }
 
+    public static string ToolName(int tier) => Loc.T(ToolTierNames[tier]);
+
     public static readonly string[] ToolTierNames =
         { "Broca Inicial", "Cortador de Pulso", "Perfurador de Arco", "Ressonador Cristalino", "Lança Prismática", "Quebra-Núcleo" };
 
@@ -117,8 +119,8 @@ public partial class GameState : Node
         {
             Data.Discovered.Add(materialId);
             MaterialDiscovered?.Invoke(def);
-            Notify(def.Rarity >= Rarity.Epico ? $"Material {RarityInfo.Name(def.Rarity)} descoberto!" : "Novo material descoberto",
-                $"{def.Name} — {FormatMoney(SellPrice(def))} por fragmento",
+            Notify(def.Rarity >= Rarity.Epico ? Loc.F("Material {0} descoberto!", RarityInfo.Name(def.Rarity)) : Loc.T("Novo material descoberto"),
+                Loc.F("{0} — {1} por fragmento", def.Name, FormatMoney(SellPrice(def))),
                 def.Rare || def.Special ? NotifyKind.Rare : NotifyKind.Info);
         }
         InventoryChanged?.Invoke();
@@ -173,8 +175,8 @@ public partial class GameState : Node
         UpgradesChanged?.Invoke();
         if (ToolTier > prevTier)
         {
-            Notify("Ferramenta evoluiu!", ToolTierNames[ToolTier], NotifyKind.Unlock);
-            BigMessage?.Invoke(ToolTierNames[ToolTier].ToUpper());
+            Notify("Ferramenta evoluiu!", ToolName(ToolTier), NotifyKind.Unlock);
+            BigMessage?.Invoke(ToolName(ToolTier).ToUpper());
         }
         return true;
     }
@@ -203,7 +205,7 @@ public partial class GameState : Node
         MoneyChanged?.Invoke();
         RegionsChanged?.Invoke();
         Notify("Região desbloqueada!", r.Name, NotifyKind.Unlock);
-        BigMessage?.Invoke("NOVA REGIÃO: " + r.Name.ToUpper());
+        BigMessage?.Invoke(Loc.T("NOVA REGIÃO: ") + r.Name.ToUpper());
         SaveGame(true);
         return true;
     }
@@ -336,7 +338,7 @@ public partial class GameState : Node
         g.ChargedDay = 0;
         MoneyChanged?.Invoke();
         GoblinChanged?.Invoke();
-        Notify($"{def.Name} contratado!", "Ele vai montar acampamento perto da entrada da região, minerar e guardar tudo no baú. Cobra uma taxa no fim do dia.", NotifyKind.Success);
+        Notify(Loc.F("{0} contratado!", def.Name), "Ele vai montar acampamento perto da entrada da região, minerar e guardar tudo no baú. Cobra uma taxa no fim do dia.", NotifyKind.Success);
         return true;
     }
 
@@ -524,7 +526,7 @@ public partial class GameState : Node
         bool ok = SaveSystem.Save(Data);
         if (ok) { LastSaveTime = Time.GetTicksMsec() / 1000.0; Saved?.Invoke(auto); }
         if (!auto || !ok)
-            Notify(ok ? "Jogo salvo" : "Erro ao salvar", ok ? "Progresso gravado com sucesso." : "Verifique o espaço em disco.",
+            Notify(ok ? Loc.T("Jogo salvo") : Loc.T("Erro ao salvar"), ok ? Loc.T("Progresso gravado com sucesso.") : Loc.T("Verifique o espaço em disco."),
                 ok ? NotifyKind.Success : NotifyKind.Warning);
         return ok;
     }
@@ -543,7 +545,7 @@ public partial class GameState : Node
         GetTree().Quit(exitCode);
     }
 
-    public void Notify(string title, string body, NotifyKind kind = NotifyKind.Info) => Notified?.Invoke(title, body, kind);
+    public void Notify(string title, string body, NotifyKind kind = NotifyKind.Info) => Notified?.Invoke(Loc.T(title), Loc.T(body), kind);
 
     public void RaiseAll()
     {
@@ -585,8 +587,8 @@ public partial class GameState : Node
         Data.GameCompleted = false;
         Data.HasPosition = false;
         RaiseAll();
-        Notify("Renascimento!", $"+{gained} Essência Ancestral · bônus permanente x{EssenceMultiplier:0.0}", NotifyKind.Unlock);
-        BigMessage?.Invoke($"RENASCIMENTO {Data.PrestigeCount}");
+        Notify("Renascimento!", Loc.F("+{0} Essência Ancestral · bônus permanente x{1:0.0}", gained, EssenceMultiplier), NotifyKind.Unlock);
+        BigMessage?.Invoke(Loc.F("RENASCIMENTO {0}", Data.PrestigeCount));
         Prestiged?.Invoke();
         SaveGame(true);
         return true;

@@ -60,13 +60,13 @@ public static class SaveSystem
     {
         message = "";
         if (TryLoadFile(SavePath, out var data)) return data;
-        if (FileAccess.FileExists(SavePath)) message = "Arquivo de salvamento principal corrompido. ";
+        if (FileAccess.FileExists(SavePath)) message = Loc.T("Arquivo de salvamento principal corrompido. ");
         if (TryLoadFile(BackupPath, out data))
         {
-            message += "Backup restaurado.";
+            message += Loc.T("Backup restaurado.");
             return data;
         }
-        if (message.Length > 0) message += "Nenhum backup válido: novo jogo iniciado.";
+        if (message.Length > 0) message += Loc.T("Nenhum backup válido: novo jogo iniciado.");
         return null;
     }
 

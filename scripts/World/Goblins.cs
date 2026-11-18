@@ -123,7 +123,7 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
             var dest = GlobalPosition + push.Normalized() * 1.8f;
             if (Camp != null && Camp.L.Reachable(dest.X, dest.Z)) GlobalPosition = Camp.L.OnGround(dest.X, dest.Z);
         }
-        Effects.Instance?.FloatText(GlobalPosition + Vector3.Up * 1.6f, HitsLeft > 0 ? "ATORDOADO" : "DERROTADO", new Color(1f, 0.85f, 0.35f), 1f);
+        Effects.Instance?.FloatText(GlobalPosition + Vector3.Up * 1.6f, HitsLeft > 0 ? Loc.T("ATORDOADO") : Loc.T("DERROTADO"), new Color(1f, 0.85f, 0.35f), 1f);
         AudioManager.Instance?.Play("thud", -4f, 1.6f, 0.1f);
         if (HitsLeft <= 0) { State = Mode.Defeated; _t = 0; Camp?.OnRebelDefeated(this); return; }
         _stun = 1.1f;
@@ -261,7 +261,7 @@ public partial class GoblinChest : StationBase
             AddMesh(new BoxMesh { Size = new Vector3(0.06f, 0.82f, 0.64f) }, band, new Vector3(x, 0.4f, 0));
         var glow = Def?.Skin.Lightened(0.3f) ?? new Color(0.5f, 1f, 0.6f);
         AddMesh(new BoxMesh { Size = new Vector3(0.9f, 0.03f, 0.04f) }, MeshFactory.Emissive(glow, glow, 2f), new Vector3(0, 0.5f, 0.3f));
-        Label = MakeLabel($"BAÚ DO {Def?.Name.ToUpperInvariant() ?? "GOBLIN"}", glow, 1.3f, 48);
+        Label = MakeLabel(Loc.F("BAÚ DO {0}", Def?.Name.ToUpperInvariant() ?? Loc.T("GOBLIN")), glow, 1.3f, 48);
     }
 
     public override string GetPrompt()
@@ -269,9 +269,9 @@ public partial class GoblinChest : StationBase
         var gs = GameState.Instance;
         string id = Def.RegionId;
         int n = gs.GoblinStashCount(id);
-        if (n == 0) return $"Baú do {Def.Name} (vazio)";
-        if (gs.FreeSpace == 0) return $"Baú do {Def.Name}: {n} fragmentos — mochila cheia";
-        return $"{InputHints.Interact} Pegar {Mathf.Min(n, gs.FreeSpace)} fragmentos do baú ({GameState.FormatMoney(gs.GoblinStashValue(id))})";
+        if (n == 0) return Loc.F("Baú do {0} (vazio)", Def.Name);
+        if (gs.FreeSpace == 0) return Loc.F("Baú do {0}: {1} fragmentos — mochila cheia", Def.Name, n);
+        return Loc.F("{0} Pegar {1} fragmentos do baú ({2})", InputHints.Interact, Mathf.Min(n, gs.FreeSpace), GameState.FormatMoney(gs.GoblinStashValue(id)));
     }
 
     public override void Interact(PlayerController player)
@@ -375,7 +375,7 @@ public partial class GoblinCamp : Node3D
         _hut.AddChild(_hutBody);
         _hut.AddChild(new Label3D
         {
-            Text = $"BARRACA DO {Def.Name.ToUpperInvariant()}", FontSize = 44, PixelSize = 0.006f, OutlineSize = 10,
+            Text = Loc.F("BARRACA DO {0}", Def.Name.ToUpperInvariant()), FontSize = 44, PixelSize = 0.006f, OutlineSize = 10,
             Billboard = BaseMaterial3D.BillboardModeEnum.FixedY, Position = new Vector3(0, 2.3f, 0.4f),
             Modulate = Def.Skin.Lightened(0.4f), OutlineModulate = new Color(0, 0, 0, 0.8f), VisibilityRangeEnd = 30f,
         });
@@ -431,7 +431,7 @@ public partial class GoblinCamp : Node3D
         {
             if (gs.MarkGoblinFound(RegionId))
             {
-                gs.Notify($"Você encontrou {Def.Name}, {Def.Title}!", $"Ele estava escondido aqui. Fale com ele para contratá-lo ({GameState.FormatMoney(gs.GoblinHirePrice(RegionId))}).", NotifyKind.Rare);
+                gs.Notify(Loc.F("Você encontrou {0}, {1}!", Def.Name, Def.Title), Loc.F("Ele estava escondido aqui. Fale com ele para contratá-lo ({0}).", GameState.FormatMoney(gs.GoblinHirePrice(RegionId))), NotifyKind.Rare);
                 AudioManager.Instance?.Play("rare", -2f);
                 Discovered?.Invoke(this);
             }
@@ -479,9 +479,9 @@ public partial class GoblinCamp : Node3D
         string price = GameState.FormatMoney(gs.GoblinHirePrice(RegionId));
         return gs.Goblin(RegionId) switch
         {
-            GameState.GoblinMood.Available => $"{i} Contratar {Def.Name}, {Def.Title} ({price})",
-            GameState.GoblinMood.Fled when gs.CanRehireGoblin(RegionId) => $"{i} {Def.Name} voltou ao esconderijo, desconfiado. Recontratar ({price})",
-            GameState.GoblinMood.Working => gs.DayOver ? $"{Def.Name} está dormindo (zzz)" : $"{i} Falar com {Def.Name} (hoje: {GameState.FormatMoney(gs.GoblinData(RegionId).DayValue)} minerados)",
+            GameState.GoblinMood.Available => Loc.F("{0} Contratar {1}, {2} ({3})", i, Def.Name, Def.Title, price),
+            GameState.GoblinMood.Fled when gs.CanRehireGoblin(RegionId) => Loc.F("{0} {1} voltou ao esconderijo, desconfiado. Recontratar ({2})", i, Def.Name, price),
+            GameState.GoblinMood.Working => gs.DayOver ? Loc.F("{0} está dormindo (zzz)", Def.Name) : Loc.F("{0} Falar com {1} (hoje: {2} minerados)", i, Def.Name, GameState.FormatMoney(gs.GoblinData(RegionId).DayValue)),
             _ => null,
         };
     }
@@ -492,7 +492,7 @@ public partial class GoblinCamp : Node3D
         gs.MarkGoblinFound(RegionId);
         if (gs.Goblin(RegionId) == GameState.GoblinMood.Available || gs.CanRehireGoblin(RegionId))
         {
-            if (!gs.TryHireGoblin(RegionId)) gs.Notify(Def.Name, $"\"Sem {GameState.FormatMoney(gs.GoblinHirePrice(RegionId))}, sem picareta!\"", NotifyKind.Warning);
+            if (!gs.TryHireGoblin(RegionId)) gs.Notify(Def.Name, Loc.F("\"Sem {0}, sem picareta!\"", GameState.FormatMoney(gs.GoblinHirePrice(RegionId))), NotifyKind.Warning);
             else { SyncState(); AudioManager.Instance?.Play("buy", -4f); }
             return;
         }
@@ -500,11 +500,11 @@ public partial class GoblinCamp : Node3D
         {
             string mood = gs.GoblinData(RegionId).Strikes switch
             {
-                0 => $"\"Pedra boa hoje, chefe! {Def.Name} trabalha, chefe paga.\"",
-                1 => $"\"Chefe esqueceu de pagar {Def.Name} ontem... {Def.Name} lembra.\"",
-                _ => $"\"{Def.Name} está de olho, chefe. Mais um dia sem moeda e... hmm.\"",
+                0 => Loc.F("\"Pedra boa hoje, chefe! {0} trabalha, chefe paga.\"", Def.Name),
+                1 => Loc.F("\"Chefe esqueceu de pagar {0} ontem... {1} lembra.\"", Def.Name, Def.Name),
+                _ => Loc.F("\"{0} está de olho, chefe. Mais um dia sem moeda e... hmm.\"", Def.Name),
             };
-            gs.Notify(Def.Name, mood + $" Baú: {gs.GoblinStashCount(RegionId)} fragmentos.", NotifyKind.Info);
+            gs.Notify(Def.Name, mood + Loc.F(" Baú: {0} fragmentos.", gs.GoblinStashCount(RegionId)), NotifyKind.Info);
         }
     }
 
@@ -537,7 +537,7 @@ public partial class GoblinCamp : Node3D
             Rebels.Add(g);
         }
         foreach (var g in Rebels) g.State = GoblinNpc.Mode.Chasing;
-        gs.Notify("REBELIÃO GOBLIN!", $"{Def.Name} e os comparsas querem o pagamento à força. Use o feixe para atordoá-los!", NotifyKind.Warning);
+        gs.Notify("REBELIÃO GOBLIN!", Loc.F("{0} e os comparsas querem o pagamento à força. Use o feixe para atordoá-los!", Def.Name), NotifyKind.Warning);
         AudioManager.Instance?.Play("error", 0f);
     }
 
@@ -559,10 +559,10 @@ public partial class GoblinCamp : Node3D
             Grub.HitsLeft = 0;
             Grub.GlobalPosition = GrubHome;
             Grub.Scale = Vector3.One;
-            gs.Notify("Rebelião contida!", $"Os comparsas fugiram. {Def.Name}, envergonhado, volta ao trabalho — e promete não brigar mais.", NotifyKind.Success);
+            gs.Notify("Rebelião contida!", Loc.F("Os comparsas fugiram. {0}, envergonhado, volta ao trabalho — e promete não brigar mais.", Def.Name), NotifyKind.Success);
             RebellionWon?.Invoke();
         }
-        else gs.Notify("Os goblins fugiram", $"Levaram o que havia no baú. {Def.Name} talvez volte ao esconderijo em alguns dias.", NotifyKind.Warning);
+        else gs.Notify("Os goblins fugiram", Loc.F("Levaram o que havia no baú. {0} talvez volte ao esconderijo em alguns dias.", Def.Name), NotifyKind.Warning);
         SyncState();
     }
 

@@ -53,8 +53,8 @@ public partial class HouseBed : StationBase
     }
 
     public override string GetPrompt() => GameState.Instance.DayOver
-        ? $"{InputHints.Interact} Dormir (começar o Dia {GameState.Instance.Data.Day + 1})"
-        : "Você já descansou. Desça pelo elevador para trabalhar.";
+        ? Loc.F("{0} Dormir (começar o Dia {1})", InputHints.Interact, GameState.Instance.Data.Day + 1)
+        : Loc.T("Você já descansou. Desça pelo elevador para trabalhar.");
 
     public override void Interact(PlayerController player) => UiBus.RequestSleep();
 }
@@ -80,6 +80,6 @@ public partial class HouseTerminal : StationBase
         Label = MakeLabel("PAINEL DA CASA", gold, 1.75f, 48);
     }
 
-    public override string GetPrompt() => $"{InputHints.Interact} Painel: melhorias da casa e habilidades";
+    public override string GetPrompt() => Loc.F("{0} Painel: melhorias da casa e habilidades", InputHints.Interact);
     public override void Interact(PlayerController player) => UiBus.RequestHomePanel();
 }

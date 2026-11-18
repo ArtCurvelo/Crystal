@@ -199,7 +199,13 @@ public partial class AudioManager : Node
         _sounds["charged"] = Synth(0.25f, (t, i) => (MathF.Sin(Tau * 1760 * t) + MathF.Sin(Tau * 2217 * t)) * MathF.Exp(-t * 10f) * 0.18f);
         _sounds["step"] = Synth(0.08f, (t, i) => Noise() * MathF.Exp(-t * 60f) * 0.12f);
         BuildOreSounds();
+        // sons-guia (acessibilidade): ping do minério mais próximo e tom de mira
+        _sounds["cue_ping"] = Synth(0.12f, (t, i) => MathF.Sin(Tau * 1400 * t) * MathF.Exp(-t * 30f) * 0.5f);
+        _sounds["cue_aim"] = Synth(0.18f, (t, i) => (MathF.Sin(Tau * 880 * t) + MathF.Sin(Tau * 1320 * t) * 0.5f) * MathF.Exp(-t * 14f) * 0.35f);
     }
+
+    /// <summary>Stream sintetizado por id (para tocadores 3D fora do gerenciador).</summary>
+    public AudioStream GetStream(string id) => _sounds.TryGetValue(id, out var s) ? s : null;
 
     // ===================== Sons por tipo de minério =====================
     /// <summary>
