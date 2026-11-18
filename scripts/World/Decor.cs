@@ -322,7 +322,7 @@ public static class Decor
                 leaves.Add(new Transform3D(b.ScaleLocal(new Vector3(0.12f, size, 0.02f)), p));
             }
         }
-        var mat = new StandardMaterial3D { AlbedoColor = color, Roughness = 0.8f, CullMode = BaseMaterial3D.CullModeEnum.Disabled, EmissionEnabled = true, Emission = color * 0.35f, EmissionEnergyMultiplier = 0.8f };
+        var mat = new StandardMaterial3D { AlbedoColor = color, Roughness = 0.8f, CullMode = BaseMaterial3D.CullModeEnum.Disabled, EmissionEnabled = true, Emission = color * 0.25f, EmissionEnergyMultiplier = 0.5f };
         AddMulti(root, MeshFactory.Spike(4, 1f, 1f), mat, leaves);
     }
 
@@ -394,7 +394,7 @@ public static class Decor
             var mat = new ShaderMaterial { Shader = shader };
             mat.SetShaderParameter("base_color", col.Lightened(0.15f));
             mat.SetShaderParameter("glow_color", col);
-            mat.SetShaderParameter("glow_energy", 1.1f);
+            mat.SetShaderParameter("glow_energy", 0.55f);
             mat.SetShaderParameter("seed", (float)rng.NextDouble() * 40f);
             var xf = new List<Transform3D>();
             for (int c = 0; c < count; c++)

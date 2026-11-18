@@ -31,14 +31,19 @@ void fragment() {
 	float up = smoothstep(0.55, 0.9, wnorm.y);
 	float strata = 0.88 + 0.12 * sin(wpos.y * 2.6 + big * 7.0);
 	vec3 col = mix(rock_color * strata, floor_color, up);
-	col *= 0.55 + 0.75 * big;
+	col *= 0.45 + 0.6 * big;
 	col *= 0.8 + 0.4 * fine;
 	// fendas escuras
 	float crack = smoothstep(0.47, 0.5, fine) * (1.0 - smoothstep(0.5, 0.53, fine));
 	col *= 1.0 - crack * 0.5;
 	ALBEDO = col;
 	ROUGHNESS = 0.95;
-	// pontos minerais nas paredes (legíveis mesmo sem luzes)
-	float sp = smoothstep(0.78, 0.84, texture(noise_tex, uv * 0.9 + wpos.y * 0.37).r) * (1.0 - up);
-	EMISSION = accent * sp * 0.7 * speckle + col * 0.08;
+	// pontos minerais nas paredes
+	float sp = smoothstep(0.8, 0.86, texture(noise_tex, uv * 0.9 + wpos.y * 0.37).r) * (1.0 - up * 0.7);
+	// veios de neon: linhas finas onde o ruído cruza 0,5, só em algumas manchas
+	float vn = texture(noise_tex, uv * 0.11 + vec2(wpos.y * 0.03, 0.0)).r;
+	float vein = 1.0 - smoothstep(0.0, 0.008, abs(vn - 0.5)) * 1.0;
+	float patch = smoothstep(0.62, 0.76, texture(noise_tex, uv * 0.017 + 0.37).r);
+	float pulse = 0.75 + 0.25 * sin(TIME * 1.3 + wpos.x * 0.07 + wpos.z * 0.05);
+	EMISSION = accent * (sp * 1.4 * speckle + vein * patch * 1.9 * pulse * speckle) + col * 0.03;
 }

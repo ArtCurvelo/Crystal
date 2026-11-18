@@ -1135,8 +1135,9 @@ public partial class TestRunner : Node
         int before = ShardManager.Instance.ActiveCount;
         while (sapph.IsMineable) sapph.Hit(1e6f, sapph.GlobalPosition, Vector3.Up);
         int spawned = ShardManager.Instance.ActiveCount - before;
-        int maxNormal = (int)MathF.Round(sapph.Material.ShardsMax * sapph.SizeScale);
-        Check(spawned > maxNormal, $"fragmentos com evento ({spawned}) devem superar o máximo normal ({maxNormal})");
+        // com o evento a quantidade sorteada é dobrada: no mínimo 2x o menor sorteio possível
+        int minDoubled = 2 * Math.Max(1, (int)MathF.Round(sapph.Material.ShardsMin * sapph.SizeScale));
+        Check(spawned >= minDoubled && spawned % 2 == 0, $"fragmentos com evento ({spawned}) devem ser o dobro do sorteio (mínimo {minDoubled})");
         GS.IsPlaying = true;
         region = GameData.Regions[0]; // jogador sai da região → evento termina
         for (int i = 0; i < 60 && ev.Active != null; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);

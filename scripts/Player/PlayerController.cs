@@ -91,17 +91,43 @@ public partial class PlayerController : CharacterBody3D
         _head.AddChild(Camera);
         Tool = new ToolView();
         Camera.AddChild(Tool);
+        // lanterna do capacete: foco principal (sombras no Alto) + brilho suave ao redor
+        Lamp = new SpotLight3D
+        {
+            Name = "HelmetLamp",
+            LightColor = new Color(1f, 0.93f, 0.82f),
+            LightEnergy = 4.4f,
+            SpotRange = 36f,
+            SpotAngle = 30f,
+            SpotAngleAttenuation = 0.8f,
+            SpotAttenuation = 1.1f,
+            LightVolumetricFogEnergy = 1.6f,
+            Position = new Vector3(0.12f, 0.1f, 0.05f),
+        };
+        _head.AddChild(Lamp);
+        _lampFill = new OmniLight3D { LightColor = new Color(0.75f, 0.85f, 1f), LightEnergy = 0.45f, OmniRange = 6f, Position = new Vector3(0, 0.2f, 0) };
+        _head.AddChild(_lampFill);
         Settings.Changed += ApplySettings;
         ApplySettings();
     }
 
     public override void _ExitTree() => Settings.Changed -= ApplySettings;
 
+    public SpotLight3D Lamp;
+    OmniLight3D _lampFill;
+    public bool LampOn = true;
+
     void ApplySettings()
     {
         if (Camera == null) return;
+        if (Lamp != null)
+        {
+            Lamp.ShadowEnabled = Settings.Quality == GraphicsQuality.High;
+            Lamp.Visible = LampOn;
+            _lampFill.Visible = LampOn && Settings.Quality != GraphicsQuality.Low;
+        }
         Camera.Fov = Settings.Data.Fov;
-        Camera.Far = Settings.Quality switch { GraphicsQuality.Low => 70f, GraphicsQuality.Medium => 110f, _ => 150f };
+        Camera.Far = Settings.Quality switch { GraphicsQuality.Low => 80f, GraphicsQuality.Medium => 140f, _ => 240f };
     }
 
     public float Yaw
@@ -164,6 +190,12 @@ public partial class PlayerController : CharacterBody3D
         var wish = (Transform.Basis * new Vector3(input.X, 0, input.Y));
         wish.Y = 0;
         if (wish.LengthSquared() > 1) wish = wish.Normalized();
+        if (active && Input.IsActionJustPressed("flashlight"))
+        {
+            LampOn = !LampOn;
+            ApplySettings();
+            AudioManager.Instance?.Play("click", -6f);
+        }
         // agachar (alterna): passa por túneis baixos; só levanta se houver espaço
         if (active && Input.IsActionJustPressed("crouch")) _wantCrouch = !_wantCrouch;
         if (active && Input.IsActionJustPressed("jump") && _crouched) _wantCrouch = false;

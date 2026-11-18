@@ -22,6 +22,12 @@ public partial class ScreenshotTour : Node
         ProcessMode = ProcessModeEnum.Always;
         DirAccess.MakeDirRecursiveAbsolute(Dir);
         SaveSystem.SavePath = "user://shots_save.json";
+        // capturas na qualidade alvo (PC com GPU dedicada); --shots-quality=0..2 para comparar
+        var qa = System.Linq.Enumerable.FirstOrDefault(OS.GetCmdlineUserArgs(), a => a.StartsWith("--shots-quality="));
+        Settings.Data.Quality = qa != null ? int.Parse(qa.Split('=')[1]) : 2;
+        Settings.Data.RenderScale = 1f;
+        Settings.Data.DynamicResolution = false;
+        Settings.Apply(GetTree());
         await Wait(1.5f);
         await Shot("01_menu");
         Main.OpenHelpForTour();
@@ -275,7 +281,7 @@ public partial class ScreenshotTour : Node
         await Wait(0.3f);
         var mats = GameData.Materials.Values.ToList();
         // galeria isolada ao sul do mapa (fundo escuro, sem outros cristais)
-        var root = new Node3D { Position = new Vector3(0, 0, 70) };
+        var root = new Node3D { Position = new Vector3(0, 0, 125) };
         Main.World.GetParent().AddChild(root);
         var floor = new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(30, 12) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.11f, 0.14f) } };
         root.AddChild(floor);
@@ -298,12 +304,38 @@ public partial class ScreenshotTour : Node
                 var label = new Label3D { Text = group[i].Name, FontSize = 36, OutlineSize = 8, PixelSize = 0.006f, Billboard = BaseMaterial3D.BillboardModeEnum.Enabled, Position = new Vector3(0, 2.1f, 0), NoDepthTest = true };
                 c.AddChild(label);
             }
-            p.GlobalPosition = new Vector3(0, 0.1f, 76.5f);
+            p.GlobalPosition = new Vector3(0, 0.1f, 131.5f);
             p.Velocity = Vector3.Zero;
             p.SetLook(0, -0.22f);
             await Wait(0.8f);
             await Shot($"16_ores_{g}");
         }
+        // as 6 ferramentas em espaço limpo, disparando contra um quartzo
+        foreach (Node c in root.GetChildren()) if (c != floor && c != body) c.QueueFree();
+        await Wait(0.1f);
+        var tq = new Mining.Crystal();
+        tq.Init(GameData.Mat("abyssaltear"), 7, 1.2f); // resistente: não quebra durante as fotos
+        root.AddChild(tq);
+        tq.Position = new Vector3(1.2f, 0.02f, 0f);
+        var gs = GameState.Instance;
+        int[] tierLevels = { 0, 3, 7, 12, 18, 24 };
+        for (int t = 0; t < tierLevels.Length; t++)
+        {
+            gs.Data.Upgrades[UpgradeIds.Damage] = tierLevels[t];
+            gs.RaiseAll();
+            p.GlobalPosition = new Vector3(0.3f, 0.1f, 127.6f);
+            p.Velocity = Vector3.Zero;
+            p.SetLook(0.28f, -0.3f);
+            await Wait(0.35f);
+            await Shot($"17_gun_idle_{t}");
+            Input.ActionPress("mine");
+            await Wait(0.45f);
+            await Shot($"17_gun_{t}");
+            Input.ActionRelease("mine");
+            await Wait(0.2f);
+        }
+        gs.Data.Upgrades.Remove(UpgradeIds.Damage);
+        gs.RaiseAll();
         root.QueueFree();
     }
 

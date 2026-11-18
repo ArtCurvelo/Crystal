@@ -172,7 +172,7 @@ public partial class Main : Node
     {
         bool on = Settings.Quality != GraphicsQuality.Low;
         foreach (var l in FindAll<OmniLight3D>(World.GetParent()))
-            if (l.GetParent() is not Mining.Effects && !l.HasMeta(HouseDiorama.AlwaysOnMeta)) l.Visible = on; // clarões do Effects controlam a si mesmos
+            if (l.GetParent() is not Mining.Effects && !l.HasMeta(HouseDiorama.AlwaysOnMeta) && l.Name != "HelmetLamp") l.Visible = on; // clarões do Effects controlam a si mesmos
         // decoração por MultiMesh: na Baixa desenha só uma fração (as posições já são aleatórias)
         foreach (var mm in FindAll<MultiMeshInstance3D>(World))
         {

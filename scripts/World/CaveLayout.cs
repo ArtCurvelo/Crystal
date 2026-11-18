@@ -91,39 +91,42 @@ public sealed class CaveLayout
         if (first)
         {
             var campC = new Vector2(0, top - 18f);
-            Camp = Add(new CaveFeature { Kind = CaveKind.Chamber, Id = "camp", Name = "Acampamento", A = campC, B = campC, RA = 13, RB = 13, LA = 0, LB = 0, HA = baseH, HB = baseH, Noise = 0.45f, Flat = true });
+            Camp = Add(new CaveFeature { Kind = CaveKind.Chamber, Id = "camp", Name = "Acampamento", A = campC, B = campC, RA = 15, RB = 15, LA = 0, LB = 0, HA = 12f, HB = 12f, Noise = 0.45f, Flat = true });
             Chambers.Add(Camp);
-            nodes.Add((campC, 7f, 0f, baseH));
+            nodes.Add((campC, 8f, 0f, 12f));
         }
         else
         {
             nodes.Add((new Vector2(0, top), 3.6f, 0f, 6.5f));
-            nodes.Add((new Vector2(0, top - 10f), 7.5f, 0f, baseH));
+            nodes.Add((new Vector2(0, top - 12f), 9f, 0f, baseH * 0.7f));
         }
-        int mids = 4;
+        int mids = 6;
         float zA = nodes[^1].p.Y, zB = hasNorth ? bottom + 10f : bottom + 16f;
-        float[] lvls = { -1f, 0f, 1.5f, 2.5f, 0.5f };
+        // relevo forte: o caminho principal sobe e desce (rampas longas entre os nós)
+        float[] lvls = { -4f, -2f, 0f, 2f, 4f, 6f, 8f };
         for (int i = 1; i <= mids; i++)
         {
             float z = Mathf.Lerp(zA, zB, i / (float)(mids + 1));
-            float x = R(-1f, 1f) * r.HalfX * 0.42f;
-            nodes.Add((new Vector2(x, z), R(6.5f, 9f), lvls[_rng.Next(lvls.Length)], baseH + R(-1f, 2f)));
+            float x = R(-1f, 1f) * r.HalfX * 0.45f;
+            // salões grandes alternados com passagens mais estreitas
+            bool hall = i % 2 == 1;
+            nodes.Add((new Vector2(x, z), hall ? R(12f, 16f) : R(8f, 10f), lvls[_rng.Next(lvls.Length)], hall ? baseH + R(4f, 10f) : baseH + R(-3f, 2f)));
         }
         if (hasNorth)
         {
-            nodes.Add((new Vector2(0, bottom + 10f), 7.5f, 0f, baseH));
+            nodes.Add((new Vector2(0, bottom + 12f), 9f, 0f, baseH * 0.7f));
             nodes.Add((new Vector2(0, bottom), 3.6f, 0f, 6.5f));
         }
-        else nodes.Add((new Vector2(0, bottom + 16f), 9f, 0f, baseH + 2));
+        else nodes.Add((new Vector2(0, bottom + 22f), 16f, 0f, baseH + 8));
 
         // Núcleo: o Coração fica numa grande câmara no meio do caminho
         if (r.Id == "core")
         {
             int mid = nodes.Count / 2;
             var n = nodes[mid];
-            nodes[mid] = (new Vector2(0, n.p.Y), 9f, 0f, baseH + 4f);
+            nodes[mid] = (new Vector2(0, n.p.Y), 12f, 0f, baseH + 8f);
             var hc = new Vector2(0, n.p.Y);
-            Heart = Add(new CaveFeature { Kind = CaveKind.Chamber, Id = "heart", Name = "Câmara do Coração", A = hc, B = hc, RA = 17, RB = 17, LA = 0, LB = 0, HA = baseH + 6, HB = baseH + 6, Noise = 0.6f, Flat = true });
+            Heart = Add(new CaveFeature { Kind = CaveKind.Chamber, Id = "heart", Name = "Câmara do Coração", A = hc, B = hc, RA = 22, RB = 22, LA = 0, LB = 0, HA = baseH + 10, HB = baseH + 10, Noise = 0.6f, Flat = true });
             Chambers.Add(Heart);
         }
 
@@ -138,17 +141,17 @@ public sealed class CaveLayout
 
         // Reservatório: grande câmara rebaixada com o lago
         if (r.Id == "abyss")
-            Lake = TryChamber("lake", "Lago Abissal", 17f, 19f, -1.5f, baseH + 3f, null);
+            Lake = TryChamber("lake", "Lago Abissal", 24f, 28f, -4f, baseH + 6f, null);
 
         // câmaras com minério em destaque (as "galerias" antigas) e câmaras comuns
-        foreach (var w in r.Wings) TryChamber(w.Id, w.Name, 10f, 13f, PickLevel(), baseH, w);
-        int extra = 5 + r.Index;
-        for (int k = 0; k < extra; k++) TryChamber("c" + k, null, 7f, 12f, PickLevel(), baseH - R(1f, 3f), null);
+        foreach (var w in r.Wings) TryChamber(w.Id, w.Name, 14f, 19f, PickLevel(), baseH + 2f, w);
+        int extra = 10 + r.Index * 2;
+        for (int k = 0; k < extra; k++) TryChamber("c" + k, null, 8f, 18f, PickLevel(), baseH + R(-5f, 6f), null);
 
         // câmaras secretas por túneis baixos (só agachado)
-        int secrets = 2;
+        int secrets = 3;
         var hosts = new List<CaveFeature>(Chambers);
-        for (int s = 0, tries = 0; s < secrets && tries < 60; tries++)
+        for (int s = 0, tries = 0; s < secrets && tries < 120; tries++)
         {
             var host = hosts[_rng.Next(hosts.Count)];
             if (host == Camp || host == Heart || host.Kind == CaveKind.Secret) continue;
@@ -169,7 +172,7 @@ public sealed class CaveLayout
 
     float PickLevel()
     {
-        float[] levels = { -1.5f, 0f, 0f, 2f, 3.5f, 5f };
+        float[] levels = { -6f, -3f, 0f, 3f, 6f, 10f, 14f };
         return levels[_rng.Next(levels.Length)];
     }
 
@@ -216,7 +219,7 @@ public sealed class CaveLayout
             var side = new Vector2(-along.Y, along.X) * (_rng.Next(2) == 0 ? -1 : 1);
             var dir = side.Rotated(R(-0.6f, 0.6f));
             float rad = R(rMin, rMax);
-            float corridor = R(6f, 14f);
+            float corridor = R(10f, 26f);
             var c = p + dir * (pr + corridor + rad);
             if (!Inside(c, rad + 4f) || Overlaps(c, rad + 4f)) continue;
             // rampa com no máximo ~25° de inclinação
@@ -224,7 +227,7 @@ public sealed class CaveLayout
             float lv = Mathf.Clamp(level, pl - maxDiff, pl + maxDiff);
             var ch = Add(new CaveFeature { Kind = wing != null ? CaveKind.Chamber : CaveKind.Chamber, Id = id, Name = name, A = c, B = c, RA = rad, RB = rad, LA = lv, LB = lv, HA = Mathf.Max(6f, height), HB = Mathf.Max(6f, height), Wing = wing });
             Chambers.Add(ch);
-            Add(new CaveFeature { Kind = CaveKind.Corridor, A = p + dir * (pr * 0.5f), B = c - dir * (rad * 0.6f), RA = R(3.2f, 4f), RB = R(3.4f, 4.4f), LA = pl, LB = lv, HA = 6.5f, HB = 7f, Noise = 0.8f });
+            Add(new CaveFeature { Kind = CaveKind.Corridor, A = p + dir * (pr * 0.5f), B = c - dir * (rad * 0.6f), RA = R(4f, 5.5f), RB = R(4.5f, 6f), LA = pl, LB = lv, HA = R(8f, 12f), HB = R(9f, 13f), Noise = 0.9f });
             return ch;
         }
         return null;

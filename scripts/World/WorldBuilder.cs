@@ -200,19 +200,22 @@ public partial class WorldBuilder : Node3D
             }
         }
         var water = r.Id switch { "depths" => new Color(0.4f, 1f, 0.85f), "abyss" => new Color(0.4f, 0.9f, 1f), _ => new Color(0.45f, 0.85f, 1f) };
-        int falls = r.Id switch { "caves" => 2, "depths" => 3, "abyss" => 4, _ => 0 };
+        // quantidades proporcionais à área da caverna
+        float af = L.Nx * L.Nz / 8000f;
+        int N(int n) => Mathf.Max(n, (int)(n * af));
+        int falls = N(r.Id switch { "caves" => 2, "depths" => 3, "abyss" => 4, _ => 0 });
         for (int i = 0; i < falls; i++) Waterfall(root, L, rng, water);
         switch (r.Id)
         {
             case "caves":
-                Decor.Mushrooms(root, L, rng, 16, new Color(0.3f, 1f, 0.9f));
-                Decor.Ferns(root, L, rng, 22, new Color(0.95f, 0.42f, 0.15f));
-                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, r.Height);
+                Decor.Mushrooms(root, L, rng, N(16), new Color(0.3f, 1f, 0.9f));
+                Decor.Ferns(root, L, rng, N(22), new Color(0.95f, 0.42f, 0.15f));
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, r.Height);
                 break;
             case "depths":
-                Decor.Mushrooms(root, L, rng, 14, new Color(0.4f, 0.6f, 1f));
-                Decor.Ferns(root, L, rng, 14, new Color(0.2f, 0.7f, 0.6f));
-                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, r.Height);
+                Decor.Mushrooms(root, L, rng, N(14), new Color(0.4f, 0.6f, 1f));
+                Decor.Ferns(root, L, rng, N(14), new Color(0.2f, 0.7f, 0.6f));
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, r.Height);
                 break;
             case "abyss":
                 if (L.Lake != null)
@@ -222,11 +225,11 @@ public partial class WorldBuilder : Node3D
                     Decor.Lake(root, center, lc.Radius + 3f, r.AccentColor);
                     Decor.Jellyfish(root, center, lc.Radius, lc.HA, rng, 12);
                 }
-                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, r.Height);
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, r.Height);
                 break;
             case "core":
                 if (L.Heart != null) Decor.AncientRuins(root, L, L.OnGround(L.Heart.A.X, L.Heart.A.Y), rng);
-                Decor.GiantClusters(root, L, rng, 5, new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, r.Height);
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, r.Height);
                 break;
         }
     }
@@ -525,7 +528,7 @@ public partial class WorldBuilder : Node3D
             if (L.WallDist(x, z) > -1f) continue;
             float g = L.Ground(x, z), c = L.Ceiling(x, z);
             if (c - g < 4.5f) continue;
-            float len = 0.8f + (float)rng.NextDouble() * Mathf.Min(3.2f, (c - g) * 0.3f);
+            float len = 0.8f + (float)rng.NextDouble() * Mathf.Min(6.5f, (c - g) * 0.28f);
             float rad = 0.25f + (float)rng.NextDouble() * 0.5f;
             spikesDown.Add(new Transform3D(new Basis(new Vector3(1, 0, 0), Mathf.Pi).ScaleLocal(new Vector3(rad, len, rad)), new Vector3(x, c + 0.2f, z)));
             if (i % 3 == 0 && L.WallDist(x, z) > -3.5f)
@@ -622,7 +625,7 @@ public partial class WorldBuilder : Node3D
         int n = 0;
         foreach (var c in L.Chambers)
         {
-            if (n >= 6) break;
+            if (n >= 16) break;
             root.AddChild(new OmniLight3D
             {
                 LightColor = n % 2 == 0 ? r.LightColor : r.AccentColor,

@@ -17,6 +17,7 @@ public static class InputSetup
         Key("jump", Godot.Key.Space);
         Key("sprint", Godot.Key.Shift);
         Key("crouch", Godot.Key.C, Godot.Key.Ctrl);
+        Key("flashlight", Godot.Key.F);
         Key("interact", Godot.Key.E);
         Key("pause", Godot.Key.Escape);
         Key("quick_save", Godot.Key.F5);
@@ -39,6 +40,7 @@ public static class InputSetup
         Pad("sprint", JoyButton.LeftShoulder, JoyButton.LeftStick);
         Pad("pause", JoyButton.Start);
         Pad("crouch", JoyButton.B, JoyButton.RightStick);
+        Pad("flashlight", JoyButton.DpadUp);
         // navegação de menus com o analógico esquerdo, além do D-pad padrão
         Axis("ui_up", JoyAxis.LeftY, -1, false);
         Axis("ui_down", JoyAxis.LeftY, 1, false);

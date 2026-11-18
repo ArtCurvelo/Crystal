@@ -82,7 +82,8 @@ public partial class Crystal : StaticBody3D
         var mat = Material;
         bool special = mat.Special;
         float s = special ? 2.6f : SizeScale;
-        _baseEnergy = mat.Rare ? 1.3f : special ? 1.5f : 0.85f;
+        // brilho forte (o bloom faz os minérios "acenderem" nas cavernas escuras)
+        _baseEnergy = mat.Rare ? 2.4f : special ? 0.9f : 1.5f;
 
         // formato e textura próprios do tipo de minério
         var built = OreVisuals.Build(_visual, mat, _rng, s);
@@ -113,19 +114,22 @@ public partial class Crystal : StaticBody3D
             };
             _sparkle.MaterialOverride = MeshFactory.Unshaded(Colors.White);
             _visual.AddChild(_sparkle);
-            {
-                _light = new OmniLight3D
-                {
-                    LightColor = mat.Glow,
-                    LightEnergy = special ? 1.4f : 1.0f,
-                    OmniRange = special ? 12f : 4f,
-                    ShadowEnabled = false,
-                    Position = new Vector3(0, 0.8f * s, 0),
-                };
-                _light.Visible = Settings.Quality != GraphicsQuality.Low;
-                _visual.AddChild(_light);
-            }
         }
+        // todo depósito ilumina a rocha ao redor com a própria cor (some à distância)
+        _light = new OmniLight3D
+        {
+            LightColor = mat.Glow,
+            LightEnergy = special ? 2.4f : mat.Rare ? 1.8f : 1.1f,
+            OmniRange = special ? 14f : (mat.Rare ? 5.5f : 3.6f) * Mathf.Max(0.8f, SizeScale),
+            OmniAttenuation = 1.4f,
+            ShadowEnabled = false,
+            Position = new Vector3(0, 0.75f * s, 0),
+            DistanceFadeEnabled = true,
+            DistanceFadeBegin = 30f,
+            DistanceFadeLength = 10f,
+        };
+        _light.Visible = Settings.Quality != GraphicsQuality.Low;
+        _visual.AddChild(_light);
 
         _colliderHeight = vh;
         var shape = new CylinderShape3D { Radius = built.Radius, Height = vh };

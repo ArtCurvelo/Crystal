@@ -50,6 +50,19 @@ public static class Settings
     public static event Action Changed;
 
     public static GraphicsQuality Quality => (GraphicsQuality)Data.Quality;
+
+    /// <summary>
+    /// Renderizador avançado (Forward+/Vulkan) ativo? Em GPUs sem Vulkan o Godot cai para OpenGL
+    /// (Compatibility) e os efeitos exclusivos (névoa volumétrica, SSAO) ficam desligados.
+    /// </summary>
+    public static bool Advanced
+    {
+        get
+        {
+            try { return RenderingServer.GetCurrentRenderingDriverName() != "opengl3"; }
+            catch { return false; }
+        }
+    }
     public static readonly Vector2I[] WindowSizes = { new(1280, 720), new(1366, 768), new(1600, 900), new(1920, 1080) };
 
     /// <summary>True quando as configurações foram criadas agora (primeira execução).</summary>

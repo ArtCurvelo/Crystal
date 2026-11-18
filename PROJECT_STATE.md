@@ -119,3 +119,8 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 
 ## Próxima ação recomendada
 Polimento final e regressão; aguardar o resultado do teste no Windows e ajustar o desempenho conforme o FPS real.
+
+## Renderização (v0.4.0)
+- Forward+ (Vulkan) com fallback automático para OpenGL. `Settings.Advanced` = Forward+ ativo. Testes/capturas locais usam Mesa lavapipe (`/home/user/tools/vk`, variáveis em `env.sh`).
+- Tour de capturas força qualidade Alta (`--shots-quality=0..2` para comparar).
+- Luzes: lanterna (SpotLight "HelmetLamp"), uma OmniLight por depósito (fade por distância), luzes de câmara; na Baixa as OmniLights são ocultadas.

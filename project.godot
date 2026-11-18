@@ -40,6 +40,7 @@ project/assembly_name="CrystalExcavator"
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
+renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="gl_compatibility"
+rendering_device/fallback_to_opengl3=true
 environment/defaults/default_clear_color=Color(0.02, 0.015, 0.04, 1)

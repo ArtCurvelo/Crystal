@@ -19,18 +19,27 @@ public partial class EnvironmentController : WorldEnvironment
         var env = new Godot.Environment
         {
             BackgroundMode = Godot.Environment.BGMode.Color,
-            BackgroundColor = new Color(0.01f, 0.01f, 0.02f),
+            BackgroundColor = new Color(0.005f, 0.005f, 0.012f),
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            TonemapMode = Godot.Environment.ToneMapper.Filmic,
-            TonemapExposure = 1.05f,
+            TonemapMode = Godot.Environment.ToneMapper.Aces,
+            TonemapExposure = 1.0f,
+            TonemapWhite = 6f,
             FogEnabled = true,
             FogLightEnergy = 1f,
-            GlowIntensity = 0.7f,
+            // bloom forte: minérios, neons e feixe "estouram" de luz
+            GlowEnabled = true,
+            GlowIntensity = 0.8f,
             GlowStrength = 1.0f,
-            GlowBloom = 0.08f,
-            GlowHdrThreshold = 0.9f,
+            GlowBloom = 0.03f,
+            GlowHdrThreshold = 1.25f,
+            GlowHdrScale = 1.4f,
             GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Additive,
+            AdjustmentEnabled = true,
+            AdjustmentSaturation = 1.25f,
+            AdjustmentContrast = 1.08f,
         };
+        float[] levels = { 0f, 1f, 1f, 0.8f, 0.45f, 0.15f, 0f };
+        for (int i = 1; i <= 6; i++) env.Set($"glow_levels/{i}", levels[i]);
         Environment = env;
         SetRegion(GameData.Regions[0], true);
         Settings.Changed += ApplyQuality;
@@ -42,8 +51,22 @@ public partial class EnvironmentController : WorldEnvironment
     void ApplyQuality()
     {
         var q = Settings.Quality;
-        Environment.GlowEnabled = q != GraphicsQuality.Low;
-        Environment.GlowIntensity = q == GraphicsQuality.High ? 0.85f : 0.65f;
+        bool adv = Settings.Advanced;
+        var e = Environment;
+        e.GlowEnabled = true;
+        e.GlowIntensity = q == GraphicsQuality.Low ? 0.6f : 0.8f;
+        // névoa volumétrica: feixes de luz da lanterna e brilho dos cristais no ar
+        e.VolumetricFogEnabled = adv && q == GraphicsQuality.High;
+        e.VolumetricFogDensity = 0.022f;
+        e.VolumetricFogLength = 48f;
+        e.VolumetricFogDetailSpread = 1.5f;
+        e.VolumetricFogGIInject = 0f;
+        e.VolumetricFogAnisotropy = 0.45f;
+        e.SsaoEnabled = adv && q != GraphicsQuality.Low;
+        e.SsaoRadius = 1.6f;
+        e.SsaoIntensity = 2.2f;
+        e.SsilEnabled = adv && q == GraphicsQuality.High;
+        e.SsilIntensity = 1.2f;
     }
 
     /// <summary>Sobreposição temporária de evento (névoa/cor/energia). Intensidade 0 = desligado.</summary>
@@ -79,10 +102,14 @@ public partial class EnvironmentController : WorldEnvironment
     {
         var e = Environment;
         e.AmbientLightColor = _ambient.Lerp(OverlayAmbient, _overlay * 0.6f);
-        // na Baixa não há luzes dinâmicas: a luz ambiente compensa
-        e.AmbientLightEnergy = _energy * (Settings.Quality == GraphicsQuality.Low ? 1.9f : 1f);
+        // cavernas escuras: quem ilumina é a lanterna do capacete, os minérios e os neons.
+        // Na Baixa (sem luzes dinâmicas) a luz ambiente compensa.
+        float amb = Settings.Quality == GraphicsQuality.Low ? 1.5f : (Settings.Advanced ? 0.45f : 0.6f);
+        e.AmbientLightEnergy = _energy * amb;
         e.FogLightColor = _fog.Lerp(OverlayFog, _overlay);
         e.FogDensity = Mathf.Lerp(_density, OverlayFogDensity, _overlay);
-        e.BackgroundColor = _fog.Darkened(0.5f);
+        e.BackgroundColor = _fog.Darkened(0.7f);
+        e.VolumetricFogAlbedo = _fog.Lightened(0.55f);
+        e.VolumetricFogEmission = _fog * 0.35f;
     }
 }
