@@ -327,3 +327,11 @@ Feedback do diretor: com o controle não dava para iniciar um novo jogo nem comp
 - **Acessibilidade:** filtro de daltonismo (protanopia, deuteranopia, tritanopia, com intensidade) aplicado na tela inteira; narração por voz do sistema (botões em foco, o que está na mira, avisos); sons-guia (sonar 3D vindo do minério mais próximo, mais rápido quando perto, e tom quando a mira está num minério); reduzir tremor da câmera.
 - Teste do controle estabilizado (eventos simulados agora são processados na hora).
 - Testes **439/439** (novos: tabelas de tradução consistentes — mesmos marcadores `{n}` nos 3 idiomas —, troca de idioma, remapeamento de tecla/mouse/controle salvo e restaurado, filtro de daltonismo e narração sem falhar). Tours de capturas em inglês e em espanhol (com filtro de deuteranopia) conferidos.
+
+## Atualização ao voltar para o menu (pronta para v0.6.1)
+Pedido do diretor: quem está no meio de uma partida e volta ao menu já deve ver se há atualização, atualizar e continuar jogando, sem fechar e abrir o jogo.
+- Voltar ao menu pela pausa salva e procura atualização na hora (antes só ao abrir o jogo). Se uma versão nova já tinha sido encontrada, a janela aparece de novo sem baixar o manifesto outra vez; verificação e download não rodam em paralelo.
+- Atualizando nesse caso, o jogo fecha, aplica os arquivos e **reabre direto na partida salva** (`--continue`). Aberto do menu inicial, reabre no menu como antes.
+- Os arquivos do jogo só podem ser trocados com ele fechado (o Windows trava arquivos em uso), por isso o reinício automático continua, mas sem passos manuais.
+- Ambiente: `env.sh` não quebra mais com `set -u` (o script de publicação parava sem mensagem).
+- Testes 441/441.

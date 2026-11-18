@@ -244,6 +244,8 @@ public partial class Main : Node
 
 
         if (args.Contains("--autostart")) StartGame(false);
+        // reaberto pelo atualizador: continua a partida de onde parou
+        else if (args.Contains("--continue") && SaveSystem.HasSave()) StartGame(true);
         var shots = args.FirstOrDefault(a => a.StartsWith("--shots="));
         if (shots != null) AddChild(new Tests.ScreenshotTour { Main = this, Dir = shots.Substring("--shots=".Length) });
         if (args.Contains("--bench"))
@@ -391,6 +393,9 @@ public partial class Main : Node
         _pause.Close();
         if (Player != null) Player.InputEnabled = false;
         ShowMenu();
+        // voltou ao menu no meio da sessão: procura atualização na hora (atualiza e volta para a partida)
+        _updater.ResumeAfterUpdate = true;
+        _updater.CheckForUpdates();
     }
 
     void QuitGame()

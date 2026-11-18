@@ -58,9 +58,21 @@ public partial class UpdateManager : Node
     }
 
     // ------------------------------------------------------------ verificação
+    bool _busy;
+    /// <summary>Ao reabrir depois da atualização, volta direto para a partida salva.</summary>
+    public bool ResumeAfterUpdate;
+
     public async void CheckForUpdates()
     {
-        if (!Supported || !Settings.Data.CheckUpdates) return;
+        if (!Supported || !Settings.Data.CheckUpdates || _busy) return;
+        // já achou uma versão nova: só mostra de novo (sem baixar o manifesto outra vez)
+        if (Available != null) { UpdateFound?.Invoke(Available); return; }
+        _busy = true;
+        try { await Check(); } finally { _busy = false; }
+    }
+
+    async Task Check()
+    {
         Status?.Invoke(Loc.T("Procurando atualizações…"));
         var bytes = await Fetch(ManifestUrl + "?t=" + Time.GetUnixTimeFromSystem());
         if (bytes == null) { Status?.Invoke(Loc.T("Sem conexão para verificar atualizações")); return; }
@@ -120,7 +132,8 @@ public partial class UpdateManager : Node
     public async void DownloadAndApply()
     {
         var m = Available;
-        if (m == null) return;
+        if (m == null || _busy) return;
+        _busy = true;
         string staging = ProjectSettings.GlobalizePath("user://update_staging");
         try
         {
@@ -143,7 +156,7 @@ public partial class UpdateManager : Node
             }
             Progress?.Invoke(1f, Loc.T("Aplicando atualização…"));
             string gameDir = System.IO.Path.GetDirectoryName(OS.GetExecutablePath());
-            string script = WriteApplyScript(staging, gameDir, OS.GetExecutablePath(), m.Files, OS.GetProcessId());
+            string script = WriteApplyScript(staging, gameDir, OS.GetExecutablePath(), m.Files, OS.GetProcessId(), ResumeAfterUpdate && SaveSystem.HasSave());
             // só salva se houver partida em andamento; e guarda um backup antes de atualizar
             if (GameState.Instance != null && GameState.Instance.IsPlaying) GameState.Instance.SaveGame(true);
             SaveSystem.Snapshot("antes-da-v" + m.Version);
@@ -154,10 +167,11 @@ public partial class UpdateManager : Node
         {
             Failed?.Invoke(Loc.T("Erro ao atualizar: ") + e.Message);
         }
+        finally { _busy = false; }
     }
 
     /// <summary>Script .bat: espera o jogo fechar, copia os arquivos baixados e reabre o jogo.</summary>
-    public static string WriteApplyScript(string staging, string gameDir, string exePath, List<UpdateFile> files, int pid)
+    public static string WriteApplyScript(string staging, string gameDir, string exePath, List<UpdateFile> files, int pid, bool resume = false)
     {
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("@echo off");
@@ -170,7 +184,7 @@ public partial class UpdateManager : Node
             string rel = f.Path.Replace('/', '\\');
             sb.AppendLine(string.Format("copy /Y \"{0}\\{1}\" \"{2}\\{3}\" >nul", staging, rel, gameDir, rel));
         }
-        sb.AppendLine(string.Format("start \"\" \"{0}\"", exePath));
+        sb.AppendLine(string.Format("start \"\" \"{0}\"", exePath) + (resume ? " -- --continue" : ""));
         string path = System.IO.Path.Combine(staging, "aplicar_atualizacao.bat");
         File.WriteAllText(path, sb.ToString().Replace("\n", "\r\n").Replace("\r\r\n", "\r\n"));
         return path;

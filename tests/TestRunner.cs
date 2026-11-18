@@ -757,6 +757,9 @@ public partial class TestRunner : Node
         string bat = System.IO.File.ReadAllText(UpdateManager.WriteApplyScript(dir, @"C:\Jogo", @"C:\Jogo\CrystalExcavator.exe", files, 1234));
         Check(bat.Contains("PID eq 1234") && bat.Contains(@"C:\Jogo\data_CrystalExcavator_windows_x86_64\CrystalExcavator.dll") && bat.Contains("start \"\" \"C:\\Jogo\\CrystalExcavator.exe\"") && bat.Contains("\r\n"),
             "script de aplicação espera o jogo fechar, copia os arquivos e reabre");
+        Check(!bat.Contains("--continue"), "aberto do menu inicial: reabre no menu");
+        string bat2 = System.IO.File.ReadAllText(UpdateManager.WriteApplyScript(dir, @"C:\Jogo", @"C:\Jogo\CrystalExcavator.exe", files, 1234, true));
+        Check(bat2.Contains("start \"\" \"C:\\Jogo\\CrystalExcavator.exe\" -- --continue"), "atualizado no meio da sessão: reabre direto na partida");
         Check(!UpdateManager.Supported, "verificação desativada fora do executável Windows");
         System.IO.Directory.Delete(dir, true);
     }
