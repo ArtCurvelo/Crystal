@@ -146,12 +146,8 @@ public partial class WorldBuilder : Node3D
             Elevator.Rotation = new Vector3(0, Mathf.Pi, 0); // frente (+Z local) voltada para dentro da caverna
             SpawnPoint = L.OnGround(cc.X, cc.Z + 8.6f, 0.1f);
             AddPlatform(root, cc, r);
-            // barraca do goblin minerador na borda leste do acampamento
-            var hut = L.OnGround(cc.X + 9.6f, cc.Z - 3.5f);
-            Goblins = new GoblinCamp { Name = "GoblinCamp", World = this };
-            AddChild(Goblins);
-            Goblins.Setup(L, hut, Mathf.Pi / 2);
-            reserved.Add(hut); reserved.Add(Goblins.ChestPos); reserved.Add(Goblins.GrubHome);
+            // barraca do goblin minerador (aparece só depois de contratado) na borda leste do acampamento
+            BuildGoblinCamp(r, L, index, L.OnGround(cc.X + 9.6f, cc.Z - 3.5f), Mathf.Pi / 2, reserved);
             reserved.Add(sell.Position); reserved.Add(shop.Position); reserved.Add(Elevator.Position); reserved.Add(cc);
         }
         else
@@ -163,14 +159,46 @@ public partial class WorldBuilder : Node3D
             shop.LookAt(L.OnGround(0, tz - 4f) + new Vector3(0, shop.Position.Y - L.Ground(0, tz - 4f), 0), Vector3.Up);
             shop.RotateY(Mathf.Pi);
             reserved.Add(shop.Position);
+            // acampamento do goblin desta região: lugar plano e livre perto da entrada
+            foreach (var off in new[] { new Vector2(-9f, -14f), new Vector2(9f, -16f), new Vector2(-10f, -22f), new Vector2(10f, -24f), new Vector2(-6f, -30f), new Vector2(6f, -32f) })
+            {
+                float x = off.X, z = r.CenterZ + r.HalfZ + off.Y;
+                if (!L.Reachable(x, z) || L.WallDist(x, z) > -3.5f || 1f - L.Normal(x, z).Y > 0.12f) continue;
+                float yaw = Mathf.Atan2(x, 0f); // frente da barraca voltada para o caminho (x = 0)
+                BuildGoblinCamp(r, L, index, L.OnGround(x, z), yaw, reserved);
+                break;
+            }
         }
 
+        BeginSolids(root, L, reserved);
         BuildDecoration(root, r, L, rng);
         BuildLights(root, r, L);
         BuildAmbientParticles(root, r);
         BuildSetPieces(root, r, L, new Random(500 + index), reserved);
         BuildChamberSigns(root, r, L);
+        L.Reflood(); // obstáculos sólidos mudam o que é alcançável a pé
         BuildCrystals(root, r, L, rng, reserved);
+    }
+
+    public readonly List<GoblinCamp> GoblinCamps = new();
+
+    void BuildGoblinCamp(RegionDef r, CaveLayout L, int index, Vector3 hut, float yaw, List<Vector3> reserved)
+    {
+        var def = GoblinData.Of(r.Id);
+        if (def == null) return;
+        // esconderijo: uma câmara secreta da região (o jogador acha explorando)
+        Vector3 hide = hut;
+        if (L.Secrets.Count > 0)
+        {
+            var sc = L.Secrets[index % L.Secrets.Count];
+            hide = L.OnGround(sc.A.X, sc.A.Y);
+        }
+        var camp = new GoblinCamp { Name = "GoblinCamp_" + r.Id, World = this };
+        AddChild(camp);
+        camp.Setup(def, L, index, hut, yaw, hide);
+        GoblinCamps.Add(camp);
+        if (index == 0) Goblins = camp;
+        reserved.Add(hut); reserved.Add(camp.ChestPos); reserved.Add(camp.GrubHome); reserved.Add(hide);
     }
 
     /// <summary>Cenografia por região (posto avançado, cachoeiras, flora, ruínas, lago).</summary>
@@ -210,12 +238,12 @@ public partial class WorldBuilder : Node3D
             case "caves":
                 Decor.Mushrooms(root, L, rng, N(16), new Color(0.3f, 1f, 0.9f));
                 Decor.Ferns(root, L, rng, N(22), new Color(0.95f, 0.42f, 0.15f));
-                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, r.Height);
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.85f, 1f), new Color(0.65f, 0.35f, 1f) }, r.Height, FreeSpot, Solid);
                 break;
             case "depths":
                 Decor.Mushrooms(root, L, rng, N(14), new Color(0.4f, 0.6f, 1f));
                 Decor.Ferns(root, L, rng, N(14), new Color(0.2f, 0.7f, 0.6f));
-                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, r.Height);
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.25f, 0.5f, 1f), new Color(0.2f, 0.95f, 0.6f), new Color(0.95f, 0.4f, 0.9f) }, r.Height, FreeSpot, Solid);
                 break;
             case "abyss":
                 if (L.Lake != null)
@@ -225,11 +253,11 @@ public partial class WorldBuilder : Node3D
                     Decor.Lake(root, center, lc.Radius + 3f, r.AccentColor);
                     Decor.Jellyfish(root, center, lc.Radius, lc.HA, rng, 12);
                 }
-                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, r.Height);
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.3f, 0.95f, 1f), new Color(1f, 0.45f, 0.85f) }, r.Height, FreeSpot, Solid);
                 break;
             case "core":
                 if (L.Heart != null) Decor.AncientRuins(root, L, L.OnGround(L.Heart.A.X, L.Heart.A.Y), rng);
-                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, r.Height);
+                Decor.GiantClusters(root, L, rng, N(5), new[] { new Color(0.8f, 0.35f, 1f), new Color(1f, 0.75f, 0.25f) }, r.Height, FreeSpot, Solid);
                 break;
         }
     }
@@ -361,7 +389,9 @@ public partial class WorldBuilder : Node3D
             if (!L.RandomFloor(rng, 1.3f, 0.22f, out var p)) continue;
             if (NearPlaced(p, 3.2f) || NearHeart(p) || InCamp(p)) continue;
             if (!FindStand(L, p, rng, out var stand)) continue;
-            var c = MakeCrystal(root, MaterialFor(r, L, p, rng), p, rng, 0.8f + (float)rng.NextDouble() * 0.55f, null);
+            float fsize = 0.8f + (float)rng.NextDouble() * 0.55f;
+            if (!ClearShot(stand, p + Vector3.Up * 0.5f * fsize, p)) continue;
+            var c = MakeCrystal(root, MaterialFor(r, L, p, rng), p, rng, fsize, null);
             c.StandPoint = stand;
             var pr = r; var pl = L; var pp = p;
             c.PickMaterial = rr => MaterialFor(pr, pl, pp, rr);
@@ -379,6 +409,7 @@ public partial class WorldBuilder : Node3D
             var eye = stand + Vector3.Up * 1.55f;
             float ed = eye.DistanceTo(spot - n * 0.12f + up * 0.7f * size);
             if (ed < 1.4f || ed > 3.3f) continue;
+            if (!ClearShot(stand, spot - n * 0.12f + up * 0.45f * size, spot)) continue;
             var basis = BasisFromUp(up) * new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
             var c = MakeCrystal(root, MaterialFor(r, L, stand, rng), spot - n * 0.12f, rng, size, basis);
             c.StandPoint = stand + Vector3.Up * 0.1f;
@@ -397,8 +428,14 @@ public partial class WorldBuilder : Node3D
                 var p = L.OnGround(s.A.X + Mathf.Cos(a) * s.RA * 0.5f, s.A.Y + Mathf.Sin(a) * s.RA * 0.5f);
                 if (NearPlaced(p, 2.4f)) continue;
                 var mat = GameData.Mat(k % 2 == 0 ? r.RareMaterialId : best);
+                // ponto de mineração entre o depósito e a parede da câmara (o centro é o esconderijo do goblin)
+                Vector3 stand2 = default;
+                bool okStand = false;
+                for (int tries = 0; tries < 6 && !okStand; tries++)
+                    okStand = FindStand(L, p, rng, out stand2) && new Vector2(stand2.X - s.A.X, stand2.Z - s.A.Y).Length() > 1.4f && ClearShot(stand2, p + Vector3.Up * 0.5f, p);
+                if (!okStand) continue;
                 var c = MakeCrystal(root, mat, p, rng, 1.0f, null);
-                c.StandPoint = L.OnGround(s.A.X, s.A.Y, 0.1f);
+                c.StandPoint = stand2;
                 var pr = r; var pl = L; var pp = p;
                 c.PickMaterial = rr => MaterialFor(pr, pl, pp, rr);
                 placed.Add(p);
@@ -487,6 +524,107 @@ public partial class WorldBuilder : Node3D
         }
     }
 
+    // =================== Colisão do cenário ===================
+    StaticBody3D _solidBody;
+    CaveLayout _solidLayout;
+    List<Vector3> _solidReserved;
+
+    void BeginSolids(Node3D root, CaveLayout L, List<Vector3> reserved)
+    {
+        _solidBody = new StaticBody3D { Name = "DecorSolids", CollisionLayer = PlayerController.WorldLayer, CollisionMask = 0 };
+        root.AddChild(_solidBody);
+        _solidLayout = L;
+        _solidReserved = reserved;
+    }
+
+    /// <summary>Lugar livre para um obstáculo sólido (longe de túneis secretos e estações).</summary>
+    bool FreeSpot(Vector3 p, float r)
+    {
+        if (_solidLayout.NearCrawl(p.X, p.Z, r)) return false;
+        // não estrangula corredores: do outro lado do obstáculo precisa sobrar caminho livre
+        var L = _solidLayout;
+        var far = p + L.Inward(p.X, p.Z) * (r * 1.6f + 2.4f);
+        if (L.WallDist(far.X, far.Z) > -1.4f) return false;
+        foreach (var q in _solidReserved) if (new Vector2(q.X - p.X, q.Z - p.Z).Length() < r + 3.5f) return false;
+        return true;
+    }
+
+    /// <summary>Adiciona colisão a um objeto do cenário e (opcionalmente) bloqueia o chão no grid.</summary>
+    // aproximação por esferas dos obstáculos, numa grade de 4 m (para testar linha de mira na criação dos depósitos)
+    readonly Dictionary<(int, int), List<(Vector3 c, float r)>> _solidHash = new();
+    const float HashCell = 4f;
+
+    void HashSphere(Vector3 c, float r)
+    {
+        int i0 = Mathf.FloorToInt((c.X - r) / HashCell), i1 = Mathf.FloorToInt((c.X + r) / HashCell);
+        int j0 = Mathf.FloorToInt((c.Z - r) / HashCell), j1 = Mathf.FloorToInt((c.Z + r) / HashCell);
+        for (int i = i0; i <= i1; i++)
+            for (int j = j0; j <= j1; j++)
+            {
+                if (!_solidHash.TryGetValue((i, j), out var list)) _solidHash[(i, j)] = list = new();
+                list.Add((c, r));
+            }
+    }
+
+    void HashShape(Shape3D shape, Transform3D xf)
+    {
+        switch (shape)
+        {
+            case SphereShape3D sp: HashSphere(xf.Origin, sp.Radius); break;
+            case CylinderShape3D cy:
+            {
+                var axis = xf.Basis.Y.Normalized();
+                int n = Mathf.Max(2, Mathf.CeilToInt(cy.Height / Mathf.Max(0.2f, cy.Radius * 1.5f)) + 1);
+                for (int k = 0; k < n; k++)
+                    HashSphere(xf.Origin + axis * cy.Height * (k / (float)(n - 1) - 0.5f), cy.Radius * 1.05f);
+                break;
+            }
+        }
+    }
+
+    /// <summary>O segmento passa por algum obstáculo sólido do cenário?</summary>
+    bool Obstructed(Vector3 a, Vector3 b, float pad = 0.05f)
+    {
+        float minX = Mathf.Min(a.X, b.X), maxX = Mathf.Max(a.X, b.X), minZ = Mathf.Min(a.Z, b.Z), maxZ = Mathf.Max(a.Z, b.Z);
+        for (int i = Mathf.FloorToInt((minX - 4) / HashCell); i <= Mathf.FloorToInt((maxX + 4) / HashCell); i++)
+            for (int j = Mathf.FloorToInt((minZ - 4) / HashCell); j <= Mathf.FloorToInt((maxZ + 4) / HashCell); j++)
+            {
+                if (!_solidHash.TryGetValue((i, j), out var list)) continue;
+                foreach (var (c, r) in list)
+                {
+                    var ab = b - a;
+                    float t = Mathf.Clamp((c - a).Dot(ab) / Mathf.Max(ab.LengthSquared(), 1e-5f), 0, 1);
+                    if ((a + ab * t).DistanceTo(c) < r + pad) return true;
+                }
+            }
+        return false;
+    }
+
+    bool InsideSolid(Vector3 p, float pad) => Obstructed(p, p + Vector3.Up * 0.01f, pad);
+
+    /// <summary>Depósito minerável daqui? (nem o depósito nem o jogador dentro de obstáculos; mira livre)</summary>
+    bool ClearShot(Vector3 stand, Vector3 center, Vector3 basePos)
+    {
+        // o teto invisível dos túneis secretos é mais largo que o túnel: nada de depósitos colados neles
+        if (_solidLayout.NearCrawl(basePos.X, basePos.Z, 2.2f) || _solidLayout.NearCrawl(stand.X, stand.Z, 2.2f)) return false;
+        if (InsideSolid(basePos, 0.5f) || InsideSolid(stand + Vector3.Up * 0.5f, 0.45f) || InsideSolid(stand + Vector3.Up * 1.4f, 0.4f)) return false;
+        var eye = stand + Vector3.Up * 1.5f;
+        // a linha de mira não pode atravessar a rocha (mapa de altura do chão/paredes) nem o teto
+        var L = _solidLayout;
+        for (float t = 0.06f; t < 0.93f; t += 0.06f)
+        {
+            var q = eye.Lerp(center, t);
+            if (q.Y < L.Ground(q.X, q.Z) + 0.3f || q.Y > L.Ceiling(q.X, q.Z) - 0.1f) return false;
+        }
+        return !Obstructed(eye, eye.Lerp(center, 0.92f), 0.06f);
+    }
+
+    void Solid(Shape3D shape, Transform3D xf, Vector3 floorPos, float blockRadius)
+    {
+        if (shape != null) { _solidBody.AddChild(new CollisionShape3D { Shape = shape, Transform = xf }); HashShape(shape, xf); }
+        if (blockRadius > 0) _solidLayout.Block(floorPos, blockRadius);
+    }
+
     // =================== Decoração ===================
 
 
@@ -502,7 +640,9 @@ public partial class WorldBuilder : Node3D
         {
             if (!L.RandomNearWall(rng, out var p, -0.9f, 0.9f)) continue;
             float s = 1.2f + (float)rng.NextDouble() * 2.4f;
+            if (!FreeSpot(p, s)) continue;
             p.Y -= s * 0.35f;
+            Solid(new SphereShape3D { Radius = s * 0.8f }, new Transform3D(Basis.Identity, p), p, s * 0.7f);
             var basis = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).ScaleLocal(new Vector3(s, s * (0.7f + (float)rng.NextDouble() * 0.6f), s));
             wallRocks.Add(new Transform3D(basis, p));
         }
@@ -514,6 +654,8 @@ public partial class WorldBuilder : Node3D
         {
             if (!L.RandomFloor(rng, 3f, 0.3f, out var p)) continue;
             float s = 0.6f + (float)rng.NextDouble() * 1.1f;
+            if (!FreeSpot(p, s)) continue;
+            Solid(new SphereShape3D { Radius = s * 0.8f }, new Transform3D(Basis.Identity, p + Vector3.Down * s * 0.25f), p, s * 0.85f);
             boulders.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).ScaleLocal(new Vector3(s, s * 0.8f, s)), p + Vector3.Down * s * 0.25f));
         }
         AddMulti(root, MeshFactory.Rock(5, 0.35f), rockMat, boulders);
@@ -531,8 +673,11 @@ public partial class WorldBuilder : Node3D
             float len = 0.8f + (float)rng.NextDouble() * Mathf.Min(6.5f, (c - g) * 0.28f);
             float rad = 0.25f + (float)rng.NextDouble() * 0.5f;
             spikesDown.Add(new Transform3D(new Basis(new Vector3(1, 0, 0), Mathf.Pi).ScaleLocal(new Vector3(rad, len, rad)), new Vector3(x, c + 0.2f, z)));
-            if (i % 3 == 0 && L.WallDist(x, z) > -3.5f)
+            if (i % 3 == 0 && L.WallDist(x, z) > -3.5f && FreeSpot(new Vector3(x, g, z), rad + 0.5f))
+            {
                 spikesUp.Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(rad * 1.2f, len * 0.6f, rad * 1.2f)), new Vector3(x, g - 0.1f, z)));
+                Solid(new CylinderShape3D { Radius = rad * 0.9f, Height = len * 0.6f }, new Transform3D(Basis.Identity, new Vector3(x, g - 0.1f + len * 0.3f, z)), new Vector3(x, g, z), rad * 1.2f + 0.3f);
+            }
         }
         var spikeMesh = MeshFactory.Spike(5, 1f, 1f);
         AddMulti(root, spikeMesh, rockMat, spikesDown);
@@ -562,8 +707,12 @@ public partial class WorldBuilder : Node3D
                 if (L.Ground(q.X, q.Z) < y) continue;
                 var n = L.Normal(q.X, q.Z);
                 var up = (n + new Vector3((float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f, (float)rng.NextDouble() - 0.5f) * 0.8f).Normalized();
-                var b = BasisFromUp(up).ScaleLocal(new Vector3(0.12f, 0.4f + (float)rng.NextDouble() * 0.9f, 0.12f) * (1f + (float)rng.NextDouble()));
-                deco.Add(new Transform3D(b, new Vector3(q.X, y, q.Z)));
+                float sc = 1f + (float)rng.NextDouble();
+                float hh = (0.4f + (float)rng.NextDouble() * 0.9f) * sc;
+                var b = BasisFromUp(up).ScaleLocal(new Vector3(0.12f * sc, hh, 0.12f * sc));
+                var at = new Vector3(q.X, y, q.Z);
+                deco.Add(new Transform3D(b, at));
+                Solid(new CylinderShape3D { Radius = 0.11f * sc, Height = hh }, new Transform3D(BasisFromUp(up), at + up * hh * 0.5f), at, 0f);
                 break;
             }
         }

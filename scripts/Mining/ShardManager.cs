@@ -17,6 +17,9 @@ public partial class ShardManager : Node3D
     public static ShardManager Instance { get; private set; }
     public const int MaxShards = 220;
     public const float FloorY = 0.08f;
+    /// <summary>Altura do chão (relevo das cavernas). Sem ela, usa y = 0.</summary>
+    public Func<float, float, float> GroundAt;
+    float Floor(float x, float z) => (GroundAt?.Invoke(x, z) ?? 0f) + FloorY;
     public const float Lifetime = 150f;
 
     sealed class Shard
@@ -193,10 +196,19 @@ public partial class ShardManager : Node3D
             else
             {
                 s.Vel += Vector3.Down * 14f * dt;
+                var old = pos;
                 pos += s.Vel * dt;
-                if (pos.Y < FloorY)
+                // bateu na parede (o "chão" ali é a rocha alta): volta e quica para dentro da caverna
+                float wallTop = Floor(pos.X, pos.Z);
+                if (wallTop > pos.Y + 0.3f && wallTop > old.Y)
                 {
-                    pos.Y = FloorY;
+                    pos.X = old.X; pos.Z = old.Z;
+                    s.Vel = new Vector3(-s.Vel.X * 0.4f, s.Vel.Y, -s.Vel.Z * 0.4f);
+                }
+                float floor = Floor(pos.X, pos.Z);
+                if (pos.Y < floor)
+                {
+                    pos.Y = floor;
                     s.Vel = new Vector3(s.Vel.X * 0.55f, -s.Vel.Y * 0.35f, s.Vel.Z * 0.55f);
                     if (MathF.Abs(s.Vel.Y) < 0.4f) s.Vel.Y = 0;
                 }
@@ -205,7 +217,7 @@ public partial class ShardManager : Node3D
             s.Node.RotateY(s.Spin * dt);
             // flutuação leve quando parado no chão
             if (!s.Homing && s.Age > 2f && s.Vel.LengthSquared() < 0.01f)
-                s.Node.Position = new Vector3(pos.X, FloorY + 0.06f + MathF.Sin(s.Age * 3f + i) * 0.04f, pos.Z);
+                s.Node.Position = new Vector3(pos.X, Floor(pos.X, pos.Z) + 0.06f + MathF.Sin(s.Age * 3f + i) * 0.04f, pos.Z);
 
             if (s.Age > Lifetime)
             {

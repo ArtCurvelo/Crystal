@@ -96,16 +96,16 @@ public partial class PlayerController : CharacterBody3D
         {
             Name = "HelmetLamp",
             LightColor = new Color(1f, 0.93f, 0.82f),
-            LightEnergy = 4.4f,
-            SpotRange = 36f,
-            SpotAngle = 30f,
+            LightEnergy = 4.6f,
+            SpotRange = 48f,
+            SpotAngle = 40f,
             SpotAngleAttenuation = 0.8f,
-            SpotAttenuation = 1.1f,
+            SpotAttenuation = 0.95f,
             LightVolumetricFogEnergy = 1.6f,
             Position = new Vector3(0.12f, 0.1f, 0.05f),
         };
         _head.AddChild(Lamp);
-        _lampFill = new OmniLight3D { LightColor = new Color(0.75f, 0.85f, 1f), LightEnergy = 0.45f, OmniRange = 6f, Position = new Vector3(0, 0.2f, 0) };
+        _lampFill = new OmniLight3D { LightColor = new Color(0.85f, 0.88f, 1f), LightEnergy = 0.9f, OmniRange = 10f, Position = new Vector3(0, 0.2f, 0) };
         _head.AddChild(_lampFill);
         Settings.Changed += ApplySettings;
         ApplySettings();
@@ -361,7 +361,7 @@ public partial class PlayerController : CharacterBody3D
             c.Hit(dmg, hitPos, (BodyCenter - hitPos).Normalized(), true);
             count++;
         }
-        World.GoblinCamp.Instance?.PulseHit(center, radius, GlobalPosition);
+        World.GoblinCamp.PulseHitAll(center, radius, GlobalPosition);
         Effects.Instance?.Shockwave(center + Vector3.Up * 0.3f, radius, origin.Material.Glow);
         AudioManager.Instance?.Play("pulse", -1f);
         _shakeAmount = Mathf.Min(2f, _shakeAmount + 1.4f);

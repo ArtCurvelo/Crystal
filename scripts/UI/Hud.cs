@@ -42,7 +42,7 @@ public partial class Hud : CanvasLayer
     void UpdateHp()
     {
         if (Player == null || !IsInstanceValid(Player)) return;
-        bool danger = World.GoblinCamp.Instance != null && World.GoblinCamp.Instance.Rebels.Count > 0;
+        bool danger = World.GoblinCamp.AnyRebellion;
         bool show = danger || Player.Hp < PlayerController.MaxHp - 0.5f;
         if (_hpPanel.Visible != show) _hpPanel.Visible = show;
         if (!show) return;

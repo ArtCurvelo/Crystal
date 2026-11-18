@@ -22,23 +22,23 @@ public partial class EnvironmentController : WorldEnvironment
             BackgroundColor = new Color(0.005f, 0.005f, 0.012f),
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
             TonemapMode = Godot.Environment.ToneMapper.Aces,
-            TonemapExposure = 1.0f,
+            TonemapExposure = 1.15f,
             TonemapWhite = 6f,
             FogEnabled = true,
             FogLightEnergy = 1f,
             // bloom forte: minérios, neons e feixe "estouram" de luz
             GlowEnabled = true,
-            GlowIntensity = 0.8f,
+            GlowIntensity = 0.45f,
             GlowStrength = 1.0f,
-            GlowBloom = 0.03f,
-            GlowHdrThreshold = 1.25f,
+            GlowBloom = 0.0f,
+            GlowHdrThreshold = 1.6f,
             GlowHdrScale = 1.4f,
             GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Additive,
             AdjustmentEnabled = true,
-            AdjustmentSaturation = 1.25f,
+            AdjustmentSaturation = 1.1f,
             AdjustmentContrast = 1.08f,
         };
-        float[] levels = { 0f, 1f, 1f, 0.8f, 0.45f, 0.15f, 0f };
+        float[] levels = { 0f, 0.8f, 1f, 0.55f, 0.2f, 0f, 0f };
         for (int i = 1; i <= 6; i++) env.Set($"glow_levels/{i}", levels[i]);
         Environment = env;
         SetRegion(GameData.Regions[0], true);
@@ -54,10 +54,10 @@ public partial class EnvironmentController : WorldEnvironment
         bool adv = Settings.Advanced;
         var e = Environment;
         e.GlowEnabled = true;
-        e.GlowIntensity = q == GraphicsQuality.Low ? 0.6f : 0.8f;
+        e.GlowIntensity = q == GraphicsQuality.Low ? 0.35f : 0.45f;
         // névoa volumétrica: feixes de luz da lanterna e brilho dos cristais no ar
         e.VolumetricFogEnabled = adv && q == GraphicsQuality.High;
-        e.VolumetricFogDensity = 0.022f;
+        e.VolumetricFogDensity = 0.012f;
         e.VolumetricFogLength = 48f;
         e.VolumetricFogDetailSpread = 1.5f;
         e.VolumetricFogGIInject = 0f;
@@ -101,10 +101,11 @@ public partial class EnvironmentController : WorldEnvironment
     void Push()
     {
         var e = Environment;
-        e.AmbientLightColor = _ambient.Lerp(OverlayAmbient, _overlay * 0.6f);
+        // tom neutro: cores das regiões aparecem sem deixar a cena roxa/azul demais
+        e.AmbientLightColor = _ambient.Lerp(OverlayAmbient, _overlay * 0.6f).Lerp(new Color(0.85f, 0.85f, 0.9f), 0.45f);
         // cavernas escuras: quem ilumina é a lanterna do capacete, os minérios e os neons.
         // Na Baixa (sem luzes dinâmicas) a luz ambiente compensa.
-        float amb = Settings.Quality == GraphicsQuality.Low ? 1.5f : (Settings.Advanced ? 0.45f : 0.6f);
+        float amb = Settings.Quality == GraphicsQuality.Low ? 1.5f : (Settings.Advanced ? 1.0f : 1.1f);
         e.AmbientLightEnergy = _energy * amb;
         e.FogLightColor = _fog.Lerp(OverlayFog, _overlay);
         e.FogDensity = Mathf.Lerp(_density, OverlayFogDensity, _overlay);

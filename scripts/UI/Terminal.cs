@@ -36,6 +36,12 @@ public partial class SegmentBar : Control
 public abstract partial class TerminalScreen : ModalScreen
 {
     public Action SwitchToShop, SwitchToSell;
+    /// <summary>
+    /// Aberto pela Estação de Venda (a única do mapa)? Só então dá para vender. Nos terminais de
+    /// melhoria das regiões a aba Vender e o botão de venda ficam escondidos.
+    /// </summary>
+    public static bool AtSellStation;
+    Button _sellTab;
     protected Label MoneyLabel;
     protected VBoxContainer InvList;
     protected Label InvTotal;
@@ -53,7 +59,8 @@ public abstract partial class TerminalScreen : ModalScreen
         header.AddThemeConstantOverride("separation", 10);
         Body.AddChild(header);
         header.AddChild(Tab("⬆  Melhorias", IsShopTab, () => { if (!IsShopTab) SwitchToShop?.Invoke(); }));
-        header.AddChild(Tab("◆  Vender", !IsShopTab, () => { if (IsShopTab) SwitchToSell?.Invoke(); }));
+        _sellTab = Tab("◆  Vender", !IsShopTab, () => { if (IsShopTab && AtSellStation) SwitchToSell?.Invoke(); });
+        header.AddChild(_sellTab);
         var spacer = new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         header.AddChild(spacer);
         var money = new PanelContainer();
@@ -147,8 +154,16 @@ public abstract partial class TerminalScreen : ModalScreen
         InvSell.Disabled = gs.InventoryCount == 0;
     }
 
+    public override void Open()
+    {
+        base.Open();
+        if (_sellTab != null) _sellTab.Visible = AtSellStation;
+        if (InvSell != null) InvSell.Visible = AtSellStation;
+    }
+
     protected void DoSell()
     {
+        if (!AtSellStation) return;
         var gs = GameState.Instance;
         int count = gs.InventoryCount;
         long earned = gs.SellAll();

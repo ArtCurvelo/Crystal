@@ -124,3 +124,6 @@ Polimento final e regressão; aguardar o resultado do teste no Windows e ajustar
 - Forward+ (Vulkan) com fallback automático para OpenGL. `Settings.Advanced` = Forward+ ativo. Testes/capturas locais usam Mesa lavapipe (`/home/user/tools/vk`, variáveis em `env.sh`).
 - Tour de capturas força qualidade Alta (`--shots-quality=0..2` para comparar).
 - Luzes: lanterna (SpotLight "HelmetLamp"), uma OmniLight por depósito (fade por distância), luzes de câmara; na Baixa as OmniLights são ocultadas.
+
+## Plataforma-alvo (decisão do diretor, v0.5)
+- O PC de referência é o do irmão do diretor (RTX 3060, i7 11ª geração, 16–32 GB DDR5, ~180 FPS no Alto) e deve ser tratado como **máquina média**: todo o design gráfico, sonoro e audiovisual parte dele. PCs fracos ficam apenas com o fallback automático (OpenGL/Baixa).

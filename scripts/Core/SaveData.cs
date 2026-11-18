@@ -38,7 +38,9 @@ public sealed class SaveData
     public Dictionary<string, int> House { get; set; } = new();
     public List<string> Skills { get; set; } = new();
     public List<string> Secrets { get; set; } = new();
-    // goblin minerador (Grub)
+    /// <summary>Goblins mineradores por região (id da região → estado).</summary>
+    public Dictionary<string, GoblinSave> Goblins { get; set; } = new();
+    // campos antigos (v0.3.x, só o Grub): lidos e migrados para Goblins["caves"]
     public int GoblinState { get; set; }             // 0 disponível, 1 trabalhando, 2 fugiu, 3 rebelado
     public int GoblinStrikes { get; set; }           // dias seguidos sem pagar
     public long GoblinDayValue { get; set; }         // valor minerado por ele hoje
@@ -80,11 +82,22 @@ public sealed class SaveData
         Skills ??= new();
         Secrets ??= new();
         GoblinStash ??= new();
-        foreach (var key in GoblinStash.Keys.ToList())
-            if (GameData.Mat(key) == null || GoblinStash[key] <= 0) GoblinStash.Remove(key);
-        GoblinState = System.Math.Clamp(GoblinState, 0, 3);
-        GoblinStrikes = System.Math.Clamp(GoblinStrikes, 0, 10);
-        if (GoblinDayValue < 0) GoblinDayValue = 0;
+        Goblins ??= new();
+        // migração: saves da v0.3.x tinham um único goblin (o das Cavernas), já encontrado
+        if (!Goblins.ContainsKey("caves") && (GoblinState != 0 || GoblinStash.Count > 0))
+        {
+            Goblins["caves"] = new GoblinSave
+            {
+                State = GoblinState, Strikes = GoblinStrikes, DayValue = GoblinDayValue, ChargedDay = GoblinChargedDay,
+                FledDay = GoblinFledDay, Stash = new Dictionary<string, int>(GoblinStash), Found = true,
+            };
+        }
+        GoblinState = 0; GoblinStrikes = 0; GoblinDayValue = 0; GoblinStash.Clear();
+        foreach (var key in Goblins.Keys.ToList())
+        {
+            if (GoblinData.Of(key) == null || Goblins[key] == null) { Goblins.Remove(key); continue; }
+            Goblins[key].Sanitize();
+        }
         Secrets = Secrets.Where(k => !string.IsNullOrEmpty(k)).Distinct().ToList();
         foreach (var key in House.Keys.ToList())
         {
@@ -115,3 +128,27 @@ public sealed class SaveData
         Version = CurrentVersion;
     }
 }
+
+/// <summary>Estado salvo de um goblin minerador.</summary>
+public sealed class GoblinSave
+{
+    public int State { get; set; }               // 0 disponível, 1 trabalhando, 2 fugiu, 3 rebelado
+    public bool Found { get; set; }              // já foi encontrado na câmara secreta
+    public int Strikes { get; set; }
+    public long DayValue { get; set; }
+    public int ChargedDay { get; set; }
+    public int FledDay { get; set; }
+    public Dictionary<string, int> Stash { get; set; } = new();
+
+    public void Sanitize()
+    {
+        State = System.Math.Clamp(State, 0, 3);
+        Strikes = System.Math.Clamp(Strikes, 0, 10);
+        if (DayValue < 0) DayValue = 0;
+        Stash ??= new();
+        foreach (var key in Stash.Keys.ToList())
+            if (GameData.Mat(key) == null || Stash[key] <= 0) Stash.Remove(key);
+        if (State != 0) Found = true;
+    }
+}
+

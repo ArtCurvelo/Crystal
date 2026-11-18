@@ -331,7 +331,7 @@ public partial class Main : Node
 
         _shards.ClearAll();
         Events.ResetAll();
-        World.Goblins?.SyncState();
+        foreach (var camp in World.GoblinCamps) camp.SyncState();
         if (Player == null)
         {
             Player = new PlayerController { Name = "Player" };
@@ -340,13 +340,15 @@ public partial class Main : Node
             Player.ResonancePulse += n => Hud.ShowPulse(n);
             Player.Damaged += _ => Hud.FlashDamage();
             Player.Fainted += OnFainted;
-            if (World.Goblins != null)
+            foreach (var camp in World.GoblinCamps)
             {
-                World.Goblins.PlayerPos = () => Player.GlobalPosition;
-                World.Goblins.DamagePlayer = (d, from) => { if (CurrentMode == Mode.Playing && !_fading) Player.TakeDamage(d, from); };
-                World.Goblins.PlayerInMine = () => CurrentMode == Mode.Playing && !PlayerInHouse && !_fading;
+                camp.PlayerPos = () => Player.GlobalPosition;
+                camp.DamagePlayer = (d, from) => { if (CurrentMode == Mode.Playing && !_fading) Player.TakeDamage(d, from); };
+                camp.PlayerInMine = () => CurrentMode == Mode.Playing && !PlayerInHouse && !_fading;
+                camp.Discovered += c => GetTree().CreateTimer(2.6f).Timeout += () => Hud.ShowBigMessage("GOBLIN ENCONTRADO!"); // depois de "PASSAGEM SECRETA!"
             }
             _shards.PlayerPosition = () => Player.BodyCenter;
+            _shards.GroundAt = World.GroundAt;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
             Hud.Player = Player;
@@ -420,6 +422,7 @@ public partial class Main : Node
     {
         if (CurrentMode != Mode.Playing || AnyModal()) return;
         if (!GameState.Instance.RequireWork()) return;
+        TerminalScreen.AtSellStation = false; // terminal de melhorias: sem venda aqui
         Input.MouseMode = Input.MouseModeEnum.Visible;
         Player.InputEnabled = false;
         _shop.Open();
@@ -428,6 +431,7 @@ public partial class Main : Node
     void OpenSell()
     {
         if (CurrentMode != Mode.Playing || AnyModal()) return;
+        TerminalScreen.AtSellStation = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         Player.InputEnabled = false;
         _sell.Open();
@@ -481,10 +485,13 @@ public partial class Main : Node
     {
         var gs = GameState.Instance;
         if (CurrentMode != Mode.Playing) return;
-        if (gs.GoblinFeeDue)
+        var due = gs.DueGoblins();
+        if (due.Count > 0)
         {
-            long fee = gs.GoblinFee;
-            string threat = gs.Data.GoblinStrikes switch
+            var def = due[0];
+            string id = def.RegionId;
+            long fee = gs.GoblinFee(id);
+            string threat = gs.GoblinData(id).Strikes switch
             {
                 0 => "Ele está de bom humor.",
                 1 => "Ele lembra que você não pagou da última vez.",
@@ -492,19 +499,20 @@ public partial class Main : Node
             };
             Input.MouseMode = Input.MouseModeEnum.Visible;
             Player.InputEnabled = false;
-            _choice.Ask("GRUB QUER SEU PAGAMENTO",
-                $"Grub, o goblin, minerou {GameState.FormatMoney(gs.Data.GoblinDayValue)} hoje (está no baú do acampamento). A taxa dele é {GameState.FormatMoney(fee)}. {threat}",
+            _choice.Ask($"{def.Name.ToUpperInvariant()} QUER SEU PAGAMENTO",
+                $"{def.Name}, {def.Title}, minerou {GameState.FormatMoney(gs.GoblinData(id).DayValue)} hoje (está no baú dele). A taxa é {GameState.FormatMoney(fee)}. {threat}",
                 $"Pagar {GameState.FormatMoney(fee)}", "Não pagar", gs.CanAfford(fee), pay =>
                 {
-                    var r = gs.SettleGoblinFee(pay);
+                    var r = gs.SettleGoblinFee(id, pay);
                     switch (r)
                     {
-                        case GameState.FeeOutcome.Paid: gs.Notify("Grub", "\"Negócio justo, chefe!\"", NotifyKind.Success); break;
-                        case GameState.FeeOutcome.Forgiven: gs.Notify("Grub", "\"Hmpf. Grub releva... desta vez.\"", NotifyKind.Info); break;
-                        case GameState.FeeOutcome.Warned: gs.Notify("Grub está irritado", "\"Mais uma vez, e Grub não responde por Grub!\"", NotifyKind.Warning); break;
-                        case GameState.FeeOutcome.Fled: gs.Notify("Grub fugiu!", "Cansado de trabalhar de graça, ele sumiu. Talvez volte em alguns dias.", NotifyKind.Warning); World.Goblins?.SyncState(); break;
-                        case GameState.FeeOutcome.Rebel: gs.Notify("Grub jurou vingança!", "Amanhã ele e os comparsas vão cobrar à força no acampamento. Prepare o feixe!", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Paid: gs.Notify(def.Name, "\"Negócio justo, chefe!\"", NotifyKind.Success); break;
+                        case GameState.FeeOutcome.Forgiven: gs.Notify(def.Name, "\"Hmpf. Releva... desta vez.\"", NotifyKind.Info); break;
+                        case GameState.FeeOutcome.Warned: gs.Notify($"{def.Name} está irritado", "\"Mais uma vez, e ninguém responde por mim!\"", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Fled: gs.Notify($"{def.Name} fugiu!", "Cansado de trabalhar de graça, ele sumiu. Talvez volte ao esconderijo em alguns dias.", NotifyKind.Warning); break;
+                        case GameState.FeeOutcome.Rebel: gs.Notify($"{def.Name} jurou vingança!", "Quando você voltar à região dele, ele e os comparsas vão cobrar à força. Prepare o feixe!", NotifyKind.Warning); break;
                     }
+                    foreach (var c in World.GoblinCamps) c.SyncState();
                     GoHome();
                 });
             return;
@@ -564,7 +572,7 @@ public partial class Main : Node
     {
         var gs = GameState.Instance;
         int stolen = gs.StealFromInventory(0.25f);
-        World.Goblins?.EndRebellion(false);
+        foreach (var camp in World.GoblinCamps) if (camp.Rebels.Count > 0) camp.EndRebellion(false);
         gs.EndDay(early: true);
         AudioManager.Instance?.SetBeam(false);
         FadeThrough(() =>

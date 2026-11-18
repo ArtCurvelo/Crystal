@@ -298,6 +298,41 @@ public sealed class CaveLayout
     }
 
     /// <summary>Busca em largura a partir da entrada: células por onde se anda (inclinação, altura livre agachado).</summary>
+    /// <summary>Células ocupadas por obstáculos sólidos do cenário (pedras, estalagmites, formações).</summary>
+    public bool[] Blocked;
+
+    /// <summary>Marca um obstáculo circular no grid (o caminho a pé e os pontos de mineração passam a evitá-lo).</summary>
+    public void Block(Vector3 p, float radius)
+    {
+        Blocked ??= new bool[Nx * Nz];
+        int r = Mathf.CeilToInt(radius);
+        int ci = Mathf.RoundToInt(p.X - X0), cj = Mathf.RoundToInt(p.Z - Z0);
+        for (int j = cj - r; j <= cj + r; j++)
+            for (int i = ci - r; i <= ci + r; i++)
+            {
+                if (i < 0 || j < 0 || i >= Nx || j >= Nz) continue;
+                float dx = X0 + i - p.X, dz = Z0 + j - p.Z;
+                if (dx * dx + dz * dz <= radius * radius) Blocked[Idx(i, j)] = true;
+            }
+    }
+
+    /// <summary>Refaz a área alcançável depois de colocar obstáculos.</summary>
+    public void Reflood() => Flood();
+
+    /// <summary>Perto da boca/percurso de um túnel secreto? (lá não pode haver obstáculos).</summary>
+    public bool NearCrawl(float x, float z, float radius)
+    {
+        var p = new Vector2(x, z);
+        foreach (var c in Crawls)
+        {
+            var a = c.A; var b = c.B;
+            var ab = b - a;
+            float t = Mathf.Clamp((p - a).Dot(ab) / Mathf.Max(ab.LengthSquared(), 1e-4f), 0, 1);
+            if (p.DistanceTo(a + ab * t) < radius + 2f) return true;
+        }
+        return false;
+    }
+
     void Flood()
     {
         Reach = new bool[Nx * Nz];
@@ -315,7 +350,7 @@ public sealed class CaveLayout
                 int ni = i + di[k], nj = j + dj[k];
                 if (ni < 0 || nj < 0 || ni >= Nx || nj >= Nz) continue;
                 int nid = Idx(ni, nj);
-                if (Reach[nid] || D[nid] > -0.3f) continue;
+                if (Reach[nid] || D[nid] > -0.3f || (Blocked != null && Blocked[nid])) continue;
                 if (Mathf.Abs(F[nid] - F[id]) > 0.85f) continue;     // ~40° (o jogador sobe até 50°)
                 if (C[nid] - F[nid] < 1.15f) continue;                // nem agachado passa
                 Reach[nid] = true;

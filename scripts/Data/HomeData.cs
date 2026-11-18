@@ -88,3 +88,30 @@ public static class HomeData
     public static HouseUpgradeDef HouseDef(string id) => House.FirstOrDefault(h => h.Id == id);
     public static SkillDef Skill(string id) => Skills.FirstOrDefault(s => s.Id == id);
 }
+
+/// <summary>Goblin minerador de uma região: escondido numa câmara secreta até ser encontrado.</summary>
+public sealed class GoblinDef
+{
+    public string RegionId;
+    public string Name;
+    public string Title;          // "o goblin minerador", "o goblin do gelo"...
+    public long HireCost, RehireCost;
+    public float MineDps;         // devagar em relação ao jogador naquela fase
+    public string[] Comrades;     // comparsas na rebelião
+    public Godot.Color Skin;
+    public long MinFee => System.Math.Max(30, HireCost / 16);
+}
+
+public static class GoblinData
+{
+    public static readonly List<GoblinDef> All = new()
+    {
+        new() { RegionId = "caves", Name = "Grub", Title = "o goblin minerador", HireCost = 500, RehireCost = 2000, MineDps = 4f, Comrades = new[] { "Snik", "Brugo" }, Skin = new Godot.Color(0.42f, 0.66f, 0.3f) },
+        new() { RegionId = "depths", Name = "Frizz", Title = "o goblin do gelo", HireCost = 6000, RehireCost = 20000, MineDps = 35f, Comrades = new[] { "Pingo", "Geada" }, Skin = new Godot.Color(0.45f, 0.65f, 0.85f) },
+        new() { RegionId = "core", Name = "Krag", Title = "o goblin da forja", HireCost = 60000, RehireCost = 200000, MineDps = 300f, Comrades = new[] { "Brasa", "Fuligem" }, Skin = new Godot.Color(0.75f, 0.35f, 0.25f) },
+        new() { RegionId = "abyss", Name = "Nixa", Title = "a goblin abissal", HireCost = 250000, RehireCost = 800000, MineDps = 1500f, Comrades = new[] { "Lodo", "Concha" }, Skin = new Godot.Color(0.3f, 0.7f, 0.65f) },
+    };
+
+    public static GoblinDef Of(string regionId) => All.Find(g => g.RegionId == regionId);
+}
+

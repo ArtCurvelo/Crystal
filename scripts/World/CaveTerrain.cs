@@ -15,7 +15,27 @@ namespace CrystalExcavator.World;
 public partial class CaveTerrain : Node3D
 {
     public const int Chunk = 32;
-    static Texture2D _noiseTex;
+    static Texture2D _noiseTex, _cellTex;
+
+    /// <summary>Ruído celular (distância à borda das células): placas e rachaduras da rocha.</summary>
+    public static Texture2D CellTexture
+    {
+        get
+        {
+            if (_cellTex != null) return _cellTex;
+            var n = new FastNoiseLite
+            {
+                Seed = 11, Frequency = 0.035f, NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular,
+                CellularDistanceFunction = FastNoiseLite.CellularDistanceFunctionEnum.Euclidean,
+                CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance2Sub,
+                FractalType = FastNoiseLite.FractalTypeEnum.None,
+            };
+            var img = n.GetSeamlessImage(256, 256);
+            img.GenerateMipmaps();
+            _cellTex = ImageTexture.CreateFromImage(img);
+            return _cellTex;
+        }
+    }
     static Shader _shader;
 
     public static Texture2D NoiseTexture
@@ -31,19 +51,20 @@ public partial class CaveTerrain : Node3D
         }
     }
 
-    public static void ClearCaches() { _noiseTex = null; _shader = null; }
+    public static void ClearCaches() { _noiseTex = null; _cellTex = null; _shader = null; }
 
     public void Build(CaveLayout L, RegionDef r)
     {
         _shader ??= GD.Load<Shader>("res://shaders/cave.gdshader");
         var floorMat = new ShaderMaterial { Shader = _shader };
         floorMat.SetShaderParameter("rock_color", r.RockColor);
-        floorMat.SetShaderParameter("floor_color", r.RockColor.Darkened(0.3f).Lerp(new Color(0.25f, 0.22f, 0.2f), 0.2f));
+        floorMat.SetShaderParameter("floor_color", r.RockColor.Darkened(0.15f).Lerp(new Color(0.3f, 0.26f, 0.22f), 0.35f));
+        floorMat.SetShaderParameter("cell_tex", CellTexture);
         floorMat.SetShaderParameter("accent", r.AccentColor);
         floorMat.SetShaderParameter("noise_tex", NoiseTexture);
         var ceilMat = (ShaderMaterial)floorMat.Duplicate();
-        ceilMat.SetShaderParameter("rock_color", r.RockColor.Darkened(0.35f));
-        ceilMat.SetShaderParameter("speckle", 0.35f);
+        ceilMat.SetShaderParameter("rock_color", r.RockColor.Darkened(0.2f));
+        ceilMat.SetShaderParameter("speckle", 0.5f);
 
         for (int cj = 0; cj < L.Nz - 1; cj += Chunk)
             for (int ci = 0; ci < L.Nx - 1; ci += Chunk)

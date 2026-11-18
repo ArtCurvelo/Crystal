@@ -181,49 +181,61 @@ public partial class TestRunner : Node
     {
         Fresh();
         var d = GS.Data;
-        Check(GS.Goblin == GameState.GoblinMood.Available && !GS.TryHireGoblin(), "sem dinheiro não contrata o goblin");
+        const string id = "caves";
+        Check(GoblinData.All.Count == GameData.Regions.Count && GameData.Regions.All(r => GoblinData.Of(r.Id) != null), "um goblin por região");
+        for (int i = 1; i < GoblinData.All.Count; i++)
+            Check(GoblinData.All[i].HireCost > GoblinData.All[i - 1].HireCost && GoblinData.All[i].MineDps > GoblinData.All[i - 1].MineDps, $"{GoblinData.All[i].Name}: mais caro e mais forte que o anterior");
         GS.AddMoney(1000);
-        Check(GS.TryHireGoblin() && GS.Goblin == GameState.GoblinMood.Working && d.Money == 500, "contratar custa ◈ 500");
+        Check(!GS.GoblinFound(id) && !GS.TryHireGoblin(id), "sem encontrar o goblin não dá para contratar");
+        Check(GS.MarkGoblinFound(id) && !GS.MarkGoblinFound(id), "encontrar marca uma vez só");
+        Check(GS.TryHireGoblin(id) && GS.Goblin(id) == GameState.GoblinMood.Working && d.Money == 500, "contratar o Grub custa ◈ 500");
+        Check(GS.Goblin("depths") == GameState.GoblinMood.Available && !GS.TryHireGoblin("depths"), "cada goblin é independente");
         var q = GameData.Mat("quartz");
-        GS.GoblinMined(q, 40);
+        GS.GoblinMined(id, q, 40);
         long val = GS.SellPrice(q) * 40;
-        Check(GS.GoblinStashCount == 40 && d.GoblinDayValue == val, "o que ele minera vai para o baú e conta no dia");
-        Check(GS.GoblinFee == Math.Max(30, val / 4), "taxa = 1/4 do dia (mínimo 30)");
+        Check(GS.GoblinStashCount(id) == 40 && GS.GoblinData(id).DayValue == val, "o que ele minera vai para o baú dele");
+        Check(GS.GoblinFee(id) == Math.Max(GoblinData.Of(id).MinFee, val / 4), "taxa = 1/4 do dia (com mínimo)");
         int cap = GS.FreeSpace;
-        int got = GS.CollectGoblinStash();
+        int got = GS.CollectGoblinStash(id);
         Check(got == Math.Min(40, cap) && GS.InventoryCount == got, "pegar do baú enche a mochila");
-        long money = d.Money, fee = GS.GoblinFee;
-        Check(GS.GoblinFeeDue && GS.SettleGoblinFee(true) == GameState.FeeOutcome.Paid && d.Money == money - fee && !GS.GoblinFeeDue, "pagar a taxa");
-        Check(GS.SettleGoblinFee(true) == GameState.FeeOutcome.NoFee, "só cobra uma vez por dia");
+        long money = d.Money, fee = GS.GoblinFee(id);
+        Check(GS.DueGoblins().Count == 1 && GS.SettleGoblinFee(id, true) == GameState.FeeOutcome.Paid && d.Money == money - fee && GS.DueGoblins().Count == 0, "pagar a taxa");
+        Check(GS.SettleGoblinFee(id, true) == GameState.FeeOutcome.NoFee, "só cobra uma vez por dia");
         GS.StartNewDay();
-        Check(GS.SettleGoblinFee(false) == GameState.FeeOutcome.Forgiven, "1ª falta: perdoa");
+        Check(GS.SettleGoblinFee(id, false) == GameState.FeeOutcome.Forgiven, "1ª falta: perdoa");
         GS.StartNewDay();
-        Check(GS.SettleGoblinFee(false) == GameState.FeeOutcome.Warned, "2ª falta: avisa");
+        Check(GS.SettleGoblinFee(id, false) == GameState.FeeOutcome.Warned, "2ª falta: avisa");
         GS.StartNewDay();
-        Check(GS.SettleGoblinFee(false, forceRebel: true) == GameState.FeeOutcome.Rebel && GS.Goblin == GameState.GoblinMood.Rebel, "3ª falta: rebelião");
-        GS.EndGoblinRebellion(true);
-        Check(GS.Goblin == GameState.GoblinMood.Working && d.GoblinStrikes == 0, "rebelião vencida: Grub volta ao trabalho");
+        Check(GS.SettleGoblinFee(id, false, forceRebel: true) == GameState.FeeOutcome.Rebel && GS.Goblin(id) == GameState.GoblinMood.Rebel, "3ª falta: rebelião");
+        GS.EndGoblinRebellion(id, true);
+        Check(GS.Goblin(id) == GameState.GoblinMood.Working && GS.GoblinData(id).Strikes == 0, "rebelião vencida: volta ao trabalho");
+        for (int i = 0; i < 2; i++) { GS.StartNewDay(); GS.SettleGoblinFee(id, false); }
         GS.StartNewDay();
-        GS.SettleGoblinFee(true);
-        Check(d.GoblinStrikes == 0, "pagar zera as faltas");
-        for (int i = 0; i < 2; i++) { GS.StartNewDay(); GS.SettleGoblinFee(false); }
-        GS.StartNewDay();
-        Check(GS.SettleGoblinFee(false, forceRebel: false) == GameState.FeeOutcome.Fled && GS.Goblin == GameState.GoblinMood.Fled, "ou ele foge");
-        Check(!GS.CanRehireGoblin && !GS.TryHireGoblin(), "não volta logo depois de fugir");
+        Check(GS.SettleGoblinFee(id, false, forceRebel: false) == GameState.FeeOutcome.Fled && GS.Goblin(id) == GameState.GoblinMood.Fled, "ou ele foge");
+        Check(!GS.CanRehireGoblin(id) && !GS.TryHireGoblin(id), "não volta logo depois de fugir");
         for (int i = 0; i < GameState.GoblinRehireDays; i++) GS.StartNewDay();
         GS.AddMoney(5000);
         long before = d.Money;
-        Check(GS.CanRehireGoblin && GS.TryHireGoblin() && before - d.Money == GameState.GoblinRehireCost, "volta dias depois, por ◈ 2.000");
+        Check(GS.CanRehireGoblin(id) && GS.TryHireGoblin(id) && before - d.Money == GoblinData.Of(id).RehireCost, "volta dias depois, mais caro");
+        // goblin de outra região: mais caro
+        GS.MarkGoblinFound("depths");
+        GS.AddMoney(10000);
+        long m0 = d.Money;
+        Check(GS.TryHireGoblin("depths") && m0 - d.Money == GoblinData.Of("depths").HireCost, "o goblin das Profundezas custa mais");
         GS.Data.Inventory.Clear();
         GS.AddItem("quartz", 20);
         int stolen = GS.StealFromInventory(0.25f);
         Check(stolen == 5 && GS.InventoryCount == 15, "desmaio: goblins levam 25% da mochila");
         GS.SaveGame(true);
         GS.LoadGame();
-        Check(GS.Goblin == GameState.GoblinMood.Working, "estado do goblin é salvo");
-        var bad = new SaveData { GoblinState = 9, GoblinStrikes = -3, GoblinStash = new() { ["nada"] = 4, ["quartz"] = -1 } };
+        Check(GS.Goblin(id) == GameState.GoblinMood.Working && GS.Goblin("depths") == GameState.GoblinMood.Working, "estado dos goblins é salvo");
+        // save antigo (v0.3.x): um único goblin nos campos antigos → migra para as Cavernas, já encontrado
+        var old = new SaveData { GoblinState = 1, GoblinStrikes = 1, GoblinStash = new() { ["quartz"] = 7 } };
+        old.Sanitize();
+        Check(old.Goblins.TryGetValue("caves", out var mg) && mg.State == 1 && mg.Found && mg.Stash["quartz"] == 7 && old.GoblinState == 0, "migração do Grub de saves antigos");
+        var bad = new SaveData { Goblins = new() { ["caves"] = new GoblinSave { State = 9, Strikes = -3, Stash = new() { ["nada"] = 4 } }, ["xx"] = new GoblinSave() } };
         bad.Sanitize();
-        Check(bad.GoblinState == 3 && bad.GoblinStrikes == 0 && bad.GoblinStash.Count == 0, "dados do goblin saneados");
+        Check(bad.Goblins["caves"].State == 3 && bad.Goblins["caves"].Strikes == 0 && bad.Goblins["caves"].Stash.Count == 0 && !bad.Goblins.ContainsKey("xx"), "dados dos goblins saneados");
         Fresh();
     }
 
@@ -241,33 +253,49 @@ public partial class TestRunner : Node
         player.SimulateCapturedMouse = true;
         player.GlobalPosition = world.SpawnPoint;
         await Frames(3);
+        Check(world.GoblinCamps.Count == GameData.Regions.Count, $"um acampamento de goblin por região ({world.GoblinCamps.Count})");
+        foreach (var c in world.GoblinCamps)
+        {
+            var Lc = world.Layouts[c.RegionIndex];
+            var secret = Lc.SecretAt(c.HideoutPos + Vector3.Up * 0.1f);
+            Check(secret != null, $"{c.Def.Name} se esconde numa câmara secreta");
+            Check(Lc.Reachable(c.HideoutPos.X, c.HideoutPos.Z), $"esconderijo de {c.Def.Name} é alcançável (agachado)");
+            Check(c.Grub.Visible && !c.Chest.Visible, $"{c.Def.Name}: acampamento escondido até ser contratado");
+            Check(c.Grub.GlobalPosition.DistanceTo(c.HideoutPos) < 0.5f, $"{c.Def.Name} começa no esconderijo");
+        }
         var camp = world.Goblins;
-        Check(camp != null && camp.Grub != null && camp.Chest != null, "acampamento do goblin com barraca, baú e Grub");
         camp.PlayerPos = () => player.GlobalPosition;
         camp.DamagePlayer = (dmg, from) => player.TakeDamage(dmg, from);
         camp.PlayerInMine = () => true;
-        Check(world.Layouts[0].Reachable(camp.GrubHome.X, camp.GrubHome.Z) && world.Layouts[0].Reachable(camp.ChestPos.X, camp.ChestPos.Z + 1f) || world.Layouts[0].NearestReach(camp.ChestPos.X, camp.ChestPos.Z) >= 0, "Grub e o baú ficam em lugar alcançável");
-        GS.AddMoney(1000);
-        GS.TryHireGoblin();
-        camp.SyncState();
         GS.IsPlaying = true;
+        // longe não descobre; perto do esconderijo descobre
+        await Frames(40);
+        Check(!GS.GoblinFound("caves"), "não é descoberto de longe");
+        player.GlobalPosition = camp.HideoutPos + new Vector3(2f, 0.1f, 0);
+        bool found = false;
+        camp.Discovered += _ => found = true;
+        for (int i = 0; i < 60 && !found; i++) await Frames(1);
+        Check(found && GS.GoblinFound("caves"), "chegar perto do esconderijo descobre o goblin");
+        GS.AddMoney(1000);
+        camp.TalkToGrub();
+        await Frames(3);
+        Check(GS.Goblin("caves") == GameState.GoblinMood.Working && camp.Chest.Visible, "contratado: monta o acampamento com o baú");
         Engine.TimeScale = 6;
         var grubStart = camp.Grub.GlobalPosition;
-        for (int i = 0; i < 1500 && GS.GoblinStashCount == 0; i++) await Frames(1);
+        for (int i = 0; i < 1800 && GS.GoblinStashCount("caves") == 0; i++) await Frames(1);
         Check(camp.Grub.GlobalPosition.DistanceTo(grubStart) > 1f, "Grub anda até um depósito");
-        Check(GS.GoblinStashCount > 0 && GS.Data.GoblinDayValue > 0, $"Grub minera e guarda no baú ({GS.GoblinStashCount} fragmentos)");
+        Check(GS.GoblinStashCount("caves") > 0 && GS.GoblinData("caves").DayValue > 0, $"Grub minera e guarda no baú ({GS.GoblinStashCount("caves")} fragmentos)");
         Check(GS.Data.CrystalsMined == 0, "o que o goblin quebra não conta como do jogador");
         Engine.TimeScale = 1;
 
         // rebelião: perseguem e atacam; o feixe atordoa
-        GS.Data.GoblinState = (int)GameState.GoblinMood.Rebel;
+        GS.GoblinData("caves").State = (int)GameState.GoblinMood.Rebel;
         camp.StartRebellion();
-        Check(camp.Rebels.Count == 3 && camp.Rebels.All(g => g.Hostile), "rebelião: Grub e 2 comparsas hostis");
+        Check(camp.Rebels.Count == 3 && camp.Rebels.All(g => g.Hostile), "rebelião: goblin e 2 comparsas hostis");
         player.GlobalPosition = world.Layouts[0].OnGround(camp.GrubHome.X - 4f, camp.GrubHome.Z, 0.1f);
         float hp0 = player.Hp;
         for (int i = 0; i < 600 && player.Hp >= hp0; i++) await Frames(1);
         Check(player.Hp < hp0, $"goblins rebelados atacam o jogador (vida {player.Hp:0})");
-        // feixe real contra o goblin mais próximo
         var g0 = camp.Rebels.OrderBy(g => g.GlobalPosition.DistanceTo(player.GlobalPosition)).First();
         int h0 = g0.HitsLeft;
         for (int tries = 0; tries < 20 && g0.HitsLeft == h0; tries++)
@@ -285,7 +313,7 @@ public partial class TestRunner : Node
         camp.RebellionWon += () => won = true;
         foreach (var g in camp.Rebels.ToList()) while (g.State != GoblinNpc.Mode.Defeated) g.TakeHit(player.GlobalPosition, 1);
         await Frames(3);
-        Check(won && GS.Goblin == GameState.GoblinMood.Working && camp.Rebels.Count == 0 && !camp.Grub.Hostile, "todos atordoados: rebelião vencida, Grub volta ao trabalho");
+        Check(won && GS.Goblin("caves") == GameState.GoblinMood.Working && camp.Rebels.Count == 0 && !camp.Grub.Hostile, "todos atordoados: rebelião vencida, volta ao trabalho");
         GS.IsPlaying = false;
         root.QueueFree();
         await Frames(2);

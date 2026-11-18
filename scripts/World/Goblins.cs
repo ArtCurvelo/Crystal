@@ -24,6 +24,7 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
     public bool Hostile { get; private set; }
     public int HitsLeft;
     public string DisplayName = "Grub";
+    public Color Skin = new(0.42f, 0.66f, 0.3f);
     public Crystal Target;
     public int Carrying;
     public const int CarryMax = 8;
@@ -57,7 +58,7 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
     {
         _rig = new Node3D { Name = "Rig" };
         AddChild(_rig);
-        _skinMat = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.66f, 0.3f), Roughness = 0.8f };
+        _skinMat = new StandardMaterial3D { AlbedoColor = Skin, Roughness = 0.8f };
         var vest = new StandardMaterial3D { AlbedoColor = new Color(0.45f, 0.3f, 0.18f), Roughness = 0.9f };
         var dark = new StandardMaterial3D { AlbedoColor = new Color(0.18f, 0.16f, 0.14f), Roughness = 0.9f };
         var helmet = new StandardMaterial3D { AlbedoColor = new Color(0.95f, 0.72f, 0.12f), Roughness = 0.6f };
@@ -195,7 +196,7 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
                 {
                     _swing = 0;
                     var gob = this;
-                    Target.Hit(MineDps, Target.Center, (GlobalPosition - Target.Center).Normalized(), true,
+                    Target.Hit(Camp.Def?.MineDps ?? MineDps, Target.Center, (GlobalPosition - Target.Center).Normalized(), true,
                         (m, n) => { gob.Carrying += n; gob.Camp.Deliver(m, n); });
                     if (!Target.IsMineable) { Target = null; State = Carrying >= CarryMax ? Mode.ToChest : Mode.Idle; if (State == Mode.ToChest) GoTo(Camp.ChestPos); }
                 }
@@ -244,9 +245,11 @@ public partial class GoblinNpc : StaticBody3D, IInteractable
     }
 }
 
-/// <summary>Baú do Grub: onde ele guarda o que minerou; o jogador pega para vender.</summary>
+/// <summary>Baú do goblin: onde ele guarda o que minerou; o jogador pega para vender.</summary>
 public partial class GoblinChest : StationBase
 {
+    public GoblinDef Def;
+
     public override void _Ready()
     {
         SetupBody(new Vector3(1.1f, 0.8f, 0.7f));
@@ -256,68 +259,81 @@ public partial class GoblinChest : StationBase
         AddMesh(new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.3f, Height = 1.0f, RadialSegments = 12, Rings = 1 }, wood, new Vector3(0, 0.5f, 0)).Rotation = new Vector3(0, 0, Mathf.Pi / 2);
         foreach (float x in new[] { -0.35f, 0.35f })
             AddMesh(new BoxMesh { Size = new Vector3(0.06f, 0.82f, 0.64f) }, band, new Vector3(x, 0.4f, 0));
-        var glow = new Color(0.5f, 1f, 0.6f);
+        var glow = Def?.Skin.Lightened(0.3f) ?? new Color(0.5f, 1f, 0.6f);
         AddMesh(new BoxMesh { Size = new Vector3(0.9f, 0.03f, 0.04f) }, MeshFactory.Emissive(glow, glow, 2f), new Vector3(0, 0.5f, 0.3f));
-        Label = MakeLabel("BAÚ DO GRUB", new Color(0.6f, 1f, 0.5f), 1.3f, 48);
+        Label = MakeLabel($"BAÚ DO {Def?.Name.ToUpperInvariant() ?? "GOBLIN"}", glow, 1.3f, 48);
     }
 
     public override string GetPrompt()
     {
         var gs = GameState.Instance;
-        int n = gs.GoblinStashCount;
-        if (n == 0) return "Baú do Grub (vazio)";
-        if (gs.FreeSpace == 0) return $"Baú do Grub: {n} fragmentos — mochila cheia";
-        return $"{InputHints.Interact} Pegar {Mathf.Min(n, gs.FreeSpace)} fragmentos do baú ({GameState.FormatMoney(gs.GoblinStashValue)})";
+        string id = Def.RegionId;
+        int n = gs.GoblinStashCount(id);
+        if (n == 0) return $"Baú do {Def.Name} (vazio)";
+        if (gs.FreeSpace == 0) return $"Baú do {Def.Name}: {n} fragmentos — mochila cheia";
+        return $"{InputHints.Interact} Pegar {Mathf.Min(n, gs.FreeSpace)} fragmentos do baú ({GameState.FormatMoney(gs.GoblinStashValue(id))})";
     }
 
     public override void Interact(PlayerController player)
     {
-        int n = GameState.Instance.CollectGoblinStash();
+        int n = GameState.Instance.CollectGoblinStash(Def.RegionId);
         if (n > 0) AudioManager.Instance?.Play("pickup", -4f, 0.9f);
     }
 }
 
 /// <summary>
-/// Acampamento do goblin na caverna inicial: barraca, cama, baú e o próprio Grub.
-/// Controla o trabalho (escolhe depósitos, leva ao baú), o sono à noite e a rebelião
-/// (Grub + comparsas perseguem e atacam o jogador; o feixe os atordoa).
+/// Goblin minerador de uma região. Antes de ser encontrado ele vive escondido numa câmara secreta
+/// (o jogador o acha explorando — sem aviso). Contratado, monta acampamento perto da entrada da
+/// região (barraca, fogueira, baú), minera devagar e leva os fragmentos ao baú.
+/// Sem pagamento: perdoa, avisa, depois foge (volta ao esconderijo) ou se rebela com comparsas.
 /// </summary>
 public partial class GoblinCamp : Node3D
 {
-    public static GoblinCamp Instance { get; private set; }
+    /// <summary>Todos os acampamentos (um por região).</summary>
+    public static readonly List<GoblinCamp> All = new();
+    public static GoblinCamp Instance => All.Count > 0 ? All[0] : null;
+    public GoblinDef Def;
+    public string RegionId => Def.RegionId;
+    public int RegionIndex;
     public CaveLayout L;
     public WorldBuilder World;
-    public Vector3 HutPos, ChestPos, BedPos, GrubHome;
+    public Vector3 HutPos, ChestPos, BedPos, GrubHome, HideoutPos;
     public GoblinNpc Grub;
     public GoblinChest Chest;
+    Node3D _hut;
+    StaticBody3D _hutBody;
     public readonly List<GoblinNpc> Rebels = new();
     public Func<Vector3> PlayerPos = () => Vector3.Zero;
     public Action<float, Vector3> DamagePlayer;
     public Func<bool> PlayerInMine = () => true;
     public event Action RebellionWon;
+    public event Action<GoblinCamp> Discovered;
     float _think;
+    public const float DiscoverDistance = 7f;
 
-    public override void _EnterTree() => Instance = this;
-    public override void _ExitTree() { if (Instance == this) Instance = null; }
+    public override void _EnterTree() { if (!All.Contains(this)) All.Add(this); }
+    public override void _ExitTree() => All.Remove(this);
 
-    public void Setup(CaveLayout layout, Vector3 hut, float yaw)
+    public void Setup(GoblinDef def, CaveLayout layout, int regionIndex, Vector3 hut, float yaw, Vector3 hideout)
     {
+        Def = def;
         L = layout;
+        RegionIndex = regionIndex;
         HutPos = hut;
+        HideoutPos = hideout;
         var right = new Vector3(Mathf.Cos(yaw), 0, -Mathf.Sin(yaw));
         var fwd = new Vector3(-Mathf.Sin(yaw), 0, -Mathf.Cos(yaw));
         ChestPos = L.OnGround(hut.X + right.X * 2.2f + fwd.X * 1.4f, hut.Z + right.Z * 2.2f + fwd.Z * 1.4f);
         BedPos = L.OnGround(hut.X + fwd.X * 1.5f, hut.Z + fwd.Z * 1.5f, 0.05f);
+        GrubHome = L.OnGround(hut.X + fwd.X * 2.4f, hut.Z + fwd.Z * 2.4f);
         BuildHut(hut, yaw);
-        Chest = new GoblinChest { Name = "GoblinChest" };
+        Chest = new GoblinChest { Name = "GoblinChest", Def = def };
         AddChild(Chest);
         Chest.GlobalPosition = ChestPos;
         Chest.Rotation = new Vector3(0, yaw, 0);
-        // a frente do baú (+Z local) fica para o lado da barraca; o jogador interage pela frente
-        Grub = new GoblinNpc { Name = "Grub", Camp = this, IsGrub = true, DisplayName = "Grub" };
+        Grub = new GoblinNpc { Name = def.Name, Camp = this, IsGrub = true, DisplayName = def.Name, Skin = def.Skin };
         AddChild(Grub);
-        GrubHome = L.OnGround(hut.X + fwd.X * 2.4f, hut.Z + fwd.Z * 2.4f);
-        Grub.GlobalPosition = GrubHome;
+        Grub.GlobalPosition = HideoutPos;
         GameState.Instance.GoblinChanged += SyncState;
         GameState.Instance.DayEnded += SyncState;
         GameState.Instance.DayStarted += SyncState;
@@ -336,56 +352,70 @@ public partial class GoblinCamp : Node3D
 
     void BuildHut(Vector3 p, float yaw)
     {
-        var node = new Node3D { Name = "GoblinHut" };
-        AddChild(node);
-        node.GlobalPosition = p;
-        node.Rotation = new Vector3(0, yaw, 0);
-        var cloth = new StandardMaterial3D { AlbedoColor = new Color(0.45f, 0.5f, 0.28f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        _hut = new Node3D { Name = "GoblinHut" };
+        AddChild(_hut);
+        _hut.GlobalPosition = p;
+        _hut.Rotation = new Vector3(0, yaw, 0);
+        var cloth = new StandardMaterial3D { AlbedoColor = Def.Skin.Darkened(0.35f).Lerp(new Color(0.45f, 0.42f, 0.3f), 0.5f), Roughness = 0.95f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
         var pole = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.2f, 0.12f) };
-        // barraca em "A" de lona remendada
-        var tent = new MeshInstance3D { Mesh = new PrismMesh { Size = new Vector3(2.4f, 1.7f, 2.4f) }, MaterialOverride = cloth, Position = new Vector3(0, 0.85f, 0.4f) };
-        node.AddChild(tent);
-        node.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.5f, 0.5f, 0.02f) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.35f, 0.2f) }, Position = new Vector3(0.4f, 0.7f, -0.82f) });
+        _hut.AddChild(new MeshInstance3D { Mesh = new PrismMesh { Size = new Vector3(2.4f, 1.7f, 2.4f) }, MaterialOverride = cloth, Position = new Vector3(0, 0.85f, 0.4f) });
+        _hut.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.5f, 0.5f, 0.02f) }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.35f, 0.2f) }, Position = new Vector3(0.4f, 0.7f, -0.82f) });
         foreach (float x in new[] { -1.1f, 1.1f })
-            node.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.04f, Height = 1.9f, RadialSegments = 6, Rings = 1 }, MaterialOverride = pole, Position = new Vector3(x * 0.05f, 0.95f, x > 0 ? 1.55f : -0.75f) });
-        // fogueira com brasas
+            _hut.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.04f, Height = 1.9f, RadialSegments = 6, Rings = 1 }, MaterialOverride = pole, Position = new Vector3(x * 0.05f, 0.95f, x > 0 ? 1.55f : -0.75f) });
         var fire = MeshFactory.Emissive(new Color(1f, 0.5f, 0.15f), new Color(1f, 0.45f, 0.1f), 2.5f);
-        node.AddChild(new MeshInstance3D { Mesh = MeshFactory.Spike(5, 0.25f, 0.45f), MaterialOverride = fire, Position = new Vector3(-1.9f, 0.05f, -1.2f) });
+        _hut.AddChild(new MeshInstance3D { Mesh = MeshFactory.Spike(5, 0.25f, 0.45f), MaterialOverride = fire, Position = new Vector3(-1.9f, 0.05f, -1.2f) });
         for (int i = 0; i < 6; i++)
         {
             float a = Mathf.Tau * i / 6;
-            node.AddChild(new MeshInstance3D { Mesh = MeshFactory.Rock(40 + i, 0.3f), MaterialOverride = MeshFactory.RockMaterial(new Color(0.35f, 0.32f, 0.3f)), Position = new Vector3(-1.9f + Mathf.Cos(a) * 0.45f, 0.05f, -1.2f + Mathf.Sin(a) * 0.45f), Scale = Vector3.One * 0.16f });
+            _hut.AddChild(new MeshInstance3D { Mesh = MeshFactory.Rock(40 + i, 0.3f), MaterialOverride = MeshFactory.RockMaterial(new Color(0.35f, 0.32f, 0.3f)), Position = new Vector3(-1.9f + Mathf.Cos(a) * 0.45f, 0.05f, -1.2f + Mathf.Sin(a) * 0.45f), Scale = Vector3.One * 0.16f });
         }
-        var light = new OmniLight3D { LightColor = new Color(1f, 0.6f, 0.3f), LightEnergy = 1.2f, OmniRange = 6f, Position = new Vector3(-1.9f, 0.9f, -1.2f) };
-        node.AddChild(light);
-        var col = new StaticBody3D { CollisionLayer = PlayerController.WorldLayer, CollisionMask = 0, Position = new Vector3(0, 0.8f, 0.4f) };
-        col.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(2.2f, 1.6f, 2.2f) } });
-        node.AddChild(col);
-        node.AddChild(new Label3D
+        _hut.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.6f, 0.3f), LightEnergy = 1.2f, OmniRange = 6f, Position = new Vector3(-1.9f, 0.9f, -1.2f) });
+        _hutBody = new StaticBody3D { CollisionLayer = PlayerController.WorldLayer, CollisionMask = 0, Position = new Vector3(0, 0.8f, 0.4f) };
+        _hutBody.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(2.2f, 1.6f, 2.2f) } });
+        _hut.AddChild(_hutBody);
+        _hut.AddChild(new Label3D
         {
-            Text = "BARRACA DO GRUB", FontSize = 44, PixelSize = 0.006f, OutlineSize = 10,
+            Text = $"BARRACA DO {Def.Name.ToUpperInvariant()}", FontSize = 44, PixelSize = 0.006f, OutlineSize = 10,
             Billboard = BaseMaterial3D.BillboardModeEnum.FixedY, Position = new Vector3(0, 2.3f, 0.4f),
-            Modulate = new Color(0.6f, 1f, 0.5f), OutlineModulate = new Color(0, 0, 0, 0.8f), VisibilityRangeEnd = 30f,
+            Modulate = Def.Skin.Lightened(0.4f), OutlineModulate = new Color(0, 0, 0, 0.8f), VisibilityRangeEnd = 30f,
         });
     }
 
-    /// <summary>Ajusta presença e comportamento do Grub ao estado salvo e ao horário.</summary>
+    /// <summary>O acampamento (barraca + baú) só existe depois de contratado.</summary>
+    void SetCampVisible(bool on)
+    {
+        if (_hut.Visible != on) _hut.Visible = on;
+        _hutBody.CollisionLayer = on ? PlayerController.WorldLayer : 0;
+        Chest.Visible = on;
+        Chest.CollisionLayer = on ? PlayerController.WorldLayer | PlayerController.InteractLayer : 0;
+    }
+
+    /// <summary>Ajusta presença e comportamento ao estado salvo e ao horário.</summary>
     public void SyncState()
     {
         var gs = GameState.Instance;
         if (Grub == null) return;
-        var mood = gs.Goblin;
-        Grub.Visible = mood != GameState.GoblinMood.Fled || gs.CanRehireGoblin;
+        var mood = gs.Goblin(RegionId);
+        bool hired = mood == GameState.GoblinMood.Working || mood == GameState.GoblinMood.Rebel;
+        SetCampVisible(hired || gs.GoblinStashCount(RegionId) > 0);
+        bool inHideout = mood == GameState.GoblinMood.Available || (mood == GameState.GoblinMood.Fled && gs.CanRehireGoblin(RegionId));
+        Grub.Visible = hired || inHideout;
         Grub.CollisionLayer = Grub.Visible ? (Grub.Hostile ? PlayerController.GoblinLayer : PlayerController.InteractLayer) : 0;
-        if (mood == GameState.GoblinMood.Rebel) return; // a rebelião começa quando o jogador aparece na mina
+        if (mood == GameState.GoblinMood.Rebel) return; // a rebelião começa quando o jogador entra na região
         if (Grub.Hostile) Grub.SetHostile(false);
         ClearRebels(false);
-        if (gs.DayOver || mood != GameState.GoblinMood.Working)
+        if (inHideout)
         {
-            if (mood == GameState.GoblinMood.Working || mood == GameState.GoblinMood.Available) Grub.Sleep(BedPos);
-            if (mood == GameState.GoblinMood.Available && !gs.DayOver) { Grub.WakeUp(); Grub.GlobalPosition = GrubHome; }
+            // escondido na câmara secreta, "minerando" a parede
+            Grub.WakeUp();
+            Grub.Target = null;
+            Grub.State = GoblinNpc.Mode.Idle;
+            Grub.GlobalPosition = HideoutPos;
+            return;
         }
-        else if (Grub.State == GoblinNpc.Mode.Sleeping) { Grub.WakeUp(); Grub.GlobalPosition = GrubHome; }
+        if (!hired) return;
+        if (gs.DayOver) Grub.Sleep(BedPos);
+        else if (Grub.State == GoblinNpc.Mode.Sleeping || Grub.GlobalPosition.DistanceTo(HideoutPos) < 1f) { Grub.WakeUp(); Grub.GlobalPosition = GrubHome; }
     }
 
     public override void _PhysicsProcess(double delta)
@@ -395,13 +425,24 @@ public partial class GoblinCamp : Node3D
         _think -= (float)delta;
         if (_think > 0) return;
         _think = 0.5f;
-        if (gs.Goblin == GameState.GoblinMood.Rebel)
+        var mood = gs.Goblin(RegionId);
+        // descoberta: só quem explora até a câmara secreta encontra o goblin
+        if (!gs.GoblinFound(RegionId) && Grub.Visible && PlayerInMine() && PlayerPos().DistanceTo(Grub.GlobalPosition) < DiscoverDistance)
+        {
+            if (gs.MarkGoblinFound(RegionId))
+            {
+                gs.Notify($"Você encontrou {Def.Name}, {Def.Title}!", $"Ele estava escondido aqui. Fale com ele para contratá-lo ({GameState.FormatMoney(gs.GoblinHirePrice(RegionId))}).", NotifyKind.Rare);
+                AudioManager.Instance?.Play("rare", -2f);
+                Discovered?.Invoke(this);
+            }
+        }
+        if (mood == GameState.GoblinMood.Rebel)
         {
             if (gs.DayOver) { if (Rebels.Count > 0) EndRebellion(false); return; }
-            if (Rebels.Count == 0 && PlayerInMine() && WorldBuilder.RegionAt(PlayerPos()).Index == 0) StartRebellion();
+            if (Rebels.Count == 0 && PlayerInMine() && WorldBuilder.RegionAt(PlayerPos()).Index == RegionIndex) StartRebellion();
             return;
         }
-        if (gs.Goblin != GameState.GoblinMood.Working || gs.DayOver || !gs.IsPlaying) return;
+        if (mood != GameState.GoblinMood.Working || gs.DayOver || !gs.IsPlaying) return;
         if (Grub.State == GoblinNpc.Mode.Idle)
         {
             if (Grub.Carrying >= GoblinNpc.CarryMax) { Grub.State = GoblinNpc.Mode.ToChest; Grub.GoTo(ChestPos); return; }
@@ -413,33 +454,34 @@ public partial class GoblinCamp : Node3D
         }
     }
 
-    /// <summary>Depósito no chão mais próximo da barraca, na caverna inicial, que ninguém reservou.</summary>
+    /// <summary>Depósito de chão mais próximo, na região dele, perto do acampamento.</summary>
     Crystal PickCrystal(Vector3 from)
     {
         Crystal best = null; float bd = float.MaxValue;
         foreach (var c in World.Crystals)
         {
-            if (!c.IsMineable || c.Material.Special || WorldBuilder.RegionAt(c.GlobalPosition).Index != 0) continue;
+            if (!c.IsMineable || c.Material.Special || WorldBuilder.RegionAt(c.GlobalPosition).Index != RegionIndex) continue;
             if (c.GlobalTransform.Basis.Y.Normalized().Y < 0.9f) continue; // goblin não alcança parede
-            if (c.StandPoint.DistanceTo(HutPos) > 45f) continue;
-            float d = c.StandPoint.DistanceSquaredTo(from) + c.StandPoint.DistanceSquaredTo(PlayerPos()) * 0.0f;
+            if (c.StandPoint.DistanceTo(HutPos) > 55f) continue;
+            float d = c.StandPoint.DistanceSquaredTo(from);
             if (d < bd) { bd = d; best = c; }
         }
         return best;
     }
 
-    public void Deliver(MaterialDef m, int n) => GameState.Instance.GoblinMined(m, n);
+    public void Deliver(MaterialDef m, int n) => GameState.Instance.GoblinMined(RegionId, m, n);
 
     // ---------------- conversa / contratação ----------------
     public string GrubPrompt()
     {
         var gs = GameState.Instance;
         string i = InputHints.Interact;
-        return gs.Goblin switch
+        string price = GameState.FormatMoney(gs.GoblinHirePrice(RegionId));
+        return gs.Goblin(RegionId) switch
         {
-            GameState.GoblinMood.Available => $"{i} Contratar Grub, o goblin minerador ({GameState.FormatMoney(gs.GoblinHirePrice)})",
-            GameState.GoblinMood.Fled when gs.CanRehireGoblin => $"{i} Grub voltou, desconfiado. Recontratar ({GameState.FormatMoney(gs.GoblinHirePrice)})",
-            GameState.GoblinMood.Working => gs.DayOver ? "Grub está dormindo (zzz)" : $"{i} Falar com Grub (hoje: {GameState.FormatMoney(gs.Data.GoblinDayValue)} minerados)",
+            GameState.GoblinMood.Available => $"{i} Contratar {Def.Name}, {Def.Title} ({price})",
+            GameState.GoblinMood.Fled when gs.CanRehireGoblin(RegionId) => $"{i} {Def.Name} voltou ao esconderijo, desconfiado. Recontratar ({price})",
+            GameState.GoblinMood.Working => gs.DayOver ? $"{Def.Name} está dormindo (zzz)" : $"{i} Falar com {Def.Name} (hoje: {GameState.FormatMoney(gs.GoblinData(RegionId).DayValue)} minerados)",
             _ => null,
         };
     }
@@ -447,21 +489,22 @@ public partial class GoblinCamp : Node3D
     public void TalkToGrub()
     {
         var gs = GameState.Instance;
-        if (gs.Goblin == GameState.GoblinMood.Available || gs.CanRehireGoblin)
+        gs.MarkGoblinFound(RegionId);
+        if (gs.Goblin(RegionId) == GameState.GoblinMood.Available || gs.CanRehireGoblin(RegionId))
         {
-            if (!gs.TryHireGoblin()) gs.Notify("Grub", $"\"Sem {GameState.FormatMoney(gs.GoblinHirePrice)}, sem picareta!\"", NotifyKind.Warning);
+            if (!gs.TryHireGoblin(RegionId)) gs.Notify(Def.Name, $"\"Sem {GameState.FormatMoney(gs.GoblinHirePrice(RegionId))}, sem picareta!\"", NotifyKind.Warning);
             else { SyncState(); AudioManager.Instance?.Play("buy", -4f); }
             return;
         }
-        if (gs.Goblin == GameState.GoblinMood.Working)
+        if (gs.Goblin(RegionId) == GameState.GoblinMood.Working)
         {
-            string mood = gs.Data.GoblinStrikes switch
+            string mood = gs.GoblinData(RegionId).Strikes switch
             {
-                0 => "\"Pedra boa hoje, chefe! Grub trabalha, chefe paga.\"",
-                1 => "\"Chefe esqueceu de pagar Grub ontem... Grub lembra.\"",
-                _ => "\"Grub está de olho, chefe. Mais um dia sem moeda e Grub... hmm.\"",
+                0 => $"\"Pedra boa hoje, chefe! {Def.Name} trabalha, chefe paga.\"",
+                1 => $"\"Chefe esqueceu de pagar {Def.Name} ontem... {Def.Name} lembra.\"",
+                _ => $"\"{Def.Name} está de olho, chefe. Mais um dia sem moeda e... hmm.\"",
             };
-            gs.Notify("Grub", mood + $" Baú: {gs.GoblinStashCount} fragmentos.", NotifyKind.Info);
+            gs.Notify(Def.Name, mood + $" Baú: {gs.GoblinStashCount(RegionId)} fragmentos.", NotifyKind.Info);
         }
     }
 
@@ -470,17 +513,18 @@ public partial class GoblinCamp : Node3D
     {
         var gs = GameState.Instance;
         ClearRebels(false);
+        SetCampVisible(true);
         Grub.WakeUp();
         Grub.Visible = true;
         Grub.SetHostile(true);
         Grub.HitsLeft = 6;
+        Grub.GlobalPosition = GrubHome;
         Rebels.Add(Grub);
-        string[] names = { "Snik", "Brugo" };
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < Def.Comrades.Length; i++)
         {
-            var g = new GoblinNpc { Name = "Rebel_" + names[i], Camp = this, DisplayName = names[i], HitsLeft = 4 };
+            var g = new GoblinNpc { Name = "Rebel_" + Def.Comrades[i], Camp = this, DisplayName = Def.Comrades[i], HitsLeft = 4, Skin = Def.Skin.Darkened(0.15f) };
             AddChild(g);
-            // espalha os comparsas ao redor do Grub, em pontos alcançáveis
+            // espalha os comparsas ao redor, em pontos alcançáveis
             var p = GrubHome;
             for (int k = 0; k < 12; k++)
             {
@@ -492,9 +536,8 @@ public partial class GoblinCamp : Node3D
             g.SetHostile(true);
             Rebels.Add(g);
         }
-        foreach (var g in Rebels) { g.State = GoblinNpc.Mode.Chasing; }
-        Grub.GlobalPosition = GrubHome;
-        gs.Notify("REBELIÃO GOBLIN!", "Grub e seus comparsas querem o pagamento à força. Use o feixe para atordoá-los!", NotifyKind.Warning);
+        foreach (var g in Rebels) g.State = GoblinNpc.Mode.Chasing;
+        gs.Notify("REBELIÃO GOBLIN!", $"{Def.Name} e os comparsas querem o pagamento à força. Use o feixe para atordoá-los!", NotifyKind.Warning);
         AudioManager.Instance?.Play("error", 0f);
     }
 
@@ -507,23 +550,19 @@ public partial class GoblinCamp : Node3D
     {
         var gs = GameState.Instance;
         ClearRebels(true);
-        gs.EndGoblinRebellion(playerWon);
+        gs.EndGoblinRebellion(RegionId, playerWon);
+        Grub.SetHostile(false);
         if (playerWon)
         {
-            Grub.SetHostile(false);
             Grub.Visible = true;
             Grub.State = GoblinNpc.Mode.Idle;
             Grub.HitsLeft = 0;
             Grub.GlobalPosition = GrubHome;
             Grub.Scale = Vector3.One;
-            gs.Notify("Rebelião contida!", "Os comparsas fugiram. Grub, envergonhado, volta ao trabalho — e promete não brigar mais.", NotifyKind.Success);
+            gs.Notify("Rebelião contida!", $"Os comparsas fugiram. {Def.Name}, envergonhado, volta ao trabalho — e promete não brigar mais.", NotifyKind.Success);
             RebellionWon?.Invoke();
         }
-        else
-        {
-            Grub.SetHostile(false);
-            gs.Notify("Os goblins fugiram", "Levaram o que havia no baú. Grub talvez volte em alguns dias.", NotifyKind.Warning);
-        }
+        else gs.Notify("Os goblins fugiram", $"Levaram o que havia no baú. {Def.Name} talvez volte ao esconderijo em alguns dias.", NotifyKind.Warning);
         SyncState();
     }
 
@@ -539,13 +578,16 @@ public partial class GoblinCamp : Node3D
         }
     }
 
-    /// <summary>Pulso de ressonância atinge goblins rebelados no raio (2 pontos cada).</summary>
-    public void PulseHit(Vector3 center, float radius, Vector3 from)
+    /// <summary>Pulso de ressonância atinge goblins rebelados no raio (2 pontos cada), em todos os acampamentos.</summary>
+    public static void PulseHitAll(Vector3 center, float radius, Vector3 from)
     {
-        foreach (var g in Rebels.ToList())
-            if (g.Hostile && g.State != GoblinNpc.Mode.Defeated && g.GlobalPosition.DistanceTo(center) <= radius + 1f)
-                g.TakeHit(from, 2);
+        foreach (var camp in All)
+            foreach (var g in camp.Rebels.ToList())
+                if (g.Hostile && g.State != GoblinNpc.Mode.Defeated && g.GlobalPosition.DistanceTo(center) <= radius + 1f)
+                    g.TakeHit(from, 2);
     }
+
+    public static bool AnyRebellion => All.Any(c => c.Rebels.Count > 0);
 
     public void HitPlayer(GoblinNpc g, float dmg) => DamagePlayer?.Invoke(dmg, g.GlobalPosition);
 }

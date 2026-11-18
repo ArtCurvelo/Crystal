@@ -83,7 +83,7 @@ public partial class Crystal : StaticBody3D
         bool special = mat.Special;
         float s = special ? 2.6f : SizeScale;
         // brilho forte (o bloom faz os minérios "acenderem" nas cavernas escuras)
-        _baseEnergy = mat.Rare ? 2.4f : special ? 0.9f : 1.5f;
+        _baseEnergy = mat.Rare ? 1.5f : special ? 0.35f : 0.95f;
 
         // formato e textura próprios do tipo de minério
         var built = OreVisuals.Build(_visual, mat, _rng, s);
@@ -119,7 +119,7 @@ public partial class Crystal : StaticBody3D
         _light = new OmniLight3D
         {
             LightColor = mat.Glow,
-            LightEnergy = special ? 2.4f : mat.Rare ? 1.8f : 1.1f,
+            LightEnergy = special ? 1.1f : mat.Rare ? 1.6f : 1.0f,
             OmniRange = special ? 14f : (mat.Rare ? 5.5f : 3.6f) * Mathf.Max(0.8f, SizeScale),
             OmniAttenuation = 1.4f,
             ShadowEnabled = false,

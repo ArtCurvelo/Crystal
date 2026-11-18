@@ -383,7 +383,7 @@ public static class GameData
             Subtitle = "Onde todo escavador começa.", UnlockCost = 0,
             AmbientColor = new Color(0.45f, 0.35f, 0.8f), AmbientEnergy = 0.6f,
             FogColor = new Color(0.07f, 0.03f, 0.14f), FogDensity = 0.018f,
-            RockColor = new Color(0.24f, 0.18f, 0.26f), AccentColor = new Color(0.15f, 1.0f, 1.0f),
+            RockColor = new Color(0.38f, 0.32f, 0.34f), AccentColor = new Color(0.15f, 1.0f, 1.0f),
             LightColor = new Color(1.0f, 0.35f, 0.85f),
             RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 130,
             CenterZ = 0, HalfX = 95, HalfZ = 90, Height = 18
@@ -403,7 +403,7 @@ r1.Spawns.Add(new SpawnEntry("quartz", 0.4f));
             Subtitle = "Névoa gelada e cristais resistentes.", UnlockCost = 6000,
             AmbientColor = new Color(0.2f, 0.5f, 0.9f), AmbientEnergy = 0.7f,
             FogColor = new Color(0.02f, 0.08f, 0.18f), FogDensity = 0.026f,
-            RockColor = new Color(0.12f, 0.17f, 0.26f), AccentColor = new Color(0.1f, 1.0f, 0.65f),
+            RockColor = new Color(0.3f, 0.34f, 0.4f), AccentColor = new Color(0.1f, 1.0f, 0.65f),
             LightColor = new Color(0.25f, 0.6f, 1.0f),
             RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 160,
             CenterZ = -204, HalfX = 110, HalfZ = 100, Height = 22
@@ -426,7 +426,7 @@ r2.Spawns.Add(new SpawnEntry("sapphire", 0.26f));
             Subtitle = "O coração quente do mundo.", UnlockCost = 400000,
             AmbientColor = new Color(0.7f, 0.25f, 0.6f), AmbientEnergy = 0.6f,
             FogColor = new Color(0.14f, 0.03f, 0.1f), FogDensity = 0.022f,
-            RockColor = new Color(0.22f, 0.12f, 0.16f), AccentColor = new Color(1.0f, 0.5f, 0.1f),
+            RockColor = new Color(0.38f, 0.25f, 0.22f), AccentColor = new Color(1.0f, 0.5f, 0.1f),
             LightColor = new Color(1.0f, 0.2f, 0.6f),
             RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 170,
             CenterZ = -423, HalfX = 115, HalfZ = 105, Height = 28
@@ -449,7 +449,7 @@ r3.Spawns.Add(new SpawnEntry("ruby", 0.26f));
             Subtitle = "Região bônus: um lago sereno e luminoso.", UnlockCost = 1500000,
             AmbientColor = new Color(0.2f, 0.6f, 0.9f), AmbientEnergy = 0.75f,
             FogColor = new Color(0.01f, 0.09f, 0.14f), FogDensity = 0.024f,
-            RockColor = new Color(0.1f, 0.15f, 0.22f), AccentColor = new Color(1.0f, 0.25f, 0.85f),
+            RockColor = new Color(0.25f, 0.32f, 0.33f), AccentColor = new Color(1.0f, 0.25f, 0.85f),
             LightColor = new Color(0.2f, 0.95f, 1.0f),
             RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 170,
             CenterZ = -647, HalfX = 115, HalfZ = 105, Height = 26

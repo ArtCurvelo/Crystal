@@ -385,7 +385,8 @@ public static class Decor
     }
 
     /// <summary>Formações gigantes de cristal (decorativas) junto às paredes, com o shader de cristal.</summary>
-    public static void GiantClusters(Node3D root, CaveLayout L, Random rng, int count, Color[] palette, float height = 10f)
+    public static void GiantClusters(Node3D root, CaveLayout L, Random rng, int count, Color[] palette, float height = 10f,
+        Func<Vector3, float, bool> free = null, Action<Shape3D, Transform3D, Vector3, float> solid = null)
     {
         var shader = GD.Load<Shader>("res://shaders/crystal.gdshader");
         var mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.3f);
@@ -401,6 +402,8 @@ public static class Decor
             {
                 // junto a uma parede, longe das passagens estreitas
                 if (!L.RandomNearWall(rng, out var basePos, -1.6f, -0.6f)) continue;
+                if (free != null && !free(basePos, 2.5f)) continue;
+                solid?.Invoke(null, default, basePos, 2.2f); // bloqueia a base no grid
                 var inward = L.Inward(basePos.X, basePos.Z);
                 int prisms = rng.Next(4, 7);
                 for (int i = 0; i < prisms; i++)
@@ -416,6 +419,9 @@ public static class Decor
                     var b = new Basis(x, dir, z).ScaleLocal(new Vector3(rad, h, rad));
                     var off = new Vector3((float)rng.NextDouble() - 0.5f, -0.2f, (float)rng.NextDouble() - 0.5f) * 1.4f;
                     xf.Add(new Transform3D(b, basePos + off));
+                    // colisão do prisma (cilindro ao longo do eixo do cristal)
+                    var axis = new Basis(x, dir, z);
+                    solid?.Invoke(new CylinderShape3D { Radius = rad * 0.85f, Height = h * 0.9f }, new Transform3D(axis, basePos + off + dir * h * 0.45f), basePos, 0f);
                 }
             }
             AddMulti(root, mesh, mat, xf);
