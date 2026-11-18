@@ -26,6 +26,8 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
+- **Construções** (`World/Buildings.cs`, `Data/BuildData.cs`): modo construção (B), poste de luz, funil + esteira até a Estação de Venda (venda automática), drone coletor. Salvas em `SaveData.Buildings`.
+- **Painel de admin** (F9 / Back): `Core/MainDebug.cs` (comandos) e `UI/DebugScreen.cs`.
 - **Acessibilidade** (`Core/Accessibility.cs`): filtro de daltonismo, narração (TTS do sistema), sons-guia, reduzir tremor. Remapeamento de teclado/mouse/controle em `InputSetup`.
 
 ## Arquitetura

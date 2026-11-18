@@ -6,5 +6,5 @@ cd "$(dirname "$0")/.."
 source /home/user/tools/env.sh 2>/dev/null || true
 GODOT_BIN="${GODOT:-godot}"
 dotnet build -nologo -v q 2>&1 | grep -E "error|Build succeeded" | sort -u
-timeout 1200 "$GODOT_BIN" --headless --fixed-fps 60 --path . -- --bot=${1:-120} 2>&1 | grep -E "^\[|Tempo de jogo|Vendas|Upgrades|Renascimento|Dias completos|Miras perdidas|Goblin:|Construções:|Construiu|drone|BOT:|Save|ERRO|EXCE"
+timeout 1200 "$GODOT_BIN" --headless --fixed-fps 60 --path . -- --bot=${1:-120} 2>&1 | grep -E "^\[|Tempo de jogo|Vendas|Upgrades|Renascimento|Dias completos|Miras perdidas|Goblin:|Construções:|Painel de admin|Construiu|drone|BOT:|Save|ERRO|EXCE"
 exit ${PIPESTATUS[0]}

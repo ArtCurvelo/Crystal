@@ -33,6 +33,7 @@ public partial class Main : Node
     ConfirmScreen _confirm;
     CodexScreen _codex;
     ObjectiveMarker _marker;
+    DebugScreen _debug;
     public BuildingManager Buildings { get; private set; }
     HelpScreen _help;
     CompletionScreen _completion;
@@ -111,6 +112,9 @@ public partial class Main : Node
         AddChild(_codex);
         _help = new HelpScreen();
         AddChild(_help);
+        _debug = new DebugScreen { Run = RunDebug };
+        AddChild(_debug);
+        _debug.Closed += () => { GetTree().Paused = false; ReturnToGameplay(); };
         _updater = new UpdateManager { Name = "Updater" };
         AddChild(_updater);
         _updateScreen = new UpdateScreen { Updater = _updater };
@@ -624,21 +628,35 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _choice, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _debug, _choice, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen;
+    bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
     public override void _UnhandledInput(InputEvent e)
     {
+        // painel de admin: F9 ou Back (controle), durante a partida
+        if (e.IsActionPressed("debug_panel"))
+        {
+            GetViewport().SetInputAsHandled();
+            if (_debug.IsOpen) { _debug.Close(); return; }
+            if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
+            GetTree().Paused = true;
+            AudioManager.Instance?.SetBeam(false);
+            Input.MouseMode = Input.MouseModeEnum.Visible;
+            Player.InputEnabled = false;
+            _debug.Open();
+            return;
+        }
         if (e.IsActionPressed("pause"))
         {
             GetViewport().SetInputAsHandled();
+            if (_debug.IsOpen) { _debug.Close(); return; }
             if (_confirm.IsOpen) { _confirm.Close(); return; }
             if (_choice.IsOpen) { _choice.Decline(); return; }
             if (_home.IsOpen) { _home.Close(); return; }
@@ -657,7 +675,8 @@ public partial class Main : Node
         if (e is InputEventJoypadButton jb && jb.Pressed && jb.ButtonIndex == JoyButton.B && AnyModal())
         {
             GetViewport().SetInputAsHandled();
-            if (_confirm.IsOpen) _confirm.Close();
+            if (_debug.IsOpen) _debug.Close();
+            else if (_confirm.IsOpen) _confirm.Close();
             else if (_choice.IsOpen) _choice.Decline();
             else if (_home.IsOpen) _home.Close();
             else if (_settings.IsOpen) _settings.Close();

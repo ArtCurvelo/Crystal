@@ -335,3 +335,13 @@ Pedido do diretor: quem está no meio de uma partida e volta ao menu já deve ve
 - Os arquivos do jogo só podem ser trocados com ele fechado (o Windows trava arquivos em uso), por isso o reinício automático continua, mas sem passos manuais.
 - Ambiente: `env.sh` não quebra mais com `set -u` (o script de publicação parava sem mensagem).
 - Testes 441/441.
+
+## v0.7.0 — construções e painel de admin
+Pedido do diretor: construções (esteira, drone, poste de luz). Durante o trabalho, também pediu um comando de admin/debug para não precisar jogar 2 horas para testar algo novo.
+- **Modo construção** (B / D-pad ↓): Q/R (D-pad ←/→) trocam o item, prévia verde/vermelha no chão com o motivo quando não pode (teto baixo, pedra no caminho, perto de estação/outra construção, sem moeda…), botão de minerar constrói, E desmonta (devolve 50%). Barra no HUD com custo e teclas; narração ao trocar.
+- **Poste de luz** (◈ 150): poste neon com luz forte (16 m), acende piscando.
+- **Funil + esteira** (◈ 2.500 + ◈ 12/m): o funil puxa fragmentos soltos num raio de 5 m e recebe a mochila (E). A esteira é traçada sozinha (A* no grid da caverna) até a Estação de Venda, atravessando os túneis de outras regiões; os fragmentos andam por ela (5 m/s, visíveis) e são vendidos ao chegar. A prévia mostra o trajeto tracejado e o custo total. O que está na esteira é salvo e volta para a fila ao carregar.
+- **Drone coletor** (◈ 6.000, único, mantido no Renascimento): segue o jogador com luz própria, busca fragmentos à vista até 18 m, entrega na mochila e, com a mochila cheia, leva ao funil mais próximo.
+- Renascimento remove as construções (o drone fica). Textos em PT/EN/ES; ajuda e rodapé mostram a tecla B.
+- **Painel de admin** (F9 / Back no controle): botões para dinheiro, liberar tudo, melhorias/habilidades/casa no máximo, encher mochila, teleporte (regiões, Coração, goblin), achar goblins, rebelião, hora/fim do dia/novo dia, evento, velocidade do tempo, drone, curar, renascimento pronto; e campo de comando (`ajuda` lista tudo). Altera o save atual.
+- Testes: integração das construções (regras de posição, custos, esteira na região 1 e do Núcleo até o acampamento, venda automática, funil puxando fragmentos, save com itens na esteira, desmontar, drone buscando fragmentos, renascimento). Bot: abre/fecha o modo construção pelos botões, constrói funil e drone, usa o funil; testa o painel de admin pelo atalho.

@@ -364,6 +364,12 @@ public partial class ScreenshotTour : Node
         await Wait(0.8f);
         await Shot("18f_build_hopper");
         bm.SetActive(false);
+        // painel de admin
+        Input.ParseInputEvent(new InputEventAction { Action = "debug_panel", Pressed = true });
+        await Wait(0.6f);
+        await Shot("19_admin");
+        Input.ParseInputEvent(new InputEventAction { Action = "debug_panel", Pressed = true });
+        await Wait(0.3f);
     }
 
     static string DrawStats()

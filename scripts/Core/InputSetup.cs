@@ -24,6 +24,7 @@ public static class InputSetup
         Key("quick_save", Godot.Key.F5);
         Key("toggle_fps", Godot.Key.F3);
         Key("build", Godot.Key.B);
+        Key("debug_panel", Godot.Key.F9);
         Key("build_prev", Godot.Key.Q);
         Key("build_next", Godot.Key.R);
         Mouse("mine", MouseButton.Left);
@@ -46,6 +47,7 @@ public static class InputSetup
         Pad("crouch", JoyButton.B, JoyButton.RightStick);
         Pad("flashlight", JoyButton.DpadUp);
         Pad("build", JoyButton.DpadDown);
+        Pad("debug_panel", JoyButton.Back);
         Pad("build_prev", JoyButton.DpadLeft);
         Pad("build_next", JoyButton.DpadRight);
         // menus com o controle: o Godot só mapeia teclado nas ações de interface.

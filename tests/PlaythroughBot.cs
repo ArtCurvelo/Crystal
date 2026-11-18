@@ -102,6 +102,8 @@ public partial class PlaythroughBot : Node
         await PrestigeViaUi();
         _r2 = _firstR2;
 
+        await AdminPanelTest();
+
         // verificação final de salvamento/carregamento do estado real
         GS.SaveGame(true);
         long money = GS.Data.Money;
@@ -530,6 +532,38 @@ public partial class PlaythroughBot : Node
         if (!await UseStationNode(Main.World.Goblins.Chest)) return;
         if (GS.InventoryCount <= before) { _errors++; Log("ERRO: baú do Grub não entregou fragmentos"); return; }
         _stashTaken += GS.InventoryCount - before;
+    }
+
+    /// <summary>Painel de admin: abre pelo atalho, usa botões e comandos digitados, confere o efeito e fecha.</summary>
+    async Task AdminPanelTest()
+    {
+        if (!GS.CanWork) { GS.StartNewDay(); await Frames(3); }
+        Main.CloseAllForTour();
+        await Frames(3);
+        PressAction("debug_panel");
+        await Frames(3);
+        var dbg = Main.GetChildren().OfType<DebugScreen>().First();
+        if (!dbg.IsOpen || !GetTree().Paused) { _errors++; Log("ERRO: painel de admin não abriu"); return; }
+        long m0 = GS.Data.Money;
+        dbg.Press("+◈ 10 mi");
+        bool money = GS.Data.Money == m0 + 10_000_000;
+        dbg.Press("Ir: Núcleo");
+        bool tele = WorldBuilder.RegionAt(P.GlobalPosition).Index == 2;
+        dbg.Press("Encher mochila");
+        bool full = GS.FreeSpace == 0;
+        string r = Main.RunDebug("hora 17");
+        bool hour = GS.Data.DayTimeSeconds > GS.DayLength * 0.9;
+        Main.RunDebug("fimdia");
+        bool ended = GS.DayOver;
+        Main.RunDebug("novodia");
+        bool unknown = Main.RunDebug("xyz").Contains("desconhecido");
+        PressAction("debug_panel");
+        await Frames(3);
+        bool closed = !dbg.IsOpen && !GetTree().Paused && P.InputEnabled;
+        Log($"Painel de admin: dinheiro={money} teleporte={tele} mochila={full} hora={hour} fimdia={ended} erro={unknown} fechou={closed}");
+        if (!(money && tele && full && hour && ended && unknown && closed)) { _errors++; Log("ERRO: painel de admin falhou"); }
+        GS.Data.Inventory.Clear();
+        P.GlobalPosition = Main.World.SpawnPoint;
     }
 
     /// <summary>Construções: entra no modo construção pelos botões, constrói um funil com esteira e o drone.</summary>
