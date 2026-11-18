@@ -22,10 +22,24 @@ public partial class ShardManager : Node3D
     float Floor(float x, float z) => (GroundAt?.Invoke(x, z) ?? 0f) + FloorY;
     public const float Lifetime = 150f;
 
-    sealed class Shard
+    /// <summary>Destino de fragmentos soltos além do jogador (ex.: funil).</summary>
+    public interface IShardSink
+    {
+        Vector3 SinkPoint { get; }
+        bool AcceptShard(MaterialDef m);
+    }
+
+    /// <summary>Procura um destino (funil) perto de um ponto.</summary>
+    public Func<Vector3, IShardSink> FindSink;
+
+    public sealed class Shard
     {
         public MeshInstance3D Node;
         public MaterialDef Mat;
+        public bool Alive = true;
+        public bool Claimed;   // reservado pelo drone
+        public IShardSink Sink;
+        public Vector3 Position => Node.GlobalPosition;
         public Vector3 Vel;
         public float Age;
         public bool Homing;
@@ -141,6 +155,7 @@ public partial class ShardManager : Node3D
     void Recycle(int index)
     {
         var s = _shards[index];
+        s.Alive = false;
         s.Node.Visible = false;
         _free.Push(s.Node);
         _shards.RemoveAt(index);
@@ -159,12 +174,32 @@ public partial class ShardManager : Node3D
         float magnet = gs.MagnetRadius;
         bool blocked = false;
 
+        _frame++;
         for (int i = _shards.Count - 1; i >= 0; i--)
         {
             var s = _shards[i];
             s.Age += dt;
             var pos = s.Node.GlobalPosition;
             float dist = hasPlayer ? pos.DistanceTo(ppos) : 999f;
+            if (s.Claimed) { s.Node.RotateY(s.Spin * dt); continue; } // o drone está vindo buscar
+            // funil por perto puxa fragmentos que o jogador não está puxando
+            if (s.Sink == null && !s.Homing && FindSink != null && s.Age > 0.6f && (i + _frame) % 6 == 0 && !(hasPlayer && dist < magnet && gs.FreeSpace > 0))
+                s.Sink = FindSink(pos);
+            if (s.Sink != null)
+            {
+                var target = s.Sink.SinkPoint;
+                var dir = (target - pos).Normalized();
+                s.Vel = s.Vel.Lerp(dir * (5f + s.Age * 2f), Mathf.Min(1, dt * 6f));
+                pos += s.Vel * dt;
+                s.Node.GlobalPosition = pos;
+                s.Node.RotateY(s.Spin * dt);
+                if (pos.DistanceTo(target) < 0.5f)
+                {
+                    if (s.Sink.AcceptShard(s.Mat)) { Recycle(i); continue; }
+                    s.Sink = null;
+                }
+                continue;
+            }
 
             if (s.Age > (s.Direct ? 0.35f : 0.45f) && hasPlayer && (dist < magnet || s.Direct))
             {
@@ -231,6 +266,36 @@ public partial class ShardManager : Node3D
             InventoryFullBlocked?.Invoke();
         }
     }
+
+    int _frame;
+
+    /// <summary>Fragmento solto mais próximo (não reservado), dentro do raio e que passe no filtro.</summary>
+    public Shard NearestLoose(Vector3 from, float radius, Func<Vector3, bool> ok = null)
+    {
+        Shard best = null;
+        float bd = radius * radius;
+        foreach (var s in _shards)
+        {
+            if (s.Claimed || s.Homing || s.Sink != null || s.Age < 0.8f) continue;
+            float d = s.Node.GlobalPosition.DistanceSquaredTo(from);
+            if (d >= bd || (ok != null && !ok(s.Node.GlobalPosition))) continue;
+            bd = d; best = s;
+        }
+        return best;
+    }
+
+    /// <summary>Remove um fragmento reservado (o drone pegou). Devolve o material.</summary>
+    public MaterialDef Take(Shard s)
+    {
+        if (s == null || !s.Alive) return null;
+        int i = _shards.IndexOf(s);
+        if (i < 0) return null;
+        var m = s.Mat;
+        Recycle(i);
+        return m;
+    }
+
+    public IReadOnlyList<Shard> Loose => _shards;
 
     public void ClearAll()
     {

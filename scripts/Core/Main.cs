@@ -33,6 +33,7 @@ public partial class Main : Node
     ConfirmScreen _confirm;
     CodexScreen _codex;
     ObjectiveMarker _marker;
+    public BuildingManager Buildings { get; private set; }
     HelpScreen _help;
     CompletionScreen _completion;
     BackupScreen _backups;
@@ -62,6 +63,10 @@ public partial class Main : Node
         world3d.AddChild(_shards);
         World = new WorldBuilder { Name = "World" };
         world3d.AddChild(World);
+        Buildings = new BuildingManager { Name = "Buildings", World = World, GetPlayer = () => Player };
+        Buildings.CanUseBuildMode = () => CurrentMode == Mode.Playing && Player != null && Player.InputEnabled && !AnyModal() && !_fading && !PlayerInHouse;
+        world3d.AddChild(Buildings);
+        _shards.FindSink = Buildings.FindSink;
         Events = new RegionEvents { Name = "RegionEvents", Env = _env, World = World, CurrentRegion = () => _currentRegion };
         world3d.AddChild(Events);
         _menuCam = new Camera3D { Current = true, Fov = 70, Far = 120 };
@@ -153,6 +158,8 @@ public partial class Main : Node
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         GameState.Instance.BeforeSave = WritePlayerToSave;
+        Buildings.BuildBarChanged += (t, d, ok) => Hud.SetBuildBar(t, d, ok);
+        GameState.Instance.Prestiged += () => Buildings.Rebuild();
         GameState.Instance.RegionsChanged += UpdateRegionCulling;
         GameState.Instance.Sold += OnSold;
         GameState.Instance.RegionsChanged += () => GameState.Instance.CheckCompletion();
@@ -333,6 +340,7 @@ public partial class Main : Node
 
         _shards.ClearAll();
         Events.ResetAll();
+        Buildings.Rebuild();
         foreach (var camp in World.GoblinCamps) camp.SyncState();
         if (Player == null)
         {
@@ -806,6 +814,7 @@ public partial class Main : Node
             bool visible = !inHouse && Mathf.Abs(i - r.Index) <= 1;
             if (World.RegionRoots[i].Visible != visible) World.RegionRoots[i].Visible = visible;
         }
+        Buildings.UpdateVisibility(r.Index, inHouse);
     }
 
     void OnSold(long amount)
@@ -876,6 +885,7 @@ public partial class Main : Node
         d.PlayerX = p.X; d.PlayerY = p.Y; d.PlayerZ = p.Z;
         d.PlayerYaw = Player.Yaw;
         d.HasPosition = true;
+        Buildings?.WriteInFlight(d);
         return true;
     }
 }

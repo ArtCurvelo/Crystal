@@ -7,6 +7,48 @@ public static partial class LocTables
 {
     static partial void Fill(List<(string pt, string en, string es)> list)
     {
+        list.Add(("Modo construção", "Build mode", "Modo construcción"));
+        list.Add(("MODO CONSTRUÇÃO", "BUILD MODE", "MODO CONSTRUCCIÓN"));
+        list.Add(("Construção anterior", "Previous building", "Construcción anterior"));
+        list.Add(("Próxima construção", "Next building", "Siguiente construcción"));
+        list.Add(("Construir", "Build", "Construir"));
+        list.Add(("Mire no chão", "Aim at the floor", "Apunta al suelo"));
+        list.Add(("Sem caminho até a Estação de Venda", "No path to the Sell Station", "Sin camino hasta la Estación de Venta"));
+        list.Add(("O drone já está trabalhando", "The drone is already working", "El dron ya está trabajando"));
+        list.Add(("Limite atingido ({0})", "Limit reached ({0})", "Límite alcanzado ({0})"));
+        list.Add(("Só dá para construir na mina", "You can only build in the mine", "Solo puedes construir en la mina"));
+        list.Add(("Lugar inválido", "Invalid spot", "Lugar no válido"));
+        list.Add(("Teto baixo demais", "Ceiling too low", "Techo demasiado bajo"));
+        list.Add(("Muito perto de outra construção", "Too close to another building", "Demasiado cerca de otra construcción"));
+        list.Add(("Muito perto de uma estação", "Too close to a station", "Demasiado cerca de una estación"));
+        list.Add(("Em cima de um minério", "On top of an ore", "Encima de un mineral"));
+        list.Add(("Tem uma pedra no caminho", "There is a rock in the way", "Hay una roca en el camino"));
+        list.Add(("Não dá para construir aqui", "You can\'t build here", "No se puede construir aquí"));
+        list.Add(("Drone coletor ativo", "Collector drone active", "Dron recolector activo"));
+        list.Add(("Ele recolhe fragmentos espalhados perto de você.", "It picks up scattered shards near you.", "Recoge los fragmentos esparcidos cerca de ti."));
+        list.Add(("Esteira construída", "Conveyor built", "Cinta construida"));
+        list.Add(("{0:0} m até a Estação de Venda. Tudo o que entrar no funil é vendido lá.", "{0:0} m to the Sell Station. Everything that goes into the hopper is sold there.", "{0:0} m hasta la Estación de Venta. Todo lo que entre en la tolva se vende allí."));
+        list.Add(("{0} desmontado", "{0} dismantled", "{0} desmontado"));
+        list.Add(("Devolvido: {0}", "Refunded: {0}", "Devuelto: {0}"));
+        list.Add(("{0} — desmontar?", "{0} — dismantle?", "{0} — ¿desmontar?"));
+        list.Add(("[{0}] Desmontar (+{1})", "[{0}] Dismantle (+{1})", "[{0}] Desmontar (+{1})"));
+        list.Add(("{0} (funil {1} + esteira {2:0} m)", "{0} (hopper {1} + conveyor {2:0} m)", "{0} (tolva {1} + cinta {2:0} m)"));
+        list.Add(("[{0}] Construir   [{1}/{2}] Trocar   [{3}] Desmontar   [{4}] Sair", "[{0}] Build   [{1}/{2}] Switch   [{3}] Dismantle   [{4}] Exit", "[{0}] Construir   [{1}/{2}] Cambiar   [{3}] Desmontar   [{4}] Salir"));
+        list.Add(("FUNIL", "HOPPER", "TOLVA"));
+        list.Add(("sem esteira", "no conveyor", "sin cinta"));
+        list.Add(("na fila: {0}", "queued: {0}", "en cola: {0}"));
+        list.Add(("{0} Colocar {1} fragmentos no funil", "{0} Put {1} shards in the hopper", "{0} Poner {1} fragmentos en la tolva"));
+        list.Add(("Funil sem esteira (sem caminho até a Estação de Venda)", "Hopper without conveyor (no path to the Sell Station)", "Tolva sin cinta (sin camino hasta la Estación de Venta)"));
+        list.Add(("Funil · esteira de {0:0} m até a Estação de Venda", "Hopper · {0:0} m conveyor to the Sell Station", "Tolva · cinta de {0:0} m hasta la Estación de Venta"));
+        list.Add(("Poste de luz", "Light post", "Farola"));
+        list.Add(("Ilumina a área ao redor.", "Lights up the surrounding area.", "Ilumina la zona de alrededor."));
+        list.Add(("Funil + esteira", "Hopper + conveyor", "Tolva + cinta"));
+        list.Add(("Puxa fragmentos soltos e leva tudo pela esteira até a Estação de Venda, que vende sozinha.", "Pulls in loose shards and carries everything on the conveyor to the Sell Station, which sells it automatically.", "Atrae fragmentos sueltos y lo lleva todo por la cinta hasta la Estación de Venta, que lo vende sola."));
+        list.Add(("Drone coletor", "Collector drone", "Dron recolector"));
+        list.Add(("Segue você, recolhe fragmentos espalhados e leva ao funil quando a mochila enche.", "Follows you, picks up scattered shards and takes them to the hopper when your backpack is full.", "Te sigue, recoge fragmentos esparcidos y los lleva a la tolva cuando la mochila se llena."));
+        list.Add(("CONSTRUÇÕES", "BUILDINGS", "CONSTRUCCIONES"));
+        list.Add(("Aperte B (D-pad ↓) para o modo construção: postes de luz, funil com esteira até a Estação de Venda (vende sozinha) e drone coletor. Q/R trocam, E desmonta.", "Press B (D-pad ↓) for build mode: light posts, a hopper with a conveyor to the Sell Station (sells automatically) and a collector drone. Q/R switch, E dismantles.", "Pulsa B (D-pad ↓) para el modo construcción: farolas, tolva con cinta hasta la Estación de Venta (vende sola) y dron recolector. Q/R cambian, E desmonta."));
+        list.Add(("Modo construção (B)", "Build mode (B)", "Modo construcción (B)"));
         list.Add(("{0:0} dano", "{0:0} damage", "{0:0} daño"));
         list.Add(("{0:0.0} golpes/s", "{0:0.0} hits/s", "{0:0.0} golpes/s"));
         list.Add(("{0:0} fragmentos", "{0:0} shards", "{0:0} fragmentos"));

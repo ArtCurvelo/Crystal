@@ -30,6 +30,9 @@ public partial class PlaythroughBot : Node
     int _errors;
     double _r2 = -1, _r3 = -1, _r4 = -1, _heart = -1;
     int _sells, _buys, _pulses, _missedAims;
+    int _hopperId, _hopperTrips;
+    long _beltSold;
+    bool _droneBought;
     readonly HashSet<Crystal> _unaimable = new();
 
     public override async void _Ready()
@@ -41,6 +44,7 @@ public partial class PlaythroughBot : Node
         Main.StartGame(false);
         P.SimulateCapturedMouse = true;
         P.ResonancePulse += _ => _pulses++;
+        GS.BeltSold += (v, _) => _beltSold += v;
         await Frames(10);
         Log("Início do jogo");
         await Frames(60);
@@ -116,6 +120,9 @@ public partial class PlaythroughBot : Node
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
         GD.Print($"Goblin: contratado={_hired} | taxas pagas {_feesPaid}, não pagas {_feesSkipped} | fragmentos do baú {_stashTaken}");
         if (!_hired || _feesPaid == 0 || _stashTaken == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
+        GD.Print($"Construções: funil={(_hopperId != 0 || _beltSold > 0)} | vendido pela esteira ◈ {_beltSold} | drone={GS.Data.DroneOwned}");
+        if (_beltSold <= 0) { _errors++; GD.Print("ERRO: a esteira não vendeu nada"); }
+        if (!GS.Data.DroneOwned) { _errors++; GD.Print("ERRO: drone não comprado"); }
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
         GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
@@ -525,10 +532,62 @@ public partial class PlaythroughBot : Node
         _stashTaken += GS.InventoryCount - before;
     }
 
+    /// <summary>Construções: entra no modo construção pelos botões, constrói um funil com esteira e o drone.</summary>
+    async Task TryBuild()
+    {
+        var bm = Main.Buildings;
+        if (_hopperId != 0 && GS.Building(_hopperId) == null) _hopperId = 0; // renascimento
+        if (!GS.CanWork) return;
+        if (_hopperId == 0 && GS.Data.Money >= 12000)
+        {
+            var L0 = Main.World.Layouts[0];
+            var at = L0.PathPoints[Math.Min(4, L0.PathPoints.Count - 1)];
+            P.GlobalPosition = at + Vector3.Up * 0.1f; P.Velocity = Vector3.Zero;
+            await Frames(3);
+            PressAction("build");
+            await Frames(3);
+            if (!bm.Active) { _errors++; Log("ERRO: modo construção não abriu"); return; }
+            int sel = bm.Selected;
+            PressAction("build_next");
+            await Frames(3);
+            if (bm.Selected != (sel + 1) % BuildData.All.Count) { _errors++; Log("ERRO: trocar de construção não funcionou"); }
+            bm.Select(BuildData.All.FindIndex(b => b.Id == BuildIds.Hopper));
+            Vector3 spot = default; bool found = false;
+            for (int r = 2; r < 18 && !found; r++)
+                for (int a = 0; a < 12 && !found; a++)
+                {
+                    float ang = a * Mathf.Tau / 12f;
+                    float x = at.X + Mathf.Cos(ang) * r, z = at.Z + Mathf.Sin(ang) * r;
+                    if (!L0.InGrid(x, z)) continue;
+                    var q = L0.OnGround(x, z);
+                    if (bm.CanPlace(BuildIds.Hopper, q, out _)) { spot = q; found = true; }
+                }
+            var b = found ? bm.Place(BuildIds.Hopper, spot, 0) : null;
+            PressAction("build");
+            await Frames(3);
+            if (bm.Active) { _errors++; Log("ERRO: modo construção não fechou"); }
+            if (b == null) { _errors++; Log("ERRO: não conseguiu construir o funil"); return; }
+            _hopperId = b.Id;
+            Log($"Construiu funil + esteira de {bm.BeltOf(b.Id)?.Length ?? -1:0} m (◈ {b.Paid})");
+        }
+        if (!_droneBought && !GS.Data.DroneOwned && GS.Data.Money >= 40000)
+        {
+            if (bm.Place(BuildIds.Drone, P.GlobalPosition, 0) != null) { _droneBought = true; Log("Comprou o drone coletor"); }
+        }
+    }
+
     async Task SellTrip()
     {
         var region = GameData.Regions[0]; // única Estação de Venda, no acampamento
         await TryHireGoblin();
+        await TryBuild();
+        // de vez em quando esvazia a mochila no funil em vez de vender no balcão
+        if (_hopperId != 0 && GS.CanWork && ++_hopperTrips % 3 == 0 && Main.Buildings.NodeOf(_hopperId) is Hopper hop)
+        {
+            int carried = GS.InventoryCount;
+            if (await UseStationNode(hop) && GS.InventoryCount == 0 && carried > 0) { _sells++; return; }
+            _errors++; Log("ERRO: não conseguiu usar o funil");
+        }
         if (!await UseStation<SellStation>(region)) return;
         var sell = Main.GetChildren().OfType<SellScreen>().First();
         if (!sell.IsOpen) { _errors++; Log("ERRO: tela de venda não abriu"); return; }

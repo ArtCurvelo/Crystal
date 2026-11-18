@@ -42,6 +42,14 @@ public partial class ScreenshotTour : Node
         p.SimulateCapturedMouse = true;
         await Wait(1.2f);
         await Shot("02_spawn");
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-build"))
+        {
+            // só a parte das construções (iteração rápida)
+            await BuildingsTour(p, gs);
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         var L0 = Main.World.Layouts[0];
         var cc = L0.OnGround(L0.Camp.A.X, L0.Camp.A.Y);
         LookAtPoint(p, L0.OnGround(cc.X + 2f, cc.Z + 6f, 0.1f), cc + new Vector3(-9.5f, 1.5f, 0f));
@@ -269,12 +277,93 @@ public partial class ScreenshotTour : Node
         await Shot("15g_rebellion");
         gc.EndRebellion(true);
 
+        await BuildingsTour(p, gs);
         await OreGallery(p);
 
         GD.Print($"[Tour] FPS (software, Xvfb): R1={fps1:0} R2={fps2:0} R3={fps3:0}");
         GD.Print($"[Tour] Qualidade {Settings.Quality} | R1: {dc1} | R2: {dc2} | R3: {dc3}");
         SaveSystem.Delete();
         GameState.Instance.QuitClean();
+    }
+
+    /// <summary>Construções: postes, funil com esteira até a Estação de Venda, drone e modo construção.</summary>
+    async Task BuildingsTour(Player.PlayerController p, GameState gs)
+    {
+        Main.CloseAllForTour();
+        gs.AddMoney(5_000_000);
+        gs.Data.DayTimeSeconds = 30;
+        var bm = Main.Buildings;
+        var L0 = Main.World.Layouts[0];
+        Vector3 Spot(string type, Vector3 near)
+        {
+            for (int r = 0; r < 16; r++)
+                for (int a = 0; a < 12; a++)
+                {
+                    float ang = a * Mathf.Tau / 12f;
+                    float x = near.X + Mathf.Cos(ang) * r * 1.5f, z = near.Z + Mathf.Sin(ang) * r * 1.5f;
+                    if (!L0.InGrid(x, z)) continue;
+                    var q = L0.OnGround(x, z);
+                    if (bm.CanPlace(type, q, out _)) return q;
+                }
+            return near;
+        }
+        var hp = Spot(Data.BuildIds.Hopper, PathAt(0, 0.12f));
+        var hop = bm.Place(Data.BuildIds.Hopper, hp, 0);
+        var belt = hop != null ? bm.BeltOf(hop.Id) : null;
+        // postes ao longo da esteira
+        if (belt != null)
+            for (float s = 6f; s < belt.Length - 6f; s += 14f)
+            {
+                belt.Sample(s, out var bp, out var dir);
+                var side = dir.Cross(Vector3.Up).Normalized() * 2.2f;
+                bm.Place(Data.BuildIds.Light, Spot(Data.BuildIds.Light, bp + side), 0);
+            }
+        bm.Place(Data.BuildIds.Drone, p.GlobalPosition, 0);
+        if (hop != null) { gs.AddItem("amethyst", 40); gs.AddItem("quartz", 60); gs.DepositInventoryInHopper(hop.Id); }
+        await Wait(4f);
+        LookAtPoint(p, hp + (Main.World.SellStation.GlobalPosition - hp).Normalized() * 5f + new Vector3(2.5f, 0.1f, 0), hp + Vector3.Up * 0.8f);
+        await Wait(0.8f);
+        await Shot("18a_hopper");
+        var st = Main.World.SellStation.GlobalPosition;
+        if (belt != null)
+        {
+            // fim da esteira chegando na Estação de Venda, visto de trás e do alto
+            belt.Sample(belt.Length - 7f, out var near, out var nd);
+            LookAtPoint(p, near - nd * 2f + nd.Cross(Vector3.Up).Normalized() * 2.5f + Vector3.Up * 0.1f, st + Vector3.Up * 0.8f);
+            await Wait(0.8f);
+            await Shot("18b_belt_station");
+            belt.Sample(belt.Length * 0.45f, out var mid, out var md);
+            LookAtPoint(p, mid - md * 4f + md.Cross(Vector3.Up).Normalized() * 1.6f + Vector3.Up * 0.1f, mid + md * 4f);
+            await Wait(0.8f);
+            await Shot("18c_belt_close");
+            p.SetLamp(false);
+            LookAtPoint(p, mid - md * 9f + md.Cross(Vector3.Up).Normalized() * 3f + Vector3.Up * 0.1f, mid + md * 10f + Vector3.Up * 1.5f);
+            await Wait(0.8f);
+            await Shot("18c_posts_lamp_off");
+            p.SetLamp(true);
+        }
+        // drone buscando fragmentos
+        gs.Data.Inventory.Clear();
+        var front = p.GlobalPosition - p.GlobalTransform.Basis.Z * 7f;
+        Mining.ShardManager.Instance?.SpawnShards(GameData.Mat("amethyst"), L0.OnGround(front.X, front.Z, 0.6f), 5);
+        await Wait(1.4f);
+        if (bm.Drone != null)
+        {
+            var dp = bm.Drone.GlobalPosition;
+            var camFrom = dp + (p.GlobalPosition - dp).Normalized() * 3f;
+            LookAtPoint(p, new Vector3(camFrom.X, L0.Ground(camFrom.X, camFrom.Z) + 0.1f, camFrom.Z), dp);
+        }
+        await Wait(0.15f);
+        await Shot("18d_drone");
+        // modo construção com prévia
+        LookAtPoint(p, Spot(Data.BuildIds.Light, PathAt(0, 0.3f)) + Vector3.Up * 0.1f, PathAt(0, 0.33f) + Vector3.Up * 0.0f);
+        bm.SetActive(true);
+        await Wait(0.6f);
+        await Shot("18e_build_mode");
+        bm.Select(1);
+        await Wait(0.8f);
+        await Shot("18f_build_hopper");
+        bm.SetActive(false);
     }
 
     static string DrawStats()

@@ -115,16 +115,109 @@ public partial class GameState : Node
         int accepted = Math.Min(amount, FreeSpace);
         if (accepted <= 0) return 0;
         Data.Inventory[materialId] = (Data.Inventory.TryGetValue(materialId, out int c) ? c : 0) + accepted;
-        if (!Data.Discovered.Contains(materialId))
-        {
-            Data.Discovered.Add(materialId);
-            MaterialDiscovered?.Invoke(def);
-            Notify(def.Rarity >= Rarity.Epico ? Loc.F("Material {0} descoberto!", RarityInfo.Name(def.Rarity)) : Loc.T("Novo material descoberto"),
-                Loc.F("{0} — {1} por fragmento", def.Name, FormatMoney(SellPrice(def))),
-                def.Rare || def.Special ? NotifyKind.Rare : NotifyKind.Info);
-        }
+        Discover(def);
         InventoryChanged?.Invoke();
         return accepted;
+    }
+
+    /// <summary>Registra um material na Coleção (primeira vez que é coletado).</summary>
+    void Discover(MaterialDef def)
+    {
+        if (Data.Discovered.Contains(def.Id)) return;
+        Data.Discovered.Add(def.Id);
+        MaterialDiscovered?.Invoke(def);
+        Notify(def.Rarity >= Rarity.Epico ? Loc.F("Material {0} descoberto!", RarityInfo.Name(def.Rarity)) : Loc.T("Novo material descoberto"),
+            Loc.F("{0} — {1} por fragmento", def.Name, FormatMoney(SellPrice(def))),
+            def.Rare || def.Special ? NotifyKind.Rare : NotifyKind.Info);
+    }
+
+    // ================= Construções =================
+    public event Action BuildingsChanged;
+    /// <summary>Venda feita pela esteira (valor, material).</summary>
+    public event Action<long, MaterialDef> BeltSold;
+
+    public int BuildingCount(string type) => Data.Buildings.Count(b => b.Type == type) + (type == BuildIds.Drone && Data.DroneOwned ? 1 : 0);
+    public bool BuildingLimitReached(string type) => BuildingCount(type) >= BuildData.Of(type).Max;
+    public BuildingSave Building(int id) => Data.Buildings.FirstOrDefault(b => b.Id == id);
+
+    /// <summary>Paga e registra uma construção. extraCost = esteira do funil. Devolve null se não puder.</summary>
+    public BuildingSave TryBuild(string type, Vector3 pos, float yaw, long extraCost = 0)
+    {
+        var def = BuildData.Of(type);
+        if (def == null || BuildingLimitReached(type)) return null;
+        long cost = def.Cost + Math.Max(0, extraCost);
+        if (!CanAfford(cost)) return null;
+        Data.Money -= cost;
+        MoneyChanged?.Invoke();
+        BuildingSave b = null;
+        if (type == BuildIds.Drone) Data.DroneOwned = true;
+        else
+        {
+            b = new BuildingSave { Id = Data.NextBuildingId++, Type = type, X = pos.X, Y = pos.Y, Z = pos.Z, Yaw = yaw, Paid = cost };
+            Data.Buildings.Add(b);
+        }
+        BuildingsChanged?.Invoke();
+        return b ?? new BuildingSave { Id = 0, Type = type, Paid = cost };
+    }
+
+    /// <summary>Desmonta: devolve metade do que foi pago; o que estava no funil é vendido na hora.</summary>
+    public long Demolish(int id)
+    {
+        var b = Building(id);
+        if (b == null) return 0;
+        foreach (var kv in b.Queue)
+            if (GameData.Mat(kv.Key) is { } m) SellFromBelt(m, kv.Value);
+        b.Queue.Clear();
+        Data.Buildings.Remove(b);
+        long refund = (long)(b.Paid * BuildData.RefundFraction);
+        if (refund > 0) { Data.Money += refund; MoneyChanged?.Invoke(); }
+        BuildingsChanged?.Invoke();
+        return refund;
+    }
+
+    /// <summary>Coloca fragmentos na fila do funil.</summary>
+    public void HopperAdd(int id, string materialId, int count = 1)
+    {
+        var b = Building(id);
+        if (b == null || count <= 0 || GameData.Mat(materialId) == null) return;
+        b.Queue[materialId] = (b.Queue.TryGetValue(materialId, out int c) ? c : 0) + count;
+    }
+
+    /// <summary>Esvazia a mochila no funil. Devolve quantos fragmentos entraram.</summary>
+    public int DepositInventoryInHopper(int id)
+    {
+        var b = Building(id);
+        if (b == null || InventoryCount == 0) return 0;
+        int n = InventoryCount;
+        foreach (var kv in Data.Inventory) HopperAdd(id, kv.Key, kv.Value);
+        Data.Inventory.Clear();
+        InventoryChanged?.Invoke();
+        return n;
+    }
+
+    /// <summary>Tira um fragmento da fila do funil (para a esteira). Null se vazio.</summary>
+    public string HopperTake(int id)
+    {
+        var b = Building(id);
+        if (b == null || b.Queue.Count == 0) return null;
+        var key = b.Queue.Keys.First();
+        if (--b.Queue[key] <= 0) b.Queue.Remove(key);
+        return key;
+    }
+
+    public int HopperQueued(int id) => Building(id)?.Queue.Values.Sum() ?? 0;
+
+    /// <summary>Fragmentos que chegaram à Estação de Venda pela esteira: vendidos na hora.</summary>
+    public long SellFromBelt(MaterialDef m, int count = 1)
+    {
+        if (m == null || count <= 0) return 0;
+        Discover(m);
+        long v = SellPrice(m) * count;
+        Data.ShardsSold += count;
+        Data.DayEarned += v;
+        AddMoney(v);
+        BeltSold?.Invoke(v, m);
+        return v;
     }
 
     public long SellPrice(MaterialDef def) =>
@@ -586,6 +679,8 @@ public partial class GameState : Node
         Data.UnlockedRegions.Add("caves");
         Data.GameCompleted = false;
         Data.HasPosition = false;
+        Data.Buildings.Clear(); // as construções ficam para trás (o drone é mantido)
+        BuildingsChanged?.Invoke();
         RaiseAll();
         Notify("Renascimento!", Loc.F("+{0} Essência Ancestral · bônus permanente x{1:0.0}", gained, EssenceMultiplier), NotifyKind.Unlock);
         BigMessage?.Invoke(Loc.F("RENASCIMENTO {0}", Data.PrestigeCount));

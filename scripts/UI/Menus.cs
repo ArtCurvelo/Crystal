@@ -537,7 +537,7 @@ public partial class HelpScreen : ModalScreen
                  {
                      ("W A S D", "Mover"), ("Mouse", "Olhar"), ("Botão esquerdo", "Minerar (segure)"),
                      ("E", "Interagir"), ("Shift", "Correr"), ("Espaço", "Pular"),
-                     ("C / Ctrl", "Agachar"), ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
+                     ("C / Ctrl", "Agachar"), ("B", "Construir"), ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
                  })
         {
             var row = new HBoxContainer();
@@ -552,6 +552,12 @@ public partial class HelpScreen : ModalScreen
         left.AddChild(UiTheme.Label("CONTROLE", 20, UiTheme.Gold, true));
         var pad = UiTheme.Label("Analógico esq.: mover · Analógico dir.: olhar\nRT: minerar · X: interagir · A: pular · B: agachar\nLB: correr · Start: pausa · B: voltar (menus)", 15, UiTheme.Text);
         left.AddChild(pad);
+        left.AddChild(UiTheme.Spacer(6));
+        left.AddChild(UiTheme.Label("CONSTRUÇÕES", 18, UiTheme.Gold, true));
+        var build = UiTheme.Label("Aperte B (D-pad ↓) para o modo construção: postes de luz, funil com esteira até a Estação de Venda (vende sozinha) e drone coletor. Q/R trocam, E desmonta.", 15, UiTheme.Text);
+        build.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        build.CustomMinimumSize = new Vector2(330, 0);
+        left.AddChild(build);
 
         var right = new VBoxContainer { CustomMinimumSize = new Vector2(440, 0) };
         right.AddThemeConstantOverride("separation", 8);

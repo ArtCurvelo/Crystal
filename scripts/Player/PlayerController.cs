@@ -39,6 +39,8 @@ public partial class PlayerController : CharacterBody3D
     public Camera3D Camera { get; private set; }
     public ToolView Tool { get; private set; }
     public bool InputEnabled { get; set; } = true;
+    /// <summary>Modo construção: o botão de minerar constrói e E desmonta (tratados pelo BuildingManager).</summary>
+    public bool BuildMode { get; set; }
     /// <summary>Permite testes automatizados sem captura real do mouse (modo headless).</summary>
     public bool SimulateCapturedMouse { get; set; }
     bool MouseCaptured => SimulateCapturedMouse || Input.MouseMode == Input.MouseModeEnum.Captured;
@@ -116,6 +118,7 @@ public partial class PlayerController : CharacterBody3D
     public SpotLight3D Lamp;
     OmniLight3D _lampFill;
     public bool LampOn = true;
+    public void SetLamp(bool on) { LampOn = on; ApplySettings(); }
 
     void ApplySettings()
     {
@@ -150,7 +153,7 @@ public partial class PlayerController : CharacterBody3D
             _head.Rotation = new Vector3(_pitch, 0, 0);
             Tool.AddSway(mm.Relative);
         }
-        else if (e.IsActionPressed("interact"))
+        else if (e.IsActionPressed("interact") && !BuildMode)
         {
             TargetInteractable?.Interact(this);
             GetViewport().SetInputAsHandled();
@@ -230,7 +233,7 @@ public partial class PlayerController : CharacterBody3D
         _sinceLastHit += dt;
         float window = Mathf.Max(Data.GameData.ResonanceWindow, _swingInterval * 2.5f);
         if (_sinceLastHit > window && _resonance > 0) _resonance = Mathf.Max(0, _resonance - dt * 3f);
-        bool wantMine = active && Input.IsActionPressed("mine") && TargetInteractable == null;
+        bool wantMine = active && Input.IsActionPressed("mine") && TargetInteractable == null && !BuildMode;
         if (_workNotice > 0) _workNotice -= dt;
         if (wantMine && !gs.CanWork)
         {

@@ -410,6 +410,22 @@ public partial class Hud : CanvasLayer
         UiTheme.Place(_keys, Control.LayoutPreset.CenterBottom, new Vector2(-300, -30), new Vector2(600, 0));
         _root.AddChild(_keys);
 
+        // barra do modo construção
+        _buildPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        UiTheme.Place(_buildPanel, Control.LayoutPreset.CenterBottom, new Vector2(-320, -190), new Vector2(640, 0));
+        _root.AddChild(_buildPanel);
+        var bv = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        bv.AddThemeConstantOverride("separation", 2);
+        _buildPanel.AddChild(bv);
+        _buildHead = UiTheme.Label("MODO CONSTRUÇÃO", 13, UiTheme.Muted, true);
+        bv.AddChild(_buildHead);
+        _buildTitle = UiTheme.Label("", 20, UiTheme.Text, true);
+        bv.AddChild(_buildTitle);
+        _buildDetail = UiTheme.Label("", 14, UiTheme.Text);
+        _buildDetail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _buildDetail.CustomMinimumSize = new Vector2(610, 0);
+        bv.AddChild(_buildDetail);
+
         _saveIcon = UiTheme.Shadowed(UiTheme.Label("◆ Salvando…", 14, UiTheme.Cyan));
         _saveIcon.Modulate = new Color(1, 1, 1, 0);
         UiTheme.Place(_saveIcon, Control.LayoutPreset.BottomLeft, new Vector2(24, -112));
@@ -708,6 +724,26 @@ public partial class Hud : CanvasLayer
     }
 
     public void SetGameplayVisible(bool v) => Visible = v;
+
+    PanelContainer _buildPanel;
+    Label _buildHead, _buildTitle, _buildDetail;
+    bool _buildOk = true, _buildStyled;
+
+    /// <summary>Mostra/esconde a barra do modo construção (title null = esconder).</summary>
+    public void SetBuildBar(string title, string detail, bool ok)
+    {
+        if (_buildPanel == null) return;
+        bool show = title != null;
+        if (_buildPanel.Visible != show) { _buildPanel.Visible = show; _keys.Visible = !show; if (show) UiTheme.PopIn(_buildPanel); }
+        if (!show) return;
+        if (_buildTitle.Text != title) _buildTitle.Text = title;
+        if (_buildDetail.Text != detail) _buildDetail.Text = detail;
+        if (ok != _buildOk || !_buildStyled)
+        {
+            _buildOk = ok; _buildStyled = true;
+            _buildPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.1f, 0.88f), ok ? new Color(0.3f, 1f, 0.75f) : new Color(1f, 0.4f, 0.3f), 10, 2, 14, 8));
+        }
+    }
 
     void UpdateEventPanel()
     {

@@ -68,6 +68,26 @@ public partial class AudioManager : Node
         p.Play();
     }
 
+    readonly List<AudioStreamPlayer3D> _pool3d = new();
+
+    /// <summary>Som posicional (some com a distância).</summary>
+    public void Play3D(string id, Vector3 pos, float volumeDb = 0f, float pitch = 1f)
+    {
+        if (!_sounds.TryGetValue(id, out var s)) return;
+        AudioStreamPlayer3D p = null;
+        foreach (var q in _pool3d) if (!q.Playing) { p = q; break; }
+        if (p == null)
+        {
+            if (_pool3d.Count < 12) { p = new AudioStreamPlayer3D { Bus = "SFX", UnitSize = 5f, MaxDistance = 35f }; AddChild(p); _pool3d.Add(p); }
+            else { p = _pool3d[0]; _pool3d.RemoveAt(0); _pool3d.Add(p); }
+        }
+        p.Stream = s;
+        p.VolumeDb = volumeDb;
+        p.PitchScale = Math.Max(0.1f, pitch + (float)(_rng.NextDouble() * 0.1 - 0.05));
+        p.GlobalPosition = pos;
+        p.Play();
+    }
+
     AudioStreamPlayer GetFreePlayer()
     {
         foreach (var p in _pool) if (!p.Playing) return p;

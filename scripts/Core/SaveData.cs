@@ -47,6 +47,11 @@ public sealed class SaveData
     public int GoblinChargedDay { get; set; }
     public int GoblinFledDay { get; set; }
     public Dictionary<string, int> GoblinStash { get; set; } = new();
+    /// <summary>Construções colocadas nas cavernas (postes, funis com esteira).</summary>
+    public List<BuildingSave> Buildings { get; set; } = new();
+    public int NextBuildingId { get; set; } = 1;
+    /// <summary>Drone coletor comprado (é mantido no Renascimento).</summary>
+    public bool DroneOwned { get; set; }
     public float PlayerX { get; set; }
     public float PlayerY { get; set; } = 1f;
     public float PlayerZ { get; set; } = 14f;
@@ -123,6 +128,25 @@ public sealed class SaveData
         }
         Discovered = Discovered.Where(d => d != null && GameData.Mat(d) != null).Distinct().ToList();
 
+        Buildings ??= new();
+        Buildings = Buildings.Where(b => b != null && BuildData.Of(b.Type) != null && b.Type != BuildIds.Drone
+                                         && !float.IsNaN(b.X) && !float.IsNaN(b.Y) && !float.IsNaN(b.Z)
+                                         && System.MathF.Abs(b.X) < 10000 && System.MathF.Abs(b.Z) < 10000).ToList();
+        foreach (var b in Buildings)
+        {
+            b.Queue ??= new();
+            if (b.InFlight != null)
+                foreach (var kv in b.InFlight)
+                    if (kv.Value > 0) b.Queue[kv.Key] = (b.Queue.TryGetValue(kv.Key, out int q) ? q : 0) + kv.Value;
+            b.InFlight = new();
+            foreach (var key in b.Queue.Keys.ToList())
+                if (GameData.Mat(key) == null || b.Queue[key] <= 0) b.Queue.Remove(key);
+            if (b.Id <= 0) b.Id = NextBuildingId++;
+        }
+        Buildings = Buildings.GroupBy(b => b.Id).Select(g => g.First()).ToList();
+        if (NextBuildingId <= Buildings.DefaultIfEmpty().Max(b => b?.Id ?? 0)) NextBuildingId = Buildings.Max(b => b.Id) + 1;
+        if (NextBuildingId < 1) NextBuildingId = 1;
+
         bool bad(float f) => float.IsNaN(f) || float.IsInfinity(f) || System.MathF.Abs(f) > 10000f;
         if (bad(PlayerX) || bad(PlayerY) || bad(PlayerZ) || bad(PlayerYaw)) HasPosition = false;
         Version = CurrentVersion;
@@ -152,3 +176,20 @@ public sealed class GoblinSave
     }
 }
 
+
+/// <summary>Uma construção salva.</summary>
+public sealed class BuildingSave
+{
+    public int Id { get; set; }
+    public string Type { get; set; }
+    public float X { get; set; }
+    public float Y { get; set; }
+    public float Z { get; set; }
+    public float Yaw { get; set; }
+    /// <summary>Quanto foi pago (esteira incluída): base da devolução ao desmontar.</summary>
+    public long Paid { get; set; }
+    /// <summary>Funil: fragmentos esperando para entrar na esteira.</summary>
+    public Dictionary<string, int> Queue { get; set; } = new();
+    /// <summary>Fragmentos que estavam andando na esteira na hora do save (voltam para a fila ao carregar).</summary>
+    public Dictionary<string, int> InFlight { get; set; } = new();
+}
