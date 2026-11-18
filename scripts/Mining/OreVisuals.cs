@@ -91,7 +91,7 @@ public static class OreVisuals
     static void BuildCrystal(Node3D parent, MaterialDef m, Random rng, float s, Result r, bool ice)
     {
         bool special = m.Special;
-        if (special) s = 2.6f;
+        if (special) s = m.SpecialScale;
         Add(parent, RockBase(rng, s), MeshFactory.RockMaterial(RockDark));
         Material crystalMat = ice
             ? OreMat(m, rng, r, 6, m.Color, Colors.White, 4f)

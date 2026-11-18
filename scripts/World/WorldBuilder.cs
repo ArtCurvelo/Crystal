@@ -180,6 +180,13 @@ public partial class WorldBuilder : Node3D
             }
         }
 
+        // câmara colossal: o centro fica livre para a formação gigante
+        if (L.Giant != null)
+            for (int k = 0; k < 8; k++)
+            {
+                float a = Mathf.Tau * k / 8;
+                reserved.Add(L.OnGround(L.Giant.A.X + Mathf.Cos(a) * 4f, L.Giant.A.Y + Mathf.Sin(a) * 4f));
+            }
         // poços: corda fixa (sempre dá para voltar) e espaço livre em volta dela
         foreach (var pit in L.Pits)
         {
@@ -411,13 +418,30 @@ public partial class WorldBuilder : Node3D
             placed.Add(hp);
             BuildHeartPedestal(root, hp, r);
         }
+        if (L.Giant != null && GameData.Mat(r.GiantMaterialId) is { } gm)
+        {
+            // formação gigante no centro da câmara colossal
+            var gp = L.OnGround(L.Giant.A.X, L.Giant.A.Y);
+            var giant = MakeCrystal(root, gm, gp, rng, 1f, null);
+            giant.PickMaterial = _ => gm;
+            float standDist = gm.SpecialScale * 0.42f + 2.4f;
+            giant.StandPoint = gp + new Vector3(0, 0.1f, standDist);
+            for (int k = 0; k < 8 && !L.Reachable(giant.StandPoint.X, giant.StandPoint.Z); k++)
+            {
+                float a = Mathf.Tau * k / 8;
+                giant.StandPoint = L.OnGround(gp.X + Mathf.Sin(a) * standDist, gp.Z + Mathf.Cos(a) * standDist, 0.1f);
+            }
+            placed.Add(gp);
+            BuildHeartPedestal(root, gp, r);
+        }
         bool NearPlaced(Vector3 p, float min)
         {
             foreach (var q in placed) if (q.DistanceTo(p) < min) return true;
             return false;
         }
         float minHeart = 9f;
-        bool NearHeart(Vector3 p) => L.Heart != null && new Vector2(p.X - L.Heart.A.X, p.Z - L.Heart.A.Y).Length() < minHeart;
+        bool NearHeart(Vector3 p) => (L.Heart != null && new Vector2(p.X - L.Heart.A.X, p.Z - L.Heart.A.Y).Length() < minHeart)
+                                     || (L.Giant != null && new Vector2(p.X - L.Giant.A.X, p.Z - L.Giant.A.Y).Length() < minHeart);
         bool InCamp(Vector3 p) => L.Camp != null && new Vector2(p.X - L.Camp.A.X, p.Z - L.Camp.A.Y).Length() < 9.5f;
 
         int wallSlots = (int)(r.CrystalSlots * 0.32f);
@@ -572,7 +596,7 @@ public partial class WorldBuilder : Node3D
         var rune = MeshFactory.Emissive(r.AccentColor, r.AccentColor, 2.5f);
         for (int i = 0; i < 8; i++)
         {
-            float a = Mathf.Tau * i / 8;
+            float a = Mathf.Tau * (i + 0.5f) / 8; // meio passo: nenhuma ponta fica no caminho de quem vem minerar
             var p = pos + new Vector3(Mathf.Cos(a) * 5.5f, 0, Mathf.Sin(a) * 5.5f);
             var spike = AddMeshOnly(root, MeshFactory.Spike(4, 0.35f, 3.2f + (i % 2) * 1.2f), MeshFactory.RockMaterial(r.RockColor), p);
             spike.Rotation = new Vector3(0, a, 0);
@@ -603,6 +627,8 @@ public partial class WorldBuilder : Node3D
         var far = p + L.Inward(p.X, p.Z) * (r * 1.6f + 2.4f);
         if (L.WallDist(far.X, far.Z) > -1.4f) return false;
         foreach (var q in _solidReserved) if (new Vector2(q.X - p.X, q.Z - p.Z).Length() < r + 3.5f) return false;
+        // câmaras secretas ficam livres (tesouro e esconderijo do goblin)
+        foreach (var sc in _solidLayout.Secrets) if (new Vector2(sc.A.X - p.X, sc.A.Y - p.Z).Length() < sc.RA + r) return false;
         // entre dois obstáculos sempre sobra passagem (nada de "muros" fechando corredores)
         int ci = Mathf.FloorToInt(p.X / 8f), cj = Mathf.FloorToInt(p.Z / 8f);
         for (int i = ci - 1; i <= ci + 1; i++)

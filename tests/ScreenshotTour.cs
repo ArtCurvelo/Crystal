@@ -49,6 +49,26 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-giants"))
+        {
+            foreach (var r in GameData.Regions) if (!gs.IsUnlocked(r.Id)) gs.Data.UnlockedRegions.Add(r.Id);
+            gs.Data.DayTimeSeconds = 30;
+            foreach (var r in GameData.Regions.Where(r => r.GiantMaterialId != null))
+            {
+                var giantC = Main.World.Crystals.First(x => x.Material.Id == r.GiantMaterialId);
+                var L = Main.World.Layouts[r.Index];
+                var dir = (giantC.StandPoint - giantC.GlobalPosition); dir.Y = 0; dir = dir.Normalized();
+                var from = giantC.GlobalPosition + dir * 9f;
+                from = L.InGrid(from.X, from.Z) ? L.OnGround(from.X, from.Z, 0.1f) : giantC.StandPoint;
+                LookAtPoint(p, from, giantC.Center + Vector3.Up * 1.5f);
+                await Wait(1.2f);
+                await Shot($"27_giant_{r.Id}");
+            }
+            await OreGallery(p);
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-house"))
         {
             gs.AddMoney(1_000_000_000);
@@ -127,12 +147,14 @@ public partial class ScreenshotTour : Node
             await Wait(0.6f);
             await Shot("24_rope_top");
             rope.Interact(p);
+            Input.ActionPress("move_back");
             await Wait(1.1f);
             p.SetLook(p.Yaw, -0.2f);
             await Wait(0.3f);
             GD.Print($"[Tour] descendo: climbing={p.Climbing} pos={p.GlobalPosition}");
             await Shot("24_climbing_down");
             for (int i = 0; i < 400 && p.Climbing; i++) await Wait(0.05f);
+            Input.ActionRelease("move_back");
             await Wait(0.5f);
             p.SetLook(p.Yaw + Mathf.Pi, 0.9f);
             await Wait(0.6f);
@@ -141,12 +163,17 @@ public partial class ScreenshotTour : Node
             await Wait(0.4f);
             await Shot("24_pit_bottom");
             rope.Interact(p);
+            Input.ActionPress("move_forward");
             await Wait(1.6f);
             p.SetLook(p.Yaw, 0.6f);
             await Wait(0.3f);
             GD.Print($"[Tour] subindo: climbing={p.Climbing} pos={p.GlobalPosition}");
             await Shot("24_climbing_up");
+            p.SetLook(p.Yaw, -0.1f);
+            await Wait(0.2f);
+            await Shot("24_climbing_up_level");
             for (int i = 0; i < 400 && p.Climbing; i++) await Wait(0.05f);
+            Input.ActionRelease("move_forward");
             await Wait(0.5f);
             // vista ampla de uma câmara grande (mapa maior)
             var big = L.Chambers.Where(c => c.Wing == null && c != L.Camp).OrderByDescending(c => c.RA).First();

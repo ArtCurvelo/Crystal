@@ -223,12 +223,73 @@ public static class InputHints
     public static bool UsingPad { get; private set; }
     public static event System.Action Changed;
 
+    // posição de repouso de cada eixo (muitos controles deixam os gatilhos em -1 quando soltos)
+    static readonly System.Collections.Generic.Dictionary<(int, JoyAxis), float> _rest = new();
+    static float _mouseAccum;
+    static ulong _mouseAt;
+
     public static void Observe(InputEvent e)
     {
-        bool pad = e is InputEventJoypadButton || (e is InputEventJoypadMotion m && Mathf.Abs(m.AxisValue) > 0.4f);
-        bool kbm = e is InputEventKey || e is InputEventMouseButton || (e is InputEventMouseMotion mm && mm.Relative.LengthSquared() > 4f);
-        if (pad && !UsingPad) { UsingPad = true; Changed?.Invoke(); }
-        else if (kbm && UsingPad) { UsingPad = false; Changed?.Invoke(); }
+        bool pad = false, kbm = false;
+        switch (e)
+        {
+            case InputEventJoypadButton jb:
+                pad = jb.Pressed;
+                break;
+            case InputEventJoypadMotion jm:
+            {
+                // só conta movimento de verdade, comparado à posição de repouso do eixo
+                var key = (jm.Device, jm.Axis);
+                if (!_rest.TryGetValue(key, out float rest))
+                {
+                    rest = Mathf.Abs(jm.AxisValue) > 0.9f ? jm.AxisValue : 0f;
+                    _rest[key] = rest;
+                }
+                pad = Mathf.Abs(jm.AxisValue - rest) > 0.5f;
+                break;
+            }
+            case InputEventKey k:
+                kbm = k.Pressed;
+                break;
+            case InputEventMouseButton mb:
+                kbm = mb.Pressed;
+                break;
+            case InputEventMouseMotion mm:
+            {
+                // um esbarrão no mouse (ou o mouse emulado pela Steam) não troca para teclado:
+                // precisa de um movimento contínuo de alguns pixels
+                ulong now = Time.GetTicksMsec();
+                if (now - _mouseAt > 250) _mouseAccum = 0;
+                _mouseAt = now;
+                _mouseAccum += mm.Relative.Length();
+                kbm = _mouseAccum > 24f;
+                break;
+            }
+        }
+        if (pad && !UsingPad) Set(true);
+        else if (kbm && UsingPad) Set(false);
+    }
+
+    static void Set(bool pad)
+    {
+        UsingPad = pad;
+        _mouseAccum = 0;
+        Changed?.Invoke();
+    }
+
+    public static void StartWithPad() { if (!UsingPad) Set(true); }
+
+    /// <summary>Controle conectado/desconectado: troca as dicas na hora e avisa.</summary>
+    public static event System.Action<bool, string> PadConnection;
+
+    public static void OnJoyConnection(long device, bool connected)
+    {
+        foreach (var k in new System.Collections.Generic.List<(int, JoyAxis)>(_rest.Keys))
+            if (k.Item1 == (int)device) _rest.Remove(k);
+        string name = connected ? Input.GetJoyName((int)device) : "";
+        if (connected) Set(true);
+        else if (Input.GetConnectedJoypads().Count == 0 && UsingPad) Set(false);
+        PadConnection?.Invoke(connected, name);
     }
 
     /// <summary>Primeira tecla/botão da ação no dispositivo em uso (para dicas na tela).</summary>

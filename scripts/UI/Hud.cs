@@ -719,7 +719,11 @@ public partial class Hud : CanvasLayer
             _targetYield.Text = (lo == hi ? $"×{lo}" : $"×{lo}–{hi}") + Loc.F("   ·   {0}/frag", GameState.FormatMoney(gs.SellPrice(m)));
         }
         // prompt
-        string prompt = Player.TargetInteractable?.GetPrompt();
+        string prompt = Player.Climbing
+            ? (InputHints.UsingPad
+                ? Loc.F("[Analógico ↑/↓] Subir/descer   [{0}] Soltar a corda", InputHints.Key("jump"))
+                : Loc.F("[{0}/{1}] Subir/descer   [{2}] Soltar a corda", InputHints.Key("move_forward"), InputHints.Key("move_back"), InputHints.Key("jump")))
+            : Player.TargetInteractable?.GetPrompt();
         _promptPanel.Visible = !string.IsNullOrEmpty(prompt);
         if (_promptPanel.Visible)
         {

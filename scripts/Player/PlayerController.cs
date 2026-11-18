@@ -120,7 +120,7 @@ public partial class PlayerController : CharacterBody3D
     float _climbS, _climbPhase, _climbSound, _mantle = -1f;
     Vector3 _mantleFrom;
     bool _climbUp;
-    Node3D _hands, _handL, _handR, _handRope;
+    Node3D _hands, _handL, _handR;
     public bool Climbing => _climb != null;
     public event Action<bool> ClimbFinished; // (subiu)
 
@@ -129,13 +129,16 @@ public partial class PlayerController : CharacterBody3D
         if (r == null || _climb != null) return;
         _climb = r;
         _climbUp = up;
-        _climbS = up ? 0f : r.Length;
+        _climbS = up ? 0.6f : r.Length;
         _climbPhase = 0;
         _mantle = -1f;
         Velocity = Vector3.Zero;
         _wantCrouch = false;
         SetCrouchedInternal(false);
         Tool.Visible = false;
+        // de frente para a corda
+        var face = -Away(r);
+        if (face.LengthSquared() > 0.01f) SetLook(Mathf.Atan2(-face.X, -face.Z), up ? 0.15f : -0.25f);
         EnsureHands();
         _hands.Visible = true;
         // colado na parede a lanterna estouraria a imagem: fica mais fraca durante a escalada
@@ -171,6 +174,7 @@ public partial class PlayerController : CharacterBody3D
     {
         var r = _climb;
         if (!IsInstanceValid(r)) { _climb = null; Tool.Visible = true; if (_hands != null) _hands.Visible = false; return; }
+        var along = (r.Top - r.Bottom).Normalized();
         // subindo na borda: puxa o corpo para cima e para frente (sem teleporte)
         if (_mantle >= 0f)
         {
@@ -179,39 +183,57 @@ public partial class PlayerController : CharacterBody3D
             var target = r.TopExit + Vector3.Up * 0.1f;
             var arc = Vector3.Up * Mathf.Sin(m * Mathf.Pi) * 0.35f;
             GlobalPosition = _mantleFrom.Lerp(target, m) + arc;
-            _hands.Position = new Vector3(0, -m * 0.4f, 0);
-            if (_mantle >= 1f) { _hands.Position = Vector3.Zero; StopClimb(true); }
+            PlaceHands(r, along, r.Length - m * 0.5f, 0f);
+            if (_mantle >= 1f) StopClimb(true);
             return;
         }
         if (active && Input.IsActionJustPressed("jump")) { StopClimb(false); return; }
-        float speed = 2.3f;
-        _climbS = Mathf.Clamp(_climbS + (_climbUp ? speed : -speed) * dt, 0f, r.Length);
-        var along = (r.Top - r.Bottom).Normalized();
+        // o jogador controla: frente/analógico para cima sobe, trás desce, sem apertar fica pendurado
+        float axis = active ? Input.GetAxis("move_back", "move_forward") : 0f;
+        float speed = 2.3f * axis;
+        _climbS = Mathf.Clamp(_climbS + speed * dt, 0f, r.Length);
         var hands = r.Bottom + along * _climbS;
         // corpo pendurado: mãos na corda na altura do peito, um pouco afastado da parede
         GlobalPosition = hands - Vector3.Up * 1.25f + Away(r) * 0.65f;
         Velocity = Vector3.Zero;
-        // animação: mãos alternam a cada nó (0,6 m); a cabeça balança junto
-        _climbPhase += speed * dt / 0.6f;
+        // animação: mãos alternam a cada nó (0,6 m); parado, só respira
+        _climbPhase += Mathf.Abs(speed) * dt / 0.6f;
+        float ph = _climbPhase * Mathf.Pi;
+        PlaceHands(r, along, _climbS, axis);
+        _head.Position = new Vector3(Mathf.Sin(ph) * 0.03f * Mathf.Abs(axis), _eye + Mathf.Abs(Mathf.Cos(ph)) * 0.04f * Mathf.Abs(axis), 0);
+        if (Mathf.Abs(axis) > 0.1f)
+        {
+            _climbSound -= dt;
+            if (_climbSound <= 0) { _climbSound = 0.6f / Mathf.Abs(speed); AudioManager.Instance?.Play("step", -12f, 0.55f, 0.08f); }
+        }
+        if (axis > 0.1f && _climbS >= r.Length - 0.01f) { _climbUp = true; _mantle = 0f; _mantleFrom = GlobalPosition; AudioManager.Instance?.Play("step", -8f, 0.8f); }
+        else if (axis < -0.1f && _climbS <= 0.01f) { _climbUp = false; StopClimb(true); }
+    }
+
+    /// <summary>
+    /// Mãos presas na corda de verdade (no mundo, na altura do peito), não na câmera:
+    /// olhando para cima, você vê a corda subindo e as mãos ficam lá embaixo.
+    /// </summary>
+    void PlaceHands(World.Rope r, Vector3 along, float s, float axis)
+    {
+        var grip = r.Bottom + along * s;
+        var toPlayer = Away(r);
+        var x = along.Cross(toPlayer).Normalized();
+        var z = x.Cross(along).Normalized();
+        _hands.GlobalTransform = new Transform3D(new Basis(x, along, z), grip);
         float ph = _climbPhase * Mathf.Pi;
         float l = Mathf.Sin(ph), rr = Mathf.Sin(ph + Mathf.Pi);
-        float dirSign = _climbUp ? 1f : -1f;
-        _handL.Position = new Vector3(-0.012f, -0.1f + l * 0.11f * dirSign, -0.47f);
-        _handR.Position = new Vector3(0.012f, -0.1f + rr * 0.11f * dirSign, -0.475f);
+        _handL.Position = new Vector3(-0.03f, -0.05f + l * 0.14f, 0.04f);
+        _handR.Position = new Vector3(0.03f, -0.05f + rr * 0.14f, 0.04f);
         _handL.Rotation = new Vector3(0, 0, Mathf.Max(0, l) * 0.12f);
         _handR.Rotation = new Vector3(0, 0, -Mathf.Max(0, rr) * 0.12f);
-        _head.Position = new Vector3(Mathf.Sin(ph) * 0.03f, _eye + Mathf.Abs(Mathf.Cos(ph)) * 0.04f, 0);
-        _climbSound -= dt;
-        if (_climbSound <= 0) { _climbSound = 0.6f / speed; AudioManager.Instance?.Play("step", -12f, 0.55f, 0.08f); }
-        if (_climbUp && _climbS >= r.Length - 0.01f) { _mantle = 0f; _mantleFrom = GlobalPosition; AudioManager.Instance?.Play("step", -8f, 0.8f); }
-        else if (!_climbUp && _climbS <= 0.01f) StopClimb(true);
     }
 
     void EnsureHands()
     {
         if (_hands != null) return;
-        _hands = new Node3D { Name = "ClimbHands", Visible = false };
-        Camera.AddChild(_hands);
+        _hands = new Node3D { Name = "ClimbHands", Visible = false, TopLevel = true };
+        AddChild(_hands);
         var glove = new StandardMaterial3D { AlbedoColor = new Color(0.12f, 0.11f, 0.12f), Roughness = 0.85f };
         var sleeve = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.28f, 0.1f), Roughness = 0.9f };
         var neon = World.MeshFactory.Emissive(new Color(0.2f, 0.6f, 0.55f), new Color(0.3f, 1f, 0.9f), 0.35f);
@@ -222,15 +244,13 @@ public partial class PlayerController : CharacterBody3D
             _hands.AddChild(h);
             h.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.075f, 0.07f, 0.065f) }, MaterialOverride = glove, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
             h.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.078f, 0.012f, 0.02f) }, MaterialOverride = neon, Position = new Vector3(0, 0.02f, 0.03f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-            var arm = new Node3D { Position = new Vector3(side * 0.02f, -0.03f, 0.02f), Rotation = new Vector3(0.75f, 0, side * 0.55f) };
+            var arm = new Node3D { Position = new Vector3(side * 0.02f, -0.03f, 0.03f), Rotation = new Vector3(-1.1f, 0, side * 0.5f) };
             h.AddChild(arm);
             arm.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.032f, BottomRadius = 0.042f, Height = 0.42f, RadialSegments = 8 }, MaterialOverride = sleeve, Position = new Vector3(0, -0.21f, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
             return h;
         }
         _handL = Hand(-1); _handR = Hand(1);
-        // trecho da corda à frente (acompanha a câmera; longo para aparecer olhando para cima ou para baixo)
-        _handRope = new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.018f, BottomRadius = 0.018f, Height = 4f, RadialSegments = 6 }, MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.42f, 0.26f), Roughness = 0.95f }, Position = new Vector3(0, 0, -0.5f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        _hands.AddChild(_handRope);
+
     }
 
     public SpotLight3D Lamp;

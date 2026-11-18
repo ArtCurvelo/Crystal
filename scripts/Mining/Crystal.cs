@@ -46,7 +46,7 @@ public partial class Crystal : StaticBody3D
     /// <summary>Onde o jogador fica para minerar este depósito (usado por testes e pelo bot).</summary>
     public Vector3 StandPoint;
     /// <summary>Centro visual do depósito (respeita depósitos inclinados nas paredes).</summary>
-    public Vector3 Center => GlobalPosition + GlobalTransform.Basis.Y.Normalized() * Mathf.Min(0.7f * (Material.Special ? 2.6f : SizeScale), _colliderHeight * 0.55f);
+    public Vector3 Center => GlobalPosition + GlobalTransform.Basis.Y.Normalized() * Mathf.Min(0.7f * (Material.Special ? Material.SpecialScale : SizeScale), _colliderHeight * 0.55f);
     float _colliderHeight = 1f;
     public const float ViewDistance = 55f;
 
@@ -81,7 +81,7 @@ public partial class Crystal : StaticBody3D
         _light = null;
         var mat = Material;
         bool special = mat.Special;
-        float s = special ? 2.6f : SizeScale;
+        float s = special ? mat.SpecialScale : SizeScale;
         // brilho forte (o bloom faz os minérios "acenderem" nas cavernas escuras)
         _baseEnergy = mat.Rare ? 1.5f : special ? 0.35f : 0.95f;
 

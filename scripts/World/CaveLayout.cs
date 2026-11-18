@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using CrystalExcavator.Data;
@@ -67,7 +68,7 @@ public sealed class CaveLayout
     /// <summary>Cordas fixas ligando áreas que ficariam isoladas (degraus altos demais).</summary>
     public readonly List<(Vector3 top, Vector3 bottom, Vector3 exit)> FixedRopes = new();
     public readonly List<Vector3> PathPoints = new();   // pontos do caminho principal (entrada → saída)
-    public CaveFeature Camp, Heart, Lake;
+    public CaveFeature Camp, Heart, Lake, Giant;
     public Vector3 Entrance, Exit;
     public const float CrawlHeight = 1.45f;
 
@@ -159,6 +160,13 @@ public sealed class CaveLayout
         if (r.Id == "abyss")
             Lake = TryChamber("lake", "Lago Abissal", 24f, 28f, -4f, baseH + 6f, null);
 
+        // câmara colossal com a formação gigante da região
+        if (r.GiantMaterialId != null)
+        {
+            Giant = TryChamber("giant", "Câmara Colossal", 17f, 21f, PickLevel(), baseH + 12f, null);
+            if (Giant != null) Giant.Flat = true;
+        }
+
         // câmaras com minério em destaque (as "galerias" antigas) e câmaras comuns
         foreach (var w in r.Wings) TryChamber(w.Id, w.Name, 14f, 19f, PickLevel(), baseH + 2f, w);
         float area = r.HalfX * r.HalfZ / (95f * 90f);
@@ -185,7 +193,7 @@ public sealed class CaveLayout
         for (int k = 0, tries = 0; k < pits && tries < 300; tries++)
         {
             var host = Chambers[_rng.Next(Chambers.Count)];
-            if (host == Camp || host == Heart || host == Lake || host.Radius < 11f) continue;
+            if (host == Camp || host == Heart || host == Lake || host == Giant || host.Radius < 11f) continue;
             float pr = R(3.6f, 5f), depth = R(7f, 13f);
             float ang = R(0, Mathf.Tau);
             var c = host.A + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * R(0f, host.RA - pr - 4f);
@@ -290,7 +298,7 @@ public sealed class CaveLayout
         {
             // célula isolada mais "importante": centro de câmara não alcançável, senão qualquer célula grande isolada
             int seed = -1;
-            foreach (var c in Chambers)
+            foreach (var c in Chambers.Concat(Secrets))
             {
                 int id = NearestOpen(c.A.X, c.A.Y);
                 if (id >= 0 && !Reach[id] && OpenCell(id)) { seed = id; break; }

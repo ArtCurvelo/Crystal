@@ -51,6 +51,7 @@ public partial class TestRunner : Node
             Run("Casa e árvore de habilidades", TestHomeAndSkills);
             Run("Áudio sem saturação", TestAudio);
             Run("Idiomas, remapeamento e acessibilidade", TestLocAndBindings);
+            Run("Detecção de controle (teclado ↔ controle)", TestPadDetection);
             Run("Regiões de fim de jogo: balanceamento", TestEndgameRegions);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
@@ -59,6 +60,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
             await RunAsync("Menus só com o controle", TestGamepadMenus);
+            await RunAsync("Loja: comprar não rola a tela", TestShopScroll);
             await RunAsync("Integração: cavernas, relevo e túneis secretos", TestWings);
             await RunAsync("Integração: coleta direta", TestDirectCollect);
             await RunAsync("Integração: goblin minerador e rebelião", TestGoblins);
@@ -700,6 +702,44 @@ public partial class TestRunner : Node
         Fresh();
     }
 
+    void TestPadDetection()
+    {
+        // começa no teclado
+        InputHints.Observe(new InputEventKey { PhysicalKeycode = Key.W, Pressed = true });
+        Check(!InputHints.UsingPad, "tecla: modo teclado");
+        // gatilho solto que fica em -1 (comum no Windows) não pode trocar para controle
+        for (int i = 0; i < 20; i++) InputHints.Observe(new InputEventJoypadMotion { Device = 3, Axis = JoyAxis.TriggerLeft, AxisValue = -1f });
+        Check(!InputHints.UsingPad, "gatilho parado em -1 não troca as dicas");
+        // apertar o gatilho de verdade troca
+        InputHints.Observe(new InputEventJoypadMotion { Device = 3, Axis = JoyAxis.TriggerLeft, AxisValue = 0.8f });
+        Check(InputHints.UsingPad, "apertar o gatilho troca para controle");
+        // um esbarrão no mouse não volta para teclado
+        InputHints.Observe(new InputEventMouseMotion { Relative = new Vector2(3, 2) });
+        InputHints.Observe(new InputEventMouseMotion { Relative = new Vector2(2, 1) });
+        Check(InputHints.UsingPad, "esbarrão no mouse não troca para teclado");
+        // movimento contínuo do mouse troca
+        for (int i = 0; i < 6; i++) InputHints.Observe(new InputEventMouseMotion { Relative = new Vector2(6, 3) });
+        Check(!InputHints.UsingPad, "mexer o mouse de verdade volta para teclado");
+        // analógico com leve folga (drift) não troca; empurrado troca
+        InputHints.Observe(new InputEventJoypadMotion { Device = 3, Axis = JoyAxis.LeftX, AxisValue = 0.18f });
+        Check(!InputHints.UsingPad, "folga do analógico não troca");
+        InputHints.Observe(new InputEventJoypadMotion { Device = 3, Axis = JoyAxis.LeftX, AxisValue = 0.9f });
+        Check(InputHints.UsingPad, "analógico empurrado troca para controle");
+        // soltar um botão não conta (só apertar)
+        InputHints.Observe(new InputEventKey { PhysicalKeycode = Key.W, Pressed = true });
+        InputHints.Observe(new InputEventJoypadButton { ButtonIndex = JoyButton.A, Pressed = false });
+        Check(!InputHints.UsingPad, "soltar botão do controle não troca");
+        // conectar o controle troca na hora; desconectar (sem outros) volta para teclado
+        bool? ev = null;
+        void H(bool c, string n) => ev = c;
+        InputHints.PadConnection += H;
+        InputHints.OnJoyConnection(5, true);
+        Check(InputHints.UsingPad && ev == true, "conectar controle: dicas de controle na hora");
+        InputHints.OnJoyConnection(5, false);
+        Check(!InputHints.UsingPad && ev == false, "desconectar: volta para teclado e avisa");
+        InputHints.PadConnection -= H;
+    }
+
     void TestSettings()
     {
         var s = new SettingsData { MouseSensitivity = float.NaN, Fov = 500, MasterVolume = -3, Quality = 9, RenderScale = 0, WindowSize = 42 };
@@ -1043,6 +1083,53 @@ public partial class TestRunner : Node
         Fresh();
     }
 
+    async Task TestShopScroll()
+    {
+        Fresh();
+        GS.AddMoney(1_000_000_000);
+        var shop = new ShopScreen();
+        AddChild(shop);
+        await Frames(2);
+        TerminalScreen.AtSellStation = false;
+        shop.Open();
+        await Frames(6);
+        // mouse: clica em comprar várias vezes; a tela tem que ficar no topo
+        InputHints.Observe(new InputEventKey { PhysicalKeycode = Key.W, Pressed = true });
+        for (int k = 0; k < 6; k++)
+        {
+            var btn = FindAll<Button>(shop).First(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == UpgradeIds.Damage);
+            btn.GrabFocus(); // o clique do mouse dá foco ao botão
+            btn.EmitSignal(BaseButton.SignalName.Pressed);
+            await Frames(4);
+        }
+        Check(GS.Data.Level(UpgradeIds.Damage) == 6, "compras aplicadas");
+        Check(shop.ScrollPos < 10, $"comprando com o mouse a tela não rola para baixo (rolagem {shop.ScrollPos})");
+        // controle: compra a última melhoria da lista; a tela acompanha o botão, sem pular para as regiões
+        InputHints.Observe(new InputEventJoypadButton { ButtonIndex = JoyButton.A, Pressed = true });
+        var last = FindAll<Button>(shop).First(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == UpgradeIds.Resonance);
+        last.GrabFocus();
+        await Frames(4);
+        int before = shop.ScrollPos;
+        last.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(6);
+        var owner = shop.GetViewport().GuiGetFocusOwner();
+        Check(owner != null && owner.HasMeta("uid") && (string)owner.GetMeta("uid") == UpgradeIds.Resonance, "controle: o foco continua na mesma melhoria");
+        Check(Math.Abs(shop.ScrollPos - before) < 40, $"controle: a rolagem não pula ({before} → {shop.ScrollPos})");
+        shop.CloseSilently();
+        shop.QueueFree();
+        await Frames(2);
+        Fresh();
+    }
+
+    static IEnumerable<T> FindAll<T>(Node n) where T : Node
+    {
+        foreach (Node c in n.GetChildren())
+        {
+            if (c is T t) yield return t;
+            foreach (var x in FindAll<T>(c)) yield return x;
+        }
+    }
+
     async Task TestGamepad()
     {
         Fresh();
@@ -1142,6 +1229,11 @@ public partial class TestRunner : Node
                 Check(L.Reachable(pit.RopeTop.X, pit.RopeTop.Z) && L.Reachable(pit.RopeBottom.X, pit.RopeBottom.Z) && pit.RopeTop.Y - pit.RopeBottom.Y > 4f,
                     $"{r.Id}: poço com corda ligando o fundo ({pit.RopeTop.Y - pit.RopeBottom.Y:0} m)");
             Check(L.Pits.Count >= 1, $"{r.Id}: tem poços ({L.Pits.Count})");
+            if (r.GiantMaterialId != null)
+            {
+                var gc = world.Crystals.FirstOrDefault(c => c.Material.Id == r.GiantMaterialId);
+                Check(L.Giant != null && gc != null && L.Reachable(gc.StandPoint.X, gc.StandPoint.Z), $"{r.Id}: câmara colossal com a formação gigante, alcançável");
+            }
             Check(world.PitRopes.Count(rp => WorldBuilder.RegionAt(rp.Top).Id == r.Id) == L.Pits.Count + L.FixedRopes.Count, $"{r.Id}: corda fixa em cada poço/degrau ({L.FixedRopes.Count} degraus)");
             foreach (var s2 in L.Secrets)
             {
@@ -1253,7 +1345,7 @@ public partial class TestRunner : Node
         var depths = world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 1).ToList();
         foreach (var c in depths) c.Hit(1e9f, c.GlobalPosition, Vector3.Up, true);
         world.UpdateRespawnRates();
-        Check(depths.All(c => c.RespawnRate > 5.5f), "Profundezas esgotadas: renascimento acelerado");
+        Check(depths.Where(c => !c.Material.Special).All(c => c.RespawnRate > 5.5f), "Profundezas esgotadas: renascimento acelerado (formações especiais têm tempo próprio)");
         Check(world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 0).All(c => c.RespawnRate < 1.5f), "outras regiões não são afetadas");
         // casa onde se entra andando
         var house = world.House;
@@ -1453,14 +1545,30 @@ public partial class TestRunner : Node
         Check(player.Climbing, "começa a escalar");
         bool? up = null;
         player.ClimbFinished += u => up = u;
+        // sem apertar nada fica pendurado no mesmo lugar
+        await Frames(5);
+        var hang = player.GlobalPosition;
+        await Frames(30);
+        Check(player.Climbing && player.GlobalPosition.DistanceTo(hang) < 0.05f, "sem apertar nada fica parado na corda");
+        // as mãos ficam na corda (mundo), não na câmera: olhando para cima elas não sobem junto
+        var handsNode = player.FindChild("ClimbHands", true, false) as Node3D;
+        var h0 = handsNode.GlobalPosition;
+        player.SetLook(player.Yaw, 1.2f);
+        await Frames(3);
+        Check(handsNode.GlobalPosition.DistanceTo(h0) < 0.05f, "olhar para cima não leva as mãos/corda junto");
+        player.SetLook(player.Yaw, 0f);
+        Input.ActionPress("move_back");
         for (int i = 0; i < 600 && player.Climbing; i++) await Frames(1);
+        Input.ActionRelease("move_back");
         await Frames(10);
         Check(!player.Climbing && up == false, "chega ao fundo");
         Check(player.GlobalPosition.Y < pit.RopeTop.Y - 4f && L.PitAt(player.GlobalPosition) != null, $"está no fundo do poço (y={player.GlobalPosition.Y:0.0})");
         // sobe de volta
         Check(!rope.PlayerAtTop() && rope.GetPrompt().Contains(Loc.T("Subir")), "no fundo: a corda oferece subir");
         rope.Interact(player);
+        Input.ActionPress("move_forward");
         for (int i = 0; i < 600 && player.Climbing; i++) await Frames(1);
+        Input.ActionRelease("move_forward");
         await Frames(20);
         Check(up == true && player.GlobalPosition.DistanceTo(pit.TopExit) < 1.5f && player.IsOnFloor(), $"subiu e ficou em pé na borda (dist {player.GlobalPosition.DistanceTo(pit.TopExit):0.0})");
         // pular solta a corda

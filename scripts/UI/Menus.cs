@@ -159,7 +159,7 @@ public partial class SettingsScreen : ModalScreen
 
     void BuildTabs()
     {
-        foreach (Node c in _tabs.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_tabs);
         for (int i = 0; i < TabNames.Length; i++)
         {
             if (i == 4 && !PadTabVisible) continue;
@@ -174,7 +174,7 @@ public partial class SettingsScreen : ModalScreen
 
     GridContainer NewGrid()
     {
-        foreach (Node c in _scroll.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_scroll);
         var grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 24);
         grid.AddThemeConstantOverride("v_separation", 6);
@@ -467,12 +467,13 @@ public partial class CodexScreen : ModalScreen
     public override void Refresh()
     {
         var gs = GameState.Instance;
-        foreach (Node c in _grid.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_grid);
         int found = 0;
         foreach (var r in GameData.Regions)
         {
             var ids = r.Spawns.Select(s => s.MaterialId).Append(r.RareMaterialId).ToList();
             if (r.Id == "core") ids.Add("heart");
+            if (r.GiantMaterialId != null) ids.Add(r.GiantMaterialId);
             foreach (var id in ids)
             {
                 var m = GameData.Mat(id);
@@ -803,7 +804,7 @@ public partial class BackupScreen : ModalScreen
 
     public override void Refresh()
     {
-        foreach (Node c in _list.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_list);
         var snaps = SaveSystem.ListSnapshots();
         if (snaps.Count == 0) _list.AddChild(UiTheme.Label("Nenhum backup ainda.", 16, UiTheme.Muted));
         foreach (var s in snaps)

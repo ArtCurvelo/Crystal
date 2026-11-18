@@ -127,7 +127,7 @@ public abstract partial class TerminalScreen : ModalScreen
     {
         var gs = GameState.Instance;
         MoneyLabel.Text = GameState.FormatNumber(gs.Data.Money);
-        foreach (Node c in InvList.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(InvList);
         if (gs.InventoryCount == 0)
         {
             var e = UiTheme.Label("Mochila vazia.\nMinere cristais e volte!", 15, UiTheme.Muted);
@@ -204,6 +204,7 @@ public partial class ShopScreen : TerminalScreen
         right.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.04f, 0.07f, 0.12f, 0.9f), new Color(UiTheme.Cyan, 0.4f), 14, 2, 12, 10));
         Content.AddChild(right);
         var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 440), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        _scroll = scroll;
         right.AddChild(scroll);
         var inner = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         inner.AddThemeConstantOverride("separation", 10);
@@ -245,6 +246,10 @@ public partial class ShopScreen : TerminalScreen
 
     string _focusId;
     bool _focusOnOpen;
+    ScrollContainer _scroll;
+    bool _openingFocus;
+    /// <summary>Para testes: rolagem atual da lista.</summary>
+    public int ScrollPos => _scroll?.ScrollVertical ?? 0;
 
     public override void Open()
     {
@@ -257,19 +262,23 @@ public partial class ShopScreen : TerminalScreen
         // controle: guarda qual melhoria estava em foco para reencontrá-la depois da reconstrução
         var owner = GetViewport()?.GuiGetFocusOwner();
         if (owner != null && owner.HasMeta("uid")) _focusId = (string)owner.GetMeta("uid");
+        _openingFocus = _focusOnOpen;
         if (_focusOnOpen)
         {
             _focusOnOpen = false;
             var gs = GameState.Instance;
             _focusId = UpgradeIds.All.FirstOrDefault(id => !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? UpgradeIds.All[0];
         }
+        // a rolagem fica onde estava (comprar uma melhoria não pode levar a tela lá para baixo)
+        int keepScroll = _focusOnOpen ? 0 : _scroll?.ScrollVertical ?? 0;
         RefreshInventory();
-        foreach (Node c in _grid.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_grid);
         foreach (var id in UpgradeIds.All) _grid.AddChild(BuildCard(GameData.Upgrades[id]));
-        foreach (Node c in _regionBox.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_regionBox);
         foreach (var r in GameData.Regions.Skip(1)) _regionBox.AddChild(BuildRegionRow(r));
-        foreach (Node c in _prestigeBox.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_prestigeBox);
         _prestigeBox.AddChild(BuildPrestigeRow());
+        if (_scroll != null) Callable.From(() => { if (IsInstanceValid(_scroll)) _scroll.ScrollVertical = keepScroll; }).CallDeferred();
     }
 
     Control BuildCard(UpgradeDef u)
@@ -313,13 +322,13 @@ public partial class ShopScreen : TerminalScreen
         if (afford && !maxed) btn.AddThemeColorOverride("font_color", UiTheme.Gold);
         h.AddChild(btn);
         btn.SetMeta("uid", u.Id);
-        if (u.Id == _focusId) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
+        if (u.Id == _focusId && (InputHints.UsingPad || _openingFocus)) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
         if (u.Id == _lastBought)
         {
             _lastBought = null;
             card.Modulate = new Color(1.8f, 1.6f, 1.0f);
             card.CreateTween().TweenProperty(card, "modulate", Colors.White, 0.45f);
-            Callable.From(() => btn.GrabFocus()).CallDeferred();
+            if (InputHints.UsingPad) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
         }
         return card;
     }
@@ -450,7 +459,7 @@ public partial class SellScreen : TerminalScreen
     {
         RefreshInventory();
         var gs = GameState.Instance;
-        foreach (Node c in _list.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_list);
         _mult.Text = Loc.F("Multiplicador de lapidação: x{0:0.00}   ·   Mochila {1}/{2}", gs.ValueMultiplier, gs.InventoryCount, gs.Capacity);
         if (gs.InventoryCount == 0)
             _list.AddChild(UiTheme.Label("Sua mochila está vazia. Minere cristais e volte aqui!", 17, UiTheme.Muted));

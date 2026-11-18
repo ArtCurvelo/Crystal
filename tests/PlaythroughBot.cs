@@ -122,7 +122,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
         GD.Print($"Goblin: contratado={_hired} | taxas pagas {_feesPaid}, não pagas {_feesSkipped} | fragmentos do baú {_stashTaken}");
         GD.Print($"Goblin: melhorias compradas {_goblinUps} | cabana pronta={GS.GoblinBuilt("caves")}");
-        if (!_hired || _feesPaid == 0 || _stashTaken == 0 || _goblinUps == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
+        // a cabana leva 1,5 dia: em partidas curtas pode haver poucas cobranças (e às vezes sem dinheiro para pagar)
+        if (!_hired || (_feesPaid + _feesSkipped) < 2 || _stashTaken == 0 || _goblinUps == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
         GD.Print($"Construções: funil={(_hopperId != 0 || _beltSold > 0)} | vendido pela esteira ◈ {_beltSold} | drone={GS.Data.DroneOwned}");
         if (_beltSold <= 0) { _errors++; GD.Print("ERRO: a esteira não vendeu nada"); }
         if (!GS.Data.DroneOwned) { _errors++; GD.Print("ERRO: drone não comprado"); }

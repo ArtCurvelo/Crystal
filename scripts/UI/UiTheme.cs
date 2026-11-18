@@ -141,6 +141,12 @@ public static class UiTheme
         return l;
     }
 
+    /// <summary>Remove os filhos na hora (não só no fim do quadro): evita o layout e a rolagem "pularem" ao recriar listas.</summary>
+    public static void ClearChildren(Node parent)
+    {
+        foreach (Node c in parent.GetChildren()) { parent.RemoveChild(c); c.QueueFree(); }
+    }
+
     public static Button Button(string text, System.Action onPressed, int minWidth = 0, int fontSize = 20)
     {
         var b = new Button { Text = Core.Loc.T(text), FocusMode = Control.FocusModeEnum.All };

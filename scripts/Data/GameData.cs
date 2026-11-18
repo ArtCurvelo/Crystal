@@ -51,6 +51,9 @@ public sealed class MaterialDef
     public int ShardsMax = 5;
     public bool Rare;
     public bool Special;       // formação especial (ex.: Coração Ancestral)
+    /// <summary>Tamanho da formação especial (o Coração usa 2,6; formações gigantes são maiores).</summary>
+    public float GiantScale;
+    public float SpecialScale => GiantScale > 0 ? GiantScale : 2.6f;
     public float RespawnSeconds = 25f;
     public Rarity Rarity = Rarity.Comum;
     public OreArchetype Archetype = OreArchetype.Crystal;
@@ -90,6 +93,8 @@ public sealed class RegionDef
     public Color LightColor;
     public List<SpawnEntry> Spawns = new();
     public string RareMaterialId;
+    /// <summary>Formação gigante da região (numa câmara própria), ou null.</summary>
+    public string GiantMaterialId;
     public float RareChance;
     public int CrystalSlots;
     // Geometria da sala (eixo Z negativo = mais fundo)
@@ -478,6 +483,72 @@ public static class GameData
             ShardsMin = 4, ShardsMax = 6, RespawnSeconds = 70
         });
 
+        // ---------------- Formações gigantes (uma por região; o Núcleo tem o Coração) ----------------
+        Add(new MaterialDef
+        {
+            Id = "giant_geode", Archetype = OreArchetype.Geode, GeodeSpheres = true, Rarity = Rarity.Lendario, Name = "Geodo Colossal", Value = 120, Hp = 9000, Special = true, GiantScale = 3.6f,
+            Description = "Formação gigante: um geodo do tamanho de uma casa, cheio de esferas que brilham.",
+            Color = new Color(0.6f, 0.45f, 1.0f), Glow = new Color(0.45f, 0.85f, 1.0f),
+            ShardsMin = 18, ShardsMax = 24, RespawnSeconds = 150
+        });
+        Add(new MaterialDef
+        {
+            Id = "giant_ice", Archetype = OreArchetype.Ice, Rarity = Rarity.Lendario, Name = "Pilar de Gelo Eterno", Value = 520, Hp = 30000, Special = true, GiantScale = 3.8f,
+            Description = "Formação gigante: um pilar de gelo que nunca derreteu, com cristais presos por dentro.",
+            Color = new Color(0.7f, 0.92f, 1.0f), Glow = new Color(0.4f, 0.85f, 1.0f),
+            ShardsMin = 18, ShardsMax = 24, RespawnSeconds = 150
+        });
+        Add(new MaterialDef
+        {
+            Id = "giant_coral", Archetype = OreArchetype.Coral, Rarity = Rarity.Lendario, Name = "Coral Rei", Value = 6000, Hp = 400000, Special = true, GiantScale = 3.8f,
+            Description = "Formação gigante: o coral mais antigo do lago, com ramos que pulsam de luz.",
+            Color = new Color(1.0f, 0.45f, 0.75f), Glow = new Color(1.0f, 0.3f, 0.8f),
+            ShardsMin = 20, ShardsMax = 26, RespawnSeconds = 160
+        });
+        Add(new MaterialDef
+        {
+            Id = "giant_spore", Archetype = OreArchetype.Pearl, Rarity = Rarity.Lendario, Name = "Esfera-Mãe de Esporos", Value = 14000, Hp = 1200000, Special = true, GiantScale = 3.6f,
+            Description = "Formação gigante: uma esfera luminosa de onde nascem todos os esporos do jardim.",
+            Color = new Color(0.75f, 1.0f, 0.5f), Glow = new Color(0.55f, 1.0f, 0.3f),
+            ShardsMin = 20, ShardsMax = 26, RespawnSeconds = 160
+        });
+        Add(new MaterialDef
+        {
+            Id = "giant_prism", Archetype = OreArchetype.Crystal, Rarity = Rarity.Lendario, Name = "Prisma Primordial", Value = 40000, Hp = 3500000, Special = true, GiantScale = 4.2f,
+            Description = "Formação gigante: o primeiro cristal do mundo. Dizem que toda a catedral cresceu a partir dele.",
+            Color = new Color(0.95f, 0.9f, 1.0f), Glow = new Color(0.9f, 0.75f, 1.0f),
+            ShardsMin = 22, ShardsMax = 28, RespawnSeconds = 170
+        });
+
+        // ---------------- Mais minérios (variedade em todas as regiões, com lendários raros) ----------------
+        void Ore(string id, OreArchetype a, Rarity r, string name, int value, float hp, string desc, Color c, Color g, bool rare = false, bool spheres = false) =>
+            Add(new MaterialDef { Id = id, Archetype = a, Rarity = r, Name = name, Value = value, Hp = hp, Description = desc, Color = c, Glow = g, Rare = rare, GeodeSpheres = spheres,
+                ShardsMin = rare ? 4 : 3, ShardsMax = rare ? 6 : 5, RespawnSeconds = rare ? 50 : 24 });
+        // Cavernas
+        Ore("hematite", OreArchetype.Vein, Rarity.Comum, "Hematita", 6, 45, "Minério de ferro avermelhado; risca a rocha de vermelho-sangue.", new Color(0.45f, 0.18f, 0.16f), new Color(1.0f, 0.35f, 0.3f));
+        Ore("calcite", OreArchetype.Crystal, Rarity.Incomum, "Calcita Fluorescente", 12, 90, "Parece comum, mas sob a lanterna brilha em laranja vivo.", new Color(0.95f, 0.85f, 0.7f), new Color(1.0f, 0.6f, 0.2f));
+        Ore("dragoneye", OreArchetype.Geode, Rarity.Lendario, "Olho de Dragão", 160, 420, "Lendário: um geodo com uma íris dourada que parece acompanhar quem passa.", new Color(0.3f, 0.12f, 0.08f), new Color(1.0f, 0.75f, 0.15f), true);
+        // Profundezas
+        Ore("tourmaline", OreArchetype.Shards, Rarity.Raro, "Turmalina Bicolor", 72, 560, "Lascas que são rosa numa ponta e verdes na outra.", new Color(0.95f, 0.4f, 0.6f), new Color(0.35f, 1.0f, 0.55f));
+        Ore("celestite", OreArchetype.Geode, Rarity.Incomum, "Celestina", 38, 320, "Geodo azul-céu, delicado como gelo fino.", new Color(0.6f, 0.75f, 1.0f), new Color(0.5f, 0.75f, 1.0f));
+        Ore("glacierheart", OreArchetype.Ice, Rarity.Lendario, "Coração de Geleira", 900, 2400, "Lendário: um bloco de gelo azul profundo que bate como um coração.", new Color(0.2f, 0.45f, 1.0f), new Color(0.3f, 0.7f, 1.0f), true);
+        // Núcleo
+        Ore("cinnabar", OreArchetype.Banded, Rarity.Raro, "Cinábrio", 240, 3100, "Faixas vermelho-vivo; os antigos o usavam como tinta sagrada.", new Color(0.8f, 0.12f, 0.1f), new Color(1.0f, 0.25f, 0.15f));
+        Ore("topaz", OreArchetype.Crystal, Rarity.Epico, "Topázio Imperial", 520, 6000, "Cristais cor de mel que guardam o calor do Núcleo.", new Color(1.0f, 0.6f, 0.25f), new Color(1.0f, 0.55f, 0.15f));
+        Ore("starruby", OreArchetype.Crystal, Rarity.Lendario, "Rubi Estrela", 3200, 9000, "Lendário: um rubi com uma estrela de seis pontas presa no centro.", new Color(0.9f, 0.1f, 0.25f), new Color(1.0f, 0.3f, 0.5f), true);
+        // Reservatório
+        Ore("turquoise", OreArchetype.Banded, Rarity.Raro, "Turquesa", 950, 11500, "Azul-esverdeado com veios escuros, polida pelas correntes.", new Color(0.25f, 0.8f, 0.75f), new Color(0.3f, 1.0f, 0.85f));
+        Ore("abalone", OreArchetype.Pearl, Rarity.Epico, "Abalone Cristalino", 2400, 26000, "Madrepérola que muda de cor a cada passo.", new Color(0.6f, 0.85f, 0.9f), new Color(0.9f, 0.5f, 1.0f));
+        Ore("leviathan", OreArchetype.Pearl, Rarity.Lendario, "Pérola do Leviatã", 12000, 36000, "Lendária: grande demais para ter vindo de uma ostra comum.", new Color(0.9f, 0.95f, 1.0f), new Color(0.4f, 0.9f, 1.0f), true);
+        // Jardim Fúngico
+        Ore("peridot", OreArchetype.Crystal, Rarity.Raro, "Peridoto", 2200, 25000, "Verde-oliva intenso; cresce onde os esporos assentam.", new Color(0.6f, 0.85f, 0.2f), new Color(0.65f, 1.0f, 0.25f));
+        Ore("chrysocolla", OreArchetype.Banded, Rarity.Incomum, "Crisocola", 1700, 20000, "Camadas azuis e verdes, macias ao toque.", new Color(0.2f, 0.6f, 0.65f), new Color(0.3f, 0.9f, 0.85f));
+        Ore("lumenroot", OreArchetype.Coral, Rarity.Lendario, "Raiz de Lúmen", 21000, 80000, "Lendária: uma raiz cristalizada que ainda conduz luz como seiva.", new Color(0.95f, 0.95f, 0.5f), new Color(1.0f, 1.0f, 0.4f), true);
+        // Catedral
+        Ore("rainbowquartz", OreArchetype.Geode, Rarity.Raro, "Quartzo Arco-íris", 9000, 100000, "Geodo com esferas de todas as cores do espectro.", new Color(0.95f, 0.85f, 1.0f), new Color(0.7f, 0.5f, 1.0f), false, true);
+        Ore("moissanite", OreArchetype.Shards, Rarity.Epico, "Moissanita", 18000, 160000, "Mais brilhante que o diamante; nasceu de estrelas que caíram aqui.", new Color(0.9f, 0.95f, 1.0f), new Color(0.6f, 0.9f, 1.0f));
+        Ore("haloite", OreArchetype.Crystal, Rarity.Lendario, "Halo Celeste", 110000, 380000, "Lendário: cristal com um anel de luz flutuando em volta.", new Color(1.0f, 0.95f, 0.8f), new Color(1.0f, 0.9f, 0.5f), true);
+
         // ---------------- Regiões ----------------
         var r1 = new RegionDef
         {
@@ -487,14 +558,17 @@ public static class GameData
             FogColor = new Color(0.07f, 0.03f, 0.14f), FogDensity = 0.018f,
             RockColor = new Color(0.38f, 0.32f, 0.34f), AccentColor = new Color(0.15f, 1.0f, 1.0f),
             LightColor = new Color(1.0f, 0.35f, 0.85f),
-            RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 220,
+            RareMaterialId = "sunstone", GiantMaterialId = "giant_geode", RareChance = 0.05f, CrystalSlots = 220,
             CenterZ = 0, HalfX = 125, HalfZ = 120, Height = 18
         };
-r1.Spawns.Add(new SpawnEntry("quartz", 0.4f));
-        r1.Spawns.Add(new SpawnEntry("copper", 0.25f));
-        r1.Spawns.Add(new SpawnEntry("pyrite", 0.15f));
-        r1.Spawns.Add(new SpawnEntry("amethyst", 0.12f));
-        r1.Spawns.Add(new SpawnEntry("jasper", 0.08f));
+        r1.Spawns.Add(new SpawnEntry("quartz", 0.3f));
+        r1.Spawns.Add(new SpawnEntry("copper", 0.2f));
+        r1.Spawns.Add(new SpawnEntry("pyrite", 0.13f));
+        r1.Spawns.Add(new SpawnEntry("hematite", 0.12f));
+        r1.Spawns.Add(new SpawnEntry("amethyst", 0.1f));
+        r1.Spawns.Add(new SpawnEntry("calcite", 0.08f));
+        r1.Spawns.Add(new SpawnEntry("jasper", 0.065f));
+        r1.Spawns.Add(new SpawnEntry("dragoneye", 0.005f));
         r1.Wings.Add(new WingDef { Id = "copper_vein", Name = "Veio de Cobre", Side = -1, ZOffset = -12, FeaturedMaterialId = "copper", Slots = 8, HalfX = 11, HalfZ = 10 });
         r1.Wings.Add(new WingDef { Id = "amethyst_grotto", Name = "Gruta das Ametistas", Side = 1, ZOffset = 6, FeaturedMaterialId = "amethyst", Slots = 8, HalfX = 11, HalfZ = 10 });
         Regions.Add(r1);
@@ -507,17 +581,20 @@ r1.Spawns.Add(new SpawnEntry("quartz", 0.4f));
             FogColor = new Color(0.02f, 0.08f, 0.18f), FogDensity = 0.026f,
             RockColor = new Color(0.3f, 0.34f, 0.4f), AccentColor = new Color(0.1f, 1.0f, 0.65f),
             LightColor = new Color(0.25f, 0.6f, 1.0f),
-            RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 270,
+            RareMaterialId = "starprism", GiantMaterialId = "giant_ice", RareChance = 0.06f, CrystalSlots = 270,
             CenterZ = 0, HalfX = 145, HalfZ = 135, Height = 22
         };
-r2.Spawns.Add(new SpawnEntry("sapphire", 0.26f));
-        r2.Spawns.Add(new SpawnEntry("frostice", 0.2f));
-        r2.Spawns.Add(new SpawnEntry("aquamarine", 0.14f));
-        r2.Spawns.Add(new SpawnEntry("silver", 0.14f));
-        r2.Spawns.Add(new SpawnEntry("emerald", 0.1f));
-        r2.Spawns.Add(new SpawnEntry("cobalt", 0.08f));
-        r2.Spawns.Add(new SpawnEntry("malachite", 0.05f));
+        r2.Spawns.Add(new SpawnEntry("sapphire", 0.2f));
+        r2.Spawns.Add(new SpawnEntry("frostice", 0.16f));
+        r2.Spawns.Add(new SpawnEntry("aquamarine", 0.12f));
+        r2.Spawns.Add(new SpawnEntry("silver", 0.12f));
+        r2.Spawns.Add(new SpawnEntry("celestite", 0.1f));
+        r2.Spawns.Add(new SpawnEntry("emerald", 0.08f));
+        r2.Spawns.Add(new SpawnEntry("tourmaline", 0.07f));
+        r2.Spawns.Add(new SpawnEntry("cobalt", 0.06f));
+        r2.Spawns.Add(new SpawnEntry("malachite", 0.045f));
         r2.Spawns.Add(new SpawnEntry("fluorite", 0.03f));
+        r2.Spawns.Add(new SpawnEntry("glacierheart", 0.015f));
         r2.Wings.Add(new WingDef { Id = "frozen_grotto", Name = "Gruta Congelada", Side = -1, ZOffset = 2, FeaturedMaterialId = "frostice" });
         r2.Wings.Add(new WingDef { Id = "silver_vein", Name = "Veio de Prata", Side = 1, ZOffset = -8, FeaturedMaterialId = "silver" });
         Regions.Add(r2);
@@ -533,14 +610,17 @@ r2.Spawns.Add(new SpawnEntry("sapphire", 0.26f));
             RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 290,
             CenterZ = 0, HalfX = 150, HalfZ = 140, Height = 28
         };
-r3.Spawns.Add(new SpawnEntry("ruby", 0.26f));
-        r3.Spawns.Add(new SpawnEntry("obsidian", 0.2f));
-        r3.Spawns.Add(new SpawnEntry("sulfur", 0.14f));
-        r3.Spawns.Add(new SpawnEntry("magmite", 0.14f));
-        r3.Spawns.Add(new SpawnEntry("garnet", 0.1f));
-        r3.Spawns.Add(new SpawnEntry("gold", 0.08f));
-        r3.Spawns.Add(new SpawnEntry("ancestralite", 0.05f));
-        r3.Spawns.Add(new SpawnEntry("meteorite", 0.03f));
+        r3.Spawns.Add(new SpawnEntry("ruby", 0.2f));
+        r3.Spawns.Add(new SpawnEntry("obsidian", 0.16f));
+        r3.Spawns.Add(new SpawnEntry("sulfur", 0.12f));
+        r3.Spawns.Add(new SpawnEntry("magmite", 0.12f));
+        r3.Spawns.Add(new SpawnEntry("cinnabar", 0.1f));
+        r3.Spawns.Add(new SpawnEntry("garnet", 0.09f));
+        r3.Spawns.Add(new SpawnEntry("gold", 0.07f));
+        r3.Spawns.Add(new SpawnEntry("topaz", 0.06f));
+        r3.Spawns.Add(new SpawnEntry("ancestralite", 0.04f));
+        r3.Spawns.Add(new SpawnEntry("meteorite", 0.025f));
+        r3.Spawns.Add(new SpawnEntry("starruby", 0.015f));
         r3.Wings.Add(new WingDef { Id = "old_forge", Name = "Forja Antiga", Side = -1, ZOffset = -0.5f, FeaturedMaterialId = "magmite", Slots = 10, HalfX = 14, HalfZ = 13 });
         r3.Wings.Add(new WingDef { Id = "obsidian_hall", Name = "Câmara de Obsidiana", Side = 1, ZOffset = -0.5f, FeaturedMaterialId = "obsidian", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r3);
@@ -553,15 +633,18 @@ r3.Spawns.Add(new SpawnEntry("ruby", 0.26f));
             FogColor = new Color(0.01f, 0.09f, 0.14f), FogDensity = 0.024f,
             RockColor = new Color(0.25f, 0.32f, 0.33f), AccentColor = new Color(1.0f, 0.25f, 0.85f),
             LightColor = new Color(0.2f, 0.95f, 1.0f),
-            RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 290,
+            RareMaterialId = "abyssaltear", GiantMaterialId = "giant_coral", RareChance = 0.05f, CrystalSlots = 290,
             CenterZ = 0, HalfX = 150, HalfZ = 140, Height = 26
         };
-r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
-        r4.Spawns.Add(new SpawnEntry("lapis", 0.2f));
-        r4.Spawns.Add(new SpawnEntry("coralprism", 0.18f));
-        r4.Spawns.Add(new SpawnEntry("titanium", 0.15f));
-        r4.Spawns.Add(new SpawnEntry("opal", 0.1f));
-        r4.Spawns.Add(new SpawnEntry("blackpearl", 0.05f));
+        r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.25f));
+        r4.Spawns.Add(new SpawnEntry("lapis", 0.17f));
+        r4.Spawns.Add(new SpawnEntry("turquoise", 0.15f));
+        r4.Spawns.Add(new SpawnEntry("coralprism", 0.14f));
+        r4.Spawns.Add(new SpawnEntry("titanium", 0.12f));
+        r4.Spawns.Add(new SpawnEntry("opal", 0.08f));
+        r4.Spawns.Add(new SpawnEntry("abalone", 0.05f));
+        r4.Spawns.Add(new SpawnEntry("blackpearl", 0.03f));
+        r4.Spawns.Add(new SpawnEntry("leviathan", 0.01f));
         r4.Wings.Add(new WingDef { Id = "coral_garden", Name = "Jardim de Coral", Side = -1, ZOffset = 4, FeaturedMaterialId = "coralprism", Slots = 10, HalfX = 14, HalfZ = 13 });
         r4.Wings.Add(new WingDef { Id = "opal_well", Name = "Poço de Opalas", Side = 1, ZOffset = 6, FeaturedMaterialId = "opal", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r4);
@@ -574,14 +657,17 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             FogColor = new Color(0.04f, 0.1f, 0.05f), FogDensity = 0.024f,
             RockColor = new Color(0.3f, 0.3f, 0.26f), AccentColor = new Color(0.55f, 1.0f, 0.3f),
             LightColor = new Color(1.0f, 0.35f, 0.85f),
-            RareMaterialId = "primalseed", RareChance = 0.05f, CrystalSlots = 300,
+            RareMaterialId = "primalseed", GiantMaterialId = "giant_spore", RareChance = 0.05f, CrystalSlots = 300,
             CenterZ = 0, HalfX = 155, HalfZ = 145, Height = 30
         };
-        r5.Spawns.Add(new SpawnEntry("sporite", 0.32f));
-        r5.Spawns.Add(new SpawnEntry("jade", 0.26f));
-        r5.Spawns.Add(new SpawnEntry("amber", 0.24f));
-        r5.Spawns.Add(new SpawnEntry("moonstone", 0.12f));
-        r5.Spawns.Add(new SpawnEntry("blackpearl", 0.06f));
+        r5.Spawns.Add(new SpawnEntry("sporite", 0.26f));
+        r5.Spawns.Add(new SpawnEntry("jade", 0.2f));
+        r5.Spawns.Add(new SpawnEntry("chrysocolla", 0.16f));
+        r5.Spawns.Add(new SpawnEntry("amber", 0.16f));
+        r5.Spawns.Add(new SpawnEntry("peridot", 0.12f));
+        r5.Spawns.Add(new SpawnEntry("moonstone", 0.07f));
+        r5.Spawns.Add(new SpawnEntry("blackpearl", 0.02f));
+        r5.Spawns.Add(new SpawnEntry("lumenroot", 0.01f));
         r5.Wings.Add(new WingDef { Id = "spore_grove", Name = "Bosque de Esporos", Side = -1, ZOffset = 2, FeaturedMaterialId = "sporite", Slots = 10, HalfX = 14, HalfZ = 13 });
         r5.Wings.Add(new WingDef { Id = "amber_cave", Name = "Caverna de Âmbar", Side = 1, ZOffset = -6, FeaturedMaterialId = "amber", Slots = 10, HalfX = 14, HalfZ = 13 });
         Regions.Add(r5);
@@ -594,14 +680,17 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             FogColor = new Color(0.07f, 0.05f, 0.14f), FogDensity = 0.02f,
             RockColor = new Color(0.36f, 0.34f, 0.4f), AccentColor = new Color(0.85f, 0.75f, 1.0f),
             LightColor = new Color(1.0f, 0.8f, 0.45f),
-            RareMaterialId = "eternaldiamond", RareChance = 0.05f, CrystalSlots = 310,
+            RareMaterialId = "eternaldiamond", GiantMaterialId = "giant_prism", RareChance = 0.05f, CrystalSlots = 310,
             CenterZ = 0, HalfX = 160, HalfZ = 150, Height = 38
         };
-        r6.Spawns.Add(new SpawnEntry("smokyquartz", 0.32f));
-        r6.Spawns.Add(new SpawnEntry("tanzanite", 0.26f));
-        r6.Spawns.Add(new SpawnEntry("alexandrite", 0.18f));
-        r6.Spawns.Add(new SpawnEntry("diamond", 0.14f));
-        r6.Spawns.Add(new SpawnEntry("opal", 0.1f));
+        r6.Spawns.Add(new SpawnEntry("smokyquartz", 0.26f));
+        r6.Spawns.Add(new SpawnEntry("tanzanite", 0.2f));
+        r6.Spawns.Add(new SpawnEntry("rainbowquartz", 0.16f));
+        r6.Spawns.Add(new SpawnEntry("alexandrite", 0.14f));
+        r6.Spawns.Add(new SpawnEntry("diamond", 0.11f));
+        r6.Spawns.Add(new SpawnEntry("moissanite", 0.08f));
+        r6.Spawns.Add(new SpawnEntry("opal", 0.04f));
+        r6.Spawns.Add(new SpawnEntry("haloite", 0.01f));
         r6.Wings.Add(new WingDef { Id = "prism_nave", Name = "Nave dos Prismas", Side = -1, ZOffset = -4, FeaturedMaterialId = "tanzanite", Slots = 11, HalfX = 15, HalfZ = 14 });
         r6.Wings.Add(new WingDef { Id = "diamond_crypt", Name = "Cripta dos Diamantes", Side = 1, ZOffset = 4, FeaturedMaterialId = "diamond", Slots = 11, HalfX = 15, HalfZ = 14 });
         Regions.Add(r6);

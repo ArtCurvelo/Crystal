@@ -49,7 +49,7 @@ public partial class GoblinScreen : ModalScreen
             : Loc.F("Cabana nível {0}: trabalha {1:0}% do turno ({2:0.#} de {3} min).", g.HutLevel + 1, frac * 100f, frac * dayMin, dayMin);
         _status.Text = $"{def.Name}, {def.Title}\n{hut}\n" +
                        Loc.F("Hoje: {0} minerados · baú: {1} fragmentos · taxa do dia: {2}", GameState.FormatMoney(g.DayValue), gs.GoblinStashCount(id), GameState.FormatMoney(gs.GoblinFee(id)));
-        foreach (Node c in _rows.GetChildren()) c.QueueFree();
+        UiTheme.ClearChildren(_rows);
         int L(GU u) => gs.GoblinLevel(id, u);
         Row(GU.Hut, "Cabana", Loc.F("Trabalha mais tempo por dia: {0:0}% → {1:0}% do turno",
             frac * 100f, GameState.GoblinWorkFractions[System.Math.Min(L(GU.Hut) + 1, GameState.GoblinMaxLevel)] * 100f));

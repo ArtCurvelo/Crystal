@@ -174,6 +174,9 @@ public partial class Main : Node
         UiBus.Sleep += SleepAtHome;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
+        Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
+        InputHints.PadConnection += OnPadConnection;
+        if (Input.GetConnectedJoypads().Count > 0) InputHints.StartWithPad(); // controle já ligado ao abrir o jogo
         GameState.Instance.BeforeSave = WritePlayerToSave;
         Buildings.BuildBarChanged += (t, d, ok) => Hud.SetBuildBar(t, d, ok);
         GameState.Instance.Prestiged += () => Buildings.Rebuild();
@@ -676,6 +679,18 @@ public partial class Main : Node
     bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
+
+    void OnPadConnection(bool connected, string name)
+    {
+        var gs = GameState.Instance;
+        if (connected) gs.Notify("Controle conectado", string.IsNullOrEmpty(name) ? "" : name, NotifyKind.Info);
+        else
+        {
+            gs.Notify("Controle desconectado", "Reconecte o controle ou use teclado e mouse.", NotifyKind.Warning);
+            // desconectou no meio da partida: pausa para ninguém ficar parado no meio da caverna
+            if (CurrentMode == Mode.Playing && !AnyModal() && !_fading) Pause();
+        }
+    }
 
     public override void _UnhandledInput(InputEvent e)
     {
