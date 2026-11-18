@@ -101,6 +101,7 @@ public partial class Main : Node
             OnCodex = () => _codex.Open(),
             OnHelp = () => _help.Open(),
             OnMainMenu = BackToMenu,
+            OnRescue = Rescue,
             OnQuit = QuitGame,
         };
         AddChild(_pause);
@@ -255,6 +256,14 @@ public partial class Main : Node
 
 
         if (args.Contains("--autostart")) StartGame(false);
+        if (args.Contains("--perf"))
+        {
+            // diagnóstico: tempos por quadro do motor a cada 3 s
+            Prof.On = true;
+            var t = new Timer { WaitTime = 3, Autostart = true, ProcessMode = ProcessModeEnum.Always };
+            AddChild(t);
+            t.Timeout += () => GD.Print($"[Perf] fps {Engine.GetFramesPerSecond():0} · process {Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000:0.0} ms · física {Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000:0.0} ms · nós {Performance.GetMonitor(Performance.Monitor.ObjectNodeCount):0} · corpos {Performance.GetMonitor(Performance.Monitor.Physics3DActiveObjects):0} · colisões {Performance.GetMonitor(Performance.Monitor.Physics3DCollisionPairs):0}\n   " + Prof.Report());
+        }
         // reaberto pelo atualizador: continua a partida de onde parou
         else if (args.Contains("--continue") && SaveSystem.HasSave()) StartGame(true);
         var shots = args.FirstOrDefault(a => a.StartsWith("--shots="));
@@ -362,6 +371,7 @@ public partial class Main : Node
                 camp.Discovered += c => GetTree().CreateTimer(2.6f).Timeout += () => Hud.ShowBigMessage("GOBLIN ENCONTRADO!"); // depois de "PASSAGEM SECRETA!"
             }
             _shards.PlayerPosition = () => Player.BodyCenter;
+            Rope.PlayerPos = () => Player.GlobalPosition;
             _shards.GroundAt = World.GroundAt;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
@@ -408,6 +418,23 @@ public partial class Main : Node
         // voltou ao menu no meio da sessão: procura atualização na hora (atualiza e volta para a partida)
         _updater.ResumeAfterUpdate = true;
         _updater.CheckForUpdates();
+    }
+
+    /// <summary>Preso em algum lugar? Volta para a entrada da região atual (sem custo).</summary>
+    public void Rescue()
+    {
+        if (Player == null || CurrentMode != Mode.Playing) return;
+        Resume();
+        Player.StopClimb(false);
+        int ri = WorldBuilder.RegionAt(Player.GlobalPosition).Index;
+        var L = World.Layouts[ri];
+        var to = ri == 0 || PlayerInHouse ? World.SpawnPoint : L.OnGround(L.Entrance.X, L.Entrance.Z - 4f, 0.2f);
+        if (PlayerInHouse) to = World.House.WakePoint;
+        Player.GlobalPosition = to;
+        Player.Velocity = Vector3.Zero;
+        UpdateRegion(true);
+        UpdateRegionCulling();
+        GameState.Instance.Notify("Resgate", "Você voltou para a entrada da região.", NotifyKind.Info);
     }
 
     void QuitGame()
@@ -715,6 +742,13 @@ public partial class Main : Node
 
     // ======================= Loop =======================
     public override void _Process(double delta)
+    {
+        long __t = Core.Prof.Start();
+        _ProcessInner(delta);
+        Core.Prof.End("main", __t);
+    }
+
+    void _ProcessInner(double delta)
     {
         if (World == null) return;
         if (_booting) return;

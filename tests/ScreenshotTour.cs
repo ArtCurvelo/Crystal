@@ -49,6 +49,50 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-ropes"))
+        {
+            var L = Main.World.Layouts[0];
+            var pit = L.Pits[0];
+            var rope = Main.World.PitRopes.First(r => r.Top.DistanceTo(pit.RopeTop) < 0.1f);
+            var c3 = new Vector3(pit.Center.X, pit.RopeTop.Y, pit.Center.Y);
+            var back = (pit.TopExit - c3); back.Y = 0; back = back.Normalized();
+            LookAtPoint(p, pit.TopExit + back * 2f + Vector3.Up * 0.1f, new Vector3(pit.Center.X, pit.Floor, pit.Center.Y));
+            await Wait(1f);
+            await Shot("24_pit_edge");
+            LookAtPoint(p, pit.TopExit + Vector3.Up * 0.1f, rope.Top + Vector3.Up * 0.3f);
+            await Wait(0.6f);
+            await Shot("24_rope_top");
+            rope.Interact(p);
+            await Wait(1.1f);
+            p.SetLook(p.Yaw, -0.2f);
+            await Wait(0.3f);
+            GD.Print($"[Tour] descendo: climbing={p.Climbing} pos={p.GlobalPosition}");
+            await Shot("24_climbing_down");
+            for (int i = 0; i < 400 && p.Climbing; i++) await Wait(0.05f);
+            await Wait(0.5f);
+            p.SetLook(p.Yaw + Mathf.Pi, 0.9f);
+            await Wait(0.6f);
+            await Shot("24_pit_bottom_up");
+            p.SetLook(p.Yaw, 0.1f);
+            await Wait(0.4f);
+            await Shot("24_pit_bottom");
+            rope.Interact(p);
+            await Wait(1.6f);
+            p.SetLook(p.Yaw, 0.6f);
+            await Wait(0.3f);
+            GD.Print($"[Tour] subindo: climbing={p.Climbing} pos={p.GlobalPosition}");
+            await Shot("24_climbing_up");
+            for (int i = 0; i < 400 && p.Climbing; i++) await Wait(0.05f);
+            await Wait(0.5f);
+            // vista ampla de uma câmara grande (mapa maior)
+            var big = L.Chambers.Where(c => c.Wing == null && c != L.Camp).OrderByDescending(c => c.RA).First();
+            LookAtPoint(p, L.OnGround(big.A.X + big.RA * 0.6f, big.A.Y, 0.1f), L.OnGround(big.A.X - big.RA, big.A.Y, 3f));
+            await Wait(1f);
+            await Shot("24_big_chamber");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-water"))
         {
             foreach (var r in GameData.Regions) if (!gs.IsUnlocked(r.Id)) gs.Data.UnlockedRegions.Add(r.Id);

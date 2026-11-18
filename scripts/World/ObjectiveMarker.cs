@@ -58,6 +58,13 @@ public partial class ObjectiveMarker : Node3D
 
     public override void _Process(double delta)
     {
+        long __t = Core.Prof.Start();
+        _ProcessInner(delta);
+        Core.Prof.End("marker", __t);
+    }
+
+    void _ProcessInner(double delta)
+    {
         var gs = GameState.Instance;
         if (gs == null || !gs.IsPlaying || PlayerPos == null) { Visible = false; return; }
         _t += (float)delta;

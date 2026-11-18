@@ -7,6 +7,16 @@ namespace CrystalExcavator.World;
 
 public enum CaveKind { Path, Chamber, Corridor, Crawl, Secret }
 
+/// <summary>Poço: buraco fundo dentro de uma câmara, com tesouro no fundo e corda fixa para subir.</summary>
+public sealed class CavePit
+{
+    public CaveFeature Host;
+    public Vector2 Center;
+    public float Radius, Depth;
+    public Vector3 RopeTop, RopeBottom, TopExit;
+    public float Floor => Host.Level - Depth;
+}
+
 /// <summary>Elemento da caverna: segmento (ou círculo, se A == B) com raio, nível do chão e altura do teto interpolados.</summary>
 public sealed class CaveFeature
 {
@@ -53,6 +63,9 @@ public sealed class CaveLayout
     public readonly List<CaveFeature> Chambers = new();
     public readonly List<CaveFeature> Secrets = new();
     public readonly List<CaveFeature> Crawls = new();
+    public readonly List<CavePit> Pits = new();
+    /// <summary>Cordas fixas ligando áreas que ficariam isoladas (degraus altos demais).</summary>
+    public readonly List<(Vector3 top, Vector3 bottom, Vector3 exit)> FixedRopes = new();
     public readonly List<Vector3> PathPoints = new();   // pontos do caminho principal (entrada → saída)
     public CaveFeature Camp, Heart, Lake;
     public Vector3 Entrance, Exit;
@@ -72,7 +85,9 @@ public sealed class CaveLayout
         Nx = (int)(r.HalfX * 2) + 1; Nz = (int)(r.HalfZ * 2) + 1;
         Plan();
         Rasterize();
+        CarvePits();
         Flood();
+        ConnectIsolated();
     }
 
     float R(float a, float b) => a + (float)_rng.NextDouble() * (b - a);
@@ -100,7 +115,8 @@ public sealed class CaveLayout
             nodes.Add((new Vector2(0, top), 3.6f, 0f, 6.5f));
             nodes.Add((new Vector2(0, top - 12f), 9f, 0f, baseH * 0.7f));
         }
-        int mids = 6;
+        // regiões maiores têm mais nós no caminho principal
+        int mids = Mathf.Clamp((int)(r.HalfZ / 16f), 6, 11);
         float zA = nodes[^1].p.Y, zB = hasNorth ? bottom + 10f : bottom + 16f;
         // relevo forte: o caminho principal sobe e desce (rampas longas entre os nós)
         float[] lvls = { -4f, -2f, 0f, 2f, 4f, 6f, 8f };
@@ -145,11 +161,43 @@ public sealed class CaveLayout
 
         // câmaras com minério em destaque (as "galerias" antigas) e câmaras comuns
         foreach (var w in r.Wings) TryChamber(w.Id, w.Name, 14f, 19f, PickLevel(), baseH + 2f, w);
-        int extra = 10 + r.Index * 2;
+        float area = r.HalfX * r.HalfZ / (95f * 90f);
+        int extra = (int)((10 + r.Index * 2) * area);
         for (int k = 0; k < extra; k++) TryChamber("c" + k, null, 8f, 18f, PickLevel(), baseH + R(-5f, 6f), null);
 
+        // túneis em laço ligando câmaras próximas (vários caminhos, menos becos)
+        int loops = 3 + (int)(area * 2.5f);
+        for (int k = 0, tries = 0; k < loops && tries < 400; tries++)
+        {
+            var a = Chambers[_rng.Next(Chambers.Count)];
+            var b = Chambers[_rng.Next(Chambers.Count)];
+            if (a == b || a == Camp || b == Camp || a == Heart || b == Heart) continue;
+            float d = a.A.DistanceTo(b.A) - a.RA - b.RA;
+            if (d < 8f || d > 55f) continue;
+            if (Mathf.Abs(a.Level - b.Level) > d * 0.4f) continue; // rampa de no máximo ~22°
+            var dir = (b.A - a.A).Normalized();
+            Add(new CaveFeature { Kind = CaveKind.Corridor, Id = "loop" + k, A = a.A + dir * a.RA * 0.6f, B = b.A - dir * b.RA * 0.6f, RA = R(3.2f, 4.5f), RB = R(3.2f, 4.5f), LA = a.Level, LB = b.Level, HA = R(6f, 9f), HB = R(6f, 9f), Noise = 1f });
+            k++;
+        }
+
+        // poços: buracos fundos dentro de câmaras grandes
+        int pits = 2 + r.Index / 2 + (int)area;
+        for (int k = 0, tries = 0; k < pits && tries < 300; tries++)
+        {
+            var host = Chambers[_rng.Next(Chambers.Count)];
+            if (host == Camp || host == Heart || host == Lake || host.Radius < 11f) continue;
+            float pr = R(3.6f, 5f), depth = R(7f, 13f);
+            float ang = R(0, Mathf.Tau);
+            var c = host.A + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * R(0f, host.RA - pr - 4f);
+            bool clash = false;
+            foreach (var o in Pits) if (o.Center.DistanceTo(c) < o.Radius + pr + 6f) clash = true;
+            if (clash) continue;
+            Pits.Add(new CavePit { Host = host, Center = c, Radius = pr, Depth = depth });
+            k++;
+        }
+
         // câmaras secretas por túneis baixos (só agachado)
-        int secrets = 3;
+        int secrets = 3 + (int)(area * 0.6f);
         var hosts = new List<CaveFeature>(Chambers);
         for (int s = 0, tries = 0; s < secrets && tries < 120; tries++)
         {
@@ -162,12 +210,178 @@ public sealed class CaveLayout
             var edgeA = host.A + dir * (host.RA - 3.5f); // começa por dentro (a borda é irregular)
             var sc = host.A + dir * (host.RA + len + rs);
             if (!Inside(sc, rs + 4f) || Overlaps(sc, rs + 3f, host) || SegmentHits(edgeA, sc, host)) continue;
+            // longe dos poços (a entrada do túnel não pode cair num buraco)
+            bool nearPit = false;
+            foreach (var pit in Pits)
+                for (int q = 0; q <= 8; q++)
+                    if (edgeA.Lerp(sc, q / 8f).DistanceTo(pit.Center) < pit.Radius + 5f) nearPit = true;
+            if (nearPit) continue;
             var secret = Add(new CaveFeature { Kind = CaveKind.Secret, Id = $"secret_{r.Id}_{s}", Name = "Câmara secreta", A = sc, B = sc, RA = rs, RB = rs, LA = host.Level, LB = host.Level, HA = 4.5f, HB = 4.5f, Noise = 0.6f, Flat = true });
             Secrets.Add(secret);
             var crawl = Add(new CaveFeature { Kind = CaveKind.Crawl, A = edgeA, B = sc - dir * (rs - 2.5f), RA = 1.45f, RB = 1.45f, LA = host.Level, LB = host.Level, HA = CrawlHeight, HB = CrawlHeight, Noise = 0.08f, Flat = true });
             Crawls.Add(crawl);
             s++;
         }
+    }
+
+    /// <summary>Afunda o chão dos poços (paredes íngremes) e calcula onde fica a corda fixa.</summary>
+    void CarvePits()
+    {
+        if (Pits.Count == 0) return;
+        var candidates = new List<CavePit>(Pits);
+        Pits.Clear();
+        Flood();
+        var baseReach = (bool[])Reach.Clone();
+        foreach (var pit in candidates)
+        {
+            int r = Mathf.CeilToInt(pit.Radius + 2f);
+            int ci = Mathf.RoundToInt(pit.Center.X - X0), cj = Mathf.RoundToInt(pit.Center.Y - Z0);
+            var saved = new List<(int id, float f)>();
+            for (int j = cj - r; j <= cj + r; j++)
+                for (int i = ci - r; i <= ci + r; i++)
+                {
+                    if (i < 0 || j < 0 || i >= Nx || j >= Nz) continue;
+                    int id = Idx(i, j);
+                    if (D[id] >= -0.5f) continue;
+                    var p = CellPos(i, j);
+                    float d = p.DistanceTo(pit.Center) - pit.Radius + _edge.GetNoise2D(p.X * 2f, p.Y * 2f) * 0.8f;
+                    float k = Mathf.SmoothStep(0.3f, -1.4f, d);
+                    if (k <= 0f) continue;
+                    saved.Add((id, F[id]));
+                    float bottom = pit.Floor + _bump.GetNoise2D(p.X, p.Y) * 0.3f;
+                    F[id] = Mathf.Lerp(F[id], bottom, k);
+                }
+            // corda no lado voltado para o centro da câmara
+            var toHost = pit.Host.A - pit.Center;
+            var dir = toHost.LengthSquared() > 0.5f ? toHost.Normalized() : Vector2.Right;
+            var top2 = pit.Center + dir * (pit.Radius + 0.35f);
+            var bot2 = pit.Center + dir * (pit.Radius - 1.8f);
+            var exit2 = pit.Center + dir * (pit.Radius + 1.9f);
+            pit.RopeTop = new Vector3(top2.X, Ground(top2.X, top2.Y), top2.Y);
+            pit.RopeBottom = new Vector3(bot2.X, Ground(bot2.X, bot2.Y), bot2.Y);
+            pit.TopExit = new Vector3(exit2.X, Ground(exit2.X, exit2.Y), exit2.Y);
+            Pits.Add(pit);
+            Flood();
+            // o poço não pode isolar nada: tudo o que era alcançável continua (fora do próprio buraco)
+            bool cuts = !Reachable(pit.RopeTop.X, pit.RopeTop.Z) || !Reachable(pit.TopExit.X, pit.TopExit.Z) || !Reachable(pit.RopeBottom.X, pit.RopeBottom.Z);
+            for (int id = 0; id < Reach.Length && !cuts; id++)
+                if (baseReach[id] && !Reach[id])
+                {
+                    var p = CellPos(id % Nx, id / Nx);
+                    if (p.DistanceTo(pit.Center) > pit.Radius + 2.5f) cuts = true;
+                }
+            if (cuts)
+            {
+                foreach (var (id, f) in saved) F[id] = f;
+                Pits.Remove(pit);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Garante que nada fica sem volta: cada área aberta isolada (câmara num degrau alto demais)
+    /// ganha uma corda fixa no ponto de menor desnível até a parte alcançável.
+    /// </summary>
+    void ConnectIsolated()
+    {
+        bool OpenCell(int id) => D[id] < -0.3f && C[id] - F[id] >= 1.15f && (Blocked == null || !Blocked[id]);
+        int[] di = { 1, -1, 0, 0 }, dj = { 0, 0, 1, -1 };
+        for (int round = 0; round < 40; round++)
+        {
+            // célula isolada mais "importante": centro de câmara não alcançável, senão qualquer célula grande isolada
+            int seed = -1;
+            foreach (var c in Chambers)
+            {
+                int id = NearestOpen(c.A.X, c.A.Y);
+                if (id >= 0 && !Reach[id] && OpenCell(id)) { seed = id; break; }
+            }
+            if (seed < 0) return;
+            if (round == 39) GD.PushWarning($"[Caverna] {Region.Id}: área isolada sem conexão");
+            // componente aberto (ignorando degraus) a partir da semente, sem atravessar áreas já alcançáveis
+            var comp = new HashSet<int> { seed };
+            var q = new Queue<int>();
+            q.Enqueue(seed);
+            int bestA = -1, bestB = -1; float bestCost = float.MaxValue;
+            while (q.Count > 0 && comp.Count < 60000)
+            {
+                int id = q.Dequeue();
+                int i = id % Nx, j = id / Nx;
+                for (int k = 0; k < 4; k++)
+                {
+                    int ni = i + di[k], nj = j + dj[k];
+                    if (ni < 1 || nj < 1 || ni >= Nx - 1 || nj >= Nz - 1) continue;
+                    int nid = Idx(ni, nj);
+                    if (!OpenCell(nid)) continue;
+                    if (Reach[nid])
+                    {
+                        if (D[nid] >= -0.8f || D[id] >= -0.8f) continue;
+                        // fronteira com a área alcançável: candidata a corda (menor desnível, longe das paredes)
+                        float cost = Mathf.Abs(F[nid] - F[id]) + Mathf.Max(0f, D[id] + 1.5f) * 2f + Mathf.Max(0f, D[nid] + 1.5f) * 2f;
+                        if (cost < bestCost) { bestCost = cost; bestA = id; bestB = nid; }
+                        continue;
+                    }
+                    if (comp.Add(nid)) q.Enqueue(nid);
+                }
+            }
+            if (bestA < 0)
+            {
+                // bolsão fechado: escava um túnel até a célula alcançável mais próxima (a próxima rodada põe corda se precisar)
+                int target = -1; float bd = float.MaxValue;
+                var sp = CellPos(seed % Nx, seed / Nx);
+                for (int id = 0; id < Reach.Length; id++)
+                    if (Reach[id])
+                    {
+                        float d = CellPos(id % Nx, id / Nx).DistanceSquaredTo(sp);
+                        if (d < bd) { bd = d; target = id; }
+                    }
+                if (target < 0) return;
+                CarveTunnel(seed, target);
+                Flood();
+                continue;
+            }
+            var pa = CellPos(bestA % Nx, bestA / Nx); var pb = CellPos(bestB % Nx, bestB / Nx);
+            bool aHigh = F[bestA] > F[bestB];
+            var hi = aHigh ? pa : pb; var lo = aHigh ? pb : pa;
+            var dir = (lo - hi).Normalized();
+            if (dir.LengthSquared() < 0.5f) dir = Vector2.Right;
+            var top2 = hi; var bot2 = lo; var exit2 = hi - dir * 1.2f;
+            if (WallDist(exit2.X, exit2.Y) > -0.7f) exit2 = hi;
+            FixedRopes.Add((new Vector3(top2.X, Ground(top2.X, top2.Y), top2.Y), new Vector3(bot2.X, Ground(bot2.X, bot2.Y), bot2.Y), new Vector3(exit2.X, Ground(exit2.X, exit2.Y), exit2.Y)));
+            Flood();
+        }
+    }
+
+    /// <summary>Escava um túnel reto (2,8 m de largura, 3 m de altura) entre duas células, interpolando o chão.</summary>
+    void CarveTunnel(int fromId, int toId)
+    {
+        var a = CellPos(fromId % Nx, fromId / Nx); var b = CellPos(toId % Nx, toId / Nx);
+        float fa = F[fromId], fb = F[toId];
+        float len = a.DistanceTo(b);
+        for (float t = 0; t <= len; t += 0.5f)
+        {
+            var c = a.Lerp(b, len < 0.01f ? 0 : t / len);
+            float fl = Mathf.Lerp(fa, fb, len < 0.01f ? 0 : t / len);
+            for (int j = Mathf.FloorToInt(c.Y - Z0 - 2); j <= Mathf.CeilToInt(c.Y - Z0 + 2); j++)
+                for (int i = Mathf.FloorToInt(c.X - X0 - 2); i <= Mathf.CeilToInt(c.X - X0 + 2); i++)
+                {
+                    if (i < 1 || j < 1 || i >= Nx - 1 || j >= Nz - 1) continue;
+                    float d = CellPos(i, j).DistanceTo(c);
+                    if (d > 1.9f) continue;
+                    int id = Idx(i, j);
+                    bool wasOpen = D[id] < -0.3f;
+                    D[id] = Mathf.Min(D[id], d - 1.9f);
+                    if (!wasOpen) { F[id] = fl; C[id] = Mathf.Max(C[id], fl + 3f); }
+                    else C[id] = Mathf.Max(C[id], F[id] + 2.2f);
+                }
+        }
+    }
+
+    /// <summary>Poço que contém o ponto (no fundo).</summary>
+    public CavePit PitAt(Vector3 p)
+    {
+        foreach (var pit in Pits)
+            if (new Vector2(p.X, p.Z).DistanceTo(pit.Center) < pit.Radius && p.Y < pit.Floor + 2f) return pit;
+        return null;
     }
 
     float PickLevel()
@@ -341,6 +555,35 @@ public sealed class CaveLayout
         if (start < 0) return;
         Reach[start] = true; q.Enqueue(start);
         int[] di = { 1, -1, 0, 0 }, dj = { 0, 0, 1, -1 };
+        // cordas fixas (poços) e cordas do jogador ligam o alto ao fundo: viram arestas do grafo
+        var linked = new HashSet<int>();
+        while (true)
+        {
+            FloodQueue(q, di, dj);
+            bool more = false;
+            foreach (var (top, bottom) in RopeLinks())
+            {
+                int t = NearestOpen(top.X, top.Z), b = NearestOpen(bottom.X, bottom.Z);
+                if (t < 0 || b < 0) continue;
+                foreach (var (from, to) in new[] { (t, b), (b, t) })
+                    if (Reach[from] && !Reach[to] && D[to] < -0.3f) { Reach[to] = true; q.Enqueue(to); more = true; }
+            }
+            if (!more) break;
+        }
+    }
+
+    /// <summary>Cordas extras (ex.: do jogador) consideradas no cálculo da área alcançável.</summary>
+    public readonly List<(Vector3 top, Vector3 bottom)> ExtraRopes = new();
+
+    IEnumerable<(Vector3, Vector3)> RopeLinks()
+    {
+        foreach (var p in Pits) yield return (p.RopeTop, p.RopeBottom);
+        foreach (var f in FixedRopes) yield return (f.top, f.bottom);
+        foreach (var r in ExtraRopes) yield return r;
+    }
+
+    void FloodQueue(Queue<int> q, int[] di, int[] dj)
+    {
         while (q.Count > 0)
         {
             int id = q.Dequeue();

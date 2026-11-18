@@ -63,6 +63,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: coleta direta", TestDirectCollect);
             await RunAsync("Integração: goblin minerador e rebelião", TestGoblins);
             await RunAsync("Integração: construções (poste, funil, esteira, drone)", TestBuildings);
+            await RunAsync("Integração: cordas (poços, subir e descer, corda do jogador)", TestRopes);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
         catch (Exception e)
@@ -1032,7 +1033,7 @@ public partial class TestRunner : Node
         await Frames(20);
         Input.ParseInputEvent(new InputEventJoypadMotion { Axis = JoyAxis.RightX, AxisValue = 0f });
         await Frames(2);
-        Check(player.Yaw > yaw0 + 0.3f, $"analógico direito deve girar a câmera (yaw {yaw0:0.00} → {player.Yaw:0.00})");
+        Check(Mathf.AngleDifference(yaw0, player.Yaw) > 0.3f, $"analógico direito deve girar a câmera (yaw {yaw0:0.00} → {player.Yaw:0.00})");
         Check(InputHints.UsingPad && InputHints.Interact == "[X]", "dicas devem mudar para o controle");
 
         // gatilho direito minera
@@ -1090,7 +1091,27 @@ public partial class TestRunner : Node
             if (r.Index + 1 < GameData.Regions.Count) Check(L.Reachable(L.Exit.X, L.Exit.Z), $"{r.Id}: a saída para a próxima região é alcançável");
             Check(L.Chambers.Count(c => c.Wing != null) == r.Wings.Count, $"{r.Id}: câmaras de minério em destaque criadas");
             Check(L.Secrets.Count >= 1 && L.Crawls.Count == L.Secrets.Count, $"{r.Id}: há câmara secreta com túnel baixo");
-            foreach (var s2 in L.Secrets) Check(L.Reachable(s2.A.X, s2.A.Y), $"{r.Id}: câmara secreta alcançável (agachado)");
+            // nada fica sem volta: cada câmara tem chão alcançável (ida e volta) perto do centro
+            int isolated = 0;
+            foreach (var ch in L.Chambers)
+            {
+                bool any = false;
+                for (float dx = -ch.RA * 0.6f; dx <= ch.RA * 0.6f && !any; dx += 1f)
+                    for (float dz = -ch.RA * 0.6f; dz <= ch.RA * 0.6f && !any; dz += 1f)
+                        if (L.InGrid(ch.A.X + dx, ch.A.Y + dz) && L.Reachable(ch.A.X + dx, ch.A.Y + dz)) any = true;
+                if (!any) isolated++;
+            }
+            Check(isolated == 0, $"{r.Id}: todas as {L.Chambers.Count} câmaras têm volta ({isolated} isoladas)");
+            foreach (var pit in L.Pits)
+                Check(L.Reachable(pit.RopeTop.X, pit.RopeTop.Z) && L.Reachable(pit.RopeBottom.X, pit.RopeBottom.Z) && pit.RopeTop.Y - pit.RopeBottom.Y > 4f,
+                    $"{r.Id}: poço com corda ligando o fundo ({pit.RopeTop.Y - pit.RopeBottom.Y:0} m)");
+            Check(L.Pits.Count >= 1, $"{r.Id}: tem poços ({L.Pits.Count})");
+            Check(world.PitRopes.Count(rp => WorldBuilder.RegionAt(rp.Top).Id == r.Id) == L.Pits.Count + L.FixedRopes.Count, $"{r.Id}: corda fixa em cada poço/degrau ({L.FixedRopes.Count} degraus)");
+            foreach (var s2 in L.Secrets)
+            {
+                bool ok2 = L.Reachable(s2.A.X, s2.A.Y);
+                Check(ok2, $"{r.Id}: câmara secreta alcançável (agachado)");
+            }
             var crystals = world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == r.Index && !c.Material.Special).ToList();
             int onWall = crystals.Count(c => c.GlobalTransform.Basis.Y.Normalized().Y < 0.9f);
             Check(crystals.Count >= r.CrystalSlots, $"{r.Id}: depósitos suficientes ({crystals.Count})");
@@ -1362,6 +1383,83 @@ public partial class TestRunner : Node
         Check(GS.Data.Buildings.Count == 0 && bm.NodeCount == 0 && GS.Data.DroneOwned && bm.Drone != null, "renascimento: construções zeradas, drone mantido");
 
         Engine.TimeScale = 1;
+        root.QueueFree();
+        await Frames(2);
+        Fresh();
+    }
+
+    async Task TestRopes()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        player.SimulateCapturedMouse = true;
+        var bm = new BuildingManager { World = world, GetPlayer = () => player, CanUseBuildMode = () => false };
+        root.AddChild(bm);
+        Rope.PlayerPos = () => player.GlobalPosition;
+        GS.IsPlaying = true;
+        await Frames(3);
+        var L = world.Layouts[0];
+        Check(L.Pits.Count > 0 && world.PitRopes.Count > 0, $"há poços com corda na região inicial ({L.Pits.Count})");
+        var pit = L.Pits[0];
+        var rope = world.PitRopes.First(r => r.Top.DistanceTo(pit.RopeTop) < 0.1f);
+        // desce pelo poço
+        player.GlobalPosition = pit.TopExit + Vector3.Up * 0.1f;
+        await Frames(10);
+        Check(rope.PlayerAtTop() && rope.GetPrompt().Contains(Loc.T("Descer")), "perto do alto: a corda oferece descer");
+        rope.Interact(player);
+        Check(player.Climbing, "começa a escalar");
+        bool? up = null;
+        player.ClimbFinished += u => up = u;
+        for (int i = 0; i < 600 && player.Climbing; i++) await Frames(1);
+        await Frames(10);
+        Check(!player.Climbing && up == false, "chega ao fundo");
+        Check(player.GlobalPosition.Y < pit.RopeTop.Y - 4f && L.PitAt(player.GlobalPosition) != null, $"está no fundo do poço (y={player.GlobalPosition.Y:0.0})");
+        // sobe de volta
+        Check(!rope.PlayerAtTop() && rope.GetPrompt().Contains(Loc.T("Subir")), "no fundo: a corda oferece subir");
+        rope.Interact(player);
+        for (int i = 0; i < 600 && player.Climbing; i++) await Frames(1);
+        await Frames(20);
+        Check(up == true && player.GlobalPosition.DistanceTo(pit.TopExit) < 1.5f && player.IsOnFloor(), $"subiu e ficou em pé na borda (dist {player.GlobalPosition.DistanceTo(pit.TopExit):0.0})");
+        // pular solta a corda
+        rope.Interact(player);
+        await Frames(20);
+        Input.ParseInputEvent(new InputEventAction { Action = "jump", Pressed = true });
+        Input.FlushBufferedEvents();
+        await Frames(3);
+        Input.ParseInputEvent(new InputEventAction { Action = "jump", Pressed = false });
+        Input.FlushBufferedEvents();
+        await Frames(3);
+        Check(!player.Climbing, "pular solta a corda");
+        // corda do jogador: mirando na beira de outro poço (ou do mesmo, de outro lado)
+        GS.AddMoney(100000);
+        var other = L.Pits[^1];
+        var dirIn = new Vector3(other.Center.X, 0, other.Center.Y) - new Vector3(other.RopeTop.X, 0, other.RopeTop.Z);
+        var side = new Vector3(-dirIn.Z, 0, dirIn.X).Normalized();
+        bool placed = false;
+        foreach (float ang in new[] { 1.6f, -1.6f, 2.4f, -2.4f })
+        {
+            var lipDir = new Vector3(Mathf.Cos(ang) * dirIn.X - Mathf.Sin(ang) * dirIn.Z, 0, Mathf.Sin(ang) * dirIn.X + Mathf.Cos(ang) * dirIn.Z).Normalized();
+            var c = new Vector3(other.Center.X, 0, other.Center.Y);
+            var aim = L.OnGround(c.X - lipDir.X * (other.Radius + 1.6f), c.Z - lipDir.Z * (other.Radius + 1.6f));
+            var stand = L.OnGround(c.X - lipDir.X * (other.Radius + 4.5f), c.Z - lipDir.Z * (other.Radius + 4.5f));
+            if (!L.Reachable(stand.X, stand.Z)) continue;
+            if (bm.RopeFor(aim, stand, out var t, out var b, out var e, out _))
+            {
+                var bs = bm.PlaceRope(t, b, e);
+                placed = bs != null && bs.Type == BuildIds.Rope && bm.NodeOf(bs.Id) is Rope;
+                Check(placed && t.Y - b.Y > 4f, $"corda do jogador colocada na beira ({t.Y - b.Y:0} m)");
+                break;
+            }
+        }
+        Check(placed, "achou uma beira para jogar a corda");
+        Check(!bm.RopeFor(L.OnGround(L.Camp.A.X, L.Camp.A.Y), L.OnGround(L.Camp.A.X + 3, L.Camp.A.Y), out _, out _, out _, out _), "chão plano: não dá para jogar corda");
         root.QueueFree();
         await Frames(2);
         Fresh();

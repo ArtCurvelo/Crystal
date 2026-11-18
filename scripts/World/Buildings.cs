@@ -25,6 +25,7 @@ public partial class BuildingManager : Node3D
     public event Action<string, string, bool> BuildBarChanged;
 
     readonly Dictionary<int, Node3D> _nodes = new();
+    bool _bulk;
     readonly Dictionary<int, Belt> _belts = new();
     DroneBot _drone;
 
@@ -41,6 +42,8 @@ public partial class BuildingManager : Node3D
         foreach (var b in _belts.Values) b.QueueFree();
         _belts.Clear();
         var gs = GameState.Instance;
+        foreach (var L in World.Layouts) L.ExtraRopes.Clear();
+        _bulk = true;
         long refund = 0;
         foreach (var b in gs.Data.Buildings.ToList())
         {
@@ -55,6 +58,8 @@ public partial class BuildingManager : Node3D
             }
             Spawn(b);
         }
+        _bulk = false;
+        foreach (var L in World.Layouts) L.Reflood();
         if (refund > 0)
         {
             gs.AddMoney(refund);
@@ -67,6 +72,17 @@ public partial class BuildingManager : Node3D
     {
         var pos = new Vector3(b.X, b.Y, b.Z);
         Node3D node;
+        if (b.Type == BuildIds.Rope)
+        {
+            var rope = new Rope { BuildingId = b.Id, Top = pos, Bottom = new Vector3(b.BX, b.BY, b.BZ), TopExit = new Vector3(b.EX, b.EY, b.EZ), Name = $"Building_{b.Id}" };
+            AddChild(rope);
+            rope.SetMeta("building_id", b.Id);
+            _nodes[b.Id] = rope;
+            var Lr = World.LayoutAt(pos);
+            Lr.ExtraRopes.Add((rope.Top, rope.Bottom));
+            if (!_bulk) Lr.Reflood();
+            return;
+        }
         if (b.Type == BuildIds.Light)
         {
             var L = World.LayoutAt(pos);
@@ -109,6 +125,8 @@ public partial class BuildingManager : Node3D
     }
 
     public DroneBot Drone => _drone;
+    /// <summary>Posição de referência (a corda fica na origem e usa coordenadas absolutas).</summary>
+    static Vector3 PosOf(Node3D n) => n is Rope r ? r.Top : n.GlobalPosition;
     public IEnumerable<Hopper> Hoppers => _nodes.Values.OfType<Hopper>();
     public Belt BeltOf(int id) => _belts.TryGetValue(id, out var b) ? b : null;
     public Node3D NodeOf(int id) => _nodes.TryGetValue(id, out var n) ? n : null;
@@ -119,7 +137,7 @@ public partial class BuildingManager : Node3D
     {
         foreach (var n in _nodes.Values)
         {
-            bool v = !inHouse && Mathf.Abs(WorldBuilder.RegionAt(n.GlobalPosition).Index - playerRegion) <= 1;
+            bool v = !inHouse && Mathf.Abs(WorldBuilder.RegionAt(PosOf(n)).Index - playerRegion) <= 1;
             if (n.Visible != v) n.Visible = v;
         }
         foreach (var b in _belts.Values) b.Visible = !inHouse;
@@ -306,7 +324,7 @@ public partial class BuildingManager : Node3D
         var space = GetWorld3D().DirectSpaceState;
         var from = p.Camera.GlobalPosition;
         var dir = -p.Camera.GlobalTransform.Basis.Z;
-        _ray ??= new PhysicsRayQueryParameters3D { CollideWithAreas = false };
+        _ray ??= new PhysicsRayQueryParameters3D { CollideWithAreas = true };
         _ray.From = from;
         _ray.To = from + dir * 9f;
         _ray.CollisionMask = PlayerController.WorldLayer | PlayerController.InteractLayer;
@@ -328,6 +346,13 @@ public partial class BuildingManager : Node3D
         var gs = GameState.Instance;
         if (_aimBuilding > 0) { _valid = false; _reason = ""; return; }
         if (!_hasPoint) { _valid = false; _reason = Loc.T("Mire no chão"); return; }
+        if (Current.Id == BuildIds.Rope)
+        {
+            _valid = RopeFor(_point, p.GlobalPosition, out _ropeTop, out _ropeBottom, out _ropeExit, out _reason);
+            _route = _valid ? new List<Vector3> { _ropeTop + Vector3.Up * 0.3f, _ropeBottom } : null;
+            if (_valid && !gs.CanAfford(Current.Cost)) { _valid = false; _reason = Loc.T("Moeda insuficiente"); }
+            return;
+        }
         _valid = CanPlace(Current.Id, _point, out _reason);
         if (_valid && Current.Id == BuildIds.Hopper)
         {
@@ -342,6 +367,70 @@ public partial class BuildingManager : Node3D
             if (_route == null) { _valid = false; _reason = Loc.T("Sem caminho até a Estação de Venda"); }
         }
         if (_valid && !gs.CanAfford(TotalCost())) { _valid = false; _reason = Loc.T("Moeda insuficiente"); }
+    }
+
+    Vector3 _ropeTop, _ropeBottom, _ropeExit;
+
+    /// <summary>
+    /// Onde a corda fica: mirando na beira de um buraco (desce) ou numa borda acima (sobe).
+    /// Devolve o ponto de cima, o de baixo e onde o jogador sai em cima.
+    /// </summary>
+    public bool RopeFor(Vector3 aim, Vector3 playerPos, out Vector3 top, out Vector3 bottom, out Vector3 exit, out string reason)
+    {
+        top = bottom = exit = default;
+        reason = Loc.T("Mire na beira de um buraco ou numa borda acima");
+        var gs = GameState.Instance;
+        if (gs.BuildingLimitReached(BuildIds.Rope)) { reason = Loc.F("Limite atingido ({0})", BuildData.Of(BuildIds.Rope).Max); return false; }
+        var L = World.LayoutAt(aim);
+        if (!L.InGrid(aim.X, aim.Z) || PlayerHouse.Contains(aim)) return false;
+        var dir = new Vector3(aim.X - playerPos.X, 0, aim.Z - playerPos.Z);
+        if (dir.LengthSquared() < 0.04f) return false;
+        dir = dir.Normalized();
+        float aimG = L.Ground(aim.X, aim.Z);
+        bool Open(Vector3 q) => L.InGrid(q.X, q.Z) && L.WallDist(q.X, q.Z) < -0.5f && L.Ceiling(q.X, q.Z) - L.Ground(q.X, q.Z) > 1.9f;
+        Vector3 G(Vector3 q) => new(q.X, L.Ground(q.X, q.Z), q.Z);
+        // descendo: depois do ponto mirado o chão cai
+        for (float k = 0.3f; k < 3.6f; k += 0.25f)
+        {
+            var q = aim + dir * k;
+            if (!L.InGrid(q.X, q.Z)) break;
+            float drop = aimG - L.Ground(q.X, q.Z);
+            if (drop < 2.2f) continue;
+            var b = G(aim + dir * (k + 1.0f));
+            var t = G(aim + dir * Mathf.Max(0, k - 0.4f));
+            var e = G(t - dir * 1.1f);
+            if (!Open(b) || !Open(e) || t.Y - b.Y < 2.2f) break;
+            if (t.Y - b.Y > 26f) { reason = Loc.T("Fundo demais para a corda (máx. 25 m)"); return false; }
+            top = t; bottom = b; exit = e;
+            return NotNearOtherRope(top, ref reason);
+        }
+        // subindo: mirando numa borda acima do jogador
+        if (aimG - playerPos.Y >= 2.2f)
+        {
+            for (float k = 0f; k < 3.6f; k += 0.25f)
+            {
+                var q = aim - dir * k;
+                if (!L.InGrid(q.X, q.Z)) break;
+                if (aimG - L.Ground(q.X, q.Z) < 1.5f) continue;
+                var t = G(aim - dir * Mathf.Max(0, k - 0.4f));
+                var b = G(aim - dir * (k + 1.0f));
+                var e = G(t + dir * 1.1f);
+                if (!Open(b) || !Open(e) || t.Y - b.Y < 2.2f) break;
+                if (t.Y - b.Y > 26f) { reason = Loc.T("Alto demais para a corda (máx. 25 m)"); return false; }
+                top = t; bottom = b; exit = e;
+                return NotNearOtherRope(top, ref reason);
+            }
+        }
+        return false;
+    }
+
+    bool NotNearOtherRope(Vector3 top, ref string reason)
+    {
+        foreach (var n in _nodes.Values)
+            if (n is Rope r && r.Top.DistanceTo(top) < 1.5f) { reason = Loc.T("Já tem uma corda aqui"); return false; }
+        foreach (var r in World.PitRopes)
+            if (r.Top.DistanceTo(top) < 1.5f) { reason = Loc.T("Já tem uma corda aqui"); return false; }
+        return true;
     }
 
     long TotalCost() => Current.Cost + (Current.Id == BuildIds.Hopper && _route != null ? BeltCost(PathLength(_route)) : 0);
@@ -366,7 +455,7 @@ public partial class BuildingManager : Node3D
         if (clearance < (type == BuildIds.Light ? 2.4f : 2.2f)) { reason = Loc.T("Teto baixo demais"); return false; }
         float minGap = type == BuildIds.Hopper ? 2.4f : 1.3f;
         foreach (var n in _nodes.Values)
-            if (n.GlobalPosition.DistanceTo(pt) < minGap) { reason = Loc.T("Muito perto de outra construção"); return false; }
+            if (PosOf(n).DistanceTo(pt) < minGap) { reason = Loc.T("Muito perto de outra construção"); return false; }
         foreach (var st in new Node3D[] { World.SellStation, World.Elevator })
             if (st != null && st.GlobalPosition.DistanceTo(pt) < 3f) { reason = Loc.T("Muito perto de uma estação"); return false; }
         foreach (var c in World.Crystals)
@@ -397,13 +486,30 @@ public partial class BuildingManager : Node3D
             if (!string.IsNullOrEmpty(_reason)) GameState.Instance.Notify("Não dá para construir aqui", _reason, NotifyKind.Warning);
             return;
         }
+        if (Current.Id == BuildIds.Rope) { PlaceRope(_ropeTop, _ropeBottom, _ropeExit); return; }
         Place(Current.Id, _point, _yaw, _route);
+    }
+
+    /// <summary>Coloca uma corda já calculada (pontas e saída).</summary>
+    public BuildingSave PlaceRope(Vector3 top, Vector3 bottom, Vector3 exit)
+    {
+        var gs = GameState.Instance;
+        var b = gs.TryBuild(BuildIds.Rope, top, 0);
+        if (b == null) return null;
+        b.BX = bottom.X; b.BY = bottom.Y; b.BZ = bottom.Z;
+        b.EX = exit.X; b.EY = exit.Y; b.EZ = exit.Z;
+        Spawn(b);
+        AudioManager.Instance?.Play("swing", -2f, 0.6f);
+        AudioManager.Instance?.Play("thud", -8f, 1.4f);
+        _route = null;
+        return b;
     }
 
     /// <summary>Constrói (paga e cria). Para o funil, o trajeto pode ser passado (senão é calculado).</summary>
     public BuildingSave Place(string type, Vector3 pt, float yaw, List<Vector3> route = null)
     {
         var gs = GameState.Instance;
+        if (type == BuildIds.Rope) return null; // use PlaceRope
         if (type == BuildIds.Hopper) { route ??= RouteToSell(pt); if (route == null) return null; }
         long extra = type == BuildIds.Hopper ? BeltCost(PathLength(route)) : 0;
         if (type == BuildIds.Drone)
@@ -434,7 +540,13 @@ public partial class BuildingManager : Node3D
         if (b == null) return;
         string name = BuildData.Of(b.Type).Name;
         long refund = gs.Demolish(id);
-        if (_nodes.TryGetValue(id, out var n)) { Effects.Instance?.Burst(n.GlobalPosition + Vector3.Up * 0.5f, new Color(1f, 0.6f, 0.3f), 0.5f); n.QueueFree(); _nodes.Remove(id); }
+        if (_nodes.TryGetValue(id, out var rn) && rn is Rope rp)
+        {
+            var Lr = World.LayoutAt(rp.Top);
+            Lr.ExtraRopes.Remove((rp.Top, rp.Bottom));
+            Lr.Reflood();
+        }
+        if (_nodes.TryGetValue(id, out var n)) { Effects.Instance?.Burst(PosOf(n) + Vector3.Up * 0.5f, new Color(1f, 0.6f, 0.3f), 0.5f); n.QueueFree(); _nodes.Remove(id); }
         if (_belts.TryGetValue(id, out var belt)) { belt.QueueFree(); _belts.Remove(id); }
         AudioManager.Instance?.Play("thud", -6f, 1.2f);
         gs.Notify(Loc.F("{0} desmontado", name), Loc.F("Devolvido: {0}", GameState.FormatMoney(refund)), NotifyKind.Info);
@@ -460,6 +572,9 @@ public partial class BuildingManager : Node3D
                     _ghost.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.9f, BottomRadius = 0.3f, Height = 0.8f }, Position = new Vector3(0, 1.3f, 0) });
                     _ghost.AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = BuildData.HopperPullRadius - 0.12f, OuterRadius = BuildData.HopperPullRadius, Rings = 64, RingSegments = 4 }, Position = new Vector3(0, 0.15f, 0) });
                     break;
+                case BuildIds.Rope:
+                    _ghost.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.07f, Height = 0.7f }, Position = new Vector3(0, 0.35f, 0) });
+                    break;
                 default:
                     _ghost.AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.35f, Height = 0.3f }, Position = new Vector3(0, 1.2f, 0) });
                     break;
@@ -470,11 +585,11 @@ public partial class BuildingManager : Node3D
         _ghost.Visible = show;
         if (show)
         {
-            _ghost.GlobalPosition = _point;
+            _ghost.GlobalPosition = Current.Id == BuildIds.Rope && _valid ? _ropeTop : _point;
             _ghost.Rotation = new Vector3(0, _yaw, 0);
             foreach (var c in _ghost.GetChildren().OfType<MeshInstance3D>()) c.MaterialOverride = _valid ? _ghostOk : _ghostBad;
         }
-        _routeLine.Visible = show && Current.Id == BuildIds.Hopper && _route != null;
+        _routeLine.Visible = show && (Current.Id == BuildIds.Hopper || Current.Id == BuildIds.Rope) && _route != null;
         if (_routeLine.Visible) DrawRoute(_route);
     }
 
@@ -538,6 +653,8 @@ public partial class BuildingManager : Node3D
         {
             var def = Current;
             string cost = GameState.FormatMoney(TotalCost());
+            if (def.Id == BuildIds.Rope && _valid)
+                cost = Loc.F("{0} · {1:0} m", GameState.FormatMoney(def.Cost), _ropeTop.DistanceTo(_ropeBottom));
             if (def.Id == BuildIds.Hopper && _route != null)
                 cost = Loc.F("{0} (funil {1} + esteira {2:0} m)", GameState.FormatMoney(TotalCost()), GameState.FormatMoney(def.Cost), PathLength(_route));
             title = $"{def.Name} · {cost}";

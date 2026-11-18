@@ -378,9 +378,10 @@ public partial class PlaythroughBot : Node
             var btn = FindButtons(choice).First(b => pay ? b.Text.StartsWith("Pagar") : b.Text == "Não pagar");
             if (pay && btn.Disabled) btn = FindButtons(choice).First(b => b.Text == "Não pagar");
             bool paying = !btn.Text.StartsWith("Não");
-            long money = GS.Data.Money, fee = GS.GoblinFee(gid);
+            long money = GS.Data.Money, fee = GS.GoblinFee(gid), belt0 = _beltSold;
             btn.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames(3);
+            money += _beltSold - belt0; // a esteira continua vendendo sozinha nesses quadros
             // depois da cobrança o dia termina e pode entrar o "Bônus do turno" (habilidade)
             if (paying) { _feesPaid++; if (GS.GoblinData(gid).Strikes != 0 || GS.Data.Money != money - fee + GS.Data.DayBonus) { _errors++; Log($"ERRO: pagamento ao goblin não aplicou ({money} - {fee} + {GS.Data.DayBonus} ≠ {GS.Data.Money})"); } }
             else { _feesSkipped++; if (GS.GoblinData(gid).Strikes != strikes + 1) { _errors++; Log("ERRO: falta de pagamento não contou"); } else if (_feesSkipped == 1) Log("Não pagou o Grub (ele perdoou a 1ª vez)"); }

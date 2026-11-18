@@ -38,6 +38,13 @@ public partial class WorldBuilder : Node3D
 
     public override void _Process(double delta)
     {
+        long __t = Core.Prof.Start();
+        _ProcessInner(delta);
+        Core.Prof.End("world", __t);
+    }
+
+    void _ProcessInner(double delta)
+    {
         if (++_tick % 30 == 0) UpdateRespawnRates();
     }
 
@@ -173,6 +180,21 @@ public partial class WorldBuilder : Node3D
             }
         }
 
+        // poços: corda fixa (sempre dá para voltar) e espaço livre em volta dela
+        foreach (var pit in L.Pits)
+        {
+            reserved.Add(pit.RopeTop); reserved.Add(pit.TopExit); reserved.Add(pit.RopeBottom);
+            var rope = new Rope { Name = "PitRope", Top = pit.RopeTop, Bottom = pit.RopeBottom, TopExit = pit.TopExit };
+            root.AddChild(rope);
+            PitRopes.Add(rope);
+        }
+        foreach (var (top, bottom, exit) in L.FixedRopes)
+        {
+            reserved.Add(top); reserved.Add(exit); reserved.Add(bottom);
+            var rope = new Rope { Name = "FixedRope", Top = top, Bottom = bottom, TopExit = exit };
+            root.AddChild(rope);
+            PitRopes.Add(rope);
+        }
         BeginSolids(root, L, reserved);
         BuildDecoration(root, r, L, rng);
         BuildLights(root, r, L);
@@ -184,6 +206,7 @@ public partial class WorldBuilder : Node3D
     }
 
     public readonly List<GoblinCamp> GoblinCamps = new();
+    public readonly List<Rope> PitRopes = new();
 
     void BuildGoblinCamp(RegionDef r, CaveLayout L, int index, Vector3 hut, float yaw, List<Vector3> reserved)
     {
@@ -457,6 +480,24 @@ public partial class WorldBuilder : Node3D
                 placed.Add(p);
             }
         }
+        // poços: tesouro no fundo (raro da região com mais chance + minério valioso)
+        foreach (var pit in L.Pits)
+        {
+            var best = r.Spawns[^1].MaterialId;
+            for (int k = 0; k < 3; k++)
+            {
+                float a = Mathf.Tau * k / 3 + 1.1f;
+                var p = L.OnGround(pit.Center.X + Mathf.Cos(a) * pit.Radius * 0.45f, pit.Center.Y + Mathf.Sin(a) * pit.Radius * 0.45f);
+                if (NearPlaced(p, 2.2f) || p.DistanceTo(pit.RopeBottom) < 1.6f) continue;
+                if (!FindStand(L, p, rng, out var stand) || !ClearShot(stand, p + Vector3.Up * 0.5f, p)) continue;
+                var mat = GameData.Mat(rng.NextDouble() < r.RareChance * 5f ? r.RareMaterialId : best);
+                var c = MakeCrystal(root, mat, p, rng, 1.05f, null);
+                c.StandPoint = stand;
+                var pr = r; var pl = L; var pp = p;
+                c.PickMaterial = rr => MaterialFor(pr, pl, pp, rr);
+                placed.Add(p);
+            }
+        }
         // na região inicial, garante depósitos fáceis perto do elevador
         if (L.Camp != null)
         {
@@ -562,8 +603,17 @@ public partial class WorldBuilder : Node3D
         var far = p + L.Inward(p.X, p.Z) * (r * 1.6f + 2.4f);
         if (L.WallDist(far.X, far.Z) > -1.4f) return false;
         foreach (var q in _solidReserved) if (new Vector2(q.X - p.X, q.Z - p.Z).Length() < r + 3.5f) return false;
+        // entre dois obstáculos sempre sobra passagem (nada de "muros" fechando corredores)
+        int ci = Mathf.FloorToInt(p.X / 8f), cj = Mathf.FloorToInt(p.Z / 8f);
+        for (int i = ci - 1; i <= ci + 1; i++)
+            for (int j = cj - 1; j <= cj + 1; j++)
+                if (_blockDiscs.TryGetValue((i, j), out var list))
+                    foreach (var (c, cr) in list)
+                        if (new Vector2(c.X - p.X, c.Z - p.Z).Length() < r + cr + 2.2f) return false;
         return true;
     }
+
+    readonly Dictionary<(int, int), List<(Vector3 c, float r)>> _blockDiscs = new();
 
     /// <summary>Adiciona colisão a um objeto do cenário e (opcionalmente) bloqueia o chão no grid.</summary>
     // aproximação por esferas dos obstáculos, numa grade de 4 m (para testar linha de mira na criação dos depósitos)
@@ -638,7 +688,13 @@ public partial class WorldBuilder : Node3D
     void Solid(Shape3D shape, Transform3D xf, Vector3 floorPos, float blockRadius)
     {
         if (shape != null) { _solidBody.AddChild(new CollisionShape3D { Shape = shape, Transform = xf }); HashShape(shape, xf); }
-        if (blockRadius > 0) _solidLayout.Block(floorPos, blockRadius);
+        if (blockRadius > 0)
+        {
+            _solidLayout.Block(floorPos, blockRadius);
+            var key = (Mathf.FloorToInt(floorPos.X / 8f), Mathf.FloorToInt(floorPos.Z / 8f));
+            if (!_blockDiscs.TryGetValue(key, out var list)) _blockDiscs[key] = list = new();
+            list.Add((floorPos, blockRadius));
+        }
     }
 
     // =================== Decoração ===================

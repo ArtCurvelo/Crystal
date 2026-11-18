@@ -171,6 +171,8 @@ public partial class Crystal : StaticBody3D
             SetGlow(_baseEnergy + pulse, 1f - HpRatio, 0f);
             if (Material.Special) _visual.RotateY(dt * 0.15f);
         }
+        // parado e comum: não precisa rodar a cada quadro (milhares de depósitos no mapa)
+        else SetProcess(false);
     }
 
     void SetGlow(float energy, float damage, float flash)
@@ -191,6 +193,7 @@ public partial class Crystal : StaticBody3D
     {
         _sink = sink;
         if (State != CrystalState.Active) return false;
+        SetProcess(true);
         Hp -= damage;
         _flash = 1f;
         _shake = 1f;
@@ -262,5 +265,5 @@ public partial class Crystal : StaticBody3D
     }
 
     /// <summary>Força o renascimento imediato (usado por testes).</summary>
-    public void DebugRespawnNow() { if (State == CrystalState.Broken) _respawnTimer = 0; }
+    public void DebugRespawnNow() { if (State == CrystalState.Broken) { _respawnTimer = 0; SetProcess(true); } }
 }

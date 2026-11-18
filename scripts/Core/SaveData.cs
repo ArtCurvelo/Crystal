@@ -186,6 +186,13 @@ public sealed class BuildingSave
     public float Y { get; set; }
     public float Z { get; set; }
     public float Yaw { get; set; }
+    /// <summary>Corda: ponta de baixo e ponto onde o jogador sai em cima.</summary>
+    public float BX { get; set; }
+    public float BY { get; set; }
+    public float BZ { get; set; }
+    public float EX { get; set; }
+    public float EY { get; set; }
+    public float EZ { get; set; }
     /// <summary>Quanto foi pago (esteira incluída): base da devolução ao desmontar.</summary>
     public long Paid { get; set; }
     /// <summary>Funil: fragmentos esperando para entrar na esteira.</summary>

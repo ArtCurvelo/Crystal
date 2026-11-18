@@ -357,3 +357,15 @@ Pedido do diretor: mais regiões (o mapa cresce a cada atualização).
 - **Reflexos e água** (pedido do diretor): reflexos em tempo real (SSR) nas qualidades Média/Alta; chão das cavernas com poças e manchas molhadas que refletem; água nova (refração do fundo, cor pela profundidade, fresnel, ondulações, cáusticas, espuma nas bordas) no lago do Reservatório, nas poças das cachoeiras e das Profundezas.
 - Bot: fica na jornada principal (as regiões de fim de jogo têm teste próprio de balanceamento); não acusa erro quando o turno acaba no meio das compras.
 - Testes 549/549.
+
+## Mapa colossal, poços e corda (em andamento para a v0.8.0)
+Pedido do diretor: mapa colossal com muitos túneis, buracos e decoração, mas sempre com volta ("se o cara cair num buraco e não conseguir voltar é meio merda"); uma corda comprável para descer e subir, com animação.
+- **Regiões ~1,8× maiores** (R1 250×240 m … Catedral 320×300 m), posições calculadas automaticamente; mais nós no caminho, mais câmaras (proporcional à área), **túneis em laço** ligando câmaras, mais câmaras secretas; ~1.730 depósitos.
+- **Poços**: buracos de 7–13 m dentro de câmaras grandes, com tesouro no fundo (raro da região com mais chance) e **corda fixa** para subir. Um poço que isolaria qualquer parte da caverna é desfeito.
+- **Nada fica sem volta**: depois de gerar a caverna, toda área isolada (câmara num degrau alto, bolsão fechado) ganha uma corda fixa ou um túnel escavado até a parte alcançável. Obstáculos do cenário sempre deixam 2,2 m de passagem entre si. Teste: todas as câmaras de todas as regiões têm volta.
+- **Corda** (◈ 300, no modo construção): mira na beira de um buraco para descer ou numa borda acima para subir (até 25 m); a área ligada passa a contar como alcançável.
+- **Escalar**: E na corda sobe/desce com animação em primeira pessoa (punhos alternando nos nós, braços, balanço da cabeça, rangido), lanterna suavizada perto da parede, e no alto o personagem sobe na borda; pular solta a corda.
+- **Resgate** no menu de pausa: volta para a entrada da região (segurança para qualquer caso).
+- Painel de admin: "Ir: poço".
+- **Desempenho**: depósitos parados não rodam mais lógica a cada quadro (cortou mais da metade do tempo de scripts com ~1.730 depósitos); `--perf` imprime os tempos por sistema. Scripts do jogo ~0,6 ms/quadro em média.
+- Testes 590/590. Bot: jornada completa no mapa maior (Coração aos 64,7 min de jogo, caminhada real até o Reservatório), funil, drone e painel de admin; a conta da taxa do goblin agora desconta o que a esteira vende sozinha no meio da checagem.

@@ -163,6 +163,13 @@ public partial class ShardManager : Node3D
 
     public override void _PhysicsProcess(double delta)
     {
+        long __t = Core.Prof.Start();
+        _PhysicsInner(delta);
+        Core.Prof.End("shards", __t);
+    }
+
+    void _PhysicsInner(double delta)
+    {
         float dt = (float)delta;
         _comboTimer -= dt;
         _fullWarnCooldown -= dt;

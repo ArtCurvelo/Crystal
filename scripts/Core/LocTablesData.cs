@@ -7,6 +7,18 @@ public static partial class LocTables
 {
     static partial void Fill(List<(string pt, string en, string es)> list)
     {
+        list.Add(("Corda", "Rope", "Cuerda"));
+        list.Add(("Mire na beira de um buraco para descer, ou numa borda acima para subir. Depois é só usar (E).", "Aim at the edge of a hole to go down, or at a ledge above to go up. Then just use it (E).", "Apunta al borde de un agujero para bajar, o a una cornisa arriba para subir. Luego úsala (E)."));
+        list.Add(("Mire na beira de um buraco ou numa borda acima", "Aim at the edge of a hole or at a ledge above", "Apunta al borde de un agujero o a una cornisa arriba"));
+        list.Add(("Fundo demais para a corda (máx. 25 m)", "Too deep for the rope (max 25 m)", "Demasiado hondo para la cuerda (máx. 25 m)"));
+        list.Add(("Alto demais para a corda (máx. 25 m)", "Too high for the rope (max 25 m)", "Demasiado alto para la cuerda (máx. 25 m)"));
+        list.Add(("Já tem uma corda aqui", "There is already a rope here", "Ya hay una cuerda aquí"));
+        list.Add(("{0} · {1:0} m", "{0} · {1:0} m", "{0} · {1:0} m"));
+        list.Add(("{0} Descer pela corda ({1:0} m)", "{0} Climb down the rope ({1:0} m)", "{0} Bajar por la cuerda ({1:0} m)"));
+        list.Add(("{0} Subir pela corda ({1:0} m)", "{0} Climb up the rope ({1:0} m)", "{0} Subir por la cuerda ({1:0} m)"));
+        list.Add(("Resgate: voltar à entrada da região", "Rescue: return to the region entrance", "Rescate: volver a la entrada de la región"));
+        list.Add(("Resgate", "Rescue", "Rescate"));
+        list.Add(("Você voltou para a entrada da região.", "You are back at the region entrance.", "Volviste a la entrada de la región."));
         list.Add(("Esporita", "Sporite", "Esporita"));
         list.Add(("Cristal poroso que solta esporos luminosos a cada golpe.", "A porous crystal that releases glowing spores with every hit.", "Cristal poroso que suelta esporas luminosas con cada golpe."));
         list.Add(("Jade Vivo", "Living Jade", "Jade Vivo"));

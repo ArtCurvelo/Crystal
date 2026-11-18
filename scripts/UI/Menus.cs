@@ -371,19 +371,19 @@ public partial class SettingsScreen : ModalScreen
 /// <summary>Menu de pausa.</summary>
 public partial class PauseScreen : ModalScreen
 {
-    public Action OnResume, OnSave, OnSettings, OnCodex, OnHelp, OnMainMenu, OnQuit;
+    public Action OnResume, OnSave, OnSettings, OnCodex, OnHelp, OnMainMenu, OnQuit, OnRescue;
     Label _stats;
 
     public override void _Ready()
     {
-        BuildFrame("PAUSA", new Vector2(440, 0), UiTheme.Violet);
+        BuildFrame("PAUSA", new Vector2(480, 0), UiTheme.Violet);
         _stats = UiTheme.Label("", 15, UiTheme.Muted);
         Body.AddChild(_stats);
         Body.AddChild(UiTheme.Spacer(4));
         foreach (var (text, act) in new (string, Func<Action>)[]
                  {
                      ("Continuar", () => OnResume), ("Salvar jogo", () => OnSave), ("Coleção", () => OnCodex), ("Como jogar", () => OnHelp), ("Configurações", () => OnSettings),
-                     ("Menu principal", () => OnMainMenu), ("Sair do jogo", () => OnQuit)
+                     ("Resgate: voltar à entrada da região", () => OnRescue), ("Menu principal", () => OnMainMenu), ("Sair do jogo", () => OnQuit)
                  })
         {
             var b = UiTheme.Button(text, () => act()?.Invoke(), 0, 22);

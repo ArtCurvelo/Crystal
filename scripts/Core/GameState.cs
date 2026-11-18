@@ -50,6 +50,13 @@ public partial class GameState : Node
 
     public override void _Process(double delta)
     {
+        long __t = Core.Prof.Start();
+        _ProcessInner(delta);
+        Core.Prof.End("gamestate", __t);
+    }
+
+    void _ProcessInner(double delta)
+    {
         if (!IsPlaying || GetTree().Paused) return;
         Data.PlayTimeSeconds += delta;
         TickDay(delta);

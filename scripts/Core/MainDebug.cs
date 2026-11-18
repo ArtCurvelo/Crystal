@@ -15,7 +15,7 @@ public partial class Main
 {
     public static readonly string DebugHelp =
         "dinheiro N · tudo · regioes · melhorias · habilidades · casa · mochila · goblins · drone · curar\n" +
-        "ir 1-6 · ir coracao · ir acampamento · ir goblin · hora HH · fimdia · novodia · velocidade N\n" +
+        "ir 1-6 · ir coracao · ir acampamento · ir goblin · ir poco · hora HH · fimdia · novodia · velocidade N\n" +
         "rebeliao · evento · renascer · construcoes (◈ para testar) · ajuda";
 
     /// <summary>Executa um comando de admin e devolve o resultado (texto).</summary>
@@ -79,6 +79,13 @@ public partial class Main
                 Vector3 to;
                 if (arg is "coracao" or "heart") to = World.Layouts[2].OnGround(World.Layouts[2].Heart.A.X, World.Layouts[2].Heart.A.Y + World.Layouts[2].Heart.RA - 4f);
                 else if (arg is "acampamento" or "camp" or "") to = World.SpawnPoint;
+                else if (arg is "poco" or "pit")
+                {
+                    var L = World.LayoutAt(Player.GlobalPosition);
+                    if (L.Pits.Count == 0) return "Sem poço nesta região";
+                    var pit = L.Pits.OrderBy(pt => pt.TopExit.DistanceTo(Player.GlobalPosition)).First();
+                    to = pit.TopExit;
+                }
                 else if (arg is "goblin")
                 {
                     int ri = WorldBuilder.RegionAt(Player.GlobalPosition).Index;

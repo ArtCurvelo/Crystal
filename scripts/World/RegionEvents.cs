@@ -54,6 +54,13 @@ public partial class RegionEvents : Node
 
     public override void _Process(double delta)
     {
+        long __t = Core.Prof.Start();
+        _ProcessInner(delta);
+        Core.Prof.End("events", __t);
+    }
+
+    void _ProcessInner(double delta)
+    {
         var gs = GameState.Instance;
         if (gs == null || !gs.IsPlaying || GetTree().Paused) return;
         float dt = (float)delta;

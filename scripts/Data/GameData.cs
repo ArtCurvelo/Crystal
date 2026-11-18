@@ -487,8 +487,8 @@ public static class GameData
             FogColor = new Color(0.07f, 0.03f, 0.14f), FogDensity = 0.018f,
             RockColor = new Color(0.38f, 0.32f, 0.34f), AccentColor = new Color(0.15f, 1.0f, 1.0f),
             LightColor = new Color(1.0f, 0.35f, 0.85f),
-            RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 130,
-            CenterZ = 0, HalfX = 95, HalfZ = 90, Height = 18
+            RareMaterialId = "sunstone", RareChance = 0.05f, CrystalSlots = 220,
+            CenterZ = 0, HalfX = 125, HalfZ = 120, Height = 18
         };
 r1.Spawns.Add(new SpawnEntry("quartz", 0.4f));
         r1.Spawns.Add(new SpawnEntry("copper", 0.25f));
@@ -507,8 +507,8 @@ r1.Spawns.Add(new SpawnEntry("quartz", 0.4f));
             FogColor = new Color(0.02f, 0.08f, 0.18f), FogDensity = 0.026f,
             RockColor = new Color(0.3f, 0.34f, 0.4f), AccentColor = new Color(0.1f, 1.0f, 0.65f),
             LightColor = new Color(0.25f, 0.6f, 1.0f),
-            RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 160,
-            CenterZ = -204, HalfX = 110, HalfZ = 100, Height = 22
+            RareMaterialId = "starprism", RareChance = 0.06f, CrystalSlots = 270,
+            CenterZ = 0, HalfX = 145, HalfZ = 135, Height = 22
         };
 r2.Spawns.Add(new SpawnEntry("sapphire", 0.26f));
         r2.Spawns.Add(new SpawnEntry("frostice", 0.2f));
@@ -530,8 +530,8 @@ r2.Spawns.Add(new SpawnEntry("sapphire", 0.26f));
             FogColor = new Color(0.14f, 0.03f, 0.1f), FogDensity = 0.022f,
             RockColor = new Color(0.38f, 0.25f, 0.22f), AccentColor = new Color(1.0f, 0.5f, 0.1f),
             LightColor = new Color(1.0f, 0.2f, 0.6f),
-            RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 170,
-            CenterZ = -423, HalfX = 115, HalfZ = 105, Height = 28
+            RareMaterialId = "voidpearl", RareChance = 0.05f, CrystalSlots = 290,
+            CenterZ = 0, HalfX = 150, HalfZ = 140, Height = 28
         };
 r3.Spawns.Add(new SpawnEntry("ruby", 0.26f));
         r3.Spawns.Add(new SpawnEntry("obsidian", 0.2f));
@@ -553,8 +553,8 @@ r3.Spawns.Add(new SpawnEntry("ruby", 0.26f));
             FogColor = new Color(0.01f, 0.09f, 0.14f), FogDensity = 0.024f,
             RockColor = new Color(0.25f, 0.32f, 0.33f), AccentColor = new Color(1.0f, 0.25f, 0.85f),
             LightColor = new Color(0.2f, 0.95f, 1.0f),
-            RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 170,
-            CenterZ = -647, HalfX = 115, HalfZ = 105, Height = 26
+            RareMaterialId = "abyssaltear", RareChance = 0.05f, CrystalSlots = 290,
+            CenterZ = 0, HalfX = 150, HalfZ = 140, Height = 26
         };
 r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
         r4.Spawns.Add(new SpawnEntry("lapis", 0.2f));
@@ -574,8 +574,8 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             FogColor = new Color(0.04f, 0.1f, 0.05f), FogDensity = 0.024f,
             RockColor = new Color(0.3f, 0.3f, 0.26f), AccentColor = new Color(0.55f, 1.0f, 0.3f),
             LightColor = new Color(1.0f, 0.35f, 0.85f),
-            RareMaterialId = "primalseed", RareChance = 0.05f, CrystalSlots = 175,
-            CenterZ = -876, HalfX = 120, HalfZ = 110, Height = 30
+            RareMaterialId = "primalseed", RareChance = 0.05f, CrystalSlots = 300,
+            CenterZ = 0, HalfX = 155, HalfZ = 145, Height = 30
         };
         r5.Spawns.Add(new SpawnEntry("sporite", 0.32f));
         r5.Spawns.Add(new SpawnEntry("jade", 0.26f));
@@ -594,8 +594,8 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
             FogColor = new Color(0.07f, 0.05f, 0.14f), FogDensity = 0.02f,
             RockColor = new Color(0.36f, 0.34f, 0.4f), AccentColor = new Color(0.85f, 0.75f, 1.0f),
             LightColor = new Color(1.0f, 0.8f, 0.45f),
-            RareMaterialId = "eternaldiamond", RareChance = 0.05f, CrystalSlots = 180,
-            CenterZ = -1115, HalfX = 125, HalfZ = 115, Height = 38
+            RareMaterialId = "eternaldiamond", RareChance = 0.05f, CrystalSlots = 310,
+            CenterZ = 0, HalfX = 160, HalfZ = 150, Height = 38
         };
         r6.Spawns.Add(new SpawnEntry("smokyquartz", 0.32f));
         r6.Spawns.Add(new SpawnEntry("tanzanite", 0.26f));
@@ -605,6 +605,14 @@ r4.Spawns.Add(new SpawnEntry("tidecrystal", 0.32f));
         r6.Wings.Add(new WingDef { Id = "prism_nave", Name = "Nave dos Prismas", Side = -1, ZOffset = -4, FeaturedMaterialId = "tanzanite", Slots = 11, HalfX = 15, HalfZ = 14 });
         r6.Wings.Add(new WingDef { Id = "diamond_crypt", Name = "Cripta dos Diamantes", Side = 1, ZOffset = 4, FeaturedMaterialId = "diamond", Slots = 11, HalfX = 15, HalfZ = 14 });
         Regions.Add(r6);
+
+        // posições em Z: cada região começa onde a anterior termina + túnel (a entrada do acampamento fica em z = 90)
+        float top = 90f;
+        foreach (var r in Regions)
+        {
+            r.CenterZ = top - r.HalfZ;
+            top = r.CenterZ - r.HalfZ - RegionDef.TunnelLength;
+        }
 
         // ---------------- Upgrades ----------------
         AddUp(new UpgradeDef

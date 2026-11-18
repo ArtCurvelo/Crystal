@@ -649,6 +649,13 @@ public partial class Hud : CanvasLayer
 
     public override void _Process(double delta)
     {
+        long __t = Core.Prof.Start();
+        _ProcessInner(delta);
+        Core.Prof.End("hud", __t);
+    }
+
+    void _ProcessInner(double delta)
+    {
         float dt = (float)delta;
         var gs = GameState.Instance;
         long target = gs.Data.Money;

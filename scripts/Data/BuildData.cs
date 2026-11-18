@@ -17,7 +17,7 @@ public sealed class BuildDef
 
 public static class BuildIds
 {
-    public const string Light = "light", Hopper = "hopper", Drone = "drone";
+    public const string Light = "light", Hopper = "hopper", Drone = "drone", Rope = "rope";
 }
 
 public static class BuildData
@@ -36,6 +36,7 @@ public static class BuildData
 
     public static readonly List<BuildDef> All = new()
     {
+        new BuildDef { Id = BuildIds.Rope, Name = "Corda", Description = "Mire na beira de um buraco para descer, ou numa borda acima para subir. Depois é só usar (E).", Cost = 300, Max = 40 },
         new BuildDef { Id = BuildIds.Light, Name = "Poste de luz", Description = "Ilumina a área ao redor.", Cost = 150, Max = 120 },
         new BuildDef { Id = BuildIds.Hopper, Name = "Funil + esteira", Description = "Puxa fragmentos soltos e leva tudo pela esteira até a Estação de Venda, que vende sozinha.", Cost = 2500, Max = 8 },
         new BuildDef { Id = BuildIds.Drone, Name = "Drone coletor", Description = "Segue você, recolhe fragmentos espalhados e leva ao funil quando a mochila enche.", Cost = 6000, Max = 1 },
