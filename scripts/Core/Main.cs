@@ -54,7 +54,20 @@ public partial class Main : Node
             AddChild(new Tests.TestRunner());
             return;
         }
+        // escolha do renderizador antes de montar o mundo (pode testar e reiniciar com outro)
+        if (Rendering.RenderBootstrap.ShouldRun(args))
+        {
+            AddChild(new Rendering.RenderBootstrap { OnContinue = () => BuildGame(args) });
+            return;
+        }
+        BuildGame(args);
+    }
 
+    /// <summary>Monta o mundo, as telas e inicia (depois da escolha do renderizador).</summary>
+    void BuildGame(string[] args)
+    {
+        // teste automático de recuperação: simula o jogo caindo antes do menu neste renderizador
+        if (args.Contains("--x-boot-crash=" + Rendering.RenderMethods.Current)) { OS.Kill(OS.GetProcessId()); return; }
         var world3d = new Node3D { Name = "World3D" };
         world3d.ProcessMode = ProcessModeEnum.Pausable;
         AddChild(world3d);
@@ -267,6 +280,14 @@ public partial class Main : Node
 
     async void Boot(string[] args)
     {
+        // processo de teste de renderizador: mede a cena real e fecha (sem menu, sem atualizador)
+        var probe = args.FirstOrDefault(a => a.StartsWith("--render-probe="));
+        if (probe != null)
+        {
+            AddChild(new Rendering.RenderProbe { Main = this, Method = probe.Substring("--render-probe=".Length),
+                OutPath = args.FirstOrDefault(a => a.StartsWith("--probe-out="))?.Substring("--probe-out=".Length) ?? "user://probe.json" });
+            return;
+        }
         var loading = BuildLoadingOverlay();
         foreach (var r in World.RegionRoots) r.Visible = true;
         _menuCam.Current = true;
@@ -281,6 +302,7 @@ public partial class Main : Node
         loading.QueueFree();
         _booting = false;
         ShowMenu();
+        Rendering.RenderBootstrap.MarkBootOk(this);
         _updater.CheckForUpdates();
 
 
@@ -295,6 +317,8 @@ public partial class Main : Node
         }
         // reaberto pelo atualizador: continua a partida de onde parou
         else if (args.Contains("--continue") && SaveSystem.HasSave()) StartGame(true);
+        var matrix = args.FirstOrDefault(a => a.StartsWith("--render-matrix="));
+        if (matrix != null) AddChild(new Tests.RenderMatrix { Main = this, Dir = matrix.Substring("--render-matrix=".Length) });
         var shots = args.FirstOrDefault(a => a.StartsWith("--shots="));
         if (shots != null) AddChild(new Tests.ScreenshotTour { Main = this, Dir = shots.Substring("--shots=".Length) });
         if (args.Contains("--bench"))

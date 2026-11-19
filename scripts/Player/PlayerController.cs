@@ -264,7 +264,7 @@ public partial class PlayerController : CharacterBody3D
         if (Camera == null) return;
         if (Lamp != null)
         {
-            Lamp.ShadowEnabled = Settings.Quality == GraphicsQuality.High;
+            Lamp.ShadowEnabled = Core.Rendering.RenderFeatures.Current.LampShadows;
             Lamp.Visible = LampOn;
             _lampFill.Visible = LampOn && Settings.Quality != GraphicsQuality.Low;
         }

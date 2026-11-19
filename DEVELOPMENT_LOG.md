@@ -417,3 +417,11 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Testado e descartado: relevo procedural na rocha (bump por derivadas) — com as texturas de ruído ampliadas gerava blocos visíveis no chão.
 - Bot: corrigido o alvo do Coração (o bot tratava qualquer formação especial como o Coração). Jogo: fragmentos recolhidos por drone/robô/funil também contam como descobertos.
 - Testes 703/703; bot SUCESSO. Não foi possível medir os 120 FPS numa RTX 3060 real (ambiente sem GPU): conferir com o contador (F3).
+
+## Sistema inteligente de renderização (seleção automática Forward+/Mobile/Compatibility)
+- Pedido do diretor (especificação completa): escolher sozinho, antes do jogo abrir, o renderizador mais avançado que roda bem na máquina; jogador nunca escolhe nem vê o renderizador; integrado ao atualizador; recuperação de falhas; perfis Baixa/Média/Alta nos três.
+- Módulos em `scripts/Core/Rendering/`: `RenderFeatures` (9 perfis), `HardwareInfo`, `RenderProfile`/`RenderStore` (persistência local + override + controle de inicialização + log), `RendererSelector` (regras puras), `RenderProbe` (teste em processo separado fora da tela com a cena real), `RenderBootstrap` (orquestração antes do mundo).
+- Mecanismo oficial da Godot: `application/config/project_settings_override = user://graphics_override.cfg` (testado: o motor lê na inicialização; linha de comando tem prioridade). Padrão do projeto agora é Compatibility.
+- Sem executável de launcher separado de propósito: o atualizador das versões antigas só aceita `.pck`/DLL; tudo chega pela atualização normal.
+- Testado de ponta a ponta com display virtual (primeira vez, inicializações seguintes, recuperação após 2 quedas, máquina sem Vulkan, teste que morre/trava, instalação antiga com save intacto) e matriz 3×3 de perfis sem erros. 758/758 testes. Detalhes e limites em `docs/RENDERIZACAO.md`.
+- Não validado aqui: FPS reais das máquinas de referência (ambiente sem GPU) e comportamento visual da janela de teste no Windows.

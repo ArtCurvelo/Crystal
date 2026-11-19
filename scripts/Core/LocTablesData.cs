@@ -739,5 +739,7 @@ public static partial class LocTables
         list.Add(("FXAA (leve)", "FXAA (light)", "FXAA (ligero)"));
         list.Add(("SMAA (recomendado)", "SMAA (recommended)", "SMAA (recomendado)"));
         list.Add(("Temporal FSR 2 (máxima)", "Temporal FSR 2 (maximum)", "Temporal FSR 2 (máximo)"));
+        list.Add(("Preparando o jogo para o seu computador…", "Getting the game ready for your computer…", "Preparando el juego para tu computadora…"));
+        list.Add(("Isso só acontece na primeira vez.", "This only happens the first time.", "Esto solo pasa la primera vez."));
     }
 }

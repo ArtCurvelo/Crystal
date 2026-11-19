@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CrystalExcavator.Core;
+using CrystalExcavator.Core.Rendering;
 using CrystalExcavator.Data;
 using CrystalExcavator.Mining;
 using CrystalExcavator.Player;
@@ -43,6 +44,7 @@ public partial class TestRunner : Node
             Run("Compatibilidade com save antigo", TestOldSave);
             Run("Configurações inválidas", TestSettings);
             Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
+            Run("Renderizador: perfis, testes, escolha, validade e recuperação", TestRendererSelection);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
@@ -740,6 +742,96 @@ public partial class TestRunner : Node
         InputHints.OnJoyConnection(5, false);
         Check(!InputHints.UsingPad && ev == false, "desconectar: volta para teclado e avisa");
         InputHints.PadConnection -= H;
+    }
+
+    void TestRendererSelection()
+    {
+        // ---- os 9 perfis (3 renderizadores × Baixa/Média/Alta)
+        foreach (var m in RenderMethods.Preference)
+            foreach (var q in new[] { GraphicsQuality.Low, GraphicsQuality.Medium, GraphicsQuality.High })
+            {
+                var f = RenderFeatures.For(m, q);
+                Check(f.Method == m && f.Quality == q && f.Glow, $"perfil {m}/{q} existe e mantém o brilho (identidade visual)");
+                if (m != RenderMethods.ForwardPlus)
+                    Check(!f.Ssao && !f.Ssr && !f.Ssil && !f.VolumetricFog && !f.Fsr2, $"{m}/{q} não liga efeitos que esse renderizador não tem");
+                if (m == RenderMethods.Compatibility)
+                    Check(!f.Smaa && !f.Fsr1 && (q == GraphicsQuality.Low || f.Msaa != Viewport.Msaa.Disabled), $"{m}/{q}: sem SMAA/FSR, usa MSAA como alternativa");
+            }
+        int Cost(RenderFeatures f) => (f.Ssao ? 1 : 0) + (f.Ssr ? 1 : 0) + (f.Ssil ? 1 : 0) + (f.VolumetricFog ? 1 : 0) + (f.LampShadows ? 1 : 0);
+        foreach (var m in RenderMethods.Preference)
+            Check(Cost(RenderFeatures.For(m, GraphicsQuality.Low)) <= Cost(RenderFeatures.For(m, GraphicsQuality.Medium)) && Cost(RenderFeatures.For(m, GraphicsQuality.Medium)) <= Cost(RenderFeatures.For(m, GraphicsQuality.High)), $"{m}: Baixa ≤ Média ≤ Alta em custo");
+        var fh = RenderFeatures.For(RenderMethods.ForwardPlus, GraphicsQuality.High);
+        Check(fh.Ssao && fh.Ssr && fh.Ssil && fh.VolumetricFog && fh.LampShadows, "Forward+ Alta usa os recursos avançados");
+
+        // ---- classificação
+        ProbeResult R(string m, double fps, double p99, double fl = 0, double pl = 0, bool rendered = true, string actual = null, int crit = 0, bool started = true)
+        {
+            var r = new ProbeResult { Method = m, ActualMethod = actual ?? m, Started = started, Rendered = rendered, FpsMedium = fps, P99MsMedium = p99, FpsLow = fl, P99MsLow = pl, CriticalErrors = crit };
+            r.Status = RendererSelector.Classify(r);
+            return r;
+        }
+        Check(R("forward_plus", 140, 12).Status == ProbeStatus.Approved, "rápido e estável: APROVADO");
+        Check(R("forward_plus", 60, 40).Status == ProbeStatus.Limited, "média boa mas com travadas (p99 alto): LIMITADO");
+        Check(R("forward_plus", 35, 30).Status == ProbeStatus.Limited, "35 FPS: LIMITADO");
+        Check(R("forward_plus", 140, 12, actual: "gl_compatibility").Status == ProbeStatus.Incompatible, "motor caiu para outro renderizador: INCOMPATÍVEL (não basta ter Vulkan)");
+        Check(R("mobile", 140, 12, rendered: false).Status == ProbeStatus.Incompatible, "imagem vazia/preta: INCOMPATÍVEL");
+        Check(R("mobile", 140, 12, crit: 1).Status == ProbeStatus.Incompatible, "erro de shader/driver: INCOMPATÍVEL");
+        Check(R("mobile", 0, 0, started: false).Status == ProbeStatus.Incompatible, "não iniciou: INCOMPATÍVEL");
+
+        // ---- ordem dos testes: para no primeiro preferido aprovado
+        var done = new List<ProbeResult>();
+        Check(RendererSelector.NextToProbe(done) == "forward_plus", "primeiro testa Forward+");
+        done.Add(R("forward_plus", 140, 12));
+        Check(RendererSelector.NextToProbe(done) == null, "Forward+ aprovado: termina na hora (sem testar os outros)");
+        done = new List<ProbeResult> { R("forward_plus", 35, 30) };
+        Check(RendererSelector.NextToProbe(done) == "mobile", "Forward+ limitado: testa Mobile");
+        done.Add(R("mobile", 60, 20));
+        Check(RendererSelector.NextToProbe(done) == null, "Mobile aprovado: termina");
+        Check(RendererSelector.NextToProbe(new List<ProbeResult>(), new[] { "forward_plus" }) == "mobile", "renderizador que falhou antes não é testado de novo");
+
+        // ---- escolha
+        var d1 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 35, 30), R("mobile", 60, 20) });
+        Check(d1.Method == "mobile" && d1.Quality == 1 && !d1.Recovery, "exemplo do pedido: Forward+ 35 FPS e Mobile 60 FPS → Mobile");
+        var d2 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 136, 10), R("mobile", 200, 8) });
+        Check(d2.Method == "forward_plus" && d2.Quality == 2, "ambos aprovados: Forward+ (Alta com folga, como a RTX 3050 a ~136 FPS)");
+        var d3 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 34, 40, 50, 30), R("mobile", 40, 30, 58, 25), R("gl_compatibility", 62, 22) });
+        Check(d3.Method == "gl_compatibility" && d3.Quality == 1, "integrada (~35 FPS no Forward+): Compatibility na Média, que segura 60");
+        var d4 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 34, 40, 50, 30), R("mobile", 40, 30, 58, 25), R("gl_compatibility", 45, 30, 50, 30) });
+        Check(d4.Method == "mobile" && d4.Quality == 0, "ninguém na meta na Média: o preferido que segura 60 na Baixa");
+        var d5 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 20, 80, 25, 60), R("gl_compatibility", 28, 45, 33, 40) });
+        Check(d5.Method == "gl_compatibility" && d5.Recovery && d5.Quality == 0, "nenhum na meta: o mais rápido que funciona, em perfil de recuperação (não é 'incompatível')");
+        var d6 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 0, 0, started: false), R("mobile", 0, 0, started: false), R("gl_compatibility", 0, 0, rendered: false) });
+        Check(d6.Method == "gl_compatibility" && d6.Recovery, "nada validado: Compatibility em modo seguro");
+        var d7 = RendererSelector.Choose(new List<ProbeResult> { R("forward_plus", 140, 12), R("mobile", 90, 12) }, new[] { "forward_plus" });
+        Check(d7.Method == "mobile", "renderizador marcado como falho não é escolhido");
+
+        // ---- validade da avaliação salva
+        var hw = new HardwareFingerprint { Os = "Windows 10", Cpu = "i5-1135G7", Cores = 8, RamGb = 16, GpuDriver = "Intel 31.0.101", ScreenW = 1920, ScreenH = 1080, RefreshHz = 60 };
+        var prof = new RenderProfile { EvalVersion = RendererSelector.EvalVersion, Engine = "4.5.1", Hardware = hw, Method = "mobile" };
+        Check(RendererSelector.IsValid(prof, hw, "4.5.1"), "mesma máquina e motor: não testa de novo");
+        Check(RendererSelector.IsValid(prof, new HardwareFingerprint { Os = hw.Os, Cpu = hw.Cpu, Cores = 8, RamGb = 16, GpuDriver = hw.GpuDriver, ScreenW = 1920, ScreenH = 1080, RefreshHz = 144 }, "4.5.1"), "só a taxa do monitor mudou: continua valendo");
+        Check(!RendererSelector.IsValid(prof, new HardwareFingerprint { Os = hw.Os, Cpu = hw.Cpu, Cores = 8, RamGb = 16, GpuDriver = "Intel 32.0.101", ScreenW = 1920, ScreenH = 1080 }, "4.5.1"), "driver de vídeo atualizado: reavalia");
+        Check(!RendererSelector.IsValid(prof, hw, "4.6.0"), "motor gráfico novo: reavalia");
+        Check(!RendererSelector.IsValid(new RenderProfile { EvalVersion = RendererSelector.EvalVersion - 1, Engine = "4.5.1", Hardware = hw, Method = "mobile" }, hw, "4.5.1"), "requisitos do jogo mudaram (versão da avaliação): reavalia");
+        prof.FailedMethods.Add("mobile");
+        Check(!RendererSelector.IsValid(prof, hw, "4.5.1"), "renderizador escolhido falhou ao iniciar: reavalia sem ele");
+        Check(!RendererSelector.IsValid(null, hw, "4.5.1"), "sem avaliação: avalia");
+
+        // ---- perfil inicial respeita a escolha do jogador
+        var mine = new SettingsData { Quality = 2, QualityManual = true };
+        Check(!RenderBootstrap.ApplyInitialQuality(new RenderDecision("mobile", 0, 0.75f, true, ""), mine) && mine.Quality == 2, "qualidade escolhida à mão nunca é trocada");
+        var auto = new SettingsData { Quality = 1 };
+        Check(RenderBootstrap.ApplyInitialQuality(new RenderDecision("forward_plus", 2, 1f, false, ""), auto) && auto.Quality == 2, "sem escolha manual: aplica o perfil inicial da avaliação");
+        var legacyLow = System.Text.Json.JsonSerializer.Deserialize<SettingsData>("{\"Version\":2,\"Quality\":0}");
+        Settings.Migrate(legacyLow, "x");
+        Check(legacyLow.QualityManual && legacyLow.Version == Settings.CurrentVersion, "configuração antiga na Baixa conta como escolha do jogador");
+
+        // ---- arquivo de override lido pela Godot ao iniciar
+        Check(RenderStore.OverrideText("mobile").Contains("[rendering]") && RenderStore.OverrideText("mobile").Contains("renderer/rendering_method=\"mobile\""), "override no formato da Godot");
+        Check(((string)ProjectSettings.GetSetting("application/config/project_settings_override", "")) == RenderStore.OverridePath, "projeto aponta o override para a pasta do usuário");
+        // o valor efetivo pode vir do override desta máquina; o padrão do projeto é o que vale sem avaliação
+        Check(FileAccess.GetFileAsString("res://project.godot").Contains("renderer/rendering_method=\"gl_compatibility\""), "sem avaliação o jogo abre no Compatibility (o mais seguro)");
+        Check(!RenderBootstrap.ShouldRun(new[] { "--run-tests" }), "seleção não roda nos testes e ferramentas");
     }
 
     void TestFpsSettings()

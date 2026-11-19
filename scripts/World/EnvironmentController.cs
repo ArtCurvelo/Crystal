@@ -50,29 +50,29 @@ public partial class EnvironmentController : WorldEnvironment
 
     void ApplyQuality()
     {
-        var q = Settings.Quality;
-        bool adv = Settings.Advanced;
+        // perfil central: renderizador em uso × qualidade (cada um liga só o que suporta)
+        var f = Core.Rendering.RenderFeatures.Current;
         var e = Environment;
-        e.GlowEnabled = true;
+        e.GlowEnabled = f.Glow;
         e.TonemapExposure = 1.15f * Settings.Data.Brightness;
-        e.GlowIntensity = q == GraphicsQuality.Low ? 0.35f : 0.45f;
+        e.GlowIntensity = f.GlowIntensity;
         // névoa volumétrica: feixes de luz da lanterna e brilho dos cristais no ar
-        e.VolumetricFogEnabled = adv && q == GraphicsQuality.High;
+        e.VolumetricFogEnabled = f.VolumetricFog;
         e.VolumetricFogDensity = 0.012f;
         e.VolumetricFogLength = 48f;
         e.VolumetricFogDetailSpread = 1.5f;
         e.VolumetricFogGIInject = 0f;
         e.VolumetricFogAnisotropy = 0.45f;
-        e.SsaoEnabled = adv && q != GraphicsQuality.Low;
+        e.SsaoEnabled = f.Ssao;
         e.SsaoRadius = 1.6f;
         e.SsaoIntensity = 2.2f;
         // reflexos em tempo real (água, poças e rocha molhada)
-        e.SsrEnabled = adv && q != GraphicsQuality.Low;
-        e.SsrMaxSteps = q == GraphicsQuality.High ? 96 : 48;
+        e.SsrEnabled = f.Ssr;
+        e.SsrMaxSteps = System.Math.Max(8, f.SsrSteps);
         e.SsrFadeIn = 0.15f;
         e.SsrFadeOut = 2.0f;
         e.SsrDepthTolerance = 0.3f;
-        e.SsilEnabled = adv && q == GraphicsQuality.High;
+        e.SsilEnabled = f.Ssil;
         e.SsilIntensity = 1.2f;
     }
 
@@ -112,7 +112,7 @@ public partial class EnvironmentController : WorldEnvironment
         e.AmbientLightColor = _ambient.Lerp(OverlayAmbient, _overlay * 0.6f).Lerp(new Color(0.85f, 0.85f, 0.9f), 0.45f);
         // cavernas escuras: quem ilumina é a lanterna do capacete, os minérios e os neons.
         // Na Baixa (sem luzes dinâmicas) a luz ambiente compensa.
-        float amb = Settings.Quality == GraphicsQuality.Low ? 1.5f : (Settings.Advanced ? 1.0f : 1.1f);
+        float amb = Core.Rendering.RenderFeatures.Current.AmbientBoost;
         e.AmbientLightEnergy = _energy * amb;
         e.FogLightColor = _fog.Lerp(OverlayFog, _overlay);
         e.FogDensity = Mathf.Lerp(_density, OverlayFogDensity, _overlay);

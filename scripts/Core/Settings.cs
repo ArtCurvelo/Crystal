@@ -24,6 +24,8 @@ public sealed class SettingsData
     public bool ShowFps { get; set; }
     /// <summary>Ajusta a resolução 3D automaticamente para segurar o FPS alvo (120, ou o limite se for menor).</summary>
     public bool DynamicResolution { get; set; } = true;
+    /// <summary>O jogador mudou a qualidade no menu: a escolha automática nunca a sobrescreve.</summary>
+    public bool QualityManual { get; set; }
     /// <summary>Suavização de bordas: 0 desligada, 1 FXAA, 2 SMAA, 3 temporal (FSR 2).</summary>
     public int AntiAliasing { get; set; } = 2;
     /// <summary>Procurar atualizações ao iniciar o jogo.</summary>
@@ -95,7 +97,7 @@ public static class Settings
     {
         get
         {
-            try { return RenderingServer.GetCurrentRenderingDriverName() != "opengl3"; }
+            try { return Rendering.RenderMethods.Current is Rendering.RenderMethods.ForwardPlus or Rendering.RenderMethods.Mobile; }
             catch { return false; }
         }
     }
@@ -133,7 +135,7 @@ public static class Settings
         if (FirstRun && DisplayServer.GetName() != "headless") Save();
     }
 
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     /// <summary>
     /// Configurações de versões antigas: o padrão era VSync + limite de 60 FPS (nunca passava de 60).
@@ -147,6 +149,11 @@ public static class Settings
             if (d.VSync && d.MaxFps == 60) { d.VSync = false; d.MaxFps = 144; }
             if (d.Quality == (int)GraphicsQuality.Medium && StrongGpu(gpu ?? AdapterName())) d.Quality = (int)GraphicsQuality.High;
             d.AntiAliasing = 2;
+        }
+        if (d.Version < 3)
+        {
+            // antes não havia como saber se a qualidade foi escolhida à mão; "Baixa" quase sempre é escolha do jogador
+            d.QualityManual = d.Quality == (int)GraphicsQuality.Low;
         }
         d.Version = CurrentVersion;
     }
@@ -237,20 +244,23 @@ public static class Settings
     /// </summary>
     public static void ApplyAntiAliasing(Viewport vp)
     {
-        bool adv = Advanced;
+        var f = Rendering.RenderFeatures.Current;
         int aa = Data.AntiAliasing;
-        if (!adv && aa >= 2) aa = 1;
+        // a opção pedida, ou a melhor alternativa que este renderizador tem
+        if (aa == 3 && !f.Fsr2) aa = 2;
+        if (aa == 2 && !f.Smaa) aa = f.Msaa != Viewport.Msaa.Disabled ? 4 : 1;
         vp.ScreenSpaceAA = aa switch
         {
-            1 => Viewport.ScreenSpaceAAEnum.Fxaa,
+            1 when f.Fxaa || f.Smaa => Viewport.ScreenSpaceAAEnum.Fxaa,
             2 => Viewport.ScreenSpaceAAEnum.Smaa,
             _ => Viewport.ScreenSpaceAAEnum.Disabled,
         };
-        vp.Scaling3DMode = !adv ? Viewport.Scaling3DModeEnum.Bilinear : aa == 3 ? Viewport.Scaling3DModeEnum.Fsr2 : Viewport.Scaling3DModeEnum.Fsr;
+        vp.Msaa3D = aa == 4 || (aa == 1 && !f.Smaa) ? f.Msaa : Viewport.Msaa.Disabled;
+        vp.Scaling3DMode = aa == 3 && f.Fsr2 ? Viewport.Scaling3DModeEnum.Fsr2 : f.Fsr1 ? Viewport.Scaling3DModeEnum.Fsr : Viewport.Scaling3DModeEnum.Bilinear;
         vp.FsrSharpness = 0.35f;
         vp.UseTaa = false;
         // cavernas escuras: gradientes suaves sem faixas
-        vp.UseDebanding = adv;
+        vp.UseDebanding = f.Debanding;
     }
 
     static void SetBus(string name, float linear)

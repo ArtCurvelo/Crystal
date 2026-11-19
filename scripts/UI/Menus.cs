@@ -206,6 +206,7 @@ public partial class SettingsScreen : ModalScreen
                 AddOption(grid, "Qualidade gráfica", new[] { "Baixa (PCs modestos)", "Média", "Alta" }, d.Quality, i =>
                 {
                     d.Quality = i;
+                    d.QualityManual = true; // escolha do jogador: a seleção automática não muda mais
                     bool low = i == 0;
                     d.RenderScale = low ? 0.75f : 1f;
                     d.DynamicResolution = true;
