@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CrystalExcavator.Core;
 using CrystalExcavator.Data;
 using CrystalExcavator.Mining;
+using CrystalExcavator.World;
 using Godot;
 
 namespace CrystalExcavator.Tests;
@@ -466,9 +467,25 @@ public partial class ScreenshotTour : Node
                 }
             return near;
         }
-        var hp = Spot(Data.BuildIds.Hopper, PathAt(0, 0.12f));
-        var hop = bm.Place(Data.BuildIds.Hopper, hp, 0);
-        var belt = hop != null ? bm.BeltOf(hop.Id) : null;
+        foreach (var sk in new[] { Data.SkillIds.BuildBelt, Data.SkillIds.BuildHopper, Data.SkillIds.BuildDrone, Data.SkillIds.BuildRobot })
+            if (!gs.HasSkill(sk)) gs.Data.Skills.Add(sk);
+        var bs = Spot(Data.BuildIds.Belt, PathAt(0, 0.12f));
+        var beltB = bm.PlaceBelt(bs, bm.SellIntake);
+        var belt = beltB != null ? bm.BeltOf(beltB.Id) : null;
+        // funil ao lado da esteira
+        Vector3 hp = bs;
+        BuildingSave hop = null;
+        if (belt != null)
+            for (float s0 = 4f; s0 < belt.Length - 4f && hop == null; s0 += 1f)
+            {
+                belt.Sample(s0, out var bp0, out var d0);
+                var side0 = d0.Cross(Vector3.Up).Normalized();
+                foreach (var sg in new[] { 1.8f, -1.8f })
+                {
+                    var q = L0.OnGround((bp0 + side0 * sg).X, (bp0 + side0 * sg).Z);
+                    if (bm.CanPlace(Data.BuildIds.Hopper, q, out _) && bm.HopperSpot(q, out _, out _, out _)) { hop = bm.Place(Data.BuildIds.Hopper, q, 0); hp = q; break; }
+                }
+            }
         // postes ao longo da esteira
         if (belt != null)
             for (float s = 6f; s < belt.Length - 6f; s += 14f)
@@ -477,8 +494,9 @@ public partial class ScreenshotTour : Node
                 var side = dir.Cross(Vector3.Up).Normalized() * 2.2f;
                 bm.Place(Data.BuildIds.Light, Spot(Data.BuildIds.Light, bp + side), 0);
             }
-        bm.Place(Data.BuildIds.Drone, p.GlobalPosition, 0);
-        if (hop != null) { gs.AddItem("amethyst", 40); gs.AddItem("quartz", 60); gs.DepositInventoryInHopper(hop.Id); }
+        var dockPos = Spot(Data.BuildIds.Drone, hp + new Vector3(4f, 0, 4f));
+        bm.Place(Data.BuildIds.Drone, dockPos, 0);
+        if (beltB != null) { gs.AddItem("amethyst", 40); gs.AddItem("quartz", 60); gs.DepositInventoryInHopper(beltB.Id); }
         await Wait(4f);
         LookAtPoint(p, hp + (Main.World.SellStation.GlobalPosition - hp).Normalized() * 5f + new Vector3(2.5f, 0.1f, 0), hp + Vector3.Up * 0.8f);
         await Wait(0.8f);
@@ -501,28 +519,71 @@ public partial class ScreenshotTour : Node
             await Shot("18c_posts_lamp_off");
             p.SetLamp(true);
         }
-        // drone buscando fragmentos
+        // drone de área buscando fragmentos
         gs.Data.Inventory.Clear();
-        var front = p.GlobalPosition - p.GlobalTransform.Basis.Z * 7f;
-        Mining.ShardManager.Instance?.SpawnShards(GameData.Mat("amethyst"), L0.OnGround(front.X, front.Z, 0.6f), 5);
-        await Wait(1.4f);
+        var shardAt = dockPos + new Vector3(5f, 0, 2f);
+        Mining.ShardManager.Instance?.SpawnShards(GameData.Mat("amethyst"), L0.OnGround(shardAt.X, shardAt.Z, 0.6f), 5);
+        p.GlobalPosition = L0.OnGround(PathAt(0, 0.9f).X, PathAt(0, 0.9f).Z);
+        await Wait(1.6f);
         if (bm.Drone != null)
         {
             var dp = bm.Drone.GlobalPosition;
-            var camFrom = dp + (p.GlobalPosition - dp).Normalized() * 3f;
+            var away = (hp - dockPos); away.Y = 0;
+            var camFrom = dp + (away.LengthSquared() > 0.01f ? away.Normalized() : Vector3.Right) * 3.5f;
             LookAtPoint(p, new Vector3(camFrom.X, L0.Ground(camFrom.X, camFrom.Z) + 0.1f, camFrom.Z), dp);
         }
         await Wait(0.15f);
         await Shot("18d_drone");
-        // modo construção com prévia
-        LookAtPoint(p, Spot(Data.BuildIds.Light, PathAt(0, 0.3f)) + Vector3.Up * 0.1f, PathAt(0, 0.33f) + Vector3.Up * 0.0f);
+        // robô minerador perto de um depósito
+        var crystal = Main.World.Crystals.Where(c => c.IsMineable && !c.Material.Special && WorldBuilder.RegionAt(c.GlobalPosition).Index == 0 && c.GlobalTransform.Basis.Y.Normalized().Y > 0.9f)
+                                         .OrderBy(c => c.StandPoint.DistanceTo(PathAt(0, 0.4f))).FirstOrDefault();
+        if (crystal != null)
+        {
+            var rp = Spot(Data.BuildIds.Robot, crystal.StandPoint + (crystal.StandPoint - crystal.GlobalPosition).Normalized() * 3f);
+            var rb = bm.Place(Data.BuildIds.Robot, rp, 0);
+            await Wait(6f);
+            if (rb != null && bm.NodeOf(rb.Id) is Dock rd && rd.Unit != null)
+            {
+                var u = rd.Unit.GlobalPosition;
+                var toC = (crystal.GlobalPosition - u); toC.Y = 0;
+                var side = toC.Normalized().Cross(Vector3.Up);
+                LookAtPoint(p, u - toC.Normalized() * 2.2f + side * 1.6f + Vector3.Up * 0.1f, u + Vector3.Up * 0.4f);
+                await Wait(0.4f);
+                await Shot("18g_robot");
+                bm.SetActive(true);
+                LookAtPoint(p, rp + new Vector3(0, 0.1f, 0) - toC.Normalized() * 6f, rp);
+                await Wait(0.6f);
+                await Shot("18h_robot_area");
+                bm.SetActive(false);
+            }
+        }
+        // modo construção: marcando a esteira (prévia do trajeto até a venda)
+        var startB = Spot(Data.BuildIds.Belt, PathAt(0, 0.3f));
+        LookAtPoint(p, startB + Vector3.Up * 0.1f + (st - startB).Normalized() * -2f, startB);
         bm.SetActive(true);
-        await Wait(0.6f);
+        bm.SelectId(Data.BuildIds.Belt);
+        await Wait(0.4f);
         await Shot("18e_build_mode");
-        bm.Select(1);
-        await Wait(0.8f);
-        await Shot("18f_build_hopper");
+        await Wait(0.05f); // o aperto precisa cair no começo de um quadro
+        Input.ActionPress("mine");
+        await Wait(0.2f);
+        LookAtPoint(p, st + (startB - st).Normalized() * 5f + Vector3.Up * 0.1f, bm.SellIntake);
+        await Wait(1.0f);
+        await Shot("18f_build_belt_drag");
         bm.SetActive(false);
+        Input.ActionRelease("mine");
+        await Wait(0.2f);
+        // árvore de habilidades com o ramo Construção
+        gs.Data.Skills.Remove(Data.SkillIds.BuildRobot);
+        gs.Data.Skills.Remove(Data.SkillIds.BuildDrone);
+        UiBus.RequestHomePanel();
+        await Wait(0.6f);
+        var homeS = Main.GetChildren().OfType<UI.HomeScreen>().First();
+        homeS.ShowSkillsTab();
+        homeS.SelectSkill(Data.SkillIds.BuildDrone);
+        await Wait(0.4f);
+        await Shot("18z_skills_build");
+        Main.CloseAllForTour();
         // painel de admin
         Input.ParseInputEvent(new InputEventAction { Action = "debug_panel", Pressed = true });
         await Wait(0.6f);

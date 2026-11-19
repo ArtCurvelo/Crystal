@@ -42,6 +42,7 @@ public partial class TestRunner : Node
             Run("Save com dados inválidos é saneado", TestSanitize);
             Run("Compatibilidade com save antigo", TestOldSave);
             Run("Configurações inválidas", TestSettings);
+            Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
@@ -64,7 +65,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: cavernas, relevo e túneis secretos", TestWings);
             await RunAsync("Integração: coleta direta", TestDirectCollect);
             await RunAsync("Integração: goblin minerador e rebelião", TestGoblins);
-            await RunAsync("Integração: construções (poste, funil, esteira, drone)", TestBuildings);
+            await RunAsync("Integração: construções (poste, esteira, funil, drone, robô)", TestBuildings);
             await RunAsync("Integração: cordas (poços, subir e descer, corda do jogador)", TestRopes);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
@@ -178,8 +179,9 @@ public partial class TestRunner : Node
         // save e renascimento
         GS.SaveGame(true);
         int houseSum = GS.Data.House.Values.Sum();
+        int skillCount = GS.Data.Skills.Count;
         GS.LoadGame();
-        Check(GS.Data.House.Values.Sum() == houseSum && GS.Data.Skills.Count == HomeData.Skills.Count, "casa e habilidades são salvas");
+        Check(GS.Data.House.Values.Sum() == houseSum && skillCount == HomeData.Skills.Count(sk => sk.Branch < 4) && GS.Data.Skills.Count == skillCount, "casa e habilidades são salvas");
         GS.Data.GameCompleted = true;
         GS.Data.RunEarned = 10_000_000;
         GS.Prestige();
@@ -738,6 +740,41 @@ public partial class TestRunner : Node
         InputHints.OnJoyConnection(5, false);
         Check(!InputHints.UsingPad && ev == false, "desconectar: volta para teclado e avisa");
         InputHints.PadConnection -= H;
+    }
+
+    void TestFpsSettings()
+    {
+        var fresh = new SettingsData();
+        Check(!fresh.VSync && fresh.MaxFps == 144 && fresh.AntiAliasing == 2 && fresh.DynamicResolution, "padrão novo: sem VSync, até 144 FPS, SMAA, resolução dinâmica");
+        // configuração antiga no padrão (VSync + 60 FPS) numa RTX
+        var old = System.Text.Json.JsonSerializer.Deserialize<SettingsData>("{\"VSync\":true,\"MaxFps\":60,\"Quality\":1}");
+        Check(old.Version == 0, "arquivo antigo não tem versão");
+        Settings.Migrate(old, "NVIDIA GeForce RTX 3060");
+        Check(!old.VSync && old.MaxFps == 144 && old.Quality == 2 && old.Version == Settings.CurrentVersion, "antigo no padrão: libera o FPS e sobe para Alta numa RTX");
+        // quem escolheu outra coisa mantém
+        var custom = System.Text.Json.JsonSerializer.Deserialize<SettingsData>("{\"VSync\":true,\"MaxFps\":30,\"Quality\":0}");
+        Settings.Migrate(custom, "NVIDIA GeForce RTX 3060");
+        Check(custom.VSync && custom.MaxFps == 30 && custom.Quality == 0, "escolhas do jogador são mantidas");
+        var weak = System.Text.Json.JsonSerializer.Deserialize<SettingsData>("{\"VSync\":true,\"MaxFps\":60,\"Quality\":1}");
+        Settings.Migrate(weak, "Intel(R) UHD Graphics 620");
+        Check(weak.Quality == 1 && !weak.VSync, "integrada não sobe para Alta");
+        var again = new SettingsData { Version = Settings.CurrentVersion, VSync = true, MaxFps = 60 };
+        Settings.Migrate(again, "NVIDIA GeForce RTX 3060");
+        Check(again.VSync && again.MaxFps == 60, "migração não roda de novo");
+        Check(Settings.StrongGpu("NVIDIA GeForce RTX 3060") && Settings.StrongGpu("AMD Radeon RX 6600") && !Settings.StrongGpu("NVIDIA GeForce GTX 750") && !Settings.StrongGpu("llvmpipe"), "detecção de placa forte");
+
+        // resolução dinâmica segura 120 FPS (ou o limite, se menor)
+        Check(Main.DynamicTarget(144, -1) == 120 && Main.DynamicTarget(0, -1) == 120, "alvo 120 FPS com limite 144 ou ilimitado");
+        Check(Main.DynamicTarget(60, -1) == 57 && Main.DynamicTarget(144, 60) == 57, "alvo abaixo do limite/VSync quando eles são menores");
+        float sc = 1f;
+        sc = Main.NextDynamicScale(sc, 1f, 90, 120);
+        Check(Mathf.IsEqualApprox(sc, 0.95f), "abaixo do alvo: baixa a resolução");
+        for (int i = 0; i < 20; i++) sc = Main.NextDynamicScale(sc, 1f, 40, 120);
+        Check(Mathf.IsEqualApprox(sc, 0.6f), "nunca abaixo de 60%");
+        sc = Main.NextDynamicScale(sc, 1f, 140, 120);
+        Check(sc > 0.6f, "com folga: sobe de novo");
+        Check(Mathf.IsEqualApprox(Main.NextDynamicScale(0.8f, 1f, 125, 120), 0.8f), "perto do alvo: mantém (sem oscilar)");
+        Check(Mathf.IsEqualApprox(Main.NextDynamicScale(1f, 1f, 200, 120), 1f), "não passa da escala escolhida");
     }
 
     void TestSettings()
@@ -1367,15 +1404,20 @@ public partial class TestRunner : Node
     /// <summary>Procura um ponto válido para construir perto de um ponto do caminho principal.</summary>
     static bool FindBuildSpot(BuildingManager bm, CaveLayout L, string type, int pathIndex, out Vector3 spot)
     {
-        var c = L.PathPoints[Math.Clamp(pathIndex, 0, L.PathPoints.Count - 1)];
+        var pp = L.PathPoints[Math.Clamp(pathIndex, 0, L.PathPoints.Count - 1)];
+        return FindBuildSpotNear(bm, L, type, new Vector2(pp.X, pp.Z), out spot);
+    }
+
+    static bool FindBuildSpotNear(BuildingManager bm, CaveLayout L, string type, Vector2 c, out Vector3 spot, System.Func<Vector3, bool> extra = null)
+    {
         for (int r = 0; r < 14; r++)
             for (int a = 0; a < 12; a++)
             {
                 float ang = a * Mathf.Tau / 12f;
-                float x = c.X + Mathf.Cos(ang) * r * 1.5f, z = c.Z + Mathf.Sin(ang) * r * 1.5f;
+                float x = c.X + Mathf.Cos(ang) * r * 1.5f, z = c.Y + Mathf.Sin(ang) * r * 1.5f;
                 if (!L.InGrid(x, z)) continue;
                 var p = L.OnGround(x, z);
-                if (bm.CanPlace(type, p, out _)) { spot = p; return true; }
+                if (bm.CanPlace(type, p, out _) && (extra == null || extra(p))) { spot = p; return true; }
             }
         spot = default;
         return false;
@@ -1431,12 +1473,12 @@ public partial class TestRunner : Node
         await Frames(3);
         var L0 = world.Layouts[0];
 
-        // ---- poste de luz ----
+        // ---- poste de luz (sempre liberado) ----
         Check(!bm.CanPlace(BuildIds.Light, world.SellStation.GlobalPosition, out _), "não constrói em cima da Estação de Venda");
         Check(!bm.CanPlace(BuildIds.Light, PlayerHouse.Origin + new Vector3(0, 0.1f, 0), out _), "não constrói dentro da casa");
         Check(FindBuildSpot(bm, L0, BuildIds.Light, 2, out var lp), "acha lugar para um poste");
         Check(bm.Place(BuildIds.Light, lp, 0) == null, "sem moeda não constrói");
-        GS.AddMoney(1_000_000);
+        GS.AddMoney(5_000_000);
         long before = GS.Data.Money;
         var post = bm.Place(BuildIds.Light, lp, 0);
         await Frames(2);
@@ -1445,58 +1487,97 @@ public partial class TestRunner : Node
         Check(postNode is LightPost && postNode.GetChildren().OfType<OmniLight3D>().Any(), "poste tem luz");
         Check(!bm.CanPlace(BuildIds.Light, lp + new Vector3(0.5f, 0, 0), out _), "não constrói colado em outra construção");
 
-        // ---- funil + esteira na região 1 ----
-        Check(FindBuildSpot(bm, L0, BuildIds.Hopper, L0.PathPoints.Count / 2, out var hp), "acha lugar para um funil");
-        var route = bm.RouteToSell(hp);
-        Check(route != null && route.Count >= 2, "esteira tem caminho até a Estação de Venda");
-        float len = BuildingManager.PathLength(route);
-        Check(route[^1].DistanceTo(world.SellStation.GlobalPosition) < 3f && len >= hp.DistanceTo(world.SellStation.GlobalPosition) * 0.9f,
-            $"esteira termina na Estação de Venda ({len:0} m)");
-        RouteIsClean(world, route, "região 1");
-        before = GS.Data.Money;
-        var hop = bm.Place(BuildIds.Hopper, hp, 0, route);
-        await Frames(2);
-        Check(hop != null && GS.Data.Money == before - BuildData.Of(BuildIds.Hopper).Cost - BuildingManager.BeltCost(len), "funil + esteira pagos por metro");
-        Check(bm.BeltOf(hop.Id) != null && bm.NodeOf(hop.Id) is Hopper, "funil e esteira criados");
+        // ---- ramo Construção: a esteira precisa ser aprendida ----
+        Check(bm.Available.Select(d => d.Id).SequenceEqual(new[] { BuildIds.Rope, BuildIds.Light }), "no começo só corda e poste no modo construção");
+        Check(!bm.CanPlace(BuildIds.Belt, lp + new Vector3(3, 0, 0), out _) && bm.PlaceBelt(lp + new Vector3(3, 0, 0), bm.SellIntake) == null, "esteira bloqueada antes da habilidade");
+        Check(!GS.SkillAvailable(SkillIds.BuildHopper) && GS.TryBuySkill(SkillIds.BuildBelt), "aprende Esteira (o Funil exige a Esteira antes)");
+        Check(bm.Available.Any(d => d.Id == BuildIds.Belt) && !bm.Available.Any(d => d.Id == BuildIds.Hopper), "esteira liberada; funil ainda não");
 
-        // mochila no funil → esteira → venda automática
+        // ---- esteira: início marcado, ponta na Estação de Venda ----
+        Check(FindBuildSpot(bm, L0, BuildIds.Belt, L0.PathPoints.Count / 2, out var bs), "acha lugar para o início da esteira");
+        bm.BeltEnd(world.SellStation.GlobalPosition + new Vector3(1, 0, 1), out _, out int f0, out _);
+        Check(f0 == 0, "mirando na Estação de Venda a ponta se liga nela");
+        bm.BeltEnd(bs + new Vector3(30, 0, 0), out _, out int fFree, out _);
+        Check(fFree == -1, "ponta solta no meio do nada não liga em nada");
+        before = GS.Data.Money;
+        var belt1 = bm.PlaceBelt(bs, bm.SellIntake);
+        await Frames(2);
+        Check(belt1 != null && belt1.Feeds == 0 && bm.BeltOf(belt1.Id) != null && bm.NodeOf(belt1.Id) is BeltIntake, "esteira construída até a Estação de Venda, com entrada no início");
+        var route = BuildingManager.Unflatten(belt1?.Path);
+        float len = BuildingManager.PathLength(route);
+        Check(belt1 != null && GS.Data.Money == before - BuildData.Of(BuildIds.Belt).Cost - BuildingManager.BeltCost(len), $"esteira paga por metro ({len:0} m)");
+        Check(route.Count >= 2 && route[0].DistanceTo(bs) < 0.6f && route[^1].DistanceTo(world.SellStation.GlobalPosition) < 3f, "trajeto vai do início marcado até a Estação");
+        RouteIsClean(world, route, "região 1");
+
+        // mochila na entrada → esteira → venda automática
         GS.AddItem("quartz", 10);
         long value = GS.SellPrice(GameData.Mat("quartz")) * 10;
-        int moved = GS.DepositInventoryInHopper(hop.Id);
-        Check(moved == 10 && GS.InventoryCount == 0 && GS.HopperQueued(hop.Id) == 10, "mochila vai para o funil");
+        int moved = GS.DepositInventoryInHopper(belt1.Id);
+        Check(moved == 10 && GS.InventoryCount == 0, "mochila vai para a entrada da esteira");
         before = GS.Data.Money;
         long sold0 = GS.Data.ShardsSold;
-        Engine.TimeScale = 8;
-        float maxWait = len / BuildData.BeltSpeed + 10 * BuildData.BeltInterval + 2f;
-        ulong t0 = Time.GetTicksMsec();
-        while (GS.Data.ShardsSold - sold0 < 10 && (Time.GetTicksMsec() - t0) / 1000f * 8 < maxWait * 1.5f) await Frames(1);
-        Engine.TimeScale = 1;
+        await WaitSold(sold0 + 10, len);
         Check(GS.Data.ShardsSold - sold0 == 10 && GS.Data.Money - before == value, $"a esteira leva e vende tudo na Estação ({GS.Data.ShardsSold - sold0}/10, +{GS.Data.Money - before}/{value})");
 
-        // fragmentos soltos perto do funil são puxados (jogador longe)
+        // ---- segunda esteira emendada na primeira ----
+        var mid = BuildingManager.Unflatten(belt1.Path)[route.Count / 2];
+        var L0b = L0;
+        Check(FindBuildSpotNear(bm, L0, BuildIds.Belt, new Vector2(mid.X, mid.Z) + new Vector2(0, 0), out var bs2,
+            p => p.DistanceTo(mid) > 7f && p.DistanceTo(mid) < 16f && bm.RouteBetween(p, mid) != null), "acha início para uma esteira-galho");
+        var belt2 = bm.PlaceBelt(bs2, mid);
+        await Frames(2);
+        Check(belt2 != null && belt2.Feeds == belt1.Id && belt2.JoinS > 0, $"ponta na outra esteira: emenda ({belt2?.JoinS:0.0} m)");
+        Check(bm.DistanceToSell(belt2.Id) > BuildingManager.PathLength(BuildingManager.Unflatten(belt2.Path)), "distância até a venda soma as duas esteiras");
+        GS.AddItem("quartz", 5);
+        GS.DepositInventoryInHopper(belt2.Id);
+        sold0 = GS.Data.ShardsSold;
+        await WaitSold(sold0 + 5, bm.DistanceToSell(belt2.Id));
+        Check(GS.Data.ShardsSold - sold0 == 5, $"o que entra na esteira-galho passa para a principal e é vendido ({GS.Data.ShardsSold - sold0}/5)");
+
+        // ---- funil: só ao lado de uma esteira ----
+        Check(GS.TryBuySkill(SkillIds.BuildHopper), "aprende Funil");
+        Check(bm.Place(BuildIds.Hopper, lp + new Vector3(0, 0, 0), 0) == null, "funil longe de esteira não é construído");
+        Vector3 hp = default; bool foundHop = false;
+        var bp = BuildingManager.Unflatten(belt1.Path);
+        for (int k = 2; k < bp.Count - 2 && !foundHop; k++)
+            for (int side = -1; side <= 1 && !foundHop; side += 2)
+            {
+                var dir = (bp[k + 1] - bp[k]); dir.Y = 0;
+                if (dir.LengthSquared() < 0.01f) continue;
+                var q = bp[k] + dir.Normalized().Cross(Vector3.Up) * 1.8f * side;
+                if (!L0.InGrid(q.X, q.Z)) continue;
+                q = L0.OnGround(q.X, q.Z);
+                if (bm.CanPlace(BuildIds.Hopper, q, out _) && bm.HopperSpot(q, out _, out _, out _)) { hp = q; foundHop = true; }
+            }
+        Check(foundHop, "acha lugar para o funil ao lado da esteira");
+        var hop = bm.Place(BuildIds.Hopper, hp, 0);
+        await Frames(2);
+        Check(hop != null && hop.Feeds > 0 && bm.NodeOf(hop.Id) is Hopper, "funil construído e ligado à esteira do lado");
         player.GlobalPosition = world.SpawnPoint;
-        int q0 = GS.HopperQueued(hop.Id); long s1 = GS.Data.ShardsSold;
+        long s1 = GS.Data.ShardsSold;
         shards.SpawnShards(GameData.Mat("quartz"), hp + new Vector3(2f, 1f, 0), 5);
-        for (int i = 0; i < 300 && GS.HopperQueued(hop.Id) - q0 + (GS.Data.ShardsSold - s1) + 0 < 5 && shards.ActiveCount > 0; i++) await Frames(1);
+        for (int i = 0; i < 300 && shards.ActiveCount > 0; i++) await Frames(1);
         Check(shards.ActiveCount == 0, "fragmentos soltos perto do funil são puxados para ele");
+        await WaitSold(s1 + 5, bm.DistanceToSell(hop.Id));
+        Check(GS.Data.ShardsSold - s1 == 5, $"o funil despeja na esteira e tudo é vendido ({GS.Data.ShardsSold - s1}/5)");
 
         // em trânsito: gravado no save e volta para a fila ao carregar
         GS.AddItem("quartz", 6);
-        GS.DepositInventoryInHopper(hop.Id);
+        GS.DepositInventoryInHopper(belt1.Id);
         await Frames(30);
-        var belt = bm.BeltOf(hop.Id);
-        int inFlight = belt.Items.Count, queued = GS.HopperQueued(hop.Id);
+        var b1 = bm.BeltOf(belt1.Id);
+        int inFlight = b1.Items.Count, queued = GS.HopperQueued(belt1.Id);
         bm.WriteInFlight(GS.Data);
         var json = System.Text.Json.JsonSerializer.Serialize(GS.Data);
         Check(SaveSystem.TryParse(json, out var loaded), "save com construções carrega");
-        var lb = loaded.Buildings.First(b => b.Id == hop.Id);
+        var lb = loaded.Buildings.First(b => b.Id == belt1.Id);
         Check(inFlight > 0 && lb.Queue.Values.Sum() == inFlight + queued, $"fragmentos na esteira não se perdem no save ({inFlight} + {queued})");
-        Check(loaded.Buildings.Count == 2 && loaded.Buildings.Any(b => b.Type == BuildIds.Light), "postes e funis salvos");
+        Check(lb.Path != null && lb.Path.Count == belt1.Path.Count && lb.Feeds == 0 && loaded.Buildings.First(b => b.Id == belt2.Id).Feeds == belt1.Id, "trajeto e ligações da esteira salvos");
 
-        // ---- funil numa região funda: esteira atravessa os túneis ----
+        // ---- trajeto longo entre regiões (Núcleo → acampamento e para baixo) ----
         foreach (var r in GameData.Regions) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
         var L2 = world.Layouts[2];
-        Check(FindBuildSpot(bm, L2, BuildIds.Hopper, L2.PathPoints.Count / 2, out var deep), "acha lugar para um funil no Núcleo");
+        Check(FindBuildSpot(bm, L2, BuildIds.Belt, L2.PathPoints.Count / 2, out var deep), "acha lugar no Núcleo");
         var deepRoute = bm.RouteToSell(deep);
         Check(deepRoute != null && deepRoute[^1].DistanceTo(world.SellStation.GlobalPosition) < 3f, "esteira do Núcleo chega à Estação de Venda passando pelas outras regiões");
         if (deepRoute != null)
@@ -1505,44 +1586,194 @@ public partial class TestRunner : Node
             bool crosses = deepRoute.Any(p => WorldBuilder.RegionAt(p).Index == 1);
             Check(crosses && BuildingManager.PathLength(deepRoute) > 300f, $"esteira longa atravessa as Profundezas ({BuildingManager.PathLength(deepRoute):0} m)");
         }
+        var down = bm.RouteBetween(bs, deep);
+        Check(down != null && WorldBuilder.RegionAt(down[^1]).Index == 2, "trajeto também desce pelas regiões");
+        if (down != null) RouteIsClean(world, down, "acampamento → Núcleo");
 
-        // ---- desmontar ----
+        // ---- desmontar: quem despejava nela fica sem saída ----
         before = GS.Data.Money;
         long paid = GS.Building(post.Id).Paid;
         bm.Demolish(post.Id);
         await Frames(2);
         Check(GS.Building(post.Id) == null && bm.NodeOf(post.Id) == null && GS.Data.Money == before + (long)(paid * BuildData.RefundFraction), "desmontar devolve metade");
+        bm.Demolish(belt1.Id);
+        await Frames(2);
+        Check(bm.BeltOf(belt1.Id) == null && GS.Building(belt2.Id).Feeds == -1 && GS.Building(hop.Id).Feeds == -1 && !bm.HasOutlet(belt2.Id) && !bm.HasOutlet(hop.Id),
+            "esteira desmontada: o galho e o funil ficam sem saída");
+        GS.AddItem("quartz", 3);
+        GS.DepositInventoryInHopper(belt2.Id);
+        await Frames(120);
+        Check(GS.HopperQueued(belt2.Id) == 3, "esteira sem saída segura os fragmentos na fila");
 
-        // ---- drone ----
-        player.GlobalPosition = L0.OnGround(L0.Camp.A.X, L0.Camp.A.Y) + Vector3.Up * 0.1f;
-        bm.Place(BuildIds.Drone, player.GlobalPosition, 0);
+        // ---- drone de área ----
+        Check(GS.TryBuySkill(SkillIds.BuildDrone), "aprende Drone de área");
+        bm.Demolish(belt2.Id); bm.Demolish(hop.Id);
+        await Frames(2);
+        var camp = L0.OnGround(L0.Camp.A.X, L0.Camp.A.Y);
+        Check(FindBuildSpotNear(bm, L0, BuildIds.Drone, L0.Camp.A, out var dp), "acha lugar para a base do drone");
+        var droneB = bm.Place(BuildIds.Drone, dp, 0);
         await Frames(3);
-        Check(GS.Data.DroneOwned && bm.Drone != null, "drone comprado e ativo");
-        Check(!bm.CanPlace(BuildIds.Drone, player.GlobalPosition, out _), "só um drone");
+        var dock = bm.NodeOf(droneB?.Id ?? -1) as Dock;
+        Check(droneB != null && dock != null && dock.Unit is DroneBot && bm.Drone != null, "base do drone construída, drone ativo");
+        player.GlobalPosition = world.SpawnPoint + new Vector3(0, 0, 0);
         GS.Data.Inventory.Clear();
-        // fragmentos fora do alcance do ímã, à vista
-        Vector3 drop = default;
-        for (int k = 0; k < 16; k++)
+        Vector3 drop = default, far = default;
+        for (int k = 0; k < 32; k++)
         {
-            float ang = k * Mathf.Tau / 16f;
-            var c = player.GlobalPosition + new Vector3(Mathf.Cos(ang) * 9f, 0, Mathf.Sin(ang) * 9f);
-            if (L0.InGrid(c.X, c.Z) && L0.Reachable(c.X, c.Z) && bm.FindSink(c) == null) { drop = L0.OnGround(c.X, c.Z, 0.5f); break; }
+            float ang = k * Mathf.Tau / 32f;
+            var c = dp + new Vector3(Mathf.Cos(ang) * 7f, 0, Mathf.Sin(ang) * 7f);
+            var c2 = dp + new Vector3(Mathf.Cos(ang) * (BuildData.DroneRange + 6f), 0, Mathf.Sin(ang) * (BuildData.DroneRange + 6f));
+            if (drop == default && L0.InGrid(c.X, c.Z) && L0.Reachable(c.X, c.Z) && bm.FindSink(c) == null && c.DistanceTo(player.GlobalPosition) > 8f) drop = L0.OnGround(c.X, c.Z, 0.5f);
+            if (far == default && L0.InGrid(c2.X, c2.Z) && L0.Reachable(c2.X, c2.Z) && c2.DistanceTo(player.GlobalPosition) > 8f) far = L0.OnGround(c2.X, c2.Z, 0.5f);
         }
+        player.GlobalPosition = L0.OnGround(L0.PathPoints[^1].X, L0.PathPoints[^1].Z); // longe: o ímã não interfere
         shards.SpawnShards(GameData.Mat("amethyst"), drop, 3);
-        for (int i = 0; i < 900 && GS.InventoryCount < 3; i++) await Frames(1);
-        Check(GS.InventoryCount == 3, $"drone busca fragmentos a 9 m e traz para a mochila ({GS.InventoryCount}/3)");
+        if (far != default) shards.SpawnShards(GameData.Mat("quartz"), far, 2);
+        for (int i = 0; i < 1200 && dock.Stored < 3; i++) await Frames(1);
+        Check(dock.Stored == 3, $"drone recolhe fragmentos na área e guarda na base sem funil por perto ({dock.Stored}/3)");
+        Check(far == default || shards.Loose.Count(s => s.Mat.Id == "quartz") == 2, "drone ignora fragmentos fora da área");
+        Check(GS.Data.Discovered.Contains("amethyst"), "material recolhido pelo drone conta como descoberto (ex.: Coração)");
+        player.GlobalPosition = dp + new Vector3(1.5f, 0.2f, 0);
+        dock.Interact(player);
+        Check(GS.InventoryCount == 3 && dock.Stored == 0, "jogador pega o que está guardado na base");
+        foreach (var s in shards.Loose.ToList()) shards.Take(s);
 
-        // ---- renascimento: construções somem, drone fica ----
+        // ---- robô minerador ----
+        Check(!bm.CanPlace(BuildIds.Robot, dp + new Vector3(5, 0, 0), out _), "robô bloqueado antes da habilidade");
+        Check(GS.TryBuySkill(SkillIds.BuildRobot), "aprende Robô mineiro");
+        var target = world.Crystals.Where(c => c.IsMineable && !c.Material.Special && WorldBuilder.RegionAt(c.GlobalPosition).Index == 0 && c.GlobalTransform.Basis.Y.Normalized().Y > 0.9f
+                                               && c.StandPoint.DistanceTo(dp) > BuildData.DroneRange + 4f)
+                                   .OrderBy(c => c.StandPoint.DistanceTo(L0.OnGround(L0.PathPoints[L0.PathPoints.Count / 3].X, L0.PathPoints[L0.PathPoints.Count / 3].Z))).FirstOrDefault();
+        Check(target != null, "acha um depósito para o robô");
+        Check(FindBuildSpotNear(bm, L0, BuildIds.Robot, new Vector2(target.StandPoint.X, target.StandPoint.Z), out var rp,
+            p => p.DistanceTo(target.StandPoint) > 2.5f && p.DistanceTo(target.StandPoint) < 7f && L0.FindPath(p, target.StandPoint) != null), "acha lugar para a base do robô perto do depósito");
+        var robotB = bm.Place(BuildIds.Robot, rp, 0);
+        await Frames(3);
+        var rdock = bm.NodeOf(robotB?.Id ?? -1) as Dock;
+        Check(rdock?.Unit is MinerBot, "base do robô construída, robô ativo");
+        var outside = world.Crystals.Where(c => c.IsMineable && c.StandPoint.DistanceTo(rp) > BuildData.RobotRange + 3f && WorldBuilder.RegionAt(c.GlobalPosition).Index == 0).Take(40).ToList();
+        GS.Data.DayOver = false;
+        Engine.TimeScale = 8;
+        for (int i = 0; i < 2400 && rdock.Stored == 0; i++) await Frames(1);
+        Engine.TimeScale = 1;
+        Check(rdock.Stored > 0, $"robô minera dentro da área e guarda na base ({rdock.Stored})");
+        Check(outside.All(c => c.IsMineable), "robô não minera fora da área dele");
+        Check(BuildData.RobotDpsFactor < 1f, "robô é mais fraco que o goblin da região");
+        GS.Data.DayOver = true;
+        await Frames(10);
+        Check(rdock.Unit.Status == Loc.T("parado (fora do turno)"), "robô para fora do turno");
+        GS.Data.DayOver = false;
+
+        // ---- modo construção com o botão: marcar início, arrastar até a venda, soltar ----
+        bm.CanUseBuildMode = () => true;
+        bm.SetActive(true);
+        Check(bm.SelectId(BuildIds.Belt), "esteira selecionada no modo construção");
+        await PFrames(2);
+        var st = world.SellStation.GlobalPosition;
+        async Task<bool> LookFrom(Vector3 target, float dist)
+        {
+            for (int k = 0; k < 16; k++)
+            {
+                float ang = k * Mathf.Tau / 16f;
+                var at = target + new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)) * dist;
+                if (!L0.InGrid(at.X, at.Z) || !L0.Reachable(at.X, at.Z)) continue;
+                player.GlobalPosition = L0.OnGround(at.X, at.Z) + Vector3.Up * 0.05f;
+                player.Velocity = Vector3.Zero;
+                await PFrames(1);
+                var cam = player.Camera.GlobalPosition;
+                var d = target + Vector3.Up * 0.05f - cam;
+                player.SetLook(Mathf.Atan2(-d.X, -d.Z), Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length()));
+                await PFrames(2);
+                // a mira precisa ver o alvo
+                var hit = player.GetWorld3D().DirectSpaceState.IntersectRay(new PhysicsRayQueryParameters3D { From = cam, To = target + Vector3.Up * 0.05f, CollisionMask = PlayerController.WorldLayer, Exclude = new Godot.Collections.Array<Rid> { player.GetRid() } });
+                if (hit.Count == 0 || hit["position"].AsVector3().DistanceTo(target) < 0.5f) return true;
+            }
+            return false;
+        }
+        async Task HoldAim(Vector3 target, int ms)
+        {
+            var pos = player.GlobalPosition;
+            ulong t0 = Time.GetTicksMsec();
+            while (Time.GetTicksMsec() - t0 < (ulong)ms)
+            {
+                // mantém o jogador parado e a mira no alvo enquanto o trajeto é recalculado (a cada 0,25 s)
+                player.GlobalPosition = pos;
+                player.Velocity = Vector3.Zero;
+                var d = target + Vector3.Up * 0.05f - player.Camera.GlobalPosition;
+                player.SetLook(Mathf.Atan2(-d.X, -d.Z), Mathf.Atan2(d.Y, new Vector2(d.X, d.Z).Length()));
+                await PFrames(1);
+            }
+        }
+        Check(FindBuildSpotNear(bm, L0, BuildIds.Belt, new Vector2(st.X, st.Z), out var ds,
+            p => p.DistanceTo(st) > 12f && p.DistanceTo(st) < 26f && bm.RouteBetween(p, bm.SellIntake) != null), "acha início para arrastar até a venda");
+        int count0 = GS.Data.Buildings.Count(b => b.Type == BuildIds.Belt);
+        Check(await LookFrom(ds, 3f), "mira no início");
+        Input.ActionPress("mine");
+        await PFrames(3);
+        Check(bm.BeltStart != null && bm.BeltStart.Value.DistanceTo(ds) < 1.2f, "apertar marca o início da esteira");
+        Check(await LookFrom(bm.SellIntake, 4f), "arrastando, mira na Estação de Venda");
+        await HoldAim(bm.SellIntake, 1200);
+        Input.ActionRelease("mine");
+        await PFrames(3);
+        var dragged = GS.Data.Buildings.Where(b => b.Type == BuildIds.Belt).OrderBy(b => b.Id).LastOrDefault();
+        Check(GS.Data.Buildings.Count(b => b.Type == BuildIds.Belt) == count0 + 1 && dragged?.Feeds == 0 && new Vector3(dragged.X, dragged.Y, dragged.Z).DistanceTo(ds) < 1.2f && bm.BeltStart == null,
+            "soltar o botão na Estação de Venda constrói a esteira arrastada");
+        // clique, clique: segunda esteira emendada na arrastada
+        var dmid = BuildingManager.Unflatten(dragged?.Path ?? new List<float>());
+        Vector3 cs = default;
+        Check(dmid.Count >= 3 && FindBuildSpotNear(bm, L0, BuildIds.Belt, new Vector2(dmid[dmid.Count / 2].X, dmid[dmid.Count / 2].Z), out cs,
+            p => p.DistanceTo(dmid[dmid.Count / 2]) > 6f && p.DistanceTo(dmid[dmid.Count / 2]) < 14f && bm.RouteBetween(p, dmid[dmid.Count / 2]) != null), "acha início para a esteira de clique-clique");
+        Check(await LookFrom(cs, 3f), "mira no início (clique)");
+        Input.ActionPress("mine"); await PFrames(2); Input.ActionRelease("mine"); await PFrames(2);
+        Check(bm.BeltStart != null, "clique rápido deixa o início marcado");
+        Input.ActionPress("interact"); await PFrames(2); Input.ActionRelease("interact"); await PFrames(2);
+        Check(bm.BeltStart == null && GS.Data.Buildings.Count(b => b.Type == BuildIds.Belt) == count0 + 1, "interagir cancela o início sem construir nem desmontar");
+        Check(await LookFrom(cs, 3f), "mira de novo no início");
+        Input.ActionPress("mine"); await PFrames(2); Input.ActionRelease("mine"); await PFrames(2);
+        Check(await LookFrom(dmid[dmid.Count / 2], 3.5f), "mira na esteira arrastada");
+        await HoldAim(dmid[dmid.Count / 2], 1200);
+        Input.ActionPress("mine"); await PFrames(2); Input.ActionRelease("mine"); await PFrames(2);
+        var clicked = GS.Data.Buildings.Where(b => b.Type == BuildIds.Belt).OrderBy(b => b.Id).LastOrDefault();
+        Check(clicked != null && clicked.Id != dragged?.Id && clicked.Feeds == dragged?.Id, "segundo clique na outra esteira constrói a emenda");
+        bm.SetActive(false);
+        bm.CanUseBuildMode = () => false;
+
+        // ---- renascimento: construções e ramo Construção recomeçam ----
         GS.Data.RunEarned = 10_000_000;
         GS.Data.GameCompleted = true;
         if (GS.CanPrestige) { GS.Prestige(); bm.Rebuild(); }
         await Frames(2);
-        Check(GS.Data.Buildings.Count == 0 && bm.NodeCount == 0 && GS.Data.DroneOwned && bm.Drone != null, "renascimento: construções zeradas, drone mantido");
+        Check(GS.Data.Buildings.Count == 0 && bm.NodeCount == 0 && !GS.BuildUnlocked(BuildIds.Belt), "renascimento: construções zeradas, ramo Construção recomeça");
+
+        // ---- save antigo: funil com esteira automática e drone que seguia o jogador ----
+        GS.Data.Buildings.Clear();
+        GS.Data.Skills.Clear();
+        GS.Data.DroneOwned = true;
+        long m0 = GS.Data.Money;
+        var legacy = new BuildingSave { Id = GS.Data.NextBuildingId++, Type = BuildIds.Hopper, X = hp.X, Y = hp.Y, Z = hp.Z, Paid = 5000 };
+        legacy.Queue["quartz"] = 4;
+        GS.Data.Buildings.Add(legacy);
+        bm.Rebuild();
+        await Frames(2);
+        var mb = GS.Data.Buildings.FirstOrDefault(b => b.Type == BuildIds.Belt);
+        Check(mb != null && mb.Feeds == 0 && legacy.Feeds == mb.Id && legacy.Ver == 1 && bm.HasOutlet(legacy.Id), "save antigo: funil vira funil + esteira até a venda");
+        Check(legacy.Paid + (mb?.Paid ?? 0) == 5000, "valor pago dividido entre funil e esteira");
+        Check(!GS.Data.DroneOwned && GS.Data.Money == m0 + BuildData.Of(BuildIds.Drone).Cost && GS.HasSkill(SkillIds.BuildDrone) && GS.HasSkill(SkillIds.BuildHopper), "save antigo: drone devolvido e ramo Construção liberado");
 
         Engine.TimeScale = 1;
         root.QueueFree();
         await Frames(2);
         Fresh();
+    }
+
+    /// <summary>Espera a esteira vender até <paramref name="target"/> fragmentos (tempo acelerado).</summary>
+    async Task WaitSold(long target, float len)
+    {
+        Engine.TimeScale = 8;
+        float maxWait = Mathf.Max(0, len) / BuildData.BeltSpeed + 20 * BuildData.BeltInterval + 3f;
+        ulong t0 = Time.GetTicksMsec();
+        while (GS.Data.ShardsSold < target && (Time.GetTicksMsec() - t0) / 1000f * 8 < maxWait * 1.5f) await Frames(1);
+        Engine.TimeScale = 1;
     }
 
     async Task TestRopes()
@@ -1761,6 +1992,12 @@ public partial class TestRunner : Node
         GS.IsPlaying = false;
         root.QueueFree();
         await Frames(2);
+    }
+
+    /// <summary>Espera quadros de processo (não de física): um aperto de botão precisa durar quadros visuais.</summary>
+    async Task PFrames(int n)
+    {
+        for (int i = 0; i < n; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
 
     async Task Frames(int n)

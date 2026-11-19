@@ -12,6 +12,8 @@ namespace CrystalExcavator.Player;
 /// </summary>
 public partial class ToolView : Node3D
 {
+    /// <summary>Camada visual da arma (a lanterna do capacete exclui esta camada).</summary>
+    public const uint ToolLayer = 1u << 9;
     Node3D _pivot;
     Node3D _model;
     Node3D _muzzle;
@@ -62,6 +64,7 @@ public partial class ToolView : Node3D
         {
             Mesh = mesh, MaterialOverride = mat, Position = pos,
             Rotation = rot ?? Vector3.Zero,
+            Layers = ToolLayer, // a lanterna do capacete não ilumina a arma (estourava de tão perto)
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         parent.AddChild(m);
@@ -77,7 +80,7 @@ public partial class ToolView : Node3D
 
     static StandardMaterial3D Metal(Color c, float rough = 0.35f, float metal = 0.75f) => new()
     {
-        AlbedoColor = c, Roughness = rough, Metallic = metal, RimEnabled = true, Rim = 0.25f, RimTint = 0.5f,
+        AlbedoColor = c, Roughness = rough, Metallic = metal,
     };
 
     static StandardMaterial3D Neon(Color c, float energy) => new()
@@ -104,10 +107,10 @@ public partial class ToolView : Node3D
         var rubber = Metal(new Color(0.06f, 0.06f, 0.07f), 0.9f, 0f);
         var glove = Metal(new Color(0.1f, 0.1f, 0.12f), 0.8f, 0.1f);
         var sleeve = Metal(new Color(0.16f, 0.12f, 0.22f), 0.7f, 0.1f);
-        _stripMat = Neon(accent, 4f);
-        _coilMat = Neon(accent, 3f);
-        _screenMat = new StandardMaterial3D { AlbedoColor = accent.Darkened(0.6f), EmissionEnabled = true, Emission = accent, EmissionEnergyMultiplier = 1.4f };
-        _coreMat = Neon(second.Lerp(Colors.White, 0.35f), 6f);
+        _stripMat = Neon(accent.Darkened(0.35f), 0.45f);
+        _coilMat = Neon(accent, 1f);
+        _screenMat = new StandardMaterial3D { AlbedoColor = accent.Darkened(0.6f), EmissionEnabled = true, Emission = accent, EmissionEnergyMultiplier = 0.6f };
+        _coreMat = Neon(second.Lerp(Colors.White, 0.35f), 1.6f);
         var rx = new Vector3(Mathf.Pi / 2, 0, 0);
         float bulk = 1f + tier * 0.06f;
 
@@ -138,7 +141,7 @@ public partial class ToolView : Node3D
         {
             // trilho superior com mira holográfica
             Part(_model, new BoxMesh { Size = new Vector3(0.02f, 0.015f, 0.18f) }, chrome, new Vector3(0.02f, 0.1f * bulk, 0.0f));
-            Part(_model, new BoxMesh { Size = new Vector3(0.03f, 0.03f, 0.004f) }, Neon(second, 3f), new Vector3(0.02f, 0.125f * bulk, -0.06f));
+            Part(_model, new BoxMesh { Size = new Vector3(0.03f, 0.03f, 0.004f) }, Neon(second, 0.8f), new Vector3(0.02f, 0.125f * bulk, -0.06f));
         }
         if (tier >= 4)
         {
@@ -256,11 +259,12 @@ public partial class ToolView : Node3D
 
         // tela e bobinas pulsam com o disparo
         float pulse = Firing ? 1.2f + 0.8f * MathF.Abs(MathF.Sin(_time * 12f)) : 0.6f + 0.3f * MathF.Sin(_time * 2f);
-        if (_screenMat != null) _screenMat.EmissionEnergyMultiplier = 0.5f + pulse * 0.25f;
-        if (_coilMat != null) _coilMat.EmissionEnergyMultiplier = 1.5f + pulse * 2f + kick * 3f;
-        if (_stripMat != null) _stripMat.EmissionEnergyMultiplier = 2.5f + pulse * 1.5f;
-        if (_coreMat != null) _coreMat.EmissionEnergyMultiplier = 4f + pulse * 3f;
-        if (_coreLight != null) _coreLight.LightEnergy = 0.4f + pulse * 0.4f;
+        // brilho contido: só passa do limiar do bloom ao atirar
+        if (_screenMat != null) _screenMat.EmissionEnergyMultiplier = 0.4f + pulse * 0.15f;
+        if (_coilMat != null) _coilMat.EmissionEnergyMultiplier = 0.7f + pulse * 0.8f + kick * 1.5f;
+        if (_stripMat != null) _stripMat.EmissionEnergyMultiplier = 0.35f + pulse * 0.2f;
+        if (_coreMat != null) _coreMat.EmissionEnergyMultiplier = 1.3f + pulse * 1.2f;
+        if (_coreLight != null) _coreLight.LightEnergy = 0.2f + pulse * 0.2f;
         // anéis giram mais rápido ao disparar
         _ringSpin = Mathf.Lerp(_ringSpin, Firing ? 22f : 1.5f, Mathf.Min(1f, dt * 4f));
         _rings?.RotateObjectLocal(Vector3.Forward, _ringSpin * dt);

@@ -26,7 +26,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
-- **Construções** (`World/Buildings.cs`, `Data/BuildData.cs`): modo construção (B), poste de luz, funil + esteira até a Estação de Venda (venda automática), drone coletor. Salvas em `SaveData.Buildings`.
+- **Construções** (`World/Buildings.cs` = gerenciador/modo construção/trajetos; `World/BuildingUnits.cs` = funil, entrada da esteira, base, drone, robô; `World/BuildingParts.cs` = poste e esteira; `Data/BuildData.cs`): modo construção (B). Corda e poste sempre liberados; o resto vem do **ramo Construção** da árvore de habilidades (Esteira → Funil → Drone de área → Robô mineiro). Esteira: marca o início e arrasta (ou clique-clique) até a Estação de Venda ou até outra esteira (emenda em `JoinS`); trajeto por `RouteBetween` (A* com folga, atravessa regiões nos dois sentidos) salvo em `BuildingSave.Path`; `Feeds` = 0 venda, id = outra esteira, −1 sem saída. Funil só ao lado de esteira. Drone e robô têm base fixa e só trabalham na área (14 m / 10 m), entregam no funil/entrada de esteira mais perto ou guardam na base; robô minera com 50% da força do goblin da região e para fora do turno. Saves antigos migram (`Ver` 0 → funil vira funil + esteira; drone antigo é devolvido). Salvas em `SaveData.Buildings`.
 - **Painel de admin** (F9 / Back): `Core/MainDebug.cs` (comandos) e `UI/DebugScreen.cs`.
 - **Acessibilidade** (`Core/Accessibility.cs`): filtro de daltonismo, narração (TTS do sistema), sons-guia, reduzir tremor. Remapeamento de teclado/mouse/controle em `InputSetup`.
 
@@ -131,3 +131,5 @@ Polimento final e regressão; aguardar o resultado do teste no Windows e ajustar
 
 ## Plataforma-alvo (decisão do diretor, v0.5)
 - O PC de referência é o do irmão do diretor (RTX 3060, i7 11ª geração, 16–32 GB DDR5, ~180 FPS no Alto) e deve ser tratado como **máquina média**: todo o design gráfico, sonoro e audiovisual parte dele. PCs fracos ficam apenas com o fallback automático (OpenGL/Baixa).
+
+- **Vídeo/desempenho** (`Core/Settings.cs`, `Main.UpdateDynamicResolution`): `SettingsData.Version` (2), padrão sem VSync e limite 144, `AntiAliasing` (0 off, 1 FXAA, 2 SMAA, 3 FSR 2) aplicado em `Settings.ApplyAntiAliasing`; resolução dinâmica mira `Main.DynamicTarget` (120 ou o limite) com FSR; `Settings.StrongGpu` sobe RTX/RX 6000+ para Alta. Texturas de ruído da rocha em `CaveTerrain.Smooth` (512 px, float).

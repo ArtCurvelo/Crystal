@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CrystalExcavator.Data;
 using CrystalExcavator.Player;
@@ -25,14 +26,12 @@ public partial class CaveTerrain : Node3D
             if (_cellTex != null) return _cellTex;
             var n = new FastNoiseLite
             {
-                Seed = 11, Frequency = 0.035f, NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular,
+                Seed = 11, Frequency = 0.035f / TexScale, NoiseType = FastNoiseLite.NoiseTypeEnum.Cellular,
                 CellularDistanceFunction = FastNoiseLite.CellularDistanceFunctionEnum.Euclidean,
                 CellularReturnType = FastNoiseLite.CellularReturnTypeEnum.Distance2Sub,
                 FractalType = FastNoiseLite.FractalTypeEnum.None,
             };
-            var img = n.GetSeamlessImage(256, 256);
-            img.GenerateMipmaps();
-            _cellTex = ImageTexture.CreateFromImage(img);
+            _cellTex = ImageTexture.CreateFromImage(Smooth(n.GetSeamlessImage(256 * TexScale, 256 * TexScale)));
             return _cellTex;
         }
     }
@@ -43,15 +42,44 @@ public partial class CaveTerrain : Node3D
         get
         {
             if (_noiseTex != null) return _noiseTex;
-            var n = new FastNoiseLite { Seed = 7, Frequency = 0.02f, FractalOctaves = 4, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth };
-            var img = n.GetSeamlessImage(256, 256);
-            img.GenerateMipmaps();
-            _noiseTex = ImageTexture.CreateFromImage(img);
+            var n = new FastNoiseLite { Seed = 7, Frequency = 0.02f / TexScale, FractalOctaves = 4, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth };
+            _noiseTex = ImageTexture.CreateFromImage(Smooth(n.GetSeamlessImage(256 * TexScale, 256 * TexScale)));
             return _noiseTex;
         }
     }
 
     public static void ClearCaches() { _noiseTex = null; _cellTex = null; _shader = null; }
+
+    /// <summary>Resolução das texturas de ruído em relação ao desenho original (256 px): mesmo padrão, mais definição.</summary>
+    const int TexScale = 2;
+
+    /// <summary>
+    /// O ruído vem em 8 bits (256 tons). O shader recorta faixas estreitas dele (rachaduras, cascalho, veios),
+    /// e cada degrau de 8 bits virava um "pixel" visível (aspecto de nitidez estourada). Aqui o ruído passa
+    /// para ponto flutuante e é suavizado (filtro 1-2-1 que dá a volta nas bordas), criando gradientes contínuos.
+    /// </summary>
+    public static Image Smooth(Image src)
+    {
+        int w = src.GetWidth(), h = src.GetHeight();
+        var a = new float[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) a[y * w + x] = src.GetPixel(x, y).R;
+        var b = new float[w * h];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    b[y * w + x] = (a[y * w + (x + w - 1) % w] + 2f * a[y * w + x] + a[y * w + (x + 1) % w]) * 0.25f;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    a[y * w + x] = (b[((y + h - 1) % h) * w + x] + 2f * b[y * w + x] + b[((y + 1) % h) * w + x]) * 0.25f;
+        }
+        var bytes = new byte[w * h * 4];
+        Buffer.BlockCopy(a, 0, bytes, 0, bytes.Length);
+        var img = Image.CreateFromData(w, h, false, Image.Format.Rf, bytes);
+        img.GenerateMipmaps();
+        return img;
+    }
 
     public void Build(CaveLayout L, RegionDef r)
     {

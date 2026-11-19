@@ -242,14 +242,28 @@ public partial class Main : Node
         if (_dynTimer < 2f) return;
         _dynTimer = 0;
         double fps = Engine.GetFramesPerSecond();
-        int cap = Settings.Data.MaxFps > 0 ? Settings.Data.MaxFps : 1000;
-        double target = Mathf.Min(30, cap - 2);
-        if (fps < target - 2 && _dynScale > 0.5f) _dynScale = Mathf.Max(0.5f, _dynScale - 0.05f);
-        else if (fps > target + 14 && _dynScale < max) _dynScale = Mathf.Min(max, _dynScale + 0.05f);
+        double target = DynamicTarget(Settings.Data.MaxFps, Settings.Data.VSync ? DisplayServer.ScreenGetRefreshRate() : -1);
+        _dynScale = NextDynamicScale(_dynScale, max, fps, target);
         if (!Mathf.IsEqualApprox(vp.Scaling3DScale, _dynScale)) vp.Scaling3DScale = _dynScale;
     }
 
     public float CurrentRenderScale => GetViewport().Scaling3DScale;
+
+    /// <summary>FPS que a resolução dinâmica tenta segurar: 120, ou menos se o limite/VSync não deixar passar disso.</summary>
+    public static double DynamicTarget(int maxFps, double refresh)
+    {
+        double cap = maxFps > 0 ? maxFps : 1000;
+        if (refresh > 0) cap = System.Math.Min(cap, refresh);
+        return System.Math.Min(120.0, cap - 3);
+    }
+
+    /// <summary>Próxima escala 3D: baixa 5% quando o FPS fica abaixo do alvo, sobe quando sobra folga (mínimo 60%).</summary>
+    public static float NextDynamicScale(float scale, float max, double fps, double target)
+    {
+        if (fps < target - 2 && scale > 0.6f) return Mathf.Max(0.6f, scale - 0.05f);
+        if (fps > target * 1.12 && scale < max) return Mathf.Min(max, scale + 0.05f);
+        return scale;
+    }
 
     async void Boot(string[] args)
     {

@@ -105,9 +105,10 @@ public partial class PlayerController : CharacterBody3D
             SpotAttenuation = 0.95f,
             LightVolumetricFogEnergy = 1.6f,
             Position = new Vector3(0.12f, 0.1f, 0.05f),
+            LightCullMask = ~ToolView.ToolLayer,
         };
         _head.AddChild(Lamp);
-        _lampFill = new OmniLight3D { LightColor = new Color(0.85f, 0.88f, 1f), LightEnergy = 0.9f, OmniRange = 10f, Position = new Vector3(0, 0.2f, 0) };
+        _lampFill = new OmniLight3D { LightCullMask = ~ToolView.ToolLayer, LightColor = new Color(0.85f, 0.88f, 1f), LightEnergy = 0.9f, OmniRange = 10f, Position = new Vector3(0, 0.2f, 0) };
         _head.AddChild(_lampFill);
         Settings.Changed += ApplySettings;
         ApplySettings();

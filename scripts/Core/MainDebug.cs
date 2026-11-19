@@ -14,9 +14,9 @@ namespace CrystalExcavator.Core;
 public partial class Main
 {
     public static readonly string DebugHelp =
-        "dinheiro N · tudo · regioes · melhorias · habilidades · casa · mochila · goblins · drone · curar\n" +
+        "dinheiro N · tudo · regioes · melhorias · habilidades · casa · mochila · goblins · curar\n" +
         "ir 1-6 · ir coracao · ir acampamento · ir goblin · ir poco · hora HH · fimdia · novodia · velocidade N\n" +
-        "rebeliao · evento · renascer · construcoes (◈ para testar) · ajuda";
+        "rebeliao · evento · renascer · construcoes (libera esteira, funil, drone, robô) · ajuda";
 
     /// <summary>Executa um comando de admin e devolve o resultado (texto).</summary>
     public string RunDebug(string line)
@@ -67,9 +67,6 @@ public partial class Main
                 foreach (var d in GoblinData.All) gs.MarkGoblinFound(d.RegionId);
                 foreach (var c in World.GoblinCamps) c.SyncState();
                 return "Todos os goblins encontrados (fale com eles para contratar)";
-            case "drone":
-                if (!gs.Data.DroneOwned) { gs.Data.DroneOwned = true; Buildings.SyncDrone(); }
-                return "Drone ativo";
             case "curar": case "heal":
                 Player?.RestoreHp();
                 return "Vida cheia";
@@ -147,9 +144,12 @@ public partial class Main
                 gs.Data.GameCompleted = true;
                 gs.Data.RunEarned = Math.Max(gs.Data.RunEarned, 25_000_000);
                 return $"Renascimento disponível (+{gs.PendingEssence} Essência) — use o Terminal";
-            case "construcoes": case "buildings":
+            case "construcoes": case "buildings": case "drone":
+                foreach (var id in new[] { SkillIds.BuildBelt, SkillIds.BuildHopper, SkillIds.BuildDrone, SkillIds.BuildRobot })
+                    if (!gs.HasSkill(id)) gs.Data.Skills.Add(id);
                 gs.AddMoney(500_000);
-                return "+◈ 500 mil para testar construções (B)";
+                gs.RaiseAll();
+                return "Ramo Construção liberado + ◈ 500 mil (B para construir)";
             default:
                 return $"Comando desconhecido: {cmd}. Digite ajuda.";
         }

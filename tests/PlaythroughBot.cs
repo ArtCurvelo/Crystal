@@ -92,7 +92,12 @@ public partial class PlaythroughBot : Node
 
         await Frames(120);
         await DismissCompletion();
-        if (!GS.Data.GameCompleted) { _errors++; Log("ERRO: jornada não foi marcada como concluída"); }
+        if (!GS.Data.GameCompleted)
+        {
+            _errors++;
+            Log($"ERRO: jornada não foi marcada como concluída (coração descoberto={GS.Data.Discovered.Contains("heart")}, regiões={string.Join(",", GS.Data.UnlockedRegions)}, " +
+                $"coração soltos={Mining.ShardManager.Instance?.Loose.Count(s => s.Mat.Id == "heart") ?? -1}, coração vivo={Main.World.Crystals.Any(c => c.Material.Id == "heart" && c.IsMineable)})");
+        }
 
         // caminhada real do acampamento até o Núcleo (colisões, túneis e portões abertos)
         if (_r3 > 0) await WalkTest();
@@ -124,9 +129,9 @@ public partial class PlaythroughBot : Node
         GD.Print($"Goblin: melhorias compradas {_goblinUps} | cabana pronta={GS.GoblinBuilt("caves")}");
         // a cabana leva 1,5 dia: em partidas curtas pode haver poucas cobranças (e às vezes sem dinheiro para pagar)
         if (!_hired || (_feesPaid + _feesSkipped) < 2 || _stashTaken == 0 || _goblinUps == 0) { _errors++; GD.Print("ERRO: ciclo do goblin incompleto"); }
-        GD.Print($"Construções: funil={(_hopperId != 0 || _beltSold > 0)} | vendido pela esteira ◈ {_beltSold} | drone={GS.Data.DroneOwned}");
+        GD.Print($"Construções: esteira={(_hopperId != 0 || _beltSold > 0)} | vendido pela esteira ◈ {_beltSold} | drone={_droneBought}");
         if (_beltSold <= 0) { _errors++; GD.Print("ERRO: a esteira não vendeu nada"); }
-        if (!GS.Data.DroneOwned) { _errors++; GD.Print("ERRO: drone não comprado"); }
+        if (!_droneBought) { _errors++; GD.Print("ERRO: drone não construído"); }
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
         GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
@@ -151,7 +156,7 @@ public partial class PlaythroughBot : Node
         var root = RegionRoot(region);
         // prefere o Coração quando o dano permite quebrá-lo em tempo razoável
         Crystal target = null;
-        var heart = Main.World.Crystals.FirstOrDefault(c => c.Material.Special && c.IsMineable);
+        var heart = Main.World.Crystals.FirstOrDefault(c => c.Material.Id == "heart" && c.IsMineable);
         if (heart != null && GS.IsUnlocked("core") && heart.Hp / GS.DamagePerSecond < 45) target = heart;
         target ??= Main.World.Crystals
             .Where(c => c.IsMineable && !c.Material.Special && c.GetParent() == root && !_unaimable.Contains(c))
@@ -171,7 +176,7 @@ public partial class PlaythroughBot : Node
             await Frames(2);
             if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); _missedAims++; _unaimable.Add(target); await Frames(5); return; }
         }
-        bool wasHeart = target.Material.Special;
+        bool wasHeart = target.Material.Id == "heart";
         Input.ActionPress("mine");
         int guard = 0;
         while (target.IsMineable && GS.CanWork && guard++ < 60 * 60) await Frames(1);
@@ -598,14 +603,15 @@ public partial class PlaythroughBot : Node
         P.GlobalPosition = Main.World.SpawnPoint;
     }
 
-    /// <summary>Construções: entra no modo construção pelos botões, constrói um funil com esteira e o drone.</summary>
+    /// <summary>Construções: aprende o ramo Construção, entra no modo construção pelos botões, constrói uma esteira até a venda e um drone.</summary>
     async Task TryBuild()
     {
         var bm = Main.Buildings;
         if (_hopperId != 0 && GS.Building(_hopperId) == null) _hopperId = 0; // renascimento
         if (!GS.CanWork) return;
-        if (_hopperId == 0 && GS.Data.Money >= 12000)
+        if (_hopperId == 0 && GS.Data.Money >= 16000)
         {
+            if (!GS.HasSkill(SkillIds.BuildBelt) && GS.TryBuySkill(SkillIds.BuildBelt)) Log("Aprendeu Esteira (ramo Construção)");
             var L0 = Main.World.Layouts[0];
             var at = L0.PathPoints[Math.Min(4, L0.PathPoints.Count - 1)];
             P.GlobalPosition = at + Vector3.Up * 0.1f; P.Velocity = Vector3.Zero;
@@ -616,29 +622,40 @@ public partial class PlaythroughBot : Node
             int sel = bm.Selected;
             PressAction("build_next");
             await Frames(3);
-            if (bm.Selected != (sel + 1) % BuildData.All.Count) { _errors++; Log("ERRO: trocar de construção não funcionou"); }
-            bm.Select(BuildData.All.FindIndex(b => b.Id == BuildIds.Hopper));
-            Vector3 spot = default; bool found = false;
-            for (int r = 2; r < 18 && !found; r++)
-                for (int a = 0; a < 12 && !found; a++)
+            if (bm.Selected != (sel + 1) % bm.Available.Count) { _errors++; Log("ERRO: trocar de construção não funcionou"); }
+            if (!bm.SelectId(BuildIds.Belt)) { _errors++; Log("ERRO: esteira não liberada após a habilidade"); }
+            BuildingSave b = null;
+            for (int r = 2; r < 18 && b == null; r++)
+                for (int a = 0; a < 12 && b == null; a++)
                 {
                     float ang = a * Mathf.Tau / 12f;
                     float x = at.X + Mathf.Cos(ang) * r, z = at.Z + Mathf.Sin(ang) * r;
                     if (!L0.InGrid(x, z)) continue;
                     var q = L0.OnGround(x, z);
-                    if (bm.CanPlace(BuildIds.Hopper, q, out _)) { spot = q; found = true; }
+                    if (bm.CanPlace(BuildIds.Belt, q, out _)) b = bm.PlaceBelt(q, bm.SellIntake);
                 }
-            var b = found ? bm.Place(BuildIds.Hopper, spot, 0) : null;
             PressAction("build");
             await Frames(3);
             if (bm.Active) { _errors++; Log("ERRO: modo construção não fechou"); }
-            if (b == null) { _errors++; Log("ERRO: não conseguiu construir o funil"); return; }
+            if (b == null) { _errors++; Log("ERRO: não conseguiu construir a esteira"); return; }
             _hopperId = b.Id;
-            Log($"Construiu funil + esteira de {bm.BeltOf(b.Id)?.Length ?? -1:0} m (◈ {b.Paid})");
+            Log($"Construiu esteira de {bm.BeltOf(b.Id)?.Length ?? -1:0} m até a venda (◈ {b.Paid})");
         }
-        if (!_droneBought && !GS.Data.DroneOwned && GS.Data.Money >= 40000)
+        if (!_droneBought && _hopperId != 0 && GS.Data.Money >= 100000)
         {
-            if (bm.Place(BuildIds.Drone, P.GlobalPosition, 0) != null) { _droneBought = true; Log("Comprou o drone coletor"); }
+            foreach (var sk in new[] { SkillIds.BuildHopper, SkillIds.BuildDrone })
+                if (!GS.HasSkill(sk)) GS.TryBuySkill(sk);
+            var L0 = Main.World.Layouts[0];
+            var at = L0.PathPoints[Math.Min(6, L0.PathPoints.Count - 1)];
+            for (int r = 2; r < 18 && !_droneBought; r++)
+                for (int a = 0; a < 12 && !_droneBought; a++)
+                {
+                    float ang = a * Mathf.Tau / 12f;
+                    float x = at.X + Mathf.Cos(ang) * r, z = at.Z + Mathf.Sin(ang) * r;
+                    if (!L0.InGrid(x, z)) continue;
+                    var q = L0.OnGround(x, z);
+                    if (bm.CanPlace(BuildIds.Drone, q, out _) && bm.Place(BuildIds.Drone, q, 0) != null) { _droneBought = true; Log("Construiu a base do drone de área"); }
+                }
         }
     }
 
@@ -648,12 +665,12 @@ public partial class PlaythroughBot : Node
         await TryHireGoblin();
         await UpgradeGoblin();
         await TryBuild();
-        // de vez em quando esvazia a mochila no funil em vez de vender no balcão
-        if (_hopperId != 0 && GS.CanWork && ++_hopperTrips % 3 == 0 && Main.Buildings.NodeOf(_hopperId) is Hopper hop)
+        // de vez em quando esvazia a mochila na entrada da esteira em vez de vender no balcão
+        if (_hopperId != 0 && GS.CanWork && ++_hopperTrips % 3 == 0 && Main.Buildings.NodeOf(_hopperId) is BeltIntake hop)
         {
             int carried = GS.InventoryCount;
             if (await UseStationNode(hop) && GS.InventoryCount == 0 && carried > 0) { _sells++; return; }
-            _errors++; Log("ERRO: não conseguiu usar o funil");
+            _errors++; Log("ERRO: não conseguiu usar a entrada da esteira");
         }
         if (!await UseStation<SellStation>(region)) return;
         var sell = Main.GetChildren().OfType<SellScreen>().First();

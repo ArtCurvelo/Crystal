@@ -394,3 +394,26 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - A esteira acompanha o relevo (pontos a cada 0,5 m na altura do chão).
 - Bug grave corrigido: a ligação entre regiões usava o fundo da região atual e o topo da anterior (invertido), e a esteira cruzava a região inteira em linha reta por dentro da rocha.
 - Teste novo `RouteIsClean` (região 1 e Núcleo → acampamento): sem parede, obstáculo, depósito ou desnível. 641/641 testes.
+
+## Ramo Construção, esteira arrastada, drone de área e robô mineiro
+- Pedido do diretor: construções compradas na árvore de habilidades (ramo Construção), começando só pela esteira; esteira colocada marcando o início e arrastando até o fim; robôs mineradores mais lentos que o goblin, trabalhando só numa área, assim como o drone.
+- Árvore: novo ramo **CONSTRUÇÃO** com 4 níveis — Esteira (◈ 1.500) → Funil (◈ 12 mil) → Drone de área (◈ 60 mil) → Robô mineiro (◈ 200 mil). Corda e poste continuam livres. Renascimento zera o ramo junto com a árvore.
+- **Esteira**: no modo construção, apertar marca o início; segurando e soltando na ponta (ou clicando de novo) constrói. A ponta precisa ficar na Estação de Venda ou encostada em outra esteira (emenda: os fragmentos passam para a outra no ponto de encontro). Prévia do trajeto em verde/vermelho com custo e metros; E cancela o início. Entrada no começo da esteira recebe a mochila. Desmontar uma esteira deixa sem saída quem despejava nela (fragmentos ficam na fila, nada se perde).
+- **Funil**: só ao lado de uma esteira; puxa fragmentos soltos e despeja nela.
+- **Drone de área**: base fixa (até 4); recolhe fragmentos soltos num raio de 14 m e leva ao funil/entrada de esteira mais perto; sem nenhum, guarda na base (o jogador pega com E).
+- **Robô mineiro**: base fixa (até 6); minera depósitos de chão num raio de 10 m com metade da força do goblin da região, carrega e entrega como o drone; para fora do turno. A área aparece como anel no modo construção.
+- Saves antigos: funil com esteira automática vira funil + esteira separados (valor dividido); drone antigo é devolvido (◈ 6 mil) e o ramo é liberado até onde o jogador já tinha.
+- Admin: `construcoes` libera o ramo inteiro + ◈ 500 mil.
+- Testes 688/688 (construções: 77 verificações, incluindo arrastar a esteira com o botão de verdade, emenda, funil, área do drone e do robô, migração de save).
+
+## Desempenho (meta 120 FPS) e acabamento visual
+- **FPS travado em 60**: o padrão antigo era VSync + limite de 60 FPS, então o jogo nunca passava de 60 em nenhuma placa. Novo padrão: sem VSync, limite 144. Configurações antigas que estavam no padrão são migradas sozinhas (versão 2); escolhas do jogador são mantidas.
+- **Resolução dinâmica** agora segura **120 FPS** (antes mirava 30), com reescala FSR (mínimo 60%).
+- **Suavização de bordas**: o jogo não tinha nenhuma. Novo padrão SMAA; opções FXAA e temporal (FSR 2) em Vídeo. Debanding ligado (gradientes escuros sem faixas).
+- **Placas RTX/RX 6000+ sobem para qualidade Alta** (primeira execução e migração de quem estava na Média padrão).
+- **Cristais**: as rachaduras (Voronoi, caro) só são calculadas em cristal danificado; cintilância de gema (pontinhos que acendem com o ângulo).
+- **Textura "estourada" (relato do diretor)**: as texturas de ruído da rocha eram 256 px em 8 bits; as rachaduras/cascalho recortam faixas estreitas e cada degrau virava pixel visível. Agora 512 px em ponto flutuante, suavizadas — mesmo desenho, sem serrilhado.
+- **Arma brilhante demais (relato do diretor)**: neon de 3–6× caiu para ~0,4–1,6× (só passa do bloom ao atirar), sem brilho de borda no metal, e a lanterna do capacete não ilumina mais a arma (camada própria).
+- Testado e descartado: relevo procedural na rocha (bump por derivadas) — com as texturas de ruído ampliadas gerava blocos visíveis no chão.
+- Bot: corrigido o alvo do Coração (o bot tratava qualquer formação especial como o Coração). Jogo: fragmentos recolhidos por drone/robô/funil também contam como descobertos.
+- Testes 703/703; bot SUCESSO. Não foi possível medir os 120 FPS numa RTX 3060 real (ambiente sem GPU): conferir com o contador (F3).

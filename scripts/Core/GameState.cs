@@ -143,7 +143,9 @@ public partial class GameState : Node
     /// <summary>Venda feita pela esteira (valor, material).</summary>
     public event Action<long, MaterialDef> BeltSold;
 
-    public int BuildingCount(string type) => Data.Buildings.Count(b => b.Type == type) + (type == BuildIds.Drone && Data.DroneOwned ? 1 : 0);
+    public int BuildingCount(string type) => Data.Buildings.Count(b => b.Type == type);
+    /// <summary>O item de construção já foi liberado na árvore (ramo Construção)?</summary>
+    public bool BuildUnlocked(string type) => BuildData.Of(type) is { } d && (d.Skill == null || HasSkill(d.Skill));
     public bool BuildingLimitReached(string type) => BuildingCount(type) >= BuildData.Of(type).Max;
     public BuildingSave Building(int id) => Data.Buildings.FirstOrDefault(b => b.Id == id);
 
@@ -151,20 +153,15 @@ public partial class GameState : Node
     public BuildingSave TryBuild(string type, Vector3 pos, float yaw, long extraCost = 0)
     {
         var def = BuildData.Of(type);
-        if (def == null || BuildingLimitReached(type)) return null;
+        if (def == null || BuildingLimitReached(type) || !BuildUnlocked(type)) return null;
         long cost = def.Cost + Math.Max(0, extraCost);
         if (!CanAfford(cost)) return null;
         Data.Money -= cost;
         MoneyChanged?.Invoke();
-        BuildingSave b = null;
-        if (type == BuildIds.Drone) Data.DroneOwned = true;
-        else
-        {
-            b = new BuildingSave { Id = Data.NextBuildingId++, Type = type, X = pos.X, Y = pos.Y, Z = pos.Z, Yaw = yaw, Paid = cost };
-            Data.Buildings.Add(b);
-        }
+        var b = new BuildingSave { Id = Data.NextBuildingId++, Type = type, X = pos.X, Y = pos.Y, Z = pos.Z, Yaw = yaw, Paid = cost, Ver = 1 };
+        Data.Buildings.Add(b);
         BuildingsChanged?.Invoke();
-        return b ?? new BuildingSave { Id = 0, Type = type, Paid = cost };
+        return b;
     }
 
     /// <summary>Desmonta: devolve metade do que foi pago; o que estava no funil é vendido na hora.</summary>
@@ -187,6 +184,8 @@ public partial class GameState : Node
     {
         var b = Building(id);
         if (b == null || count <= 0 || GameData.Mat(materialId) == null) return;
+        // coletado por drone/robô/funil também conta como descoberto (ex.: fragmentos do Coração)
+        Discover(GameData.Mat(materialId));
         b.Queue[materialId] = (b.Queue.TryGetValue(materialId, out int c) ? c : 0) + count;
     }
 
@@ -760,7 +759,7 @@ public partial class GameState : Node
         Data.UnlockedRegions.Add("caves");
         Data.GameCompleted = false;
         Data.HasPosition = false;
-        Data.Buildings.Clear(); // as construções ficam para trás (o drone é mantido)
+        Data.Buildings.Clear(); // as construções ficam para trás (a árvore, com o ramo Construção, recomeça)
         BuildingsChanged?.Invoke();
         RaiseAll();
         Notify("Renascimento!", Loc.F("+{0} Essência Ancestral · bônus permanente x{1:0.0}", gained, EssenceMultiplier), NotifyKind.Unlock);

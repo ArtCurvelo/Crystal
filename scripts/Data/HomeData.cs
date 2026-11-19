@@ -67,6 +67,7 @@ public static class SkillIds
     public const string Early = "early_bird", Overtime = "overtime", ShiftBonus = "shift_bonus";
     public const string FirmStrike = "firm_strike", Cadence = "cadence", Critical = "critical";
     public const string Haggle = "haggle", RareNose = "rare_nose", Jeweler = "jeweler";
+    public const string BuildBelt = "build_belt", BuildHopper = "build_hopper", BuildDrone = "build_drone", BuildRobot = "build_robot";
 }
 
 public static class HomeData
@@ -80,7 +81,7 @@ public static class HomeData
         new() { Id = HouseIds.Trophies, Name = "Estante de troféus", Description = "Fama de escavador: +4% no valor de venda por nível.", BaseCost = 4000, CostGrowth = 3.4, MaxLevel = 5, PerLevel = 0.04f },
     };
 
-    public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO" };
+    public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO", "CONSTRUÇÃO" };
 
     public static readonly List<SkillDef> Skills = new()
     {
@@ -99,6 +100,11 @@ public static class HomeData
         new() { Id = SkillIds.Haggle, Name = "Negociador", Description = "+10% no valor de venda.", Branch = 3, Tier = 1, Cost = 3000 },
         new() { Id = SkillIds.RareNose, Name = "Faro para raros", Description = "Minérios raros aparecem 50% mais.", Branch = 3, Tier = 2, Cost = 45000, Requires = SkillIds.Haggle },
         new() { Id = SkillIds.Jeweler, Name = "Joalheiro", Description = "Minérios raros e especiais valem +50%.", Branch = 3, Tier = 3, Cost = 500000, Requires = SkillIds.RareNose },
+
+        new() { Id = SkillIds.BuildBelt, Name = "Esteira", Description = "Libera a esteira no modo construção (B): marque o início e arraste até a Estação de Venda.", Branch = 4, Tier = 1, Cost = 1500 },
+        new() { Id = SkillIds.BuildHopper, Name = "Funil", Description = "Libera o funil: ao lado de uma esteira, puxa fragmentos soltos e despeja nela.", Branch = 4, Tier = 2, Cost = 12000, Requires = SkillIds.BuildBelt },
+        new() { Id = SkillIds.BuildDrone, Name = "Drone de área", Description = "Libera o drone: recolhe fragmentos soltos dentro da área da base dele.", Branch = 4, Tier = 3, Cost = 60000, Requires = SkillIds.BuildHopper },
+        new() { Id = SkillIds.BuildRobot, Name = "Robô mineiro", Description = "Libera o robô: minera sozinho dentro da área dele, mais devagar que um goblin.", Branch = 4, Tier = 4, Cost = 200000, Requires = SkillIds.BuildDrone },
     };
 
     public static HouseUpgradeDef HouseDef(string id) => House.FirstOrDefault(h => h.Id == id);

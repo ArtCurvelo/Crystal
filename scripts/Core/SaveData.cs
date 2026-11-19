@@ -129,7 +129,7 @@ public sealed class SaveData
         Discovered = Discovered.Where(d => d != null && GameData.Mat(d) != null).Distinct().ToList();
 
         Buildings ??= new();
-        Buildings = Buildings.Where(b => b != null && BuildData.Of(b.Type) != null && b.Type != BuildIds.Drone
+        Buildings = Buildings.Where(b => b != null && BuildData.Of(b.Type) != null
                                          && !float.IsNaN(b.X) && !float.IsNaN(b.Y) && !float.IsNaN(b.Z)
                                          && System.MathF.Abs(b.X) < 10000 && System.MathF.Abs(b.Z) < 10000).ToList();
         foreach (var b in Buildings)
@@ -211,4 +211,12 @@ public sealed class BuildingSave
     public Dictionary<string, int> Queue { get; set; } = new();
     /// <summary>Fragmentos que estavam andando na esteira na hora do save (voltam para a fila ao carregar).</summary>
     public Dictionary<string, int> InFlight { get; set; } = new();
+    /// <summary>Esteira: pontos do trajeto (x, y, z em sequência).</summary>
+    public List<float> Path { get; set; }
+    /// <summary>Esteira/funil: para onde despeja (0 = Estação de Venda, id = outra esteira, -1 = sem saída).</summary>
+    public int Feeds { get; set; } = -1;
+    /// <summary>Ponto da esteira de destino (metros desde o início) onde entra.</summary>
+    public float JoinS { get; set; }
+    /// <summary>Formato: 0 = funil antigo com esteira automática; 1 = sistema de construção atual.</summary>
+    public int Ver { get; set; }
 }

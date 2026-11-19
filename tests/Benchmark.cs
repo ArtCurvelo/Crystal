@@ -25,6 +25,8 @@ public partial class Benchmark : Node
         Settings.Data.Quality = Quality;
         Settings.Data.VSync = false;
         Settings.Data.MaxFps = 0;
+        var aa = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--bench-aa="));
+        if (aa != null) Settings.Data.AntiAliasing = int.Parse(aa.Split('=')[1]);
         Settings.Data.ShowFps = false;
         Settings.Data.DynamicResolution = false; // mede com escala fixa
         var rs = OS.GetCmdlineUserArgs().FirstOrDefault(a => a.StartsWith("--bench-scale="));
@@ -81,10 +83,14 @@ public partial class Benchmark : Node
             double ms = (Time.GetTicksUsec() - t0) / 1000.0 / frames;
             results.Add(ms);
             var draws = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
-            GD.Print($"[Bench] {name,-16} {1000.0 / ms,6:0.0} FPS  ({ms:0.0} ms)  draw calls {draws:0}");
+            var objs = Performance.GetMonitor(Performance.Monitor.RenderTotalObjectsInFrame);
+            var prims = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
+            var proc = Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000.0;
+            var phys = Performance.GetMonitor(Performance.Monitor.TimePhysicsProcess) * 1000.0;
+            GD.Print($"[Bench] {name,-16} {1000.0 / ms,6:0.0} FPS  ({ms:0.0} ms)  draw calls {draws:0}  objetos {objs:0}  triângulos {prims / 1000:0}k  CPU process {proc:0.00} ms  física {phys:0.00} ms");
         }
         double avg = results.Average();
-        GD.Print($"[Bench] MÉDIA qualidade={(GraphicsQuality)Quality} escala3D={Settings.Data.RenderScale:0.00}: {1000.0 / avg:0.0} FPS ({avg:0.0} ms)");
+        GD.Print($"[Bench] MÉDIA qualidade={(GraphicsQuality)Quality} escala3D={Settings.Data.RenderScale:0.00} AA={Settings.Data.AntiAliasing}: {1000.0 / avg:0.0} FPS ({avg:0.0} ms)");
         SaveSystem.Delete();
         GameState.Instance.QuitClean();
     }

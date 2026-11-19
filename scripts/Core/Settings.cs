@@ -17,14 +17,18 @@ public sealed class SettingsData
     public float SfxVolume { get; set; } = 0.9f;
     public int Quality { get; set; } = (int)GraphicsQuality.Medium;
     public bool Fullscreen { get; set; }
-    public bool VSync { get; set; } = true;
+    /// <summary>Formato das configurações: 2 = padrões de alto FPS (sem VSync, limite 144, anti-aliasing).</summary>
+    public int Version { get; set; }
+    public bool VSync { get; set; }
     public float RenderScale { get; set; } = 1f;
     public bool ShowFps { get; set; }
-    /// <summary>Ajusta a resolução 3D automaticamente para manter ~30 FPS.</summary>
+    /// <summary>Ajusta a resolução 3D automaticamente para segurar o FPS alvo (120, ou o limite se for menor).</summary>
     public bool DynamicResolution { get; set; } = true;
+    /// <summary>Suavização de bordas: 0 desligada, 1 FXAA, 2 SMAA, 3 temporal (FSR 2).</summary>
+    public int AntiAliasing { get; set; } = 2;
     /// <summary>Procurar atualizações ao iniciar o jogo.</summary>
     public bool CheckUpdates { get; set; } = true;
-    public int MaxFps { get; set; } = 60;
+    public int MaxFps { get; set; } = 144;
     public int WindowSize { get; set; } = 0; // índice em Settings.WindowSizes
     // ---- geral
     public string Language { get; set; } = "pt";
@@ -62,6 +66,7 @@ public sealed class SettingsData
         Quality = Math.Clamp(Quality, 0, 2);
         WindowSize = Math.Clamp(WindowSize, 0, Settings.WindowSizes.Length - 1);
         if (MaxFps != 0) MaxFps = Math.Clamp(MaxFps, 30, 240);
+        AntiAliasing = Math.Clamp(AntiAliasing, 0, 3);
         if (Array.IndexOf(Loc.Languages, Language) < 0) Language = "pt";
         Brightness = ok(Brightness, 0.6f, 1.8f, 1f);
         UiScale = ok(UiScale, 0.8f, 1.5f, 1f);
@@ -109,6 +114,7 @@ public static class Settings
             {
                 var d = JsonSerializer.Deserialize<SettingsData>(FileAccess.GetFileAsString(Path));
                 if (d != null) Data = d;
+                if (Data.Version < CurrentVersion) Migrate(Data);
             }
         }
         catch (Exception e)
@@ -127,6 +133,36 @@ public static class Settings
         if (FirstRun && DisplayServer.GetName() != "headless") Save();
     }
 
+    public const int CurrentVersion = 2;
+
+    /// <summary>
+    /// Configurações de versões antigas: o padrão era VSync + limite de 60 FPS (nunca passava de 60).
+    /// Quem estava no padrão passa para o novo (sem VSync, até 144 FPS, resolução dinâmica segurando 120).
+    /// Placas de vídeo fortes que estavam no padrão (Média) sobem para Alta.
+    /// </summary>
+    public static void Migrate(SettingsData d, string gpu = null)
+    {
+        if (d.Version < 2)
+        {
+            if (d.VSync && d.MaxFps == 60) { d.VSync = false; d.MaxFps = 144; }
+            if (d.Quality == (int)GraphicsQuality.Medium && StrongGpu(gpu ?? AdapterName())) d.Quality = (int)GraphicsQuality.High;
+            d.AntiAliasing = 2;
+        }
+        d.Version = CurrentVersion;
+    }
+
+    static string AdapterName()
+    {
+        try { return RenderingServer.GetVideoAdapterName() ?? ""; } catch { return ""; }
+    }
+
+    /// <summary>Placas dedicadas modernas (RTX, RX 6000/7000/9000, Arc): aguentam a qualidade Alta.</summary>
+    public static bool StrongGpu(string gpu)
+    {
+        string g = (gpu ?? "").ToLowerInvariant();
+        return g.Contains("rtx") || g.Contains("rx 6") || g.Contains("rx 7") || g.Contains("rx 9") || g.Contains("arc a") || g.Contains("arc b");
+    }
+
     /// <summary>Na primeira execução escolhe preset conforme a GPU (integradas Intel antigas → Baixa).</summary>
     static void AutoDetect()
     {
@@ -136,11 +172,14 @@ public static class Settings
         string g = gpu.ToLowerInvariant();
         bool weak = g.Contains("intel") && (g.Contains("hd graphics") || g.Contains("uhd") || g.Contains("haswell") || g.Contains("ivybridge"))
                     || g.Contains("llvmpipe") || g.Contains("swiftshader");
+        Data.Version = CurrentVersion;
         if (weak)
         {
             Data.Quality = (int)GraphicsQuality.Low;
             Data.RenderScale = 0.75f;
+            Data.AntiAliasing = 1;
         }
+        else if (StrongGpu(gpu)) Data.Quality = (int)GraphicsQuality.High;
         GD.Print($"[Configurações] GPU: '{gpu}' → qualidade {(GraphicsQuality)Data.Quality}");
     }
 
@@ -185,10 +224,33 @@ public static class Settings
         {
             tree.Root.Scaling3DScale = Data.RenderScale;
             tree.Root.ContentScaleFactor = Data.UiScale;
+            ApplyAntiAliasing(tree.Root);
         }
         InputSetup.ApplyBindings();
         Accessibility.Apply();
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Suavização de bordas e reescala 3D. FSR 1 reescala barato quando a resolução dinâmica baixa;
+    /// a opção temporal usa FSR 2 (também suaviza na resolução cheia). Sem Vulkan só há FXAA.
+    /// </summary>
+    public static void ApplyAntiAliasing(Viewport vp)
+    {
+        bool adv = Advanced;
+        int aa = Data.AntiAliasing;
+        if (!adv && aa >= 2) aa = 1;
+        vp.ScreenSpaceAA = aa switch
+        {
+            1 => Viewport.ScreenSpaceAAEnum.Fxaa,
+            2 => Viewport.ScreenSpaceAAEnum.Smaa,
+            _ => Viewport.ScreenSpaceAAEnum.Disabled,
+        };
+        vp.Scaling3DMode = !adv ? Viewport.Scaling3DModeEnum.Bilinear : aa == 3 ? Viewport.Scaling3DModeEnum.Fsr2 : Viewport.Scaling3DModeEnum.Fsr;
+        vp.FsrSharpness = 0.35f;
+        vp.UseTaa = false;
+        // cavernas escuras: gradientes suaves sem faixas
+        vp.UseDebanding = adv;
     }
 
     static void SetBus(string name, float linear)

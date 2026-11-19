@@ -54,16 +54,27 @@ void fragment() {
 	vec3 facet = base_color.rgb * COLOR.rgb;
 	ALBEDO = facet * (0.45 + 0.55 * h);
 
-	// rachaduras: projeção lateral (xz/y) para cobrir o prisma
-	vec2 uv = vec2(UV.x * 5.6, UV.y * 2.2) * 2.4 + seed;
-	vec2 v = voronoi(uv);
-	float reveal = step(v.y, damage * 1.15);
-	float width = 0.025 + 0.06 * damage;
-	float crack = (1.0 - smoothstep(0.0, width, v.x)) * reveal * step(0.01, damage);
+	// rachaduras: projeção lateral (xz/y) para cobrir o prisma.
+	// Só calcula o Voronoi (caro) em cristal danificado: a grande maioria está inteira.
+	float crack = 0.0;
+	if (damage > 0.01) {
+		vec2 uv = vec2(UV.x * 5.6, UV.y * 2.2) * 2.4 + seed;
+		vec2 v = voronoi(uv);
+		float reveal = step(v.y, damage * 1.15);
+		float width = 0.025 + 0.06 * damage;
+		crack = (1.0 - smoothstep(0.0, width, v.x)) * reveal;
+	}
+
+	// cintilância de gema lapidada: pontinhos que acendem conforme o ângulo de quem olha
+	vec3 gc = floor(lpos * 24.0 + seed);
+	float gh = fract(sin(dot(gc, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+	float tw = fract(gh * 7.13 + dot(normalize(VIEW), vec3(3.1, 2.3, 1.7)) * 1.4 + TIME * 0.12);
+	float glint = step(0.93, gh) * smoothstep(0.82, 1.0, tw) * (0.4 + fres);
 
 	float inner = glow_energy * (0.25 + 0.75 * h * h);
 	EMISSION = glow_color.rgb * (inner + fres * 1.1)
 		+ mix(glow_color.rgb, vec3(1.0), 0.45) * crack * (1.5 + 2.5 * damage)
+		+ mix(glow_color.rgb, vec3(1.0), 0.6) * glint * 2.2
 		+ vec3(flash) * 0.6;
 	ROUGHNESS = 0.12;
 	METALLIC = 0.15;

@@ -161,7 +161,7 @@ public partial class HomeScreen : ModalScreen
             {
                 var def = nodes[i];
                 if (i > 0) col.AddChild(UiTheme.Label("▼", 12, UiTheme.Muted, false, HorizontalAlignment.Center));
-                var btn = UiTheme.Button(def.Name, () => Select(def.Id), 140, 15);
+                var btn = UiTheme.Button(def.Name, () => Select(def.Id), 140, 14);
                 btn.CustomMinimumSize = new Vector2(140, 52);
                 btn.ClipText = true;
                 col.AddChild(btn);
@@ -257,7 +257,7 @@ public partial class HomeScreen : ModalScreen
             var btn = _skillButtons[def.Id];
             bool owned = gs.HasSkill(def.Id);
             bool avail = gs.SkillAvailable(def.Id);
-            btn.Text = (owned ? "✓ " : "") + def.Name + "\n" + (owned ? Loc.T("adquirida") : GameState.FormatMoney(def.Cost));
+            btn.Text = def.Name + "\n" + (owned ? "✓" : GameState.FormatMoney(def.Cost));
             var col = owned ? UiTheme.Gold : avail ? (gs.CanAfford(def.Cost) ? UiTheme.Success : UiTheme.Text) : UiTheme.Muted;
             btn.AddThemeColorOverride("font_color", col);
             btn.Modulate = def.Id == _selectedSkill ? Colors.White : new Color(1, 1, 1, owned || avail ? 0.9f : 0.55f);
