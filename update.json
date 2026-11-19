@@ -1,0 +1,32 @@
+{
+  "version": "0.11.1",
+  "engine": "4.5.1",
+  "notes": "v0.11.1: corrige o erro 'OpenGL 3.3' ao abrir (usa DirectX 11/ANGLE primeiro no Windows), testes de vídeo sem caixas de erro e instaladores atualizados",
+  "setupUrl": "https://github.com/ArtCurvelo/Crystal/raw/main/dist/CrystalExcavator-Setup.exe",
+  "files": [
+    {
+      "path": "CrystalExcavator.pck",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/CrystalExcavator.pck?v=0.11.1",
+      "sha256": "c71dd07356c835486cd33115accca4d2beb8934894a486faf43a685071ca9f43",
+      "size": 11504008
+    },
+    {
+      "path": "data_CrystalExcavator_windows_x86_64/CrystalExcavator.dll",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/data_CrystalExcavator_windows_x86_64/CrystalExcavator.dll?v=0.11.1",
+      "sha256": "9d8f4c747d6b2d303e34ae3ee489952720ba1047f583b292e28e23d6af3a15ce",
+      "size": 1243648
+    },
+    {
+      "path": "data_CrystalExcavator_windows_x86_64/CrystalExcavator.deps.json",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/data_CrystalExcavator_windows_x86_64/CrystalExcavator.deps.json?v=0.11.1",
+      "sha256": "bc375d73a590ad15806ebadd1a3328b063a0789a9ac118fda5cd7ff2eb76d472",
+      "size": 27172
+    },
+    {
+      "path": "data_CrystalExcavator_windows_x86_64/CrystalExcavator.runtimeconfig.json",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/data_CrystalExcavator_windows_x86_64/CrystalExcavator.runtimeconfig.json?v=0.11.1",
+      "sha256": "c00b42e04642331c2a6a6b11c293ee9d39f669163e8dc13b6a4dc68216c9b1b6",
+      "size": 358
+    }
+  ]
+}
