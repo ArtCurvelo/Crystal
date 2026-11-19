@@ -69,6 +69,8 @@ public sealed class RenderProfile
     public List<ProbeResult> Results { get; set; } = new();
     /// <summary>Renderizadores que falharam ao iniciar depois de escolhidos (não voltam a ser usados nesta máquina).</summary>
     public List<string> FailedMethods { get; set; } = new();
+    /// <summary>APIs gráficas encontradas antes dos testes.</summary>
+    public GpuCaps Caps { get; set; }
 }
 
 /// <summary>Controle de inicializações: detecta quando o jogo cai antes de chegar ao menu.</summary>
@@ -86,7 +88,7 @@ public static class RenderStore
 {
     public const string ProfilePath = "user://graphics_profile.json";
     /// <summary>Lido pela Godot ao iniciar (application/config/project_settings_override em project.godot).</summary>
-    public const string OverridePath = "user://graphics_override.cfg";
+    public const string OverridePath = "user://graphics_override_v2.cfg";
     public const string GuardPath = "user://render_boot.json";
     public const string LogPath = "user://logs/render.log";
 

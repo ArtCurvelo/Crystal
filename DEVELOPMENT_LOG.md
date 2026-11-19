@@ -425,3 +425,9 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Sem executável de launcher separado de propósito: o atualizador das versões antigas só aceita `.pck`/DLL; tudo chega pela atualização normal.
 - Testado de ponta a ponta com display virtual (primeira vez, inicializações seguintes, recuperação após 2 quedas, máquina sem Vulkan, teste que morre/trava, instalação antiga com save intacto) e matriz 3×3 de perfis sem erros. 758/758 testes. Detalhes e limites em `docs/RENDERIZACAO.md`.
 - Não validado aqui: FPS reais das máquinas de referência (ambiente sem GPU) e comportamento visual da janela de teste no Windows.
+
+## Correção do incidente da v0.11.0 ("OpenGL 3.3" ao abrir)
+- Relato do diretor: o jogo não abriu (caixa "OpenGL 3.3"); reinstalou e caiu na 0.2.1, que não recebe a atualização.
+- Causa provável (código-fonte da Godot 4.5.1): no Compatibility o Windows tenta o OpenGL nativo e só usa ANGLE se o driver declarar < 3.3; se declarar 3.3 e falhar, a Godot mostra a caixa e fecha antes do C#. Os testes da v0.11.0 ainda abriam janelas fora de todas as telas.
+- Correções: Compatibility no Windows com ANGLE (DirectX 11) primeiro e OpenGL nativo de reserva; consulta de Vulkan/Direct3D 12 num processo sem janela antes de testar Forward+/Mobile (sem eles, nem abre o teste); janela de teste no canto da tela principal; teste que não inicia é encerrado em 20 s; override renomeado (`graphics_override_v2.cfg`) e reavaliação forçada; trava para uma avaliação por vez (duplo clique); instaladores de `dist/` passam a ser regerados a cada publicação (estavam na 0.2.1).
+- Testes de ponta a ponta: GPU com Vulkan, sem Vulkan (Forward+/Mobile descartados em 1 s, sem abrir janela), driver travado antes do jogo, duas instâncias. 761/761.

@@ -18,7 +18,7 @@ public sealed record RenderDecision(string Method, int Quality, float RenderScal
 public static class RendererSelector
 {
     /// <summary>Versão das regras/teste: subir quando os requisitos do jogo mudarem (força nova avaliação).</summary>
-    public const int EvalVersion = 1;
+    public const int EvalVersion = 2;
     public const double TargetFps = 55, MaxP99Ms = 33.4, HighFps = 100;
 
     public static ProbeStatus Classify(ProbeResult r)

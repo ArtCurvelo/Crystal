@@ -28,6 +28,15 @@ rm -rf build/windows && mkdir -p build/windows
 "$GODOT" --headless --path . --export-release "Windows Desktop" build/windows/CrystalExcavator.exe 2>&1 | grep -E "^ERROR" || true
 test -f build/windows/CrystalExcavator.pck
 
+echo "== Instaladores (dist/): quem reinstala recebe sempre a versão atual"
+NSIS_ROOT="${NSIS_ROOT:-/home/user/tools/nsis}"
+export NSISDIR="$NSIS_ROOT/usr/share/nsis"
+cp README.md build/windows/LEIA-ME.md
+"$NSIS_ROOT/usr/bin/makensis" -V2 -DVERSION="$NEW" installer/CrystalExcavator.nsi
+"$NSIS_ROOT/usr/bin/makensis" -V2 -DVERSION="$NEW" installer/CrystalExcavator-Update.nsi
+mkdir -p dist && cp build/CrystalExcavator-Setup.exe build/CrystalExcavator-Atualizacao.exe dist/
+ls -la dist/*.exe
+
 echo "== Pacote"
 PAY=build/update_payload
 rm -rf "$PAY" && mkdir -p "$PAY/$DATA"
@@ -60,7 +69,7 @@ rm -f .git/updates-index
 for i in 1 2 3 4; do git push -f origin "$COMMIT:refs/heads/updates" && break || sleep $((i * 2)); done
 
 echo "== Versão no main"
-git add project.godot
+git add project.godot dist/
 git commit -q -m "Publica atualização v$NEW: $NOTES
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

@@ -19,6 +19,31 @@ um executável de launcher novo seria recusado por essas instalações e elas nu
 Por isso o "launcher" é o próprio jogo, numa etapa que roda **antes de montar o mundo**, e toda a
 lógica chega pelo `.pck`/DLL — qualquer instalação antiga recebe o sistema pela atualização normal.
 
+## Incidente da v0.11.0 e correções (v0.11.1)
+
+Na v0.11.0, um computador mostrou a caixa da Godot "Your video card drivers seem not to support the
+required OpenGL 3.3 version" e o jogo não abriu (a 0.2.1 abria). Essa caixa vem do **motor**, antes de
+qualquer código do jogo. Pelo código-fonte da Godot 4.5.1 (`platform/windows/display_server_windows.cpp`):
+no Compatibility o Windows tenta o OpenGL nativo e só usa o ANGLE (OpenGL sobre DirectX 11) se o driver
+*declarar* menos que 3.3; se declarar 3.3 mas falhar ao criar o contexto, desiste com essa caixa. Na v0.11.0
+os testes também abriam janelas totalmente fora das telas, o que pode impedir o driver OpenGL de criar o
+contexto. Correções:
+
+- **Compatibility no Windows usa ANGLE (DirectX 11) primeiro** (`rendering/gl_compatibility/driver.windows =
+  "opengl3_angle"`), com volta para o OpenGL nativo se o ANGLE falhar (`fallback_to_native`). Nunca fica pior
+  que a 0.2.1: o ANGLE está embutido no executável (conferido no binário exportado).
+- **Antes de testar Forward+/Mobile**, um processo **sem janela** (`--headless -- --gpu-check=`) consulta se há
+  Vulkan com GPU real (via `vulkan-1.dll`) ou Direct3D 12 (`d3d12.dll`). Sem nenhum, esses testes nem são abertos
+  (nenhuma caixa de erro em máquinas antigas). Se a própria consulta falhar, só o Compatibility é usado.
+- A janela de teste fica **no canto da tela principal** (1 pixel visível, atrás da barra de tarefas), e não
+  fora de todas as telas.
+- Teste que não chega a iniciar o jogo (driver parado numa caixa de erro) é encerrado em **20 s** (aviso
+  `.alive` gravado assim que o C# começa).
+- Override renomeado para `graphics_override_v2.cfg` e regras na versão 2: o arquivo antigo da v0.11.0 é
+  ignorado e todos reavaliam.
+- A publicação passou a **regerar os instaladores** em `dist/` (estavam parados na 0.2.1; quem reinstalava
+  recebia a 0.2.1).
+
 ## Como funciona
 
 1. **Sem avaliação**, o jogo abre no **Compatibility** (OpenGL), o renderizador que abre em praticamente
@@ -33,7 +58,7 @@ lógica chega pelo `.pck`/DLL — qualquer instalação antiga recebe o sistema 
    Se não bater a meta na Média, mede também na Baixa.
 4. Ordem: **Forward+ → Mobile → Compatibility**, parando no primeiro aprovado (sem espera artificial).
 5. A escolha é gravada no arquivo oficial de override da Godot
-   (`application/config/project_settings_override = "user://graphics_override.cfg"`), lido pelo motor
+   (`application/config/project_settings_override = "user://graphics_override_v2.cfg"`), lido pelo motor
    ao iniciar. Se o escolhido não é o que está aberto, o jogo **reinicia uma vez** já nele
    (os argumentos, como `--continue` do atualizador, são mantidos).
 6. Inicializações seguintes leem o perfil e abrem direto no renderizador certo, sem teste.
@@ -88,7 +113,7 @@ A qualidade sugerida pela avaliação só é aplicada se o jogador ainda não es
 
 | Arquivo | Conteúdo |
 |---|---|
-| `graphics_override.cfg` | renderizador escolhido (lido pela Godot ao iniciar) |
+| `graphics_override_v2.cfg` | renderizador escolhido (lido pela Godot ao iniciar) |
 | `graphics_profile.json` | perfil: renderizador, qualidade inicial, impressão do hardware, driver, versão do motor e da avaliação, resultado resumido de cada teste, renderizadores que falharam |
 | `render_boot.json` | controle de inicializações (recuperação) |
 | `logs/render.log` | registro interno (até 200 KB) |
@@ -118,7 +143,7 @@ Nada disso é enviado para fora.
 - **Queda nativa do driver antes do C# iniciar** (o processo morre antes de qualquer código do jogo):
   os testes em processos separados evitam escolher um renderizador assim, e a Godot já cai sozinha
   para OpenGL quando o Vulkan não inicializa; mas se um driver passar a travar *depois* da escolha e
-  antes do C#, só uma reinstalação/atualização de driver resolve (o arquivo `graphics_override.cfg`
+  antes do C#, só uma reinstalação/atualização de driver resolve (o arquivo `graphics_override_v2.cfg`
   pode ser apagado para voltar ao Compatibility).
 - Fluxo real do `.bat` do atualizador no Windows (a parte do jogo após reabrir foi testada).
 
@@ -126,6 +151,6 @@ Nada disso é enviado para fora.
 
 - Ver a matriz de perfis: `godot --path . --rendering-method mobile -- --render-matrix=pasta`
 - Forçar a seleção fora do jogo exportado: `godot --path . -- --render-select`
-- Simulações de falha para testes: `--x-probe-crash=<r>`, `--x-probe-hang=<r>`, `--x-probe-black=<r>`,
+- Simulações de falha para testes: `--x-probe-nostart=<r>`, `--x-probe-start-timeout=<s>`, `--x-gpu-allow-cpu`, `--x-probe-crash=<r>`, `--x-probe-hang=<r>`, `--x-probe-black=<r>`,
   `--x-probe-slow=<r>`, `--x-probe-fast=<r>`, `--x-boot-crash=<r>`, `--x-probe-timeout=<s>`
 - Benchmark: `RENDER=mobile ./tools/run_bench.sh 1`

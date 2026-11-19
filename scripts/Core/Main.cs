@@ -49,6 +49,23 @@ public partial class Main : Node
     {
         ProcessMode = ProcessModeEnum.Always;
         var args = OS.GetCmdlineUserArgs();
+        // processo de teste de renderizador: avisa logo que o motor e o C# iniciaram (o driver abriu)
+        var probeOut = args.FirstOrDefault(a => a.StartsWith("--probe-out="));
+        if (probeOut != null && args.Any(a => a.StartsWith("--render-probe=")))
+        {
+            // teste automático: simula o driver parado numa caixa de erro antes do jogo iniciar
+            if (args.Contains("--probe-simulate=nostart")) return;
+            using var alive = FileAccess.Open(probeOut.Substring("--probe-out=".Length) + ".alive", FileAccess.ModeFlags.Write);
+            alive?.StoreString("ok");
+        }
+        // verificação das APIs gráficas num processo sem janela (pedido pelo RenderBootstrap)
+        var gpuCheck = args.FirstOrDefault(a => a.StartsWith("--gpu-check="));
+        if (gpuCheck != null)
+        {
+            Rendering.GpuCapabilities.RunAndWrite(gpuCheck.Substring("--gpu-check=".Length));
+            GetTree().Quit(0);
+            return;
+        }
         if (args.Contains("--run-tests"))
         {
             AddChild(new Tests.TestRunner());

@@ -832,6 +832,12 @@ public partial class TestRunner : Node
         // o valor efetivo pode vir do override desta máquina; o padrão do projeto é o que vale sem avaliação
         Check(FileAccess.GetFileAsString("res://project.godot").Contains("renderer/rendering_method=\"gl_compatibility\""), "sem avaliação o jogo abre no Compatibility (o mais seguro)");
         Check(!RenderBootstrap.ShouldRun(new[] { "--run-tests" }), "seleção não roda nos testes e ferramentas");
+        var proj = FileAccess.GetFileAsString("res://project.godot");
+        Check(proj.Contains("gl_compatibility/driver.windows=\"opengl3_angle\"") && proj.Contains("gl_compatibility/fallback_to_native=true"),
+            "Compatibility no Windows: ANGLE (DirectX 11) primeiro, OpenGL nativo como reserva");
+        Check(RenderStore.OverridePath.Contains("_v2") && RendererSelector.EvalVersion >= 2, "override da v0.11.0 ignorado e reavaliação forçada");
+        var noRd = new GpuCaps { Checked = true };
+        Check(!noRd.RenderingDevice && new GpuCaps { D3D12 = true }.RenderingDevice && new GpuCaps { Vulkan = true }.RenderingDevice, "sem Vulkan nem Direct3D 12: Forward+/Mobile não são testados");
     }
 
     void TestFpsSettings()

@@ -93,10 +93,19 @@ public partial class RenderBootstrap : Node
         }
 
         // ---- 3. avaliação (primeira vez, hardware/driver/motor mudou ou regras novas)
+        // outra janela do jogo já está avaliando (duplo clique no atalho): esta abre normal, sem mexer em nada
+        if (!TryLock())
+        {
+            RenderStore.Log("outra instância está avaliando; esta segue sem avaliar");
+            Continue();
+            return;
+        }
         RenderStore.Log("avaliação necessária: " + HardwareInfo.Describe(hw) + $" · motor {engine} · regras v{RendererSelector.EvalVersion}");
         BuildOverlay();
         ulong t0 = Time.GetTicksMsec();
         var results = new List<ProbeResult>();
+        var caps = await CheckGpu();
+        RenderStore.Log($"APIs gráficas: Vulkan {(caps.Vulkan ? "sim" : "não")} ({caps.VulkanDevices} disp., '{caps.VulkanDevice}') · Direct3D 12 {(caps.D3D12 ? "sim" : "não")}{(string.IsNullOrEmpty(caps.Note) ? "" : " · " + caps.Note.Trim())}");
         var skip = profile?.FailedMethods ?? new List<string>();
         if (skip.Count >= RenderMethods.Preference.Length) skip = skip.Where(x => x != RenderMethods.Compatibility).ToList(); // nunca fica sem nenhum
         int step = 0;
@@ -105,7 +114,11 @@ public partial class RenderBootstrap : Node
         {
             step++;
             SetProgress(step / 4f);
-            var r = await Probe(m);
+            // sem Vulkan nem Direct3D 12 Forward+/Mobile não iniciam: nem abre o processo
+            // (evita a caixa de erro do motor numa máquina antiga)
+            var r = !caps.RenderingDevice && m != RenderMethods.Compatibility
+                ? new ProbeResult { Method = m, Note = "sem Vulkan nem Direct3D 12 utilizável" }
+                : await Probe(m);
             r.Status = RendererSelector.Classify(r);
             results.Add(r);
             RenderStore.Log($"teste {m}: {r.Status} · real {r.ActualMethod}/{r.Driver} · '{r.Adapter}' · Média {r.FpsMedium:0.0} FPS (média {r.AvgMsMedium:0.0} ms, p99 {r.P99MsMedium:0.0} ms)" +
@@ -121,12 +134,13 @@ public partial class RenderBootstrap : Node
             EvalVersion = RendererSelector.EvalVersion, Engine = engine, GameVersion = UpdateManager.CurrentVersion,
             EvaluatedAt = Time.GetDatetimeStringFromSystem(), Hardware = hw, Method = decision.Method,
             Quality = decision.Quality, RenderScale = decision.RenderScale, Recovery = decision.Recovery,
-            Results = results, FailedMethods = new List<string>(skip),
+            Results = results, FailedMethods = new List<string>(skip), Caps = caps,
         };
         RenderStore.SaveProfile(profile);
         RenderStore.WriteOverride(decision.Method);
         ApplyInitialQuality(decision);
 
+        Unlock();
         if (decision.Method != current && !restarted && !string.IsNullOrEmpty(current))
         {
             Restart(decision.Method);
@@ -147,6 +161,32 @@ public partial class RenderBootstrap : Node
         s.DynamicResolution = true;
         if (ReferenceEquals(s, Settings.Data)) Settings.Save();
         return true;
+    }
+
+    const string LockPath = "user://render_eval.lock";
+
+    /// <summary>Uma avaliação por vez (trava com o PID; trava de processo que não existe mais é ignorada).</summary>
+    static bool TryLock()
+    {
+        string abs = ProjectSettings.GlobalizePath(LockPath);
+        try
+        {
+            if (System.IO.File.Exists(abs) && int.TryParse(System.IO.File.ReadAllText(abs).Trim(), out int other) && other != OS.GetProcessId())
+            {
+                bool alive;
+                try { using var p = System.Diagnostics.Process.GetProcessById(other); alive = !p.HasExited; } catch { alive = false; }
+                bool fresh = (DateTime.Now - System.IO.File.GetLastWriteTime(abs)).TotalMinutes < 5;
+                if (alive && fresh) return false;
+            }
+            System.IO.File.WriteAllText(abs, OS.GetProcessId().ToString());
+            return true;
+        }
+        catch { return true; }
+    }
+
+    static void Unlock()
+    {
+        try { System.IO.File.Delete(ProjectSettings.GlobalizePath(LockPath)); } catch { }
     }
 
     static void BeginGuard(BootGuard g, string method)
@@ -216,6 +256,7 @@ public partial class RenderBootstrap : Node
         string outRel = $"user://probe_{method}.json";
         string outAbs = ProjectSettings.GlobalizePath(outRel);
         if (System.IO.File.Exists(outAbs)) System.IO.File.Delete(outAbs);
+        if (System.IO.File.Exists(outAbs + ".alive")) System.IO.File.Delete(outAbs + ".alive");
         var size = ProbeResolution();
         var args = BaseArgs();
         args.AddRange(new[] { "--rendering-method", method, "--windowed", "--resolution", $"{size.X}x{size.Y}", "--position", OffscreenPosition(size) });
@@ -224,7 +265,7 @@ public partial class RenderBootstrap : Node
         args.Add("--probe-out=" + outRel);
         args.Add("--probe-parent=" + OS.GetProcessId());
         // simulação de falhas para os testes automáticos: --x-probe-<modo>=<renderizador>
-        foreach (var mode in new[] { "crash", "hang", "black", "slow", "fast" })
+        foreach (var mode in new[] { "crash", "hang", "black", "slow", "fast", "nostart" })
             if (OS.GetCmdlineUserArgs().Any(a => a == $"--x-probe-{mode}={method}")) args.Add("--probe-simulate=" + mode);
         ulong t0 = Time.GetTicksMsec();
         int pid = OS.CreateProcess(OS.GetExecutablePath(), args.ToArray());
@@ -241,12 +282,20 @@ public partial class RenderBootstrap : Node
                 {
                     var r = JsonSerializer.Deserialize<ProbeResult>(System.IO.File.ReadAllText(outAbs));
                     System.IO.File.Delete(outAbs);
+                    if (System.IO.File.Exists(outAbs + ".alive")) System.IO.File.Delete(outAbs + ".alive");
                     if (OS.IsProcessRunning(pid)) OS.Kill(pid); // alguns drivers demoram a fechar: o resultado já chegou
                     if (r != null) return r;
                 }
                 catch (Exception e) { fail.Note = "resultado ilegível: " + e.Message; return fail; }
             }
             if (!OS.IsProcessRunning(pid)) { fail.Note = "o processo de teste fechou sem resultado (falha ao iniciar ou travamento)"; return fail; }
+            // não chegou nem a iniciar o jogo: o driver travou ou o motor abriu uma caixa de erro → encerra logo
+            if (!System.IO.File.Exists(outAbs + ".alive") && (Time.GetTicksMsec() - t0) / 1000.0 > StartTimeout())
+            {
+                OS.Kill(pid);
+                fail.Note = $"o driver não iniciou em {StartTimeout():0} s";
+                return fail;
+            }
             if ((Time.GetTicksMsec() - t0) / 1000.0 > Timeout())
             {
                 OS.Kill(pid);
@@ -273,21 +322,60 @@ public partial class RenderBootstrap : Node
         return size;
     }
 
-    /// <summary>À direita de todas as telas (fora da área visível, inclusive com vários monitores).</summary>
+    /// <summary>
+    /// No canto inferior direito da tela principal, quase toda fora dela (sobra 1 pixel, atrás da barra de tarefas).
+    /// A janela continua "num monitor": totalmente fora das telas alguns drivers OpenGL não criam o contexto.
+    /// </summary>
     static string OffscreenPosition(Vector2I size)
     {
-        int right = 0, top = 0;
         try
         {
-            for (int i = 0; i < DisplayServer.GetScreenCount(); i++)
-            {
-                var p = DisplayServer.ScreenGetPosition(i); var s = DisplayServer.ScreenGetSize(i);
-                right = Math.Max(right, p.X + s.X);
-                top = Math.Min(top, p.Y);
-            }
+            int s = DisplayServer.GetPrimaryScreen();
+            var p = DisplayServer.ScreenGetPosition(s); var sz = DisplayServer.ScreenGetSize(s);
+            return $"{p.X + sz.X - 1},{p.Y + sz.Y - 1}";
         }
-        catch { right = 4000; }
-        return $"{right + 200},{top}";
+        catch { return "0,0"; }
+    }
+
+    static double StartTimeout()
+    {
+        var a = OS.GetCmdlineUserArgs().FirstOrDefault(x => x.StartsWith("--x-probe-start-timeout="));
+        return a != null && double.TryParse(a.Split('=')[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double t) ? t : 20;
+    }
+
+    /// <summary>Vulkan/Direct3D 12 disponíveis? Consulta num processo sem janela (driver com defeito não afeta o jogo).</summary>
+    async Task<GpuCaps> CheckGpu()
+    {
+        string rel = "user://gpu_caps.json", abs = ProjectSettings.GlobalizePath(rel);
+        if (System.IO.File.Exists(abs)) System.IO.File.Delete(abs);
+        var args = BaseArgs();
+        args.Add("--headless");
+        args.Add("--");
+        args.Add("--gpu-check=" + rel);
+        if (OS.GetCmdlineUserArgs().Contains("--x-gpu-allow-cpu")) args.Add("--x-gpu-allow-cpu");
+        int pid = OS.CreateProcess(OS.GetExecutablePath(), args.ToArray());
+        ulong t0 = Time.GetTicksMsec();
+        while (pid > 0 && (Time.GetTicksMsec() - t0) < 20000)
+        {
+            await ToSignal(GetTree().CreateTimer(0.2, true, false, true), SceneTreeTimer.SignalName.Timeout);
+            if (System.IO.File.Exists(abs))
+            {
+                try
+                {
+                    await ToSignal(GetTree().CreateTimer(0.1, true, false, true), SceneTreeTimer.SignalName.Timeout);
+                    var caps = JsonSerializer.Deserialize<GpuCaps>(System.IO.File.ReadAllText(abs));
+                    System.IO.File.Delete(abs);
+                    if (OS.IsProcessRunning(pid)) OS.Kill(pid);
+                    if (caps != null) return caps;
+                }
+                catch { }
+                break;
+            }
+            if (!OS.IsProcessRunning(pid)) break;
+        }
+        if (pid > 0 && OS.IsProcessRunning(pid)) OS.Kill(pid);
+        // a própria consulta falhou (driver com defeito): por segurança, só o Compatibility
+        return new GpuCaps { Checked = false, Note = "consulta das APIs gráficas falhou" };
     }
 
     // ------------------------------------------------------------ tela (a mesma da carga do jogo, sem detalhes técnicos)
