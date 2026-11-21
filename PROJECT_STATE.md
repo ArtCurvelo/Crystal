@@ -19,8 +19,12 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 ## Conteúdo do jogo
 - **6 regiões** em sequência no eixo −Z: Cavernas Luminosas (z≈0), Profundezas Prismáticas (◈ 6.000), Núcleo Ancestral (◈ 400 mil), Reservatório Abissal (◈ 1,5 mi), Jardim Fúngico (◈ 8 mi) e Catedral de Cristal (◈ 40 mi). Jornada principal = 4 primeiras + Coração (`GameData.JourneyRegions`); as outras são fim de jogo.
 - **13 materiais** com raridade (Comum → Lendário), incluindo a formação especial Coração Ancestral.
-- **7 upgrades**: Potência do Feixe, Ritmo de Extração, Mochila Reforçada, Botas, Lapidação Fina, Ímã de Coleta e Amplificador de Ressonância.
-- **6 ferramentas visuais** conforme o nível de Potência: 0, 3, 7, 12, 18 e 24.
+- **5 upgrades no Terminal**: Mochila Reforçada, Botas, Lapidação Fina, Ímã de Coleta e Amplificador de Ressonância (dano e velocidade saíram da loja).
+- **12 ferramentas compradas** (`Data/ToolData.cs`): picaretas de madeira → cobre → hematita → ametista → prata → safira → obsidiana → rubi, brocas de titânio e peridoto, lasers de diamante e prisma (só no fim). Cada uma tem dano, golpes/s, durabilidade e região mínima; quebrada → mãos (1 de dano) até comprar outra. Lasers gastam **munição** (células, pacote de 200 comprado no Terminal).
+- **Raridade por profundidade**: `CaveLayout.Depth` (distância andando desde a entrada) limita a raridade (`WorldBuilder.MaxRarityAt`); região 1 vai no máximo até Épico; desvios/salas secretas dão +1.
+- **Identidade por minério**: `Mining/OreShapes.cs` gera uma forma 3D própria por minério (aglomerado, lascas, geodo, pepita, bandado, gelo, brasa, coral, pérola) com duas cores; `UI/OreIcons.cs` fotografa cada forma para os ícones do HUD, Terminal, venda e códice.
+- **Casa** (`World/PlayerHouse.cs`, `World/HouseDiorama.cs`): 9 melhorias — Cama, Bancada, Armário, Cozinha, Troféus, **Suporte de ferramentas** (+12% durabilidade; nível 1 libera comprar ferramentas/munição na bancada da casa), **Baú do comprador** (vende a mochila em casa; +5% capacidade), **Lampiões** (+12% alcance da lanterna) e **Carregador de células** (+30 células por manhã com laser). Cada uma tem móvel próprio; o patamar visual (0–4) usa referência fixa de 20 níveis.
+- **Árvore de habilidades**: 7 ramos, 28 habilidades (`UI/SkillTreeView.cs`).
 - **Ressonância**: 10 golpes rítmicos carregam um pulso em área.
 - **Eventos por região**: Eco Luminoso, Maré Gélida, Surto do Núcleo e Maré Luminosa.
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
@@ -111,9 +115,9 @@ Argumentos de usuário (após `--`): `--run-tests`, `--shots=<pasta>`, `--bot[=m
 3. Tour de capturas (inclui folha das ferramentas e métricas de draw calls) → inspecionar os PNGs.
 4. Exportar para Windows e enviar o zip ao diretor; no Windows: F3 a 720p na qualidade Baixa.
 
-## Balanceamento atual (bot: teleporta e mira perfeitamente)
-Região 2 em cerca de 8–10 min · Região 3 em cerca de 30–36 min · Reservatório em cerca de 38–44 min · Coração em cerca de 44–50 min · conclusão em cerca de 45 min.
-Para um humano, a estimativa é 1,5–2,5× mais lento (cerca de 1,5–2 h).
+## Balanceamento atual (economia nerfada, `Economy` em GameData.cs)
+Simulação de jogador (teste "balanceamento"): região 2 ≈ 33 min, região 3 ≈ 3 h, Coração ≈ 5,7 h.
+O bot multiplica a venda por 2,6 (`Economy.SellValue`) só para cobrir a jornada inteira em ~85 min.
 
 ## Métricas (qualidade Baixa, 720p, software)
 Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo simulado.

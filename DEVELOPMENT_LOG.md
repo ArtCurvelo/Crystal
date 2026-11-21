@@ -431,3 +431,13 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Causa provável (código-fonte da Godot 4.5.1): no Compatibility o Windows tenta o OpenGL nativo e só usa ANGLE se o driver declarar < 3.3; se declarar 3.3 e falhar, a Godot mostra a caixa e fecha antes do C#. Os testes da v0.11.0 ainda abriam janelas fora de todas as telas.
 - Correções: Compatibility no Windows com ANGLE (DirectX 11) primeiro e OpenGL nativo de reserva; consulta de Vulkan/Direct3D 12 num processo sem janela antes de testar Forward+/Mobile (sem eles, nem abre o teste); janela de teste no canto da tela principal; teste que não inicia é encerrado em 20 s; override renomeado (`graphics_override_v2.cfg`) e reavaliação forçada; trava para uma avaliação por vez (duplo clique); instaladores de `dist/` passam a ser regerados a cada publicação (estavam na 0.2.1).
 - Testes de ponta a ponta: GPU com Vulkan, sem Vulkan (Forward+/Mobile descartados em 1 s, sem abrir janela), driver travado antes do jogo, duas instâncias. 761/761.
+
+## Pedido da faculdade: ferramentas, raridade por profundidade, economia, árvore, pedras, minérios e casa
+- Ferramentas pré-definidas com durabilidade no lugar de dano/velocidade (madeira → ... → laser só no fim); quebrou → compra outra no Terminal. Lasers com munição comprada. Saves antigos migram pelo nível de dano.
+- Raridade limitada pela distância andando desde a entrada (lendário não nasce mais perto do jogador na região 1).
+- Economia nerfada (venda ×0,75, regiões/melhorias ×1,5, ferramentas ×1,6) medida pela simulação: região 2 ≈ 33 min, região 3 ≈ 3 h.
+- Árvore de habilidades redesenhada (7 ramos, 28 habilidades, nós com conectores).
+- Pedras sem colisão/textura: seixos maiores têm esfera de colisão e todas as rochas usam o shader da caverna.
+- Identidade por minério: forma 3D própria em duas cores para drops/fragmentos e ícones fotografados no HUD (brilho reduzido para o padrão aparecer).
+- Casa: 4 melhorias novas com móveis próprios (suporte de ferramentas, baú do comprador, lampiões, carregador de células); bancada da casa vende ferramentas e munição, baú vende a mochila. Patamar visual com referência fixa para casas antigas não regredirem.
+- Testes: 830/830. Bot: SUCESSO (jornada completa, renascimento, 2ª jornada).

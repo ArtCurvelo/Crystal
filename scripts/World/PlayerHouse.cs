@@ -17,6 +17,8 @@ public partial class PlayerHouse : Node3D
     public HouseBed Bed;
     public HouseTerminal Panel;
     public MineElevator ElevatorDown;
+    public HouseToolBench ToolBench;
+    public HouseChest Chest;
 
     /// <summary>Onde o jogador aparece ao subir da mina (na frente do elevador).</summary>
     public Vector3 ArrivePoint => Origin + new Vector3(1.7f, 0.1f, 0.3f);
@@ -37,6 +39,10 @@ public partial class PlayerHouse : Node3D
         AddChild(Panel);
         ElevatorDown = new MineElevator { Name = "ElevatorDown", GoesDown = true, Position = new Vector3(1.7f, 0, 1.78f), Rotation = new Vector3(0, Mathf.Pi, 0), Scale = Vector3.One * 0.72f };
         AddChild(ElevatorDown);
+        ToolBench = new HouseToolBench { Name = "ToolBench", Position = new Vector3(0.2f, 0, -2.05f) };
+        AddChild(ToolBench);
+        Chest = new HouseChest { Name = "Chest", Position = new Vector3(-0.55f, 0, 2.1f), Rotation = new Vector3(0, Mathf.Pi, 0) };
+        AddChild(Chest);
         var warm = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.55f), LightEnergy = 0.8f, OmniRange = 6f, Position = new Vector3(-1.5f, 2.4f, -0.5f) };
         warm.SetMeta(HouseDiorama.AlwaysOnMeta, true);
         AddChild(warm);
@@ -82,4 +88,48 @@ public partial class HouseTerminal : StationBase
 
     public override string GetPrompt() => Loc.F("{0} Painel: melhorias da casa e habilidades", InputHints.Interact);
     public override void Interact(PlayerController player) => UiBus.RequestHomePanel();
+}
+
+/// <summary>
+/// Estação da casa que só funciona depois de uma melhoria: sem ela, não tem colisão nem prompt
+/// (o móvel visível vem da maquete).
+/// </summary>
+public abstract partial class HouseUnlockStation : StationBase
+{
+    protected abstract bool Unlocked { get; }
+    protected abstract Vector3 Size { get; }
+    uint _layer;
+
+    public override void _Ready()
+    {
+        SetupBody(Size);
+        _layer = CollisionLayer;
+        Refresh();
+        if (GameState.Instance != null) GameState.Instance.HomeChanged += Refresh;
+    }
+
+    public override void _ExitTree()
+    {
+        if (GameState.Instance != null) GameState.Instance.HomeChanged -= Refresh;
+    }
+
+    public void Refresh() => CollisionLayer = Unlocked ? _layer : 0;
+}
+
+/// <summary>Bancada da casa: com o suporte de ferramentas, vende ferramentas e munição (abre o Terminal).</summary>
+public partial class HouseToolBench : HouseUnlockStation
+{
+    protected override bool Unlocked => GameState.Instance?.HomeToolShop ?? false;
+    protected override Vector3 Size => new(1.6f, 0.95f, 0.7f);
+    public override string GetPrompt() => Loc.F("{0} Bancada: comprar ferramentas e munição", InputHints.Interact);
+    public override void Interact(PlayerController player) => UiBus.RequestShop();
+}
+
+/// <summary>Baú do comprador: vende a mochila sem descer à mina.</summary>
+public partial class HouseChest : HouseUnlockStation
+{
+    protected override bool Unlocked => GameState.Instance?.HomeChestSell ?? false;
+    protected override Vector3 Size => new(0.9f, 0.6f, 0.55f);
+    public override string GetPrompt() => Loc.F("{0} Baú do comprador: vender a mochila", InputHints.Interact);
+    public override void Interact(PlayerController player) => UiBus.RequestSell();
 }

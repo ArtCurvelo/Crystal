@@ -298,6 +298,17 @@ public static partial class LocTables
         list.Add(("Café reforçado: +5% de velocidade por nível.", "Hearty breakfast: +5% speed per level.", "Desayuno reforzado: +5% de velocidad por nivel."));
         list.Add(("Estante de troféus", "Trophy Shelf", "Estante de trofeos"));
         list.Add(("Fama de escavador: +4% no valor de venda por nível.", "Digger fame: +4% sell value per level.", "Fama de minero: +4% en el valor de venta por nivel."));
+        list.Add(("Suporte de ferramentas", "Tool Rack", "Soporte de herramientas"));
+        list.Add(("Ferramentas bem guardadas: +12% de durabilidade por nível. Nível 1: compre ferramentas e munição na bancada da casa.", "Well-kept tools: +12% durability per level. Level 1: buy tools and ammo at the house workbench.", "Herramientas bien guardadas: +12% de durabilidad por nivel. Nivel 1: compra herramientas y munición en el banco de la casa."));
+        list.Add(("Baú do comprador", "Buyer's Chest", "Baúl del comprador"));
+        list.Add(("Venda a mochila direto do baú da casa. +5% de capacidade por nível.", "Sell your backpack straight from the house chest. +5% capacity per level.", "Vende la mochila directamente desde el baúl de la casa. +5% de capacidad por nivel."));
+        list.Add(("Lampiões", "Lanterns", "Faroles"));
+        list.Add(("Lampiões ajustados toda noite: +12% de alcance da lanterna por nível.", "Lanterns tuned every night: +12% flashlight range per level.", "Faroles ajustados cada noche: +12% de alcance de la linterna por nivel."));
+        list.Add(("Carregador de células", "Cell Charger", "Cargador de celdas"));
+        list.Add(("Recarrega à noite: +30 células de energia por nível a cada manhã (só com laser equipado).", "Recharges overnight: +30 energy cells per level every morning (laser equipped only).", "Recarga de noche: +30 celdas de energía por nivel cada mañana (solo con láser equipado)."));
+        list.Add(("+{0} células de energia recarregadas à noite (total {1})", "+{0} energy cells recharged overnight (total {1})", "+{0} celdas de energía recargadas de noche (total {1})"));
+        list.Add(("{0} Bancada: comprar ferramentas e munição", "{0} Workbench: buy tools and ammo", "{0} Banco: comprar herramientas y munición"));
+        list.Add(("{0} Baú do comprador: vender a mochila", "{0} Buyer's chest: sell your backpack", "{0} Baúl del comprador: vender la mochila"));
         list.Add(("Ímã ampliado", "Wider Magnet", "Imán ampliado"));
         list.Add(("+30% de raio do ímã de fragmentos.", "+30% shard magnet radius.", "+30% de radio del imán de fragmentos."));
         list.Add(("Coleta direta", "Direct Collection", "Recolección directa"));

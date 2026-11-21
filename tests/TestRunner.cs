@@ -60,6 +60,7 @@ public partial class TestRunner : Node
             Run("Regiões de fim de jogo: balanceamento", TestEndgameRegions);
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
+            await RunAsync("Integração: casa (melhorias novas, bancada e baú)", TestHouseUpgrades);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
@@ -1212,6 +1213,55 @@ public partial class TestRunner : Node
         Check(c2.Hp < hpBefore || !c2.IsMineable, $"segurar o botão de mineração deve causar dano (hp {hpBefore} → {c2.Hp})");
         root.QueueFree();
         await Frames(2);
+    }
+
+    async Task TestHouseUpgrades()
+    {
+        Fresh();
+        GS.NewGame();
+        GS.IsPlaying = true;
+        GS.Data.DayOver = false;
+        Check(HomeData.House.Count >= 9, $"casa com 9+ melhorias ({HomeData.House.Count})");
+        var root = new Node3D();
+        AddChild(root);
+        var house = new PlayerHouse();
+        root.AddChild(house);
+        await Frames(2);
+        Check(house.ToolBench.CollisionLayer == 0 && house.Chest.CollisionLayer == 0, "bancada e baú sem uso antes da melhoria");
+        void Buy(string id) { GS.AddMoney(GS.HouseCost(id)); Check(GS.TryBuyHouse(id), $"comprar {id}"); }
+
+        int dur = GS.ToolMaxDurability; Buy(HouseIds.ToolRack);
+        Check(GS.ToolMaxDurability == (int)(dur * 1.12f), $"suporte: +12% durabilidade ({dur} → {GS.ToolMaxDurability})");
+        Check(house.ToolBench.CollisionLayer != 0 && GS.HomeToolShop, "suporte nível 1 libera a bancada da casa");
+        bool shop = false; void OnShop() => shop = true;
+        UiBus.OpenShop += OnShop; house.ToolBench.Interact(null); UiBus.OpenShop -= OnShop;
+        Check(shop, "bancada abre a loja de ferramentas");
+
+        int cap = GS.Capacity; Buy(HouseIds.Chest);
+        Check(GS.Capacity > cap, $"baú: capacidade maior ({cap} → {GS.Capacity})");
+        Check(house.Chest.CollisionLayer != 0, "baú nível 1 fica utilizável");
+        bool sell = false; void OnSell() => sell = true;
+        UiBus.OpenSell += OnSell; house.Chest.Interact(null); UiBus.OpenSell -= OnSell;
+        Check(sell, "baú abre a venda da mochila");
+
+        float lamp = GS.LampRangeMultiplier; Buy(HouseIds.Lanterns);
+        Check(Mathf.IsEqualApprox(GS.LampRangeMultiplier, lamp * 1.12f), "lampiões: +12% de alcance da lanterna");
+
+        Buy(HouseIds.Charger);
+        int ammo0 = GS.Data.Ammo; GS.StartNewDay();
+        Check(GS.Data.Ammo == ammo0, "carregador não dá munição sem laser equipado");
+        foreach (var r in GameData.Regions) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+        GS.DebugSetTool(ToolData.All.FindIndex(t => t.Kind == ToolKind.Laser));
+        ammo0 = GS.Data.Ammo; GS.StartNewDay();
+        Check(GS.Data.Ammo == ammo0 + 30, $"carregador nível 1: +30 células por manhã ({ammo0} → {GS.Data.Ammo})");
+
+        Check(World.HouseDiorama.HouseTier(GS) <= 1, "melhorias novas não pulam patamares da casa sozinhas");
+        house.Room.Rebuild();
+        await Frames(2);
+        Check(house.Room.GetChildCount() > 0, "maquete remontada com os móveis novos");
+        root.QueueFree();
+        await Frames(2);
+        Fresh();
     }
 
     async Task TestGatesIntegration()

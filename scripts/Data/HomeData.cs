@@ -59,6 +59,10 @@ public static class HouseIds
     public const string Wardrobe = "wardrobe";
     public const string Kitchen = "kitchen";
     public const string Trophies = "trophies";
+    public const string ToolRack = "tool_rack";
+    public const string Chest = "chest";
+    public const string Lanterns = "lanterns";
+    public const string Charger = "charger";
 }
 
 public static class SkillIds
@@ -82,6 +86,10 @@ public static class HomeData
         new() { Id = HouseIds.Wardrobe, Name = "Armário de equipamento", Description = "Mochila melhor organizada: +10% de capacidade por nível.", BaseCost = 2000, CostGrowth = 3.5, MaxLevel = 4, PerLevel = 0.10f },
         new() { Id = HouseIds.Kitchen, Name = "Cozinha", Description = "Café reforçado: +5% de velocidade por nível.", BaseCost = 1200, CostGrowth = 3, MaxLevel = 3, PerLevel = 0.05f },
         new() { Id = HouseIds.Trophies, Name = "Estante de troféus", Description = "Fama de escavador: +4% no valor de venda por nível.", BaseCost = 4000, CostGrowth = 3.4, MaxLevel = 5, PerLevel = 0.04f },
+        new() { Id = HouseIds.ToolRack, Name = "Suporte de ferramentas", Description = "Ferramentas bem guardadas: +12% de durabilidade por nível. Nível 1: compre ferramentas e munição na bancada da casa.", BaseCost = 3000, CostGrowth = 3.2, MaxLevel = 4, PerLevel = 0.12f },
+        new() { Id = HouseIds.Chest, Name = "Baú do comprador", Description = "Venda a mochila direto do baú da casa. +5% de capacidade por nível.", BaseCost = 2500, CostGrowth = 4, MaxLevel = 3, PerLevel = 0.05f },
+        new() { Id = HouseIds.Lanterns, Name = "Lampiões", Description = "Lampiões ajustados toda noite: +12% de alcance da lanterna por nível.", BaseCost = 1800, CostGrowth = 3, MaxLevel = 3, PerLevel = 0.12f },
+        new() { Id = HouseIds.Charger, Name = "Carregador de células", Description = "Recarrega à noite: +30 células de energia por nível a cada manhã (só com laser equipado).", BaseCost = 60000, CostGrowth = 3, MaxLevel = 3, PerLevel = 30f },
     };
 
     public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO", "CONSTRUÇÃO", "FERRAMENTAS", "EXPLORAÇÃO" };

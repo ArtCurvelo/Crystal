@@ -131,6 +131,10 @@ public partial class HouseDiorama : Node3D
         int wardrobe = gs?.HouseLevel(HouseIds.Wardrobe) ?? 0;
         int kitchen = gs?.HouseLevel(HouseIds.Kitchen) ?? 0;
         int trophies = gs?.HouseLevel(HouseIds.Trophies) ?? 0;
+        int rack = gs?.HouseLevel(HouseIds.ToolRack) ?? 0;
+        int chest = gs?.HouseLevel(HouseIds.Chest) ?? 0;
+        int lanterns = gs?.HouseLevel(HouseIds.Lanterns) ?? 0;
+        int charger = gs?.HouseLevel(HouseIds.Charger) ?? 0;
         var p = _props;
         BuildTier(p, HouseTier(gs));
 
@@ -236,6 +240,96 @@ public partial class HouseDiorama : Node3D
                 i++;
             }
         }
+
+        BuildToolRack(p, rack);
+        BuildChest(p, chest);
+        BuildLanterns(p, lanterns);
+        BuildCharger(p, charger);
+    }
+
+    public const int TierLevels = 20;
+
+    /// <summary>Suporte de ferramentas: painel perfurado com uma picareta por nível (madeira → ametista).</summary>
+    void BuildToolRack(Node3D p, int level)
+    {
+        if (level <= 0) return;
+        var rp = new Vector3(-0.95f, 1.55f, -2.36f);
+        Box(p, new Vector3(1.0f, 0.75f, 0.03f), rp, new Color(0.62f, 0.5f, 0.36f));
+        for (int i = 0; i < 6; i++) for (int j = 0; j < 4; j++)
+            Box(p, new Vector3(0.025f, 0.025f, 0.01f), rp + new Vector3(-0.4f + i * 0.16f, -0.27f + j * 0.18f, 0.02f), WoodDark);
+        Box(p, new Vector3(1.04f, 0.05f, 0.06f), rp + new Vector3(0, -0.4f, 0.02f), WoodDark);
+        string[] tools = { "wood", "copper", "hematite", "amethyst" };
+        for (int i = 0; i < level && i < tools.Length; i++)
+        {
+            var t = ToolData.All.Find(x => x.Id == tools[i]);
+            var head = t?.Ore != null && GameData.Mat(t.Ore) is { } m ? m.Color : new Color(0.55f, 0.4f, 0.25f);
+            var x = -0.34f + i * 0.23f;
+            Box(p, new Vector3(0.035f, 0.5f, 0.035f), rp + new Vector3(x, -0.03f, 0.05f), new Color(0.5f, 0.33f, 0.18f));
+            var h = Box(p, new Vector3(0.3f, 0.06f, 0.05f), rp + new Vector3(x, 0.22f, 0.05f), head, head * 0.3f, 0.6f);
+            h.Rotation = new Vector3(0, 0, 0.12f);
+        }
+    }
+
+    /// <summary>Baú do comprador: madeira com cintas; nível 2 ganha detalhes dourados; nível 3, gemas transbordando.</summary>
+    void BuildChest(Node3D p, int level)
+    {
+        if (level <= 0) return;
+        var cp = new Vector3(-0.55f, 0, 2.1f);
+        var gold = new Color(1f, 0.78f, 0.3f);
+        var band = level >= 2 ? gold : Metal;
+        Box(p, new Vector3(0.9f, 0.42f, 0.5f), cp + new Vector3(0, 0.21f, 0), Wood);
+        var lid = Box(p, new Vector3(0.92f, 0.14f, 0.52f), cp + new Vector3(0, 0.49f, -0.02f), Wood.Darkened(0.1f));
+        if (level >= 3) { lid.Position = cp + new Vector3(0, 0.62f, 0.2f); lid.Rotation = new Vector3(0.9f, 0, 0); }
+        foreach (float x in new[] { -0.3f, 0.3f })
+            Box(p, new Vector3(0.06f, 0.58f, 0.54f), cp + new Vector3(x, 0.28f, 0), band);
+        Box(p, new Vector3(0.12f, 0.12f, 0.04f), cp + new Vector3(0, 0.38f, -0.27f), band, level >= 2 ? gold * 0.4f : null, level >= 2 ? 0.8f : 0);
+        if (level < 3) return;
+        int k = 0;
+        foreach (var m in GameData.Materials.Values)
+        {
+            if (k >= 7) break;
+            if (!m.Rare) continue;
+            var gem = new MeshInstance3D { Mesh = Mining.OreShapes.For(m), MaterialOverride = Mining.ShardManager.DropMaterial(m), Position = cp + new Vector3(-0.3f + k * 0.1f, 0.45f + (k % 2) * 0.04f, -0.05f + (k % 3) * 0.05f), Scale = Vector3.One * 0.7f };
+            p.AddChild(gem);
+            k++;
+        }
+    }
+
+    /// <summary>Lampiões pendurados nas vigas: um por nível, com luz quente própria.</summary>
+    void BuildLanterns(Node3D p, int level)
+    {
+        Vector3[] spots = { new(-1.6f, 0, 0.6f), new(1.6f, 0, -0.6f), new(-0.3f, 0, -1.4f) };
+        for (int i = 0; i < level && i < spots.Length; i++)
+        {
+            var lp = spots[i];
+            Box(p, new Vector3(0.015f, 0.55f, 0.015f), lp + new Vector3(0, 2.95f, 0), Metal);
+            Box(p, new Vector3(0.2f, 0.04f, 0.2f), lp + new Vector3(0, 2.66f, 0), WoodDark);
+            Box(p, new Vector3(0.16f, 0.24f, 0.16f), lp + new Vector3(0, 2.52f, 0), Lamp, Lamp, 0.9f);
+            Box(p, new Vector3(0.22f, 0.04f, 0.22f), lp + new Vector3(0, 2.38f, 0), WoodDark);
+            p.AddChild(new OmniLight3D { LightColor = Lamp, LightEnergy = 0.3f, OmniRange = 3.6f, Position = lp + new Vector3(0, 2.4f, 0) });
+        }
+    }
+
+    /// <summary>Carregador de células na parede da frente: uma célula brilhando por nível.</summary>
+    void BuildCharger(Node3D p, int level)
+    {
+        if (level <= 0) return;
+        var cp = new Vector3(0.18f, 1.0f, 2.33f);
+        var cyan = new Color(0.35f, 0.95f, 1f);
+        Box(p, new Vector3(0.5f, 0.55f, 0.12f), cp, new Color(0.22f, 0.23f, 0.27f));
+        Box(p, new Vector3(0.44f, 0.04f, 0.02f), cp + new Vector3(0, 0.23f, -0.07f), cyan, cyan, 0.8f);
+        for (int i = 0; i < 3; i++)
+        {
+            bool on = i < level;
+            var c = new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.05f, Height = 0.3f, RadialSegments = 10, Rings = 1 },
+                MaterialOverride = Mat(on ? cyan : new Color(0.15f, 0.17f, 0.2f), on ? cyan : null, on ? 0.7f : 0),
+                Position = cp + new Vector3(-0.14f + i * 0.14f, -0.04f, -0.1f),
+            };
+            p.AddChild(c);
+        }
+        Box(p, new Vector3(0.02f, 0.9f, 0.02f), cp + new Vector3(0.22f, -0.55f, -0.04f), new Color(0.1f, 0.1f, 0.12f)); // cabo até o chão
     }
 
     /// <summary>Patamar da casa (0..4) pelo total de melhorias compradas: o cômodo inteiro evolui.</summary>
@@ -243,7 +337,9 @@ public partial class HouseDiorama : Node3D
     {
         if (gs == null) return 0;
         int total = 0, max = 0;
-        foreach (var h in HomeData.House) { total += gs.HouseLevel(h.Id); max += h.MaxLevel; }
+        foreach (var h in HomeData.House) total += gs.HouseLevel(h.Id);
+        // referência fixa (os 20 níveis das 5 melhorias originais): melhorias novas não fazem a casa "regredir"
+        max = TierLevels;
         return Mathf.Clamp((int)(total / (float)max * 4.99f), 0, 4);
     }
 

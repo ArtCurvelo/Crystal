@@ -80,7 +80,7 @@ public partial class GameState : Node
     public ToolDef CurrentTool => ToolData.Of(Data.Tool);
     public bool ToolBroken => Data.ToolBroken;
     /// <summary>Golpes até quebrar (com o bônus do Cabo reforçado).</summary>
-    public int ToolMaxDurability => (int)(CurrentTool.Durability * (HasSkill(SkillIds.ToolGrip) ? 1.25f : 1f));
+    public int ToolMaxDurability => (int)(CurrentTool.Durability * (HasSkill(SkillIds.ToolGrip) ? 1.25f : 1f) * HouseMul(HouseIds.ToolRack));
     public int ToolDurabilityLeft => Math.Max(0, ToolMaxDurability - Data.ToolWear);
     public float ToolDurability01 => ToolBroken ? 0f : ToolDurabilityLeft / (float)Math.Max(1, ToolMaxDurability);
     /// <summary>Ferramenta laser na mão (gasta munição em vez de desgastar).</summary>
@@ -111,7 +111,7 @@ public partial class GameState : Node
                            * (!UsingHands && HasSkill(SkillIds.Temper) ? 1.15f : 1f);
     public float SwingsPerSecond => BaseSwings * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f) * (!UsingHands && HasSkill(SkillIds.Hone) ? 1.10f : 1f);
     public float SwingInterval => 1f / SwingsPerSecond;
-    public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f));
+    public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * HouseMul(HouseIds.Chest) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f));
     public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen) * (HasSkill(SkillIds.LightBoots) ? 1.08f : 1f);
     public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier
                                     * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f) * (HasSkill(SkillIds.LoyalBuyer) ? 1.10f : 1f);
@@ -123,7 +123,7 @@ public partial class GameState : Node
     /// <summary>Multiplicador do tempo de renascimento dos depósitos (Geólogo).</summary>
     public float RespawnMultiplier => HasSkill(SkillIds.Geologist) ? 0.7f : 1f;
     /// <summary>Alcance da lanterna do capacete (Lanterna potente).</summary>
-    public float LampRangeMultiplier => HasSkill(SkillIds.BrightLamp) ? 1.35f : 1f;
+    public float LampRangeMultiplier => (HasSkill(SkillIds.BrightLamp) ? 1.35f : 1f) * HouseMul(HouseIds.Lanterns);
     /// <summary>Preço de uma construção para o jogador (Kit de cordas: cordas pela metade).</summary>
     public long BuildCost(string type) => BuildData.Of(type) is { } bd ? (type == BuildIds.Rope && HasSkill(SkillIds.RopeKit) ? bd.Cost / 2 : bd.Cost) : 0;
     public float RareChanceMultiplier => HasSkill(SkillIds.RareNose) ? 1.5f : 1f;
@@ -485,6 +485,12 @@ public partial class GameState : Node
         Data.DayEarned = 0;
         Data.DayCrystals = 0;
         Data.DayBonus = 0;
+        int charged = ChargerAmmoPerDay;
+        if (charged > 0)
+        {
+            Data.Ammo += charged;
+            Notify("Carregador de células", Loc.F("+{0} células de energia recarregadas à noite (total {1})", charged, Data.Ammo), NotifyKind.Success);
+        }
         DayStarted?.Invoke();
         SaveGame(true);
     }
@@ -723,6 +729,13 @@ public partial class GameState : Node
     float HouseMul(string id) => 1f + HouseLevel(id) * HomeData.HouseDef(id).PerLevel;
     public long HouseCost(string id) => HomeData.HouseDef(id).CostAt(HouseLevel(id));
     public bool HouseMaxed(string id) => HouseLevel(id) >= HomeData.HouseDef(id).MaxLevel;
+
+    /// <summary>Células recarregadas a cada manhã pelo carregador da casa (só com um laser equipado).</summary>
+    public int ChargerAmmoPerDay => IsLaser ? (int)(HouseLevel(HouseIds.Charger) * HomeData.HouseDef(HouseIds.Charger).PerLevel) : 0;
+    /// <summary>Bancada da casa vende ferramentas e munição (suporte de ferramentas nível 1+).</summary>
+    public bool HomeToolShop => HouseLevel(HouseIds.ToolRack) >= 1;
+    /// <summary>Baú da casa compra a mochila (baú nível 1+).</summary>
+    public bool HomeChestSell => HouseLevel(HouseIds.Chest) >= 1;
 
     public bool TryBuyHouse(string id)
     {

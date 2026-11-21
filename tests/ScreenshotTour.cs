@@ -91,6 +91,18 @@ public partial class ScreenshotTour : Node
                 await Wait(0.8f);
                 await Shot($"26_house_tier_{tier}");
             }
+            // melhorias novas no máximo: suporte, baú, lampiões e carregador
+            foreach (var id in new[] { "tool_rack", "chest", "lanterns", "charger" })
+                while (gs.TryBuyHouse(id)) { }
+            Main.World.House.Room.Rebuild();
+            p.GlobalPosition = World.PlayerHouse.Origin + new Vector3(-0.4f, 0.1f, 1.0f);
+            p.SetLook(0f, -0.05f);
+            await Wait(0.8f);
+            await Shot("27_house_back");
+            p.GlobalPosition = World.PlayerHouse.Origin + new Vector3(-0.3f, 0.1f, -0.9f);
+            p.SetLook(Mathf.Pi, -0.25f);
+            await Wait(0.8f);
+            await Shot("27_house_front");
             SaveSystem.Delete();
             GameState.Instance.QuitClean();
             return;
