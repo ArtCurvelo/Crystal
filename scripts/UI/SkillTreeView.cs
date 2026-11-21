@@ -26,10 +26,11 @@ public partial class SkillTreeView : Control
         new(0.3f, 1f, 0.8f),     // construção
         new(1f, 0.6f, 0.2f),     // ferramentas
         new(0.75f, 0.55f, 1f),   // exploração
+        new(1f, 0.45f, 0.75f),   // técnica
     };
     static readonly HudIcon.Kind[] BranchIcons =
     {
-        HudIcon.Kind.Bag, HudIcon.Kind.Clock, HudIcon.Kind.Pick, HudIcon.Kind.Coin, HudIcon.Kind.Bolt, HudIcon.Kind.Shard, HudIcon.Kind.Region,
+        HudIcon.Kind.Bag, HudIcon.Kind.Clock, HudIcon.Kind.Pick, HudIcon.Kind.Coin, HudIcon.Kind.Bolt, HudIcon.Kind.Shard, HudIcon.Kind.Region, HudIcon.Kind.Star,
     };
 
     const float ColW = 156, NodeW = 140, NodeH = 58, TierGap = 84, Top = 54;

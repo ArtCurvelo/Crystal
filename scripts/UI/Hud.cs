@@ -87,6 +87,7 @@ public partial class Hud : CanvasLayer
     readonly List<(PanelContainer panel, HudIcon gem, Label count)> _slots = new();
     // energia / ressonância
     Label _toolName, _toolStats, _energyPct, _pulseInfo;
+    PanelContainer _energyPanel;
     int _lastWear = -1;
     bool _lastBroken;
     ProgressBar _energyBar;
@@ -372,6 +373,7 @@ public partial class Hud : CanvasLayer
         energy.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 8));
         UiTheme.Place(energy, Control.LayoutPreset.BottomRight, new Vector2(-342, -132), new Vector2(320, 0));
         _root.AddChild(energy);
+        _energyPanel = energy;
         var ev = new VBoxContainer();
         ev.AddThemeConstantOverride("separation", 4);
         energy.AddChild(ev);
@@ -533,7 +535,7 @@ public partial class Hud : CanvasLayer
             text = gs.InventoryCount > 0
                 ? Loc.T("FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento e pegue o ELEVADOR para casa.")
                 : Loc.T("FIM DO TURNO\nPegue o ELEVADOR no acampamento para ir para casa.");
-        else if (d.CrystalsMined == 0) text = Loc.T("OBJETIVO\nMire em um cristal e segure o botão esquerdo para minerar.");
+        else if (d.CrystalsMined == 0) text = Loc.T("OBJETIVO\nMire em um cristal e clique com o botão esquerdo para minerar (um golpe por clique).");
         else if (d.ShardsSold == 0 && gs.InventoryCount < 8) text = Loc.T("OBJETIVO\nColete os fragmentos. Eles são atraídos até você.");
         else if (d.ShardsSold == 0) text = Loc.T("OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.");
         else if (d.Upgrades.Count == 0) text = Loc.T("OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).");
@@ -695,7 +697,8 @@ public partial class Hud : CanvasLayer
         if (_fps.Visible) _fps.Text = Loc.F("{0:0} FPS · 3D {1:0}%", Engine.GetFramesPerSecond(), GetViewport().Scaling3DScale * 100);
 
         if (Player == null || !IsInstanceValid(Player)) return;
-        // ressonância
+        // ressonância (só com ferramenta a laser)
+        _energyPanel.Visible = GameState.Instance.ResonanceActive;
         float res = Player.Resonance01;
         _energyBar.Value = res;
         _energyPct.Text = Player.ResonanceReady ? Loc.T("PRONTO") : $"{res * 100:0}%";

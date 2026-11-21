@@ -88,8 +88,16 @@ public partial class GameState : Node
     public bool OutOfAmmo => IsLaser && Data.Ammo <= 0;
     /// <summary>Sem ferramenta utilizável (quebrou ou laser sem munição): minera com as mãos.</summary>
     public bool UsingHands => ToolBroken || OutOfAmmo;
+    /// <summary>Golpes por clique (habilidade Golpe triplo).</summary>
+    public int HitsPerClick => HasSkill(SkillIds.TripleTap) ? 3 : 1;
+    /// <summary>Segurar o botão continua minerando (habilidade Mineração contínua).</summary>
+    public bool HoldToMine => HasSkill(SkillIds.HoldMine);
+    /// <summary>O pulso ressonante só existe nas ferramentas a laser (com munição).</summary>
+    public bool ResonanceActive => IsLaser && !OutOfAmmo;
     public float BaseDamage => UsingHands ? ToolData.HandsDamage : CurrentTool.Damage;
     public float BaseSwings => UsingHands ? ToolData.HandsSwings : CurrentTool.Swings;
+    /// <summary>O Amplificador de Ressonância só aparece no Terminal quando já existe um laser para usar.</summary>
+    public bool UpgradeShown(string id) => id != UpgradeIds.Resonance || AnyLaserAvailable;
     public bool AnyLaserAvailable => ToolData.All.Any(t => t.Kind == ToolKind.Laser && ToolAvailable(t.Index));
 
     /// <summary>Compra um pacote de células de energia para o laser.</summary>

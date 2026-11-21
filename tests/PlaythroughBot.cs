@@ -184,9 +184,14 @@ public partial class PlaythroughBot : Node
             if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); _missedAims++; _unaimable.Add(target); await Frames(5); return; }
         }
         bool wasHeart = target.Material.Id == "heart";
+        // sem Mineração contínua o jogador clica a cada golpe (o bot clica ~6 vezes por segundo)
         Input.ActionPress("mine");
         int guard = 0;
-        while (target.IsMineable && GS.CanWork && guard++ < 60 * 60) await Frames(1);
+        while (target.IsMineable && GS.CanWork && guard++ < 60 * 60)
+        {
+            await Frames(1);
+            if (!GS.HoldToMine && guard % 10 == 0) { Input.ActionRelease("mine"); await Frames(1); Input.ActionPress("mine"); }
+        }
         Input.ActionRelease("mine");
         if (!target.IsMineable && wasHeart && _heart < 0)
         {

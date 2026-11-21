@@ -53,6 +53,8 @@ public sealed class SettingsData
     public bool AudioCues { get; set; }
     public bool Narration { get; set; }
     public bool ReduceShake { get; set; }
+    /// <summary>Acessibilidade: minerar segurando o botão desde o início (sem precisar clicar a cada golpe).</summary>
+    public bool HoldToMine { get; set; }
     public bool HighContrastHud { get; set; }
 
     public void Sanitize()

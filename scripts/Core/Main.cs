@@ -476,7 +476,7 @@ public partial class Main : Node
         _currentRegion = null;
         UpdateRegion(true);
         UpdateRegionCulling();
-        if (!continueSave) gs.Notify("Bem-vindo, escavador!", "Mire em um cristal e segure o botão esquerdo do mouse.", NotifyKind.Info);
+        if (!continueSave) gs.Notify("Bem-vindo, escavador!", "Mire em um cristal e clique com o botão esquerdo para dar cada golpe.", NotifyKind.Info);
         gs.SaveGame(true);
     }
 

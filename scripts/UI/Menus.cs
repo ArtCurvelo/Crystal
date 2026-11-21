@@ -251,6 +251,7 @@ public partial class SettingsScreen : ModalScreen
                 AddCheck(grid, "Sons-guia (sonar de minérios e tom de mira)", d.AudioCues, v => d.AudioCues = v);
                 AddCheck(grid, "Narração por voz (menus, mira e avisos)", d.Narration, v => { d.Narration = v; if (v) Accessibility.Speak(Loc.T("Narração ligada"), true); });
                 AddCheck(grid, "Reduzir tremor da câmera", d.ReduceShake, v => d.ReduceShake = v);
+                AddCheck(grid, "Minerar segurando o botão (sem clicar a cada golpe)", d.HoldToMine, v => d.HoldToMine = v);
                 AddSlider(grid, "Escala da interface", 0.8f, 1.5f, 0.05f, d.UiScale, v => d.UiScale = v, v => $"{v * 100:0}%");
                 var note = UiTheme.Label(Loc.T("Sons-guia: um \"ping\" vem da direção do minério mais próximo e acelera quando você se aproxima; um tom confirma quando a mira está num minério. Com a narração, o jogo lê os botões, o que está na mira e os avisos."), 14, UiTheme.Muted);
                 note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -539,7 +540,7 @@ public partial class HelpScreen : ModalScreen
         left.AddChild(UiTheme.Label("CONTROLES", 20, UiTheme.Gold, true));
         foreach (var (k, a) in new[]
                  {
-                     ("W A S D", "Mover"), ("Mouse", "Olhar"), ("Botão esquerdo", "Minerar (segure)"),
+                     ("W A S D", "Mover"), ("Mouse", "Olhar"), ("Botão esquerdo", "Minerar (clique)"),
                      ("E", "Interagir"), ("Shift", "Correr"), ("Espaço", "Pular"),
                      ("C / Ctrl", "Agachar"), ("B", "Construir"), ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
                  })

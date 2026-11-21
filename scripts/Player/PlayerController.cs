@@ -51,6 +51,9 @@ public partial class PlayerController : CharacterBody3D
     Node3D _head;
     float _pitch;
     float _swingTimer;
+    /// <summary>Golpes pedidos por cliques e ainda não dados (modo clique).</summary>
+    int _queuedSwings;
+    float _beamHold;
     float _swingInterval = 0.5f;
     float _pendingHit = -1f;
     float _stepAccum;
@@ -383,22 +386,30 @@ public partial class PlayerController : CharacterBody3D
         _sinceLastHit += dt;
         float window = Mathf.Max(Data.GameData.ResonanceWindow, _swingInterval * 2.5f);
         if (_sinceLastHit > window && _resonance > 0) _resonance = Mathf.Max(0, _resonance - dt * 3f);
-        bool wantMine = active && Input.IsActionPressed("mine") && TargetInteractable == null && !BuildMode;
+        // clique = golpe; Golpe triplo = 3 golpes por clique; Mineração contínua (ou acessibilidade) = segurar
+        bool canAim = active && TargetInteractable == null && !BuildMode;
+        bool hold = gs.HoldToMine || Settings.Data.HoldToMine;
+        if (!canAim || hold) _queuedSwings = 0;
+        else if (Input.IsActionJustPressed("mine")) _queuedSwings = gs.HitsPerClick;
+        bool wantMine = canAim && (hold ? Input.IsActionPressed("mine") : _queuedSwings > 0);
         if (_workNotice > 0) _workNotice -= dt;
         if (wantMine && !gs.CanWork)
         {
             // fora do turno: só vender e voltar para casa
             if (_workNotice <= 0) { gs.RequireWork(); _workNotice = 4f; }
             wantMine = false;
+            _queuedSwings = 0;
         }
         if (wantMine && _swingTimer <= 0)
         {
             _swingTimer = _swingInterval;
+            if (_queuedSwings > 0) _queuedSwings--;
             Tool.Swing(_swingInterval);
             AudioManager.Instance?.Play("swing", -16f, 1f, 0.1f);
             _pendingHit = Mathf.Min(_swingInterval * 0.45f, 0.12f);
         }
-        UpdateBeam(gs, wantMine);
+        if (wantMine) _beamHold = 0.2f; else if (_beamHold > 0) _beamHold -= dt;
+        UpdateBeam(gs, wantMine || _beamHold > 0); // no modo clique o feixe fica aceso um instante por golpe
         if (_pendingHit >= 0)
         {
             _pendingHit -= dt;
@@ -469,7 +480,8 @@ public partial class PlayerController : CharacterBody3D
         if (collider is Crystal c && c.IsMineable)
         {
             _sinceLastHit = 0;
-            if (ResonanceReady)
+            if (!gs.ResonanceActive) _resonance = 0; // sem laser não há pulso
+            else if (ResonanceReady)
             {
                 _resonance = 0;
                 TriggerPulse(gs, c, pos);

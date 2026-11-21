@@ -281,7 +281,7 @@ public partial class ShopScreen : TerminalScreen
             _focusId = gs.ToolBroken ? "tool_" + gs.Data.Tool
                 : gs.OutOfAmmo ? "ammo"
                 : next < ToolData.All.Count && gs.ToolAvailable(next) && gs.CanAfford(ToolData.All[next].Cost) ? "tool_" + next
-                : UpgradeIds.All.FirstOrDefault(id => !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? "tool_" + gs.Data.Tool;
+                : UpgradeIds.All.FirstOrDefault(id => gs.UpgradeShown(id) && !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? "tool_" + gs.Data.Tool;
         }
         // a rolagem fica onde estava (comprar uma melhoria não pode levar a tela lá para baixo)
         int keepScroll = _focusOnOpen ? 0 : _scroll?.ScrollVertical ?? 0;
@@ -297,7 +297,7 @@ public partial class ShopScreen : TerminalScreen
             _toolBox.AddChild(BuildToolRow(t, avail));
         }
         UiTheme.ClearChildren(_grid);
-        foreach (var id in UpgradeIds.All) _grid.AddChild(BuildCard(GameData.Upgrades[id]));
+        foreach (var id in UpgradeIds.All.Where(GameState.Instance.UpgradeShown)) _grid.AddChild(BuildCard(GameData.Upgrades[id]));
         UiTheme.ClearChildren(_regionBox);
         foreach (var r in GameData.Regions.Skip(1)) _regionBox.AddChild(BuildRegionRow(r));
         UiTheme.ClearChildren(_prestigeBox);

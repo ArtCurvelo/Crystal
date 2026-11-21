@@ -775,7 +775,7 @@ public static class GameData
         AddUp(new UpgradeDef
         {
             Id = UpgradeIds.Resonance, Name = "Amplificador de Ressonância", Icon = "✺",
-            Description = "Golpes em ritmo carregam um pulso que atinge todos os cristais próximos.",
+            Description = "Com ferramenta a laser, disparos em ritmo carregam um pulso que atinge todos os cristais próximos.",
             BaseCost = 400, CostGrowth = 1.9, MaxLevel = 12,
             ValueAt = l => 1.5f + l * 0.5f,
             Format = v => Core.Loc.F("pulso x{0:0.0} · raio {1:0.0} m", v, ResonanceRadius(v))

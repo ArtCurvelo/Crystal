@@ -75,6 +75,7 @@ public static class SkillIds
     public const string ExtraShards = "extra_shards", LongShift = "long_shift", Piercing = "piercing", LoyalBuyer = "loyal_buyer";
     public const string ToolGrip = "tool_grip", Temper = "temper", Hone = "hone", CellSaver = "cell_saver";
     public const string BrightLamp = "bright_lamp", LightBoots = "light_boots", RopeKit = "rope_kit", Geologist = "geologist";
+    public const string TripleTap = "triple_tap", HoldMine = "hold_mine";
 }
 
 public static class HomeData
@@ -92,7 +93,7 @@ public static class HomeData
         new() { Id = HouseIds.Charger, Name = "Carregador de células", Description = "Recarrega à noite: +30 células de energia por nível a cada manhã (só com laser equipado).", BaseCost = 60000, CostGrowth = 3, MaxLevel = 3, PerLevel = 30f },
     };
 
-    public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO", "CONSTRUÇÃO", "FERRAMENTAS", "EXPLORAÇÃO" };
+    public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO", "CONSTRUÇÃO", "FERRAMENTAS", "EXPLORAÇÃO", "TÉCNICA" };
 
     public static readonly List<SkillDef> Skills = new()
     {
@@ -134,6 +135,10 @@ public static class HomeData
         new() { Id = SkillIds.LightBoots, Name = "Passo leve", Description = "+8% de velocidade de movimento.", Branch = 6, Tier = 2, Cost = 30_000, Requires = SkillIds.BrightLamp },
         new() { Id = SkillIds.RopeKit, Name = "Kit de cordas", Description = "Cordas custam metade do preço.", Branch = 6, Tier = 3, Cost = 120_000, Requires = SkillIds.LightBoots },
         new() { Id = SkillIds.Geologist, Name = "Geólogo", Description = "Depósitos quebrados renascem 30% mais rápido.", Branch = 6, Tier = 4, Cost = 800_000, Requires = SkillIds.RopeKit },
+
+        // TÉCNICA: no começo cada clique é um golpe
+        new() { Id = SkillIds.TripleTap, Name = "Golpe triplo", Description = "Cada clique dá 3 golpes seguidos.", Branch = 7, Tier = 1, Cost = 1500 },
+        new() { Id = SkillIds.HoldMine, Name = "Mineração contínua", Description = "Basta segurar o botão para continuar minerando.", Branch = 7, Tier = 2, Cost = 15_000, Requires = SkillIds.TripleTap },
     };
 
     public static HouseUpgradeDef HouseDef(string id) => House.FirstOrDefault(h => h.Id == id);

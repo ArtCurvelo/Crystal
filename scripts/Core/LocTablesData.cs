@@ -287,7 +287,13 @@ public static partial class LocTables
         list.Add(("Ímã de Coleta", "Collection Magnet", "Imán de Recolección"));
         list.Add(("Alcance de mineração e raio de atração de fragmentos.", "Mining reach and shard pull radius.", "Alcance de minería y radio de atracción de fragmentos."));
         list.Add(("Amplificador de Ressonância", "Resonance Amplifier", "Amplificador de Resonancia"));
-        list.Add(("Golpes em ritmo carregam um pulso que atinge todos os cristais próximos.", "Rhythmic hits charge a pulse that strikes every nearby crystal.", "Los golpes rítmicos cargan un pulso que golpea todos los cristales cercanos."));
+        list.Add(("Com ferramenta a laser, disparos em ritmo carregam um pulso que atinge todos os cristais próximos.", "With a laser tool, rhythmic shots charge a pulse that strikes every nearby crystal.", "Con una herramienta láser, los disparos rítmicos cargan un pulso que golpea todos los cristales cercanos."));
+        list.Add(("TÉCNICA", "TECHNIQUE", "TÉCNICA"));
+        list.Add(("Golpe triplo", "Triple Strike", "Golpe triple"));
+        list.Add(("Cada clique dá 3 golpes seguidos.", "Each click lands 3 hits in a row.", "Cada clic da 3 golpes seguidos."));
+        list.Add(("Mineração contínua", "Continuous Mining", "Minería continua"));
+        list.Add(("Basta segurar o botão para continuar minerando.", "Just hold the button to keep mining.", "Basta mantener el botón para seguir minando."));
+        list.Add(("Minerar segurando o botão (sem clicar a cada golpe)", "Mine by holding the button (no click per hit)", "Minar manteniendo el botón (sin clic por golpe)"));
         list.Add(("Cama", "Bed", "Cama"));
         list.Add(("Descanso melhor: +1 min de turno por nível.", "Better rest: +1 min of shift per level.", "Mejor descanso: +1 min de turno por nivel."));
         list.Add(("Bancada de ferramentas", "Workbench", "Banco de herramientas"));
@@ -510,10 +516,10 @@ public static partial class LocTables
         list.Add(("Melhorias da casa", "Home upgrades", "Mejoras de la casa"));
         list.Add(("Menu principal", "Main menu", "Menú principal"));
         list.Add(("Minerar", "Mine", "Minar"));
-        list.Add(("Minerar (segure)", "Mine (hold)", "Minar (mantener)"));
+        list.Add(("Minerar (clique)", "Mine (click)", "Minar (clic)"));
         list.Add(("Minere no chão e nas paredes → venda na Estação do acampamento → compre melhorias → abra portões. Explore o relevo e os túneis baixos: agachado (C) você acha câmaras secretas.", "Mine floors and walls → sell at the camp Station → buy upgrades → open gates. Crouch (C) through low tunnels to find secret chambers.", "Mina suelo y paredes → vende en la Estación del campamento → compra mejoras → abre puertas. Agachado (C) en túneles bajos hallas cámaras secretas."));
         list.Add(("Minere. Venda. Evolua. Desça mais fundo.", "Mine. Sell. Upgrade. Dig deeper.", "Mina. Vende. Evoluciona. Baja más hondo."));
-        list.Add(("Mire em um cristal e segure o botão esquerdo do mouse.", "Aim at a crystal and hold the left mouse button.", "Apunta a un cristal y mantén el botón izquierdo del ratón."));
+        list.Add(("Mire em um cristal e clique com o botão esquerdo para dar cada golpe.", "Aim at a crystal and click the left button for each hit.", "Apunta a un cristal y haz clic con el botón izquierdo para cada golpe."));
         list.Add(("Mochila cheia!", "Backpack full!", "¡Mochila llena!"));
         list.Add(("Mochila vazia.\nMinere cristais e volte!", "Backpack empty.\nMine crystals and come back!", "Mochila vacía.\n¡Mina cristales y vuelve!"));
         list.Add(("Modo para daltonismo", "Colorblind mode", "Modo para daltonismo"));
@@ -544,7 +550,7 @@ public static partial class LocTables
         list.Add(("O turno está acabando", "The shift is ending", "El turno está terminando"));
         list.Add(("OBJETIVO\nColete os fragmentos. Eles são atraídos até você.", "OBJECTIVE\nCollect the shards. They are pulled toward you.", "OBJETIVO\nRecoge los fragmentos. Son atraídos hacia ti."));
         list.Add(("OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).", "OBJECTIVE\nBuy an upgrade at the TERMINAL (gold).", "OBJETIVO\nCompra una mejora en la TERMINAL (dorada)."));
-        list.Add(("OBJETIVO\nMire em um cristal e segure o botão esquerdo para minerar.", "OBJECTIVE\nAim at a crystal and hold the left button to mine.", "OBJETIVO\nApunta a un cristal y mantén el botón izquierdo para minar."));
+        list.Add(("OBJETIVO\nMire em um cristal e clique com o botão esquerdo para minerar (um golpe por clique).", "OBJECTIVE\nAim at a crystal and click the left button to mine (one hit per click).", "OBJETIVO\nApunta a un cristal y haz clic con el botón izquierdo para minar (un golpe por clic)."));
         list.Add(("OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.", "OBJECTIVE\nGo to the SELL STATION (green) and press E.", "OBJETIVO\nVe a la ESTACIÓN DE VENTA (verde) y pulsa E."));
         list.Add(("Olhar", "Look", "Mirar"));
         list.Add(("Os comparsas fugiram. {0}, envergonhado, volta ao trabalho — e promete não brigar mais.", "The cronies ran off. {0}, ashamed, goes back to work — and promises not to fight again.", "Los compinches huyeron. {0}, avergonzado, vuelve al trabajo — y promete no pelear más."));

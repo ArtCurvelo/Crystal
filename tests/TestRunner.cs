@@ -46,7 +46,7 @@ public partial class TestRunner : Node
             Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
             Run("Renderizador: perfis, testes, escolha, validade e recuperação", TestRendererSelection);
             Run("Ferramentas: picaretas, durabilidade, quebra e compra", TestTools);
-            Run("Árvore: 7 ramos e efeito de cada habilidade nova", TestNewSkills);
+            Run("Árvore: 8 ramos e efeito de cada habilidade nova", TestNewSkills);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
@@ -62,6 +62,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: casa (melhorias novas, bancada e baú)", TestHouseUpgrades);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
+            await RunAsync("Integração: clique, golpe triplo e mineração contínua", TestClickMining);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
             await RunAsync("Integração: marcador de objetivo", TestObjectiveMarker);
             await RunAsync("Integração: controle (gamepad)", TestGamepad);
@@ -755,7 +756,7 @@ public partial class TestRunner : Node
     {
         Fresh();
         GS.NewGame();
-        Check(HomeData.BranchNames.Length == 7 && HomeData.Skills.Count >= 28, $"árvore com 7 ramos ({HomeData.Skills.Count} habilidades)");
+        Check(HomeData.BranchNames.Length == 8 && HomeData.Skills.Count >= 30, $"árvore com 8 ramos ({HomeData.Skills.Count} habilidades)");
         Check(HomeData.Skills.All(sk => sk.Requires == null || HomeData.Skill(sk.Requires)?.Branch == sk.Branch && HomeData.Skill(sk.Requires).Tier == sk.Tier - 1), "cada habilidade exige a anterior do mesmo ramo");
         Check(HomeData.Skills.GroupBy(sk => sk.Branch).All(g => g.Select(x => x.Tier).OrderBy(x => x).SequenceEqual(Enumerable.Range(1, g.Count()))), "níveis contínuos em cada ramo");
         void Learn(string id) { if (!GS.HasSkill(id)) GS.Data.Skills.Add(id); }
@@ -1300,10 +1301,68 @@ public partial class TestRunner : Node
         await Frames(2);
     }
 
+    async Task TestClickMining()
+    {
+        Fresh();
+        GS.NewGame();
+        GS.IsPlaying = true;
+        GS.Data.DayOver = false;
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        await Frames(3);
+        var target = world.Crystals.Where(c => c.IsMineable && !c.Material.Special).OrderByDescending(c => c.MaxHp).First();
+        Face(player, target);
+        player.SimulateCapturedMouse = true;
+        int hits = 0;
+        player.CrystalHit += (c, b) => hits++;
+        await Frames(3);
+        Check(player.TargetCrystal == target && target.MaxHp > GS.Damage * 40, $"mira um cristal resistente (hp {target.MaxHp})");
+        async Task Hold(int frames) { Input.ActionPress("mine"); await Frames(frames); Input.ActionRelease("mine"); await Frames(2); }
+        bool oldAcc = Settings.Data.HoldToMine;
+        Settings.Data.HoldToMine = false;
+        // sem habilidade: segurar dá só um golpe
+        await Hold(150);
+        await Frames(60);
+        Check(hits == 1, $"segurar sem habilidade = 1 golpe por clique ({hits})");
+        // clique, clique, clique
+        hits = 0;
+        for (int k = 0; k < 3; k++) { await Hold(2); await Frames(50); }
+        Check(hits == 3, $"3 cliques = 3 golpes ({hits})");
+        // Golpe triplo
+        GS.Data.Skills.Add(SkillIds.TripleTap);
+        hits = 0;
+        await Hold(2);
+        await Frames(150);
+        Check(hits == 3, $"Golpe triplo: 1 clique = 3 golpes ({hits})");
+        // Mineração contínua
+        GS.Data.Skills.Add(SkillIds.HoldMine);
+        hits = 0;
+        float interval = GS.SwingInterval;
+        await Hold((int)(interval * 60 * 6));
+        Check(hits >= 5, $"Mineração contínua: segurar continua minerando ({hits} golpes)");
+        // acessibilidade: segurar sem habilidade
+        GS.Data.Skills.Remove(SkillIds.HoldMine); GS.Data.Skills.Remove(SkillIds.TripleTap);
+        Settings.Data.HoldToMine = true;
+        hits = 0;
+        await Hold((int)(interval * 60 * 6));
+        Check(hits >= 5, $"opção de acessibilidade permite segurar ({hits} golpes)");
+        Settings.Data.HoldToMine = oldAcc;
+        root.QueueFree();
+        await Frames(2);
+        Fresh();
+    }
+
     async Task TestResonance()
     {
         Fresh();
         GS.Data.Upgrades[UpgradeIds.Resonance] = 6;
+        GS.Data.Skills.Add(SkillIds.HoldMine); // segura o botão
         var root = new Node3D();
         AddChild(root);
         root.AddChild(new Effects());
@@ -1327,12 +1386,27 @@ public partial class TestRunner : Node
         player.ResonancePulse += n => { pulses++; hitCount = n; };
         await Frames(3);
         Check(player.TargetCrystal == target, "deve mirar a safira");
+        // picareta: o pulso ressonante não existe
+        Check(!GS.ResonanceActive, "com picareta não há ressonância");
+        Input.ActionPress("mine");
+        for (int i = 0; i < 60 * 3; i++) await Frames(1);
+        Input.ActionRelease("mine");
+        Check(pulses == 0 && player.Resonance01 == 0, "picareta não carrega o pulso");
+        foreach (var r in GameData.Regions) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+        int laser = ToolData.All.FindIndex(t => t.Kind == ToolKind.Laser);
+        GS.DebugSetTool(laser);
+        GS.Data.Ammo = 5000;
+        float laserDmg = ToolData.All[laser].Damage;
+        ToolData.All[laser].Damage = 0.5f; // o alvo não pode quebrar antes de carregar o pulso
+        Check(GS.ResonanceActive, "laser com munição ativa a ressonância");
+        await Frames(2);
         Input.ActionPress("mine");
         for (int i = 0; i < 60 * 9 && pulses == 0; i++) await Frames(1);
         Input.ActionRelease("mine");
         Check(pulses >= 1, "segurar o ritmo deve disparar um pulso");
         Check(hitCount >= 2, $"pulso deve atingir o alvo e vizinhos (atingiu {hitCount})");
         Check(neighbors.Any(n => n.Hp < n.MaxHp), "vizinho deve receber dano do pulso");
+        ToolData.All[laser].Damage = laserDmg;
         root.QueueFree();
         await Frames(2);
     }
@@ -1419,14 +1493,16 @@ public partial class TestRunner : Node
         Check(Math.Abs(shop.ScrollPos - baseScroll) < 10, $"comprando com o mouse a tela não pula (rolagem {baseScroll} → {shop.ScrollPos})");
         // controle: compra a última melhoria da lista; a tela acompanha o botão, sem pular para as regiões
         InputHints.Observe(new InputEventJoypadButton { ButtonIndex = JoyButton.A, Pressed = true });
-        var last = FindAll<Button>(shop).First(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == UpgradeIds.Resonance);
+        var last = FindAll<Button>(shop).Where(b => b.HasMeta("uid") && UpgradeIds.All.Contains((string)b.GetMeta("uid"))).Last();
+        string lastId = (string)last.GetMeta("uid");
+        Check(!GS.AnyLaserAvailable && lastId != UpgradeIds.Resonance, "sem laser o Amplificador de Ressonância não aparece no Terminal");
         last.GrabFocus();
         await Frames(4);
         int before = shop.ScrollPos;
         last.EmitSignal(BaseButton.SignalName.Pressed);
         await Frames(6);
         var owner = shop.GetViewport().GuiGetFocusOwner();
-        Check(owner != null && owner.HasMeta("uid") && (string)owner.GetMeta("uid") == UpgradeIds.Resonance, "controle: o foco continua na mesma melhoria");
+        Check(owner != null && owner.HasMeta("uid") && (string)owner.GetMeta("uid") == lastId, "controle: o foco continua na mesma melhoria");
         Check(Math.Abs(shop.ScrollPos - before) < 40, $"controle: a rolagem não pula ({before} → {shop.ScrollPos})");
         shop.CloseSilently();
         shop.QueueFree();
