@@ -828,7 +828,7 @@ public partial class WorldBuilder : Node3D
             if (c - g < 4.5f) continue;
             float len = 0.8f + (float)rng.NextDouble() * Mathf.Min(6.5f, (c - g) * 0.28f);
             float rad = 0.25f + (float)rng.NextDouble() * 0.5f;
-            var spin = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
+            var spin = new Basis(Vector3.Up, DecorMeshes.PosHash(new Vector3(x, 0, z)) * Mathf.Tau); // sem gastar o rng do mundo
             spikesDownV[i % 3].Add(new Transform3D((new Basis(new Vector3(1, 0, 0), Mathf.Pi) * spin).ScaleLocal(new Vector3(rad, len, rad)), new Vector3(x, c + 0.2f, z)));
             if (i % 3 == 0 && L.WallDist(x, z) > -3.5f && FreeSpot(new Vector3(x, g, z), rad + 0.5f))
             {

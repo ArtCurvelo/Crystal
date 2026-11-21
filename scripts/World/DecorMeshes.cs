@@ -49,6 +49,9 @@ public static class DecorMeshes
         return st.Commit();
     }
 
+    /// <summary>Número 0..1 estável a partir de uma posição (variações visuais sem consumir o gerador do mundo).</summary>
+    public static float PosHash(Vector3 p) => Hash((int)MathF.Floor(p.Y * 7f), (int)MathF.Floor(p.X * 13f), (int)MathF.Floor(p.Z * 17f));
+
     static float Hash(int seed, int a, int b)
     {
         unchecked

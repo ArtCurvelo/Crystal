@@ -310,11 +310,13 @@ public static class Decor
                 float h = 0.25f + (float)rng.NextDouble() * 0.6f;
                 float capR = 0.15f + (float)rng.NextDouble() * 0.25f;
                 var tilt = new Basis(new Vector3(1, 0, 0), ((float)rng.NextDouble() - 0.5f) * 0.4f);
-                tilt = tilt * new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
+                // variações tiradas da posição (não do rng compartilhado: o resto do mundo não muda)
+                float hv = DecorMeshes.PosHash(p);
+                tilt = tilt * new Basis(Vector3.Up, hv * Mathf.Tau);
                 float stemR = 0.035f + capR * 0.12f;
                 stems.Add(new Transform3D(tilt.ScaleLocal(new Vector3(stemR, h, stemR)), p));
                 var top = p + tilt * (Vector3.Up * h);
-                capsV[rng.Next(3)].Add(new Transform3D(tilt.ScaleLocal(new Vector3(capR, capR, capR)), top));
+                capsV[(int)(hv * 3f) % 3].Add(new Transform3D(tilt.ScaleLocal(new Vector3(capR, capR, capR)), top));
                 gills.Add(new Transform3D(tilt.ScaleLocal(new Vector3(capR * 0.97f, capR, capR * 0.97f)), top));
             }
         }
@@ -341,7 +343,7 @@ public static class Decor
                 float a = Mathf.Tau * f / fronds + (float)rng.NextDouble() * 0.3f;
                 // folha nasce quase em pé e se arqueia para fora (a curva está na malha)
                 var b = new Basis(Vector3.Up, a) * new Basis(Vector3.Right, -0.15f - (float)rng.NextDouble() * 0.35f);
-                float sz = size * (0.75f + (float)rng.NextDouble() * 0.4f);
+                float sz = size * (0.75f + DecorMeshes.PosHash(p + new Vector3(f, 0, 0)) * 0.4f);
                 leavesV[f % 2].Add(new Transform3D(b.ScaleLocal(new Vector3(sz, sz, sz)), p));
             }
         }
