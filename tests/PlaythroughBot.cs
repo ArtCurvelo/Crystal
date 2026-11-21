@@ -30,6 +30,7 @@ public partial class PlaythroughBot : Node
     int _errors;
     double _r2 = -1, _r3 = -1, _r4 = -1, _heart = -1;
     int _sells, _buys, _pulses, _missedAims;
+    bool _usedLaser;
     int _hopperId, _hopperTrips;
     int _toolBuys, _breaks;
     long _beltSold;
@@ -47,7 +48,11 @@ public partial class PlaythroughBot : Node
         await Frames(10);
         Main.StartGame(false);
         P.SimulateCapturedMouse = true;
-        P.ResonancePulse += _ => _pulses++;
+        P.ResonancePulse += _ =>
+        {
+            _pulses++;
+            if (!GS.ResonanceActive) { _errors++; Log("ERRO: pulso ressonante sem ferramenta a laser"); }
+        };
         GS.BeltSold += (v, _) => _beltSold += v;
         await Frames(10);
         Log("Início do jogo");
@@ -126,7 +131,7 @@ public partial class PlaythroughBot : Node
         GD.Print("===== BOT DE JOGO — RESUMO =====");
         foreach (var l in _log) GD.Print(l);
         GD.Print($"Tempo de jogo: {GameMinutes:0.0} min | Região 2: {Fmt(_r2)} | Região 3: {Fmt(_r3)} | Coração quebrado: {Fmt(_heart)} | Reservatório: {Fmt(_r4)}");
-        GD.Print($"Vendas: {_sells} | Compras: {_buys} | Pulsos: {_pulses} | Cristais: {GS.Data.CrystalsMined} | Total ganho: {GS.Data.TotalEarned}");
+        GD.Print($"Vendas: {_sells} | Compras: {_buys} | Pulsos: {_pulses} (usou laser: {_usedLaser}) | Cristais: {GS.Data.CrystalsMined} | Total ganho: {GS.Data.TotalEarned}");
         GD.Print($"Renascimento: {(_prestiged ? "sim" : "não")} | Região 2 na 2ª jornada: {(_secondR2 > 0 ? $"{_secondR2:0.0} min" : "não alcançada")}");
         GD.Print($"Upgrades: {string.Join(", ", UpgradeIds.All.Select(id => $"{id}={GS.Data.Level(id)}"))}");
         GD.Print($"Save/Load após a partida: {(saveOk ? "OK" : "FALHOU")}");
@@ -142,7 +147,7 @@ public partial class PlaythroughBot : Node
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
         GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
-        bool ok = _days >= 2 && _houseBuys > 0 && _skillBuys > 0 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && _pulses > 0;
+        bool ok = _days >= 2 && _houseBuys > 0 && _skillBuys > 0 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && (_pulses > 0 || !_usedLaser);
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
         GameState.Instance.QuitClean(ok ? 0 : 1);
@@ -184,6 +189,7 @@ public partial class PlaythroughBot : Node
             if (P.TargetCrystal != target) { Log($"Não conseguiu mirar {target.Material.Name}"); _missedAims++; _unaimable.Add(target); await Frames(5); return; }
         }
         bool wasHeart = target.Material.Id == "heart";
+        if (GS.IsLaser) _usedLaser = true;
         // sem Mineração contínua o jogador clica a cada golpe (o bot clica ~6 vezes por segundo)
         Input.ActionPress("mine");
         int guard = 0;
