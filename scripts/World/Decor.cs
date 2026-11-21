@@ -296,7 +296,8 @@ public static class Decor
     public static void Mushrooms(Node3D root, CaveLayout L, Random rng, int clusters, Color capColor)
     {
         var stems = new List<Transform3D>();
-        var caps = new List<Transform3D>();
+        var capsV = new[] { new List<Transform3D>(), new List<Transform3D>(), new List<Transform3D>() };
+        var gills = new List<Transform3D>();
         for (int c = 0; c < clusters; c++)
         {
             // perto das paredes
@@ -309,18 +310,27 @@ public static class Decor
                 float h = 0.25f + (float)rng.NextDouble() * 0.6f;
                 float capR = 0.15f + (float)rng.NextDouble() * 0.25f;
                 var tilt = new Basis(new Vector3(1, 0, 0), ((float)rng.NextDouble() - 0.5f) * 0.4f);
-                stems.Add(new Transform3D(tilt.ScaleLocal(new Vector3(0.05f, h, 0.05f)), p + Vector3.Up * h * 0.5f));
-                caps.Add(new Transform3D(tilt.ScaleLocal(new Vector3(capR, capR * 0.6f, capR)), p + Vector3.Up * h));
+                tilt = tilt * new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
+                float stemR = 0.035f + capR * 0.12f;
+                stems.Add(new Transform3D(tilt.ScaleLocal(new Vector3(stemR, h, stemR)), p));
+                var top = p + tilt * (Vector3.Up * h);
+                capsV[rng.Next(3)].Add(new Transform3D(tilt.ScaleLocal(new Vector3(capR, capR, capR)), top));
+                gills.Add(new Transform3D(tilt.ScaleLocal(new Vector3(capR * 0.97f, capR, capR * 0.97f)), top));
             }
         }
-        AddMulti(root, new CylinderMesh { TopRadius = 1, BottomRadius = 1.2f, Height = 1, RadialSegments = 5, Rings = 1 }, Lit(new Color(0.8f, 0.85f, 0.85f)), stems);
-        AddMulti(root, new SphereMesh { Radius = 1, Height = 1, IsHemisphere = true, RadialSegments = 8, Rings = 3 }, Glow(capColor, 1.8f), caps);
+        var stemMat = new StandardMaterial3D { AlbedoColor = new Color(0.85f, 0.88f, 0.86f), Roughness = 0.75f, VertexColorUseAsAlbedo = true, RimEnabled = true, Rim = 0.25f };
+        // chapéu: cor do vértice (topo claro, borda escura) e brilho próprio moderado, para a forma aparecer
+        var capMat = new StandardMaterial3D { AlbedoColor = capColor, VertexColorUseAsAlbedo = true, Roughness = 0.45f, EmissionEnabled = true, Emission = capColor, EmissionEnergyMultiplier = 0.4f, RimEnabled = true, Rim = 0.4f, RimTint = 0.7f };
+        var gillMat = new StandardMaterial3D { AlbedoColor = capColor.Darkened(0.5f), VertexColorUseAsAlbedo = true, Roughness = 0.9f, EmissionEnabled = true, Emission = capColor, EmissionEnergyMultiplier = 0.25f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        AddMulti(root, DecorMeshes.MushroomStem(), stemMat, stems);
+        for (int v = 0; v < 3; v++) AddMulti(root, DecorMeshes.MushroomCap(v), capMat, capsV[v]);
+        AddMulti(root, DecorMeshes.MushroomGills(), gillMat, gills);
     }
 
     /// <summary>Samambaias estilizadas (folhas em leque) em tons quentes.</summary>
     public static void Ferns(Node3D root, CaveLayout L, Random rng, int count, Color color)
     {
-        var leaves = new List<Transform3D>();
+        var leavesV = new[] { new List<Transform3D>(), new List<Transform3D>() };
         for (int i = 0; i < count; i++)
         {
             if (!L.RandomNearWall(rng, out var p, -4f, -0.5f)) continue;
@@ -329,12 +339,14 @@ public static class Decor
             for (int f = 0; f < fronds; f++)
             {
                 float a = Mathf.Tau * f / fronds + (float)rng.NextDouble() * 0.3f;
-                var b = new Basis(Vector3.Up, a) * new Basis(Vector3.Right, -0.9f - (float)rng.NextDouble() * 0.4f);
-                leaves.Add(new Transform3D(b.ScaleLocal(new Vector3(0.12f, size, 0.02f)), p));
+                // folha nasce quase em pé e se arqueia para fora (a curva está na malha)
+                var b = new Basis(Vector3.Up, a) * new Basis(Vector3.Right, -0.15f - (float)rng.NextDouble() * 0.35f);
+                float sz = size * (0.75f + (float)rng.NextDouble() * 0.4f);
+                leavesV[f % 2].Add(new Transform3D(b.ScaleLocal(new Vector3(sz, sz, sz)), p));
             }
         }
-        var mat = new StandardMaterial3D { AlbedoColor = color, Roughness = 0.8f, CullMode = BaseMaterial3D.CullModeEnum.Disabled, EmissionEnabled = true, Emission = color * 0.25f, EmissionEnergyMultiplier = 0.5f };
-        AddMulti(root, MeshFactory.Spike(4, 1f, 1f), mat, leaves);
+        var mat = new StandardMaterial3D { AlbedoColor = color, VertexColorUseAsAlbedo = true, Roughness = 0.7f, CullMode = BaseMaterial3D.CullModeEnum.Disabled, EmissionEnabled = true, Emission = color * 0.35f, EmissionEnergyMultiplier = 0.5f, RimEnabled = true, Rim = 0.3f };
+        for (int v = 0; v < 2; v++) AddMulti(root, DecorMeshes.Frond(v), mat, leavesV[v]);
     }
 
     // ------------------------------------------------------------------

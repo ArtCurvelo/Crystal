@@ -406,7 +406,7 @@ public partial class PlayerController : CharacterBody3D
             if (_queuedSwings > 0) _queuedSwings--;
             Tool.Swing(_swingInterval);
             AudioManager.Instance?.Play("swing", -16f, 1f, 0.1f);
-            _pendingHit = Mathf.Min(_swingInterval * 0.45f, 0.12f);
+            _pendingHit = ToolView.HitDelay(_swingInterval); // o acerto coincide com o impacto da animação
         }
         if (wantMine) _beamHold = 0.2f; else if (_beamHold > 0) _beamHold -= dt;
         UpdateBeam(gs, wantMine || _beamHold > 0); // no modo clique o feixe fica aceso um instante por golpe

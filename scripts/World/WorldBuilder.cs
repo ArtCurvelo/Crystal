@@ -816,8 +816,9 @@ public partial class WorldBuilder : Node3D
         AddMulti(root, MeshFactory.Rock(5, 0.35f), rockMat, boulders);
 
         // estalactites (teto) e estalagmites (chão, perto das paredes)
-        var spikesDown = new List<Transform3D>();
-        var spikesUp = new List<Transform3D>();
+        // 3 variantes de pedra pingada (cada uma num MultiMesh)
+        var spikesDownV = new[] { new List<Transform3D>(), new List<Transform3D>(), new List<Transform3D>() };
+        var spikesUpV = new[] { new List<Transform3D>(), new List<Transform3D>(), new List<Transform3D>() };
         for (int i = 0; i < (int)(area / 38); i++)
         {
             float x = L.X0 + 2 + (float)rng.NextDouble() * (L.Nx - 4);
@@ -827,16 +828,19 @@ public partial class WorldBuilder : Node3D
             if (c - g < 4.5f) continue;
             float len = 0.8f + (float)rng.NextDouble() * Mathf.Min(6.5f, (c - g) * 0.28f);
             float rad = 0.25f + (float)rng.NextDouble() * 0.5f;
-            spikesDown.Add(new Transform3D(new Basis(new Vector3(1, 0, 0), Mathf.Pi).ScaleLocal(new Vector3(rad, len, rad)), new Vector3(x, c + 0.2f, z)));
+            var spin = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau);
+            spikesDownV[i % 3].Add(new Transform3D((new Basis(new Vector3(1, 0, 0), Mathf.Pi) * spin).ScaleLocal(new Vector3(rad, len, rad)), new Vector3(x, c + 0.2f, z)));
             if (i % 3 == 0 && L.WallDist(x, z) > -3.5f && FreeSpot(new Vector3(x, g, z), rad + 0.5f))
             {
-                spikesUp.Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(rad * 1.2f, len * 0.6f, rad * 1.2f)), new Vector3(x, g - 0.1f, z)));
+                spikesUpV[(i / 3) % 3].Add(new Transform3D(spin.ScaleLocal(new Vector3(rad * 1.2f, len * 0.6f, rad * 1.2f)), new Vector3(x, g - 0.1f, z)));
                 Solid(new CylinderShape3D { Radius = rad * 0.9f, Height = len * 0.6f }, new Transform3D(Basis.Identity, new Vector3(x, g - 0.1f + len * 0.3f, z)), new Vector3(x, g, z), rad * 1.2f + 0.3f);
             }
         }
-        var spikeMesh = MeshFactory.Spike(5, 1f, 1f);
-        AddMulti(root, spikeMesh, rockMat, spikesDown);
-        AddMulti(root, spikeMesh, rockMat, spikesUp);
+        for (int v = 0; v < 3; v++)
+        {
+            AddMulti(root, DecorMeshes.Dripstone(v), rockMat, spikesDownV[v]);
+            AddMulti(root, DecorMeshes.Dripstone(v + 3), rockMat, spikesUpV[v]);
+        }
 
         // pedras pequenas no chão
         var pebbles = new List<Transform3D>();

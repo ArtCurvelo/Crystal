@@ -846,6 +846,7 @@ public partial class GameState : Node
     {
         World.MeshFactory.ClearCaches();
         World.CaveTerrain.ClearCaches();
+        World.DecorMeshes.ClearCaches();
         Mining.ShardManager.ClearCaches();
         GC.Collect();
         GC.WaitForPendingFinalizers();

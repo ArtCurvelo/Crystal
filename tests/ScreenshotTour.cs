@@ -70,6 +70,54 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-decor"))
+        {
+            Main.CloseAllForTour();
+            foreach (var r in GameData.Regions) if (!gs.IsUnlocked(r.Id)) gs.Data.UnlockedRegions.Add(r.Id);
+            gs.Data.DayTimeSeconds = 30;
+            p.Tool.Visible = false;
+            // fotografa de perto instâncias reais de cada malha nova da decoração
+            var targets = new (Mesh mesh, string name, float dist, float lift)[]
+            {
+                (World.DecorMeshes.MushroomStem(), "mushrooms", 2.2f, 0.3f),
+                (World.DecorMeshes.Frond(0), "ferns", 2.6f, 0.4f),
+                (World.DecorMeshes.Dripstone(3), "stalagmite", 4.5f, 1.0f),
+                (World.DecorMeshes.Dripstone(0), "stalactite", 5f, 3.0f),
+            };
+            var all = new System.Collections.Generic.List<MultiMeshInstance3D>();
+            void Collect(Node n) { foreach (Node c in n.GetChildren()) { if (c is MultiMeshInstance3D mm) all.Add(mm); Collect(c); } }
+            Collect(Main.World);
+            foreach (var (mesh, name, dist, lift) in targets)
+            {
+                int shot = 0;
+                foreach (var mm in all.Where(m => m.Multimesh?.Mesh == mesh))
+                {
+                    var count = mm.Multimesh.VisibleInstanceCount < 0 ? mm.Multimesh.InstanceCount : mm.Multimesh.VisibleInstanceCount;
+                    for (int k = 0; k < count && shot < 2; k += System.Math.Max(1, count / 3))
+                    {
+                        var at = mm.GlobalTransform * mm.Multimesh.GetInstanceTransform(k).Origin;
+                        if (name == "stalactite") at += Vector3.Down * 1.5f;
+                        // de que lado há chão livre: tenta 8 direções
+                        Vector3? stand = null;
+                        for (int d = 0; d < 8 && stand == null; d++)
+                        {
+                            var dir = new Vector3(Mathf.Cos(d * 0.785f), 0, Mathf.Sin(d * 0.785f));
+                            var q = at + dir * dist;
+                            var L = Main.World.Layouts[GameData.Regions.IndexOf(World.WorldBuilder.RegionAt(q))];
+                            if (L.WallDist(q.X, q.Z) < -1.2f) stand = L.OnGround(q.X, q.Z, 0.1f);
+                        }
+                        if (stand == null) continue;
+                        LookAtPoint(p, stand.Value, at + Vector3.Up * lift);
+                        await Wait(0.7f);
+                        await Shot($"35_decor_{name}_{shot++}");
+                    }
+                    if (shot >= 2) break;
+                }
+            }
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-house"))
         {
             gs.AddMoney(1_000_000_000);
@@ -771,11 +819,15 @@ public partial class ScreenshotTour : Node
             gs.DebugSetTool(ti);
             await Wait(0.5f);
             await Shot($"30_tool_{ti}_{ToolData.All[ti].Id}");
-            // no meio do golpe
-            Input.ActionPress("mine");
-            await Wait(0.18f);
-            await Shot($"30_tool_{ti}_swing");
-            Input.ActionRelease("mine");
+            // fases do golpe congeladas: antecipação, impacto e volta
+            if (ti <= 7)
+                foreach (var (ph, name) in new[] { (0.22f, "a_windup"), (0.42f, "b_impact"), (0.6f, "c_recover") })
+                {
+                    p.Tool.DebugPhase = ph;
+                    await Wait(0.25f);
+                    await Shot($"30_tool_{ti}_{name}");
+                }
+            p.Tool.DebugPhase = -1f;
             await Wait(0.3f);
         }
         gs.DebugSetTool(2, true);

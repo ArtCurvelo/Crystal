@@ -107,6 +107,7 @@ public partial class ToolView : Node3D
         var gs = GameState.Instance;
         _tier = toolIndex;
         _broken = gs?.ToolBroken ?? false;
+        if (_model != null) _equipT = 0f; // troca de ferramenta: animação de sacar
         _model?.QueueFree();
         _model = new Node3D();
         _pivot.AddChild(_model);
@@ -144,30 +145,128 @@ public partial class ToolView : Node3D
         Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.11f, 0.24f) }, sleeve, at + new Vector3(0.01f, -0.06f, 0.16f), new Vector3(-0.45f, 0, 0));
     }
 
-    /// <summary>Picareta: cabo de madeira e cabeça de duas pontas feita do minério da ferramenta.</summary>
+    /// <summary>
+    /// "Chifre" da cabeça da picareta: seção quase quadrada (octógono arredondado) varrida ao longo de um
+    /// arco que desce para a ponta, afinando. chisel = lâmina larga e achatada (enxó) em vez de ponta.
+    /// sign = −1 espelha para o outro lado (com a ordem dos triângulos invertida).
+    /// </summary>
+    static ArrayMesh Horn(float len, float w0, float h0, float droop, bool chisel, float sign, int segs = 10)
+    {
+        const int sides = 8;
+        var rings = new Vector3[segs + 1][];
+        for (int i = 0; i <= segs; i++)
+        {
+            float t = i / (float)segs;
+            var c = new Vector3(sign * t * len, -droop * t * t, 0);
+            var tan = new Vector3(sign * len, -2f * droop * t, 0).Normalized();
+            var n = new Vector3(-tan.Y * sign, tan.X * sign, 0).Normalized(); // "para cima" ao longo do arco
+            float ease = 1f - (1f - t) * (1f - t);
+            float h = chisel ? Mathf.Lerp(h0, h0 * 0.12f, ease) : Mathf.Lerp(h0, h0 * 0.06f, t);
+            float w = chisel ? Mathf.Lerp(w0, w0 * 1.25f, t) : Mathf.Lerp(w0, w0 * 0.08f, ease);
+            var ring = new Vector3[sides];
+            for (int k = 0; k < sides; k++)
+            {
+                float a = (k + 0.5f) * Mathf.Tau / sides;
+                float ca = MathF.Cos(a), sa = MathF.Sin(a);
+                float r = MathF.Pow(MathF.Pow(MathF.Abs(ca), 4) + MathF.Pow(MathF.Abs(sa), 4), -0.25f); // superelipse
+                ring[k] = c + n * (ca * r * h * 0.5f) + Vector3.Back * (sa * r * w * 0.5f);
+            }
+            rings[i] = ring;
+        }
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        void Tri(Vector3 a, Vector3 b, Vector3 c)
+        {
+            if (sign > 0) { st.AddVertex(a); st.AddVertex(b); st.AddVertex(c); }
+            else { st.AddVertex(a); st.AddVertex(c); st.AddVertex(b); }
+        }
+        for (int i = 0; i < segs; i++)
+            for (int k = 0; k < sides; k++)
+            {
+                int k2 = (k + 1) % sides;
+                var a = rings[i][k]; var b = rings[i][k2]; var c = rings[i + 1][k2]; var d = rings[i + 1][k];
+                Tri(a, c, b); Tri(a, d, c);
+            }
+        // tampas: base (encostada no miolo) e ponta
+        var c0 = Vector3.Zero; var c1 = rings[segs][0] * 0f;
+        foreach (var v in rings[segs]) c1 += v / sides;
+        for (int k = 0; k < sides; k++)
+        {
+            int k2 = (k + 1) % sides;
+            Tri(c0, rings[0][k], rings[0][k2]);
+            Tri(c1, rings[segs][k2], rings[segs][k]);
+        }
+        st.GenerateNormals();
+        return st.Commit();
+    }
+
+    /// <summary>
+    /// Picareta: cabo de madeira com empunhadura de couro e pomo; cabeça curva com ponta de um lado e
+    /// lâmina do outro. Madeira = pedra lascada amarrada com corda; metais = cabeça inteira do minério;
+    /// gemas = miolo de aço com pontas de cristal e uma gema encravada.
+    /// </summary>
     void BuildPickaxe(ToolDef t)
     {
-        var wood = Metal(new Color(0.62f, 0.42f, 0.24f), 0.8f, 0f);
-        var band = Metal(new Color(0.25f, 0.22f, 0.2f), 0.5f, 0.6f);
-        var head = HeadMat(t);
         float tier = t.Index / (float)Math.Max(1, ToolData.All.Count - 1);
+        var wood = Metal(new Color(0.56f, 0.37f, 0.2f), 0.75f, 0f);
+        var woodDark = Metal(new Color(0.36f, 0.22f, 0.12f), 0.8f, 0f);
+        var leather = Metal(new Color(0.24f, 0.13f, 0.08f), 0.9f, 0f);
+        var steel = Metal(new Color(0.6f, 0.62f, 0.67f), 0.42f, 0.5f); // metal claro: na caverna escura o metálico puro ficava preto
+        steel.RimEnabled = true; steel.Rim = 0.35f; steel.RimTint = 0.5f;
+        var rope = Metal(new Color(0.72f, 0.6f, 0.4f), 0.95f, 0f);
+        var head = HeadMat(t);
+        bool stone = t.Ore == null;
+        var m = stone ? null : GameData.Mat(t.Ore);
+        bool gem = m != null && m.Archetype is OreArchetypeAlias.Crystal or OreArchetypeAlias.Shards or OreArchetypeAlias.Geode;
+        var core = stone ? Metal(new Color(0.5f, 0.47f, 0.43f), 0.95f, 0f) : gem ? steel : head;
+        var tips = stone ? core : head;
+
         var shaft = new Node3D { Rotation = new Vector3(-0.55f, 0.15f, 0.18f), Position = new Vector3(0.0f, -0.04f, 0) };
         _model.AddChild(shaft);
         var tmp = _model; _model = shaft;
-        Part(_model, new CylinderMesh { TopRadius = 0.016f, BottomRadius = 0.02f, Height = 0.56f, RadialSegments = 8, Rings = 1 }, wood, new Vector3(0, 0.12f, 0));
-        Part(_model, new CylinderMesh { TopRadius = 0.022f, BottomRadius = 0.022f, Height = 0.05f, RadialSegments = 8, Rings = 1 }, band, new Vector3(0, -0.12f, 0));
-        // cabeça: miolo + duas pontas afinando (maior e mais elaborada nas melhores)
-        var top = new Vector3(0, 0.38f, 0);
-        Part(_model, new BoxMesh { Size = new Vector3(0.05f, 0.05f, 0.06f) }, band, top);
-        float len = 0.15f + tier * 0.05f;
-        foreach (float side in new[] { -1f, 1f })
+        // cabo levemente afinado com veio (duas tonalidades) e pomo
+        Part(_model, new CylinderMesh { TopRadius = 0.017f, BottomRadius = 0.021f, Height = 0.6f, RadialSegments = 10, Rings = 3 }, wood, new Vector3(0, 0.12f, 0));
+        for (int i = 0; i < 3; i++)
+            Part(_model, new BoxMesh { Size = new Vector3(0.003f, 0.16f + i * 0.05f, 0.004f) }, woodDark, new Vector3(MathF.Cos(i * 2.1f) * 0.018f, 0.06f + i * 0.09f, MathF.Sin(i * 2.1f) * 0.018f));
+        Part(_model, new SphereMesh { Radius = 0.026f, Height = 0.04f, RadialSegments = 10, Rings = 5 }, stone ? woodDark : steel, new Vector3(0, -0.185f, 0));
+        // empunhadura: tiras de couro em espiral (anéis levemente inclinados)
+        for (int i = 0; i < 6; i++)
+            Part(_model, new TorusMesh { InnerRadius = 0.017f, OuterRadius = 0.026f, Rings = 10, RingSegments = 6 }, leather,
+                new Vector3(0, -0.15f + i * 0.026f, 0), new Vector3(0.18f, 0, 0.12f));
+        var top = new Vector3(0, 0.4f, 0);
+        if (!stone)
         {
-            var tip = Part(_model, new CylinderMesh { TopRadius = 0.004f, BottomRadius = 0.026f, Height = len, RadialSegments = t.Ore == null ? 4 : 6, Rings = 1 }, head,
-                top + new Vector3(side * (len * 0.5f + 0.02f), -0.012f, 0), new Vector3(0, 0, side * -1.45f));
-            tip.Scale = new Vector3(1f, 1f, 0.7f);
+            // colar de metal sob a cabeça e cunha
+            Part(_model, new CylinderMesh { TopRadius = 0.026f, BottomRadius = 0.023f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, steel, top + new Vector3(0, -0.055f, 0));
+            Part(_model, new BoxMesh { Size = new Vector3(0.012f, 0.012f, 0.03f) }, woodDark, top + new Vector3(0, 0.036f, 0));
+        }
+        // miolo (olho) da cabeça
+        Part(_model, new BoxMesh { Size = new Vector3(0.062f, 0.064f, 0.058f) }, core, top);
+        Part(_model, new BoxMesh { Size = new Vector3(0.07f, 0.014f, 0.064f) }, stone ? core : steel, top + new Vector3(0, 0.028f, 0));
+        float len = 0.16f + tier * 0.07f;
+        float h0 = 0.05f + tier * 0.01f, w0 = 0.044f + tier * 0.008f;
+        Part(_model, Horn(len, w0, h0, 0.05f + tier * 0.02f, false, 1f), tips, top + new Vector3(0.026f, 0, 0));
+        Part(_model, Horn(len * 0.72f, w0, h0, 0.04f + tier * 0.015f, !stone, -1f), tips, top + new Vector3(-0.026f, 0, 0));
+        if (stone)
+        {
+            // amarração de corda cruzada prendendo a pedra
+            foreach (float a in new[] { 0.7f, -0.7f })
+                Part(_model, new CylinderMesh { TopRadius = 0.006f, BottomRadius = 0.006f, Height = 0.11f, RadialSegments = 5, Rings = 1 }, rope, top + new Vector3(0, -0.02f, 0.031f), new Vector3(0, 0, a));
+            for (int i = 0; i < 3; i++)
+                Part(_model, new TorusMesh { InnerRadius = 0.019f, OuterRadius = 0.027f, Rings = 10, RingSegments = 5 }, rope, top + new Vector3(0, -0.045f - i * 0.014f, 0));
+        }
+        if (gem)
+        {
+            // gema encravada no olho, dos dois lados
+            var glow = ToolData.GlowColor(t);
+            var inlay = new StandardMaterial3D { AlbedoColor = m.Color, Roughness = 0.1f, Metallic = 0.2f, EmissionEnabled = true, Emission = glow, EmissionEnergyMultiplier = 0.5f, RimEnabled = true, Rim = 0.7f };
+            foreach (float z in new[] { -1f, 1f })
+                Part(_model, new SphereMesh { Radius = 0.014f, Height = 0.016f, RadialSegments = 6, Rings = 2 }, inlay, top + new Vector3(0, 0, z * 0.03f));
         }
         if (t.Index >= 4)
-            Part(_model, new BoxMesh { Size = new Vector3(0.055f, 0.012f, 0.064f) }, head, top + new Vector3(0, 0.03f, 0)); // reforço
+            foreach (float x in new[] { -0.022f, 0.022f }) // rebites
+                foreach (float z in new[] { -0.03f, 0.03f })
+                    Part(_model, new SphereMesh { Radius = 0.005f, Height = 0.01f, RadialSegments = 6, Rings = 3 }, steel, top + new Vector3(x, -0.018f, z));
         _model = tmp;
         Grip(new Vector3(0.0f, -0.07f, 0.06f));
         _model.Position = new Vector3(0.02f, -0.08f, 0.02f);
@@ -340,10 +439,48 @@ public partial class ToolView : Node3D
     }
 
     /// <summary>Pulso de dano: recuo curto com duração ligada à cadência.</summary>
+    /// <summary>Atraso entre o clique e o acerto (o golpe "cai" na pedra nesse instante).</summary>
+    public static float HitDelay(float interval) => Mathf.Min(interval * 0.45f, 0.14f);
+    /// <summary>Fração da animação do golpe em que a picareta encosta na pedra.</summary>
+    const float ImpactAt = 0.42f;
+    float _equipT = 1f;
+    /// <summary>Capturas de tela: congela o golpe nesta fração (0..1); negativo = normal.</summary>
+    public float DebugPhase = -1f;
+
     public void Swing(float interval)
     {
-        _recoilDuration = Mathf.Clamp(interval * 0.8f, 0.06f, 0.2f);
+        // picareta: duração escolhida para o impacto da animação coincidir com o acerto
+        _recoilDuration = Kind is HeldKind.Pickaxe or HeldKind.Hands
+            ? Mathf.Clamp(HitDelay(interval) / ImpactAt, 0.12f, interval * 0.95f)
+            : Mathf.Clamp(interval * 0.8f, 0.06f, 0.2f);
         _recoilT = 0f;
+    }
+
+    static float EaseOut(float x) => 1f - (1f - x) * (1f - x) * (1f - x);
+    static float EaseIn(float x) => x * x;
+
+    /// <summary>
+    /// Golpe de picareta em três fases: puxa para trás (antecipação), desce rápido até o impacto
+    /// (com um tranco) e volta suavemente. Retorna (ergue, gira para baixo, avanço, tranco).
+    /// </summary>
+    static (float raise, float chop, float reach, float jolt) PickPose(float t)
+    {
+        const float windEnd = 0.24f;
+        if (t >= 1f) return (0, 0, 0, 0);
+        if (t < windEnd)
+        {
+            float a = EaseOut(t / windEnd);
+            return (a, -a * 0.55f, -a * 0.02f, 0);
+        }
+        if (t < ImpactAt)
+        {
+            float a = EaseIn((t - windEnd) / (ImpactAt - windEnd));
+            return (1f - a * 1.15f, -0.55f + a * 1.75f, a * 0.1f, 0);
+        }
+        float r = (t - ImpactAt) / (1f - ImpactAt);
+        float back = EaseOut(r);
+        float jolt = r < 0.25f ? MathF.Sin(r / 0.25f * MathF.PI) : 0f;
+        return (-0.15f * (1f - back), 1.2f * (1f - back), 0.1f * (1f - back), jolt);
     }
 
     public void AddSway(Vector2 mouseDelta) => _sway += mouseDelta * 0.0006f;
@@ -358,25 +495,36 @@ public partial class ToolView : Node3D
         _sway = _sway.Clamp(new Vector2(-0.06f, -0.06f), new Vector2(0.06f, 0.06f));
 
         float kick = 0;
-        if (_recoilT < 1f)
+        if (DebugPhase >= 0f) _recoilT = DebugPhase;
+        else if (_recoilT < 1f)
         {
             _recoilT = Mathf.Min(1f, _recoilT + dt / _recoilDuration);
             kick = MathF.Sin(_recoilT * MathF.PI) * (1f - _recoilT * 0.5f);
         }
         float idle = MathF.Sin(_time * 1.6f) * 0.004f;
         float vibrate = Firing ? MathF.Sin(_time * 70f) * 0.0015f : 0f;
+        // sacar a ferramenta (troca, compra, quebra): sobe de baixo girando
+        if (_equipT < 1f) _equipT = Mathf.Min(1f, _equipT + dt / 0.35f);
+        float equip = 1f - EaseOut(_equipT);
+        // balanço de andar com leve rolagem; respiração parada
+        float walkRoll = MathF.Sin(_bobT) * 0.03f * moveSpeed01;
+        float breathe = MathF.Sin(_time * 1.3f) * 0.012f;
         if (Kind is HeldKind.Pickaxe or HeldKind.Hands)
         {
-            // golpe de picareta: ergue e desce em arco (a cada acerto)
-            float arc = _recoilT < 1f ? MathF.Sin(_recoilT * MathF.PI) : 0f;
-            float raise = _recoilT < 0.35f ? _recoilT / 0.35f : 1f - (_recoilT - 0.35f) / 0.65f;
-            _pivot.Position = _restPos + new Vector3(bobX - _sway.X, -bobY + _sway.Y + idle + raise * 0.06f, -arc * 0.08f);
-            _pivot.Rotation = new Vector3(-raise * 0.9f + arc * 0.5f, 0, raise * 0.15f);
+            var (raise, chop, reach, jolt) = PickPose(_recoilT);
+            float shake = jolt * MathF.Sin(_time * 90f) * 0.006f;
+            _pivot.Position = _restPos + new Vector3(bobX - _sway.X + shake - raise * 0.02f,
+                -bobY + _sway.Y + idle + raise * 0.07f - reach * 0.25f - equip * 0.35f,
+                -reach + raise * 0.03f);
+            // +X puxa a cabeça para trás (antecipação), −X a leva para frente (golpe)
+            _pivot.Rotation = new Vector3(raise * 0.7f - chop * 0.5f + breathe - equip * 0.9f - jolt * 0.04f,
+                raise * 0.12f - _sway.X * 2f,
+                raise * 0.22f + walkRoll + _sway.X * 1.5f);
         }
         else
         {
-            _pivot.Position = _restPos + new Vector3(bobX - _sway.X + vibrate * (Kind == HeldKind.Drill ? 2f : 1f), -bobY + _sway.Y + idle, kick * 0.035f);
-            _pivot.Rotation = new Vector3(kick * 0.06f, 0, 0);
+            _pivot.Position = _restPos + new Vector3(bobX - _sway.X + vibrate * (Kind == HeldKind.Drill ? 2f : 1f), -bobY + _sway.Y + idle - equip * 0.3f, kick * 0.035f);
+            _pivot.Rotation = new Vector3(kick * 0.06f + breathe * 0.5f - equip * 0.8f, -_sway.X, walkRoll);
         }
         _drillSpin = Mathf.Lerp(_drillSpin, Firing ? 40f : 0f, Mathf.Min(1f, dt * 6f));
         _bit?.RotateObjectLocal(Vector3.Forward, _drillSpin * dt);
