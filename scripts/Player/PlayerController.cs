@@ -485,6 +485,7 @@ public partial class PlayerController : CharacterBody3D
                 Effects.Instance?.FloatText(pos + Vector3.Up * 0.4f, Core.Loc.T("CRÍTICO!"), new Color(1f, 0.85f, 0.3f), 1.1f);
             }
             bool broke = c.IsMineable && c.Hit(dmg, pos, normal);
+            gs.WearTool(); // cada golpe que acerta gasta a ferramenta
             _shakeAmount = Mathf.Min(1.5f, _shakeAmount + (broke ? 1.2f : 0.45f));
             _fovKick = broke ? 3f : 1f;
             CrystalHit?.Invoke(c, broke);
@@ -525,19 +526,20 @@ public partial class PlayerController : CharacterBody3D
     void UpdateBeam(GameState gs, bool firing)
     {
         Tool.Firing = firing;
-        AudioManager.Instance?.SetBeam(firing, TargetCrystal != null ? 1f - TargetCrystal.HpRatio : 0f);
+        // o zumbido do feixe só existe no laser
+        AudioManager.Instance?.SetBeam(firing && Tool.Kind == ToolView.HeldKind.Laser, TargetCrystal != null ? 1f - TargetCrystal.HpRatio : 0f);
         if (!firing) return;
         float reach = gs.MiningReach + 0.6f;
         var hit = RayCast(reach, WorldLayer | CrystalLayer | GoblinLayer);
         if (hit.Count > 0)
         {
             Tool.BeamEnd = hit["position"].AsVector3();
-            Tool.BeamColor = hit["collider"].AsGodotObject() is Crystal c ? c.Material.Glow : ToolView.TierColors[gs.ToolTier];
+            Tool.BeamColor = hit["collider"].AsGodotObject() is Crystal c ? c.Material.Glow : Data.ToolData.GlowColor(gs.CurrentTool);
         }
         else
         {
             Tool.BeamEnd = Camera.GlobalPosition - Camera.GlobalTransform.Basis.Z * reach;
-            Tool.BeamColor = ToolView.TierColors[gs.ToolTier];
+            Tool.BeamColor = Data.ToolData.GlowColor(gs.CurrentTool);
         }
     }
 

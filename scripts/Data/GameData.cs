@@ -166,7 +166,9 @@ public static class UpgradeIds
     public const string Value = "sell_value";
     public const string Reach = "reach";
     public const string Resonance = "resonance";
-    public static readonly string[] All = { Damage, Speed, Capacity, Move, Value, Reach, Resonance };
+    /// <summary>Melhorias à venda. Dano e velocidade agora vêm da ferramenta comprada (ToolData); as entradas
+    /// antigas ficam só para converter saves.</summary>
+    public static readonly string[] All = { Capacity, Move, Value, Reach, Resonance };
 }
 
 public static class GameData

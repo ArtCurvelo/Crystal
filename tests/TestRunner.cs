@@ -45,6 +45,7 @@ public partial class TestRunner : Node
             Run("Configurações inválidas", TestSettings);
             Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
             Run("Renderizador: perfis, testes, escolha, validade e recuperação", TestRendererSelection);
+            Run("Ferramentas: picaretas, durabilidade, quebra e compra", TestTools);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
@@ -68,6 +69,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: coleta direta", TestDirectCollect);
             await RunAsync("Integração: goblin minerador e rebelião", TestGoblins);
             await RunAsync("Integração: construções (poste, esteira, funil, drone, robô)", TestBuildings);
+            await RunAsync("Exploração: minérios raros só no fundo das cavernas", TestRarityByDepth);
             await RunAsync("Integração: cordas (poços, subir e descer, corda do jogador)", TestRopes);
             Run("Simulação de balanceamento", TestBalanceSimulation);
         }
@@ -517,8 +519,9 @@ public partial class TestRunner : Node
         int c0 = GS.Capacity;
         float v0 = GS.ValueMultiplier;
         foreach (var id in UpgradeIds.All) GS.Data.Upgrades[id] = 5;
-        Check(GS.Damage > d0 * 2, "dano deve crescer significativamente");
-        Check(GS.SwingsPerSecond > s0 * 1.4f, "velocidade de golpe deve crescer");
+        GS.DebugSetTool(5);
+        Check(GS.Damage > d0 * 2, "dano deve crescer significativamente (ferramenta melhor)");
+        Check(GS.SwingsPerSecond > s0 * 1.4f, "velocidade de golpe deve crescer (ferramenta melhor)");
         Check(GS.MoveSpeed > m0, "velocidade de movimento deve crescer");
         Check(GS.MagnetRadius > r0 && GS.MiningReach > reach0, "alcance deve crescer");
         Check(GS.Capacity > c0, "capacidade deve crescer");
@@ -528,8 +531,9 @@ public partial class TestRunner : Node
         Fresh();
         float tStart = q.Hp / GS.DamagePerSecond;
         foreach (var id in UpgradeIds.All) GS.Data.Upgrades[id] = 12;
+        GS.DebugSetTool(7);
         float tLate = q.Hp / GS.DamagePerSecond;
-        GD.Print($"      quartzo: {tStart:0.00}s no início, {tLate:0.000}s com upgrades nível 12");
+        GD.Print($"      quartzo: {tStart:0.00}s com a picareta de madeira, {tLate:0.000}s com a de rubi");
         Check(tStart >= 2.5f && tLate < 0.3f, "progressão de poder deve ser perceptível");
     }
 
@@ -744,6 +748,72 @@ public partial class TestRunner : Node
         InputHints.PadConnection -= H;
     }
 
+    void TestTools()
+    {
+        Fresh();
+        GS.NewGame();
+        GS.IsPlaying = true;
+        GS.Data.DayOver = false;
+        Check(GS.Data.Tool == 0 && GS.CurrentTool.Id == "wood" && !GS.ToolBroken, "começa com a picareta de madeira");
+        Check(GS.Damage <= 4f, $"picareta de madeira tem dano muito baixo ({GS.Damage})");
+        Check(!UpgradeIds.All.Contains(UpgradeIds.Damage) && !UpgradeIds.All.Contains(UpgradeIds.Speed), "dano e velocidade saíram da loja de melhorias");
+        // ordem: cada ferramenta é melhor que a anterior; lasers só no fim
+        bool increasing = true;
+        for (int i = 1; i < ToolData.All.Count; i++)
+            increasing &= ToolData.All[i].DamagePerSecond > ToolData.All[i - 1].DamagePerSecond && ToolData.All[i].Cost > ToolData.All[i - 1].Cost && ToolData.All[i].Region >= ToolData.All[i - 1].Region;
+        Check(increasing, "cada ferramenta é melhor, mais cara e de região igual ou mais funda");
+        Check(ToolData.All.Where(t => t.Kind == ToolKind.Laser).All(t => t.Region >= GameData.Regions.Count - 1), "armas laser só no final");
+        Check(ToolData.All.Skip(1).All(t => t.Ore != null && GameData.Mat(t.Ore) != null), "ferramentas feitas dos minérios do jogo");
+
+        // região bloqueada
+        int silver = ToolData.All.FindIndex(t => t.Id == "silver");
+        GS.AddMoney(10_000_000);
+        Check(!GS.ToolAvailable(silver) && !GS.TryBuyTool(silver), "picareta de prata exige as Profundezas liberadas");
+        GS.Data.UnlockedRegions.Add("depths");
+        Check(GS.ToolAvailable(silver), "liberou a região: dá para comprar");
+
+        // compra e desgaste
+        long m0 = GS.Data.Money;
+        Check(GS.TryBuyTool(1) && GS.Data.Tool == 1 && GS.Data.Money == m0 - ToolData.All[1].Cost, "compra a picareta de cobre pelo preço");
+        float dmgCopper = GS.Damage;
+        int dur = GS.CurrentTool.Durability;
+        GS.WearTool(dur - 1);
+        Check(!GS.ToolBroken && GS.ToolDurabilityLeft == 1, "desgasta a cada golpe");
+        GS.WearTool();
+        Check(GS.ToolBroken && GS.ToolDurabilityLeft == 0, "no último golpe a ferramenta quebra");
+        Check(GS.Damage < dmgCopper && Mathf.IsEqualApprox(GS.BaseDamage, ToolData.HandsDamage), "quebrada: minera com as mãos (dano mínimo)");
+        Check(GS.ToolLabel.Contains(Loc.T("quebrada").Trim('(', ')')) || GS.ToolLabel.Contains("quebrada"), "nome mostra que quebrou");
+        // compra outra (a mesma)
+        Check(GS.TryBuyTool(1) && !GS.ToolBroken && GS.ToolDurabilityLeft == dur, "compra outra igual: nova, durabilidade cheia");
+        // turno encerrado: não compra
+        GS.Data.DayOver = true;
+        Check(!GS.TryBuyTool(2), "fora do turno não compra");
+        GS.Data.DayOver = false;
+        // salva e carrega
+        GS.WearTool(10);
+        var json = System.Text.Json.JsonSerializer.Serialize(GS.Data);
+        Check(SaveSystem.TryParse(json, out var back) && back.Tool == 1 && back.ToolWear == 10 && !back.ToolBroken, "ferramenta e desgaste salvos");
+
+        // save antigo: dano vinha da melhoria → recebe a ferramenta equivalente
+        var old = new SaveData();
+        old.UnlockedRegions.Add("depths");
+        old.Upgrades[UpgradeIds.Damage] = 12; // ~ 4·1,32^12 + 24 ≈ 87 de dano
+        GS.UseDataForTests(old);
+        GS.MigrateTools();
+        Check(old.ToolsMigrated && ToolData.All[old.Tool].Damage <= GameData.Upgrades[UpgradeIds.Damage].ValueAt(12) * 1.05f && old.Tool >= 3, $"save antigo recebe a ferramenta equivalente ({ToolData.All[old.Tool].NamePt})");
+        int before = old.Tool;
+        GS.MigrateTools();
+        Check(old.Tool == before, "conversão só acontece uma vez");
+        // renascimento volta à madeira
+        Fresh();
+        GS.DebugSetTool(6);
+        GS.Data.GameCompleted = true;
+        GS.Data.RunEarned = 10_000_000;
+        GS.Prestige();
+        Check(GS.Data.Tool == 0 && !GS.ToolBroken, "renascimento recomeça com a picareta de madeira");
+        Fresh();
+    }
+
     void TestRendererSelection()
     {
         // ---- os 9 perfis (3 renderizadores × Baixa/Média/Alta)
@@ -916,7 +986,7 @@ public partial class TestRunner : Node
         Check(GS.CanPrestige, "concluído com ganhos permite renascer");
         int pending = GS.PendingEssence;
         Check(pending == 4, $"4 mi de ganhos devem render 4 de Essência (obtido {pending})");
-        float dmgBase0 = GameData.Upgrades[UpgradeIds.Damage].ValueAt(0);
+        float dmgBase0 = ToolData.All[0].Damage;
         long totalBefore = GS.Data.TotalEarned;
         Check(GS.Prestige(), "renascimento deve ocorrer");
         var d = GS.Data;
@@ -1230,15 +1300,17 @@ public partial class TestRunner : Node
         await Frames(6);
         // mouse: clica em comprar várias vezes; a tela tem que ficar no topo
         InputHints.Observe(new InputEventKey { PhysicalKeycode = Key.W, Pressed = true });
+        int baseScroll = -1;
         for (int k = 0; k < 6; k++)
         {
-            var btn = FindAll<Button>(shop).First(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == UpgradeIds.Damage);
-            btn.GrabFocus(); // o clique do mouse dá foco ao botão
+            var btn = FindAll<Button>(shop).First(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == UpgradeIds.Capacity);
+            btn.GrabFocus(); // o clique do mouse dá foco ao botão (o botão está à vista)
             btn.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames(4);
+            if (k == 0) baseScroll = shop.ScrollPos; // a tela já mostra o botão clicado
         }
-        Check(GS.Data.Level(UpgradeIds.Damage) == 6, "compras aplicadas");
-        Check(shop.ScrollPos < 10, $"comprando com o mouse a tela não rola para baixo (rolagem {shop.ScrollPos})");
+        Check(GS.Data.Level(UpgradeIds.Capacity) == 6, "compras aplicadas");
+        Check(Math.Abs(shop.ScrollPos - baseScroll) < 10, $"comprando com o mouse a tela não pula (rolagem {baseScroll} → {shop.ScrollPos})");
         // controle: compra a última melhoria da lista; a tela acompanha o botão, sem pular para as regiões
         InputHints.Observe(new InputEventJoypadButton { ButtonIndex = JoyButton.A, Pressed = true });
         var last = FindAll<Button>(shop).First(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == UpgradeIds.Resonance);
@@ -1546,6 +1618,68 @@ public partial class TestRunner : Node
         }
         Check(walls == 0 && blocked == 0 && crystals == 0, $"esteira ({name}) não atravessa parede/obstáculo/depósito (parede {walls}, obstáculo {blocked}, depósito {crystals})");
         Check(ground == 0, $"esteira ({name}) acompanha o chão ({ground} pontos fora)");
+    }
+
+    async Task TestRarityByDepth()
+    {
+        Fresh();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        root.AddChild(new ShardManager());
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        await Frames(3);
+
+        // regra
+        Check(WorldBuilder.MaxRarityAt(0, 0.05f) == (int)Rarity.Comum, "começo do jogo: só comuns");
+        Check(WorldBuilder.MaxRarityAt(0, 1f) < (int)Rarity.Lendario && WorldBuilder.MaxRarityAt(0, 1f, true) < (int)Rarity.Lendario, "região inicial nunca tem lendário (nem no desvio mais fundo)");
+        Check(WorldBuilder.MaxRarityAt(0, 0.6f) > WorldBuilder.MaxRarityAt(0, 0.1f), "mais fundo, mais raro");
+        Check(WorldBuilder.MaxRarityAt(3, 0.9f) == (int)Rarity.Lendario, "lendário existe no fundo das regiões avançadas");
+
+        int bad = 0, total = 0;
+        var report = new System.Text.StringBuilder();
+        for (int ri = 0; ri < world.Layouts.Count; ri++)
+        {
+            var L = world.Layouts[ri];
+            var counts = new int[5];
+            foreach (var c in world.Crystals)
+            {
+                if (c.Material.Special || WorldBuilder.RegionAt(c.GlobalPosition).Index != ri) continue;
+                total++;
+                counts[(int)c.Material.Rarity]++;
+                var f = L.FeatureAt(c.StandPoint.X, c.StandPoint.Z);
+                bool detour = f?.Kind == CaveKind.Secret || f?.Wing != null;
+                // folga: o ponto usado na geração pode ser o depósito ou o ponto onde o jogador fica
+                int cap = Math.Max(WorldBuilder.MaxRarityAt(ri, L.Depth(c.StandPoint.X, c.StandPoint.Z), true), WorldBuilder.MaxRarityAt(ri, L.Depth(c.GlobalPosition.X, c.GlobalPosition.Z), true));
+                if ((int)c.Material.Rarity > cap) bad++;
+            }
+            report.Append($" R{ri + 1}[C{counts[0]} I{counts[1]} R{counts[2]} É{counts[3]} L{counts[4]}]");
+        }
+        GD.Print("[Raridade] " + report);
+        Check(total > 500 && bad == 0, $"nenhum depósito mais raro que o permitido pela profundidade ({bad} de {total})");
+
+        var L0 = world.Layouts[0];
+        var nearStart = world.Crystals.Where(c => !c.Material.Special && WorldBuilder.RegionAt(c.GlobalPosition).Index == 0 && L0.Depth(c.StandPoint.X, c.StandPoint.Z) < 0.2f).ToList();
+        Check(nearStart.Count >= 5 && nearStart.All(c => c.Material.Rarity == Rarity.Comum), $"perto da entrada só minério comum ({nearStart.Count} depósitos)");
+        Check(world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 0).All(c => c.Material.Rarity != Rarity.Lendario || c.Material.Special), "nenhum lendário na região inicial");
+
+        // regeneração (evento e renascimento normal): 200 renascimentos perto da entrada continuam comuns
+        int regrowBad = 0;
+        foreach (var c in nearStart.Take(10))
+            for (int k = 0; k < 20; k++)
+            {
+                var m = c.PickMaterial?.Invoke(new Random(k * 7919 + c.GetHashCode()));
+                if (m != null && m.Rarity != Rarity.Comum) regrowBad++;
+            }
+        Check(regrowBad == 0, $"cristal que renasce perto da entrada não vira raro ({regrowBad} de 200)");
+        // e no fundo da região as raridades maiores aparecem
+        var deep = world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 0 && L0.Depth(c.StandPoint.X, c.StandPoint.Z) > 0.75f).ToList();
+        Check(deep.Any(c => c.Material.Rarity >= Rarity.Raro), $"no fundo da região inicial aparecem raros ({deep.Count} depósitos fundos)");
+
+        root.QueueFree();
+        await Frames(2);
+        Fresh();
     }
 
     async Task TestBuildings()
@@ -2117,7 +2251,7 @@ public partial class TestRunner : Node
         const double walkPerCrystal = 2.2;    // deslocamento entre cristais
         const double sellTrip = 14;           // ida e volta até a estação
         var rng = new Random(5);
-        int guard = 0;
+        int guard = 0, toolBuys = 0;
         while (t < 6 * 3600 && guard++ < 200000)
         {
             var region = GameData.Regions.Last(r => GS.IsUnlocked(r.Id));
@@ -2132,8 +2266,10 @@ public partial class TestRunner : Node
             double time = mat.Hp / GS.DamagePerSecond + walkPerCrystal;
             int shards = (mat.ShardsMin + mat.ShardsMax) / 2;
             t += time;
+            GS.WearTool((int)Math.Ceiling(mat.Hp / Math.Max(0.01f, GS.Damage))); // cada golpe gasta a ferramenta
             GS.AddItem(mat.Id, shards);
-            if (GS.InventoryFull)
+            // mochila cheia, ou a ferramenta quebrou: volta ao acampamento (vende e compra outra)
+            if (GS.InventoryFull || GS.ToolBroken)
             {
                 t += sellTrip;
                 GS.SellAll();
@@ -2144,6 +2280,13 @@ public partial class TestRunner : Node
                     GS.TryUnlockRegion(next.Id);
                     if (next.Index == 1) unlock2 = t;
                     if (next.Index == 2) unlock3 = t;
+                }
+                // ferramenta: a melhor liberada que dá para pagar (sempre repõe se quebrou)
+                for (int ti = ToolData.All.Count - 1; ti >= 0; ti--)
+                {
+                    if (!GS.ToolAvailable(ti) || !GS.CanAfford(ToolData.All[ti].Cost)) continue;
+                    if (ti > d.Tool || GS.ToolBroken) { GS.TryBuyTool(ti); toolBuys++; }
+                    break;
                 }
                 bool bought = true;
                 while (bought)
@@ -2161,11 +2304,11 @@ public partial class TestRunner : Node
                 double heartTime = GameData.Mat("heart").Hp / GS.DamagePerSecond;
                 if (heartTime < 60) heart = t;
             }
-            if (unlock3 > 0 && heart > 0 && UpgradeIds.All.All(GS.IsMaxed)) break;
+            if (unlock3 > 0 && heart > 0 && UpgradeIds.All.All(GS.IsMaxed) && d.Tool == ToolData.All.Count - 1) break;
         }
         string Fmt(double s) => s < 0 ? "não alcançado" : $"{s / 60:0.0} min";
         GD.Print($"      Região 2 em {Fmt(unlock2)}, Região 3 em {Fmt(unlock3)}, Coração viável em {Fmt(heart)}");
-        GD.Print($"      Após {Fmt(t)}: dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0} golpes/s, cap {GS.Capacity}, valor x{GS.ValueMultiplier:0.00}");
+        GD.Print($"      Após {Fmt(t)}: {GS.CurrentTool.NamePt}, dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0} golpes/s, cap {GS.Capacity}, valor x{GS.ValueMultiplier:0.00}, ferramentas compradas {toolBuys}");
         Check(unlock2 > 4 * 60 && unlock2 < 25 * 60, $"Região 2 deveria levar 4–25 min (simulado {Fmt(unlock2)})");
         Check(unlock3 > unlock2 + 10 * 60 && unlock3 < 120 * 60, $"Região 3 deveria levar 10–120 min após a 2 (simulado {Fmt(unlock3)})");
         Fresh();

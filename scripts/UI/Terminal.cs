@@ -193,6 +193,7 @@ public partial class ShopScreen : TerminalScreen
 {
     protected override bool IsShopTab => true;
     GridContainer _grid;
+    VBoxContainer _toolBox;
     VBoxContainer _regionBox;
     VBoxContainer _prestigeBox;
     string _lastBought;
@@ -209,6 +210,11 @@ public partial class ShopScreen : TerminalScreen
         var inner = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         inner.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(inner);
+        inner.AddChild(UiTheme.Label("FERRAMENTAS", 20, UiTheme.Gold, true));
+        _toolBox = new VBoxContainer();
+        _toolBox.AddThemeConstantOverride("separation", 8);
+        inner.AddChild(_toolBox);
+        inner.AddChild(UiTheme.Label("MELHORIAS", 20, UiTheme.Cyan, true));
         _grid = new GridContainer { Columns = 1, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _grid.AddThemeConstantOverride("v_separation", 8);
         inner.AddChild(_grid);
@@ -231,6 +237,7 @@ public partial class ShopScreen : TerminalScreen
         GameState.Instance.UpgradesChanged += OnChanged;
         GameState.Instance.RegionsChanged += OnChanged;
         GameState.Instance.InventoryChanged += OnChanged;
+        GameState.Instance.ToolChanged += OnChanged;
     }
 
     public override void _ExitTree()
@@ -240,6 +247,7 @@ public partial class ShopScreen : TerminalScreen
         GameState.Instance.UpgradesChanged -= OnChanged;
         GameState.Instance.RegionsChanged -= OnChanged;
         GameState.Instance.InventoryChanged -= OnChanged;
+        GameState.Instance.ToolChanged -= OnChanged;
     }
 
     void OnChanged() { if (Visible) Refresh(); }
@@ -267,11 +275,25 @@ public partial class ShopScreen : TerminalScreen
         {
             _focusOnOpen = false;
             var gs = GameState.Instance;
-            _focusId = UpgradeIds.All.FirstOrDefault(id => !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? UpgradeIds.All[0];
+            // ferramenta quebrada: o foco já vai para comprar outra
+            // ao abrir: ferramenta quebrada → comprar outra; senão a próxima ferramenta melhor (fica no topo)
+            int next = gs.Data.Tool + 1;
+            _focusId = gs.ToolBroken ? "tool_" + gs.Data.Tool
+                : next < ToolData.All.Count && gs.ToolAvailable(next) && gs.CanAfford(ToolData.All[next].Cost) ? "tool_" + next
+                : UpgradeIds.All.FirstOrDefault(id => !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? "tool_" + gs.Data.Tool;
         }
         // a rolagem fica onde estava (comprar uma melhoria não pode levar a tela lá para baixo)
         int keepScroll = _focusOnOpen ? 0 : _scroll?.ScrollVertical ?? 0;
         RefreshInventory();
+        UiTheme.ClearChildren(_toolBox);
+        _toolBox.AddChild(BuildCurrentTool());
+        int shownLocked = 0;
+        foreach (var t in ToolData.All)
+        {
+            bool avail = GameState.Instance.ToolAvailable(t.Index);
+            if (!avail && shownLocked++ > 0) break; // só a próxima bloqueada aparece (sem estragar a surpresa)
+            _toolBox.AddChild(BuildToolRow(t, avail));
+        }
         UiTheme.ClearChildren(_grid);
         foreach (var id in UpgradeIds.All) _grid.AddChild(BuildCard(GameData.Upgrades[id]));
         UiTheme.ClearChildren(_regionBox);
@@ -331,6 +353,66 @@ public partial class ShopScreen : TerminalScreen
             if (InputHints.UsingPad) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
         }
         return card;
+    }
+
+    /// <summary>Ferramenta na mão: nome, números e durabilidade.</summary>
+    Control BuildCurrentTool()
+    {
+        var gs = GameState.Instance;
+        var t = gs.CurrentTool;
+        var card = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        var edge = gs.ToolBroken ? UiTheme.Danger : gs.ToolDurability01 < 0.2f ? UiTheme.Gold : UiTheme.Success;
+        card.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.07f, 0.09f, 0.08f, 0.95f), new Color(edge, 0.7f), 12, 2, 14, 8));
+        var v = new VBoxContainer();
+        v.AddThemeConstantOverride("separation", 3);
+        card.AddChild(v);
+        v.AddChild(UiTheme.Label(gs.ToolBroken ? Loc.F("Na mão: {0} — QUEBRADA (minerando com as mãos)", t.Name) : Loc.F("Na mão: {0}", t.Name), 18, gs.ToolBroken ? UiTheme.Danger : UiTheme.Text, true));
+        var bar = new SegmentBar { Segments = 20, Fill = gs.ToolDurability01, Color = edge, CustomMinimumSize = new Vector2(260, 10) };
+        bar.SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
+        v.AddChild(bar);
+        v.AddChild(UiTheme.Label(gs.ToolBroken ? Loc.T("Compre outra abaixo (a mesma ou uma melhor).")
+            : Loc.F("Durabilidade: {0}/{1} golpes · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, t.Durability, GameState.FormatNumber(t.Damage), t.Swings), 14, UiTheme.Muted));
+        return card;
+    }
+
+    Control BuildToolRow(ToolDef t, bool avail)
+    {
+        var gs = GameState.Instance;
+        bool current = t.Index == gs.Data.Tool;
+        bool afford = gs.CanAfford(t.Cost);
+        var card = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        card.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.06f, 0.11f, 0.18f, 0.95f), new Color(current ? UiTheme.Gold : UiTheme.Cyan, avail && afford ? 0.55f : 0.2f), 12, 2, 14, 8));
+        if (!avail) card.Modulate = new Color(1, 1, 1, 0.6f);
+        var h = new HBoxContainer();
+        h.AddThemeConstantOverride("separation", 14);
+        card.AddChild(h);
+        var dot = new ColorRect { Color = ToolData.HeadColor(t), CustomMinimumSize = new Vector2(16, 16), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+        h.AddChild(dot);
+        var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        v.AddThemeConstantOverride("separation", 2);
+        h.AddChild(v);
+        string kind = t.Kind switch { ToolKind.Drill => Loc.T("broca"), ToolKind.Laser => Loc.T("laser"), _ => Loc.T("picareta") };
+        v.AddChild(UiTheme.Label(t.Name + (current ? "  ★" : ""), 18, UiTheme.Text, true));
+        v.AddChild(UiTheme.Label(avail ? Loc.F("{0} de dano · {1:0.0} golpes/s · {2} golpes · {3}", GameState.FormatNumber(t.Damage), t.Swings, t.Durability, kind)
+                                       : Loc.F("Libere a região {0} para comprar", GameData.Regions[Math.Clamp(t.Region, 0, GameData.Regions.Count - 1)].Name), 14, UiTheme.Muted));
+        if (avail) v.AddChild(UiTheme.Label(t.Description, 13, UiTheme.Muted));
+        string label = !avail ? Loc.T("Bloqueada") : current && !gs.ToolBroken ? Loc.F("Outra · {0}", GameState.FormatMoney(t.Cost)) : GameState.FormatMoney(t.Cost);
+        var btn = UiTheme.Button(label, () => BuyTool(t.Index), 170, 17);
+        btn.Disabled = !avail || !afford;
+        btn.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        if (avail && afford) btn.AddThemeColorOverride("font_color", UiTheme.Gold);
+        h.AddChild(btn);
+        string uid = "tool_" + t.Index;
+        btn.SetMeta("uid", uid);
+        if (uid == _focusId && (InputHints.UsingPad || _openingFocus) && !btn.Disabled) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
+        return card;
+    }
+
+    void BuyTool(int i)
+    {
+        _focusId = "tool_" + i;
+        if (GameState.Instance.TryBuyTool(i)) AudioManager.Instance?.Play("buy", -3f);
+        else AudioManager.Instance?.Play("error", -6f);
     }
 
     void Buy(string id)

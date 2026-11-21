@@ -76,9 +76,18 @@ public partial class GameState : Node
     /// <summary>Bônus permanente da Essência Ancestral: +10% por ponto.</summary>
     public float EssenceMultiplier => 1f + Data.Essence * EssenceBonusPerPoint;
     public const float EssenceBonusPerPoint = 0.10f;
-    public float Damage => StatValue(UpgradeIds.Damage) * EventDamageMultiplier * EssenceMultiplier
+    // ---------------- ferramenta ----------------
+    public ToolDef CurrentTool => ToolData.Of(Data.Tool);
+    public bool ToolBroken => Data.ToolBroken;
+    public int ToolDurabilityLeft => Math.Max(0, CurrentTool.Durability - Data.ToolWear);
+    public float ToolDurability01 => ToolBroken ? 0f : ToolDurabilityLeft / (float)Math.Max(1, CurrentTool.Durability);
+    public float BaseDamage => ToolBroken ? ToolData.HandsDamage : CurrentTool.Damage;
+    public float BaseSwings => ToolBroken ? ToolData.HandsSwings : CurrentTool.Swings;
+    public event Action ToolChanged;
+
+    public float Damage => BaseDamage * EventDamageMultiplier * EssenceMultiplier
                            * HouseMul(HouseIds.Workbench) * (HasSkill(SkillIds.FirmStrike) ? 1.15f : 1f);
-    public float SwingsPerSecond => StatValue(UpgradeIds.Speed) * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f);
+    public float SwingsPerSecond => BaseSwings * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f);
     public float SwingInterval => 1f / SwingsPerSecond;
     public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f));
     public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen);
@@ -94,20 +103,80 @@ public partial class GameState : Node
     public float ResonanceMultiplier => StatValue(UpgradeIds.Resonance);
     public float ResonanceRadius => GameData.ResonanceRadius(ResonanceMultiplier);
 
-    /// <summary>Nível de "tier" visual da ferramenta (0..4) baseado em dano.</summary>
-    public int ToolTier
+    /// <summary>Ferramenta equipada (índice) — também define o visual em primeira pessoa.</summary>
+    public int ToolTier => Data.Tool;
+
+    public static string ToolName(int tier) => ToolData.Of(tier).Name;
+    public string ToolLabel => ToolBroken ? Loc.F("{0} (quebrada)", CurrentTool.Name) : CurrentTool.Name;
+
+    /// <summary>A ferramenta pode ser comprada agora (região do minério dela liberada)?</summary>
+    public bool ToolAvailable(int i) => i >= 0 && i < ToolData.All.Count && IsUnlocked(GameData.Regions[Math.Clamp(ToolData.All[i].Region, 0, GameData.Regions.Count - 1)].Id);
+
+    /// <summary>Compra (ou recompra) uma ferramenta: vem nova, com durabilidade cheia.</summary>
+    public bool TryBuyTool(int i)
     {
-        get
+        if (!ToolAvailable(i)) return false;
+        if (!RequireWork()) return false;
+        var t = ToolData.All[i];
+        if (!CanAfford(t.Cost)) return false;
+        bool upgrade = i > Data.Tool || ToolBroken;
+        Data.Money -= t.Cost;
+        Data.Tool = i;
+        Data.ToolWear = 0;
+        Data.ToolBroken = false;
+        MoneyChanged?.Invoke();
+        UpgradesChanged?.Invoke();
+        ToolChanged?.Invoke();
+        Notify(Loc.F("{0} equipada", t.Name), Loc.F("{0} de dano · {1:0.0} golpes/s · {2} golpes de durabilidade", FormatNumber(t.Damage), t.Swings, t.Durability), NotifyKind.Success);
+        if (upgrade) BigMessage?.Invoke(t.Name.ToUpper());
+        return true;
+    }
+
+    /// <summary>Admin/testes: equipa uma ferramenta nova (sem cobrar) ou quebra a atual.</summary>
+    public void DebugSetTool(int i, bool broken = false)
+    {
+        Data.Tool = Math.Clamp(i, 0, ToolData.All.Count - 1);
+        Data.ToolWear = broken ? CurrentTool.Durability : 0;
+        Data.ToolBroken = broken;
+        UpgradesChanged?.Invoke();
+        ToolChanged?.Invoke();
+    }
+
+    /// <summary>Um golpe que acertou um depósito gasta a ferramenta; no fim da durabilidade ela quebra.</summary>
+    public void WearTool(int hits = 1)
+    {
+        if (ToolBroken) return;
+        Data.ToolWear += hits;
+        if (Data.ToolWear == (int)(CurrentTool.Durability * 0.8f))
+            Notify("Ferramenta desgastada", Loc.F("{0}: restam {1} golpes. Compre outra no Terminal.", CurrentTool.Name, ToolDurabilityLeft), NotifyKind.Warning);
+        if (Data.ToolWear >= CurrentTool.Durability)
         {
-            int l = Data.Level(UpgradeIds.Damage);
-            return l >= 24 ? 5 : l >= 18 ? 4 : l >= 12 ? 3 : l >= 7 ? 2 : l >= 3 ? 1 : 0;
+            Data.ToolBroken = true;
+            Notify(Loc.F("{0} quebrou!", CurrentTool.Name), Loc.T("Você está minerando com as mãos. Volte ao Terminal e compre outra ferramenta."), NotifyKind.Warning);
+            BigMessage?.Invoke(Loc.T("FERRAMENTA QUEBROU"));
+            UpgradesChanged?.Invoke();
+            ToolChanged?.Invoke();
         }
     }
 
-    public static string ToolName(int tier) => Loc.T(ToolTierNames[tier]);
-
-    public static readonly string[] ToolTierNames =
-        { "Broca Inicial", "Cortador de Pulso", "Perfurador de Arco", "Ressonador Cristalino", "Lança Prismática", "Quebra-Núcleo" };
+    /// <summary>
+    /// Saves de antes das ferramentas: o dano vinha da melhoria "Potência do Feixe". O jogador recebe
+    /// a melhor ferramenta liberada que não passa do dano que já tinha (nova, durabilidade cheia).
+    /// </summary>
+    public void MigrateTools()
+    {
+        if (Data.ToolsMigrated) return;
+        Data.ToolsMigrated = true;
+        int lvl = Data.Level(UpgradeIds.Damage);
+        if (lvl <= 0) { Data.Tool = 0; return; }
+        float old = GameData.Upgrades[UpgradeIds.Damage].ValueAt(lvl);
+        int best = 0;
+        for (int i = 0; i < ToolData.All.Count; i++)
+            if (ToolData.All[i].Damage <= old * 1.05f && ToolAvailable(i)) best = i;
+        Data.Tool = best;
+        Data.ToolWear = 0;
+        Data.ToolBroken = false;
+    }
 
     // ================= Inventário =================
     public int InventoryCount => Data.Inventory.Values.Sum();
@@ -267,16 +336,10 @@ public partial class GameState : Node
         if (!RequireWork()) return false;
         long cost = UpgradeCost(id);
         if (!CanAfford(cost)) return false;
-        int prevTier = ToolTier;
         Data.Money -= cost;
         Data.Upgrades[id] = Data.Level(id) + 1;
         MoneyChanged?.Invoke();
         UpgradesChanged?.Invoke();
-        if (ToolTier > prevTier)
-        {
-            Notify("Ferramenta evoluiu!", ToolName(ToolTier), NotifyKind.Unlock);
-            BigMessage?.Invoke(ToolName(ToolTier).ToUpper());
-        }
         return true;
     }
 
@@ -657,7 +720,7 @@ public partial class GameState : Node
     // ================= Sessão / Save =================
     public void NewGame()
     {
-        Data = new SaveData();
+        Data = new SaveData { ToolsMigrated = true }; // começa com a picareta de madeira
         Data.Sanitize();
         _autosaveTimer = 0;
         SessionActive = true;
@@ -671,6 +734,7 @@ public partial class GameState : Node
         if (!string.IsNullOrEmpty(msg)) Notify("Salvamento", msg, NotifyKind.Warning);
         if (loaded == null) { NewGame(); return false; }
         Data = loaded;
+        MigrateTools();
         _autosaveTimer = 0;
         SessionActive = true;
         RaiseAll();
@@ -687,6 +751,9 @@ public partial class GameState : Node
 
     /// <summary>Simula o estado logo após abrir o jogo (só para testes).</summary>
     public void ResetToBootStateForTests() { Data = new SaveData(); SessionActive = false; }
+
+    /// <summary>Testes: usa um save em memória como se tivesse sido carregado.</summary>
+    public void UseDataForTests(SaveData d) => Data = d;
 
     public bool SaveGame(bool auto = false)
     {
@@ -753,6 +820,7 @@ public partial class GameState : Node
         Data.Money = 0;
         Data.RunEarned = 0;
         Data.Upgrades.Clear();
+        Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; // a jornada recomeça com a picareta de madeira
         Data.Skills.Clear(); // a árvore recomeça; a casa é permanente
         Data.Inventory.Clear();
         Data.UnlockedRegions.Clear();

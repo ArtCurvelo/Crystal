@@ -555,13 +555,31 @@ public sealed class CaveLayout
         return false;
     }
 
+    /// <summary>Distância andando desde a entrada (células; corda conta como trecho longo). -1 = inalcançável.</summary>
+    public float[] PathDist;
+    public float MaxPathDist = 1;
+
+    /// <summary>
+    /// Quão fundo na exploração da região está o ponto: 0 na entrada, 1 no ponto mais distante que dá para alcançar.
+    /// Pontos fora do alcance contam como o mais fundo (só se chega com corda/exploração).
+    /// </summary>
+    public float Depth(float x, float z)
+    {
+        if (PathDist == null || !InGrid(x, z)) return 0.5f;
+        int id = NearestOpen(x, z);
+        if (id < 0 || PathDist[id] < 0) return 1f;
+        return Mathf.Clamp(PathDist[id] / Mathf.Max(1f, MaxPathDist), 0f, 1f);
+    }
+
     void Flood()
     {
         Reach = new bool[Nx * Nz];
+        PathDist = new float[Nx * Nz];
+        System.Array.Fill(PathDist, -1f);
         var q = new Queue<int>();
         int start = NearestOpen(Entrance.X, Entrance.Z);
         if (start < 0) return;
-        Reach[start] = true; q.Enqueue(start);
+        Reach[start] = true; PathDist[start] = 0; q.Enqueue(start);
         int[] di = { 1, -1, 0, 0 }, dj = { 0, 0, 1, -1 };
         // cordas fixas (poços) e cordas do jogador ligam o alto ao fundo: viram arestas do grafo
         var linked = new HashSet<int>();
@@ -574,10 +592,12 @@ public sealed class CaveLayout
                 int t = NearestOpen(top.X, top.Z), b = NearestOpen(bottom.X, bottom.Z);
                 if (t < 0 || b < 0) continue;
                 foreach (var (from, to) in new[] { (t, b), (b, t) })
-                    if (Reach[from] && !Reach[to] && D[to] < -0.3f) { Reach[to] = true; q.Enqueue(to); more = true; }
+                    if (Reach[from] && !Reach[to] && D[to] < -0.3f) { Reach[to] = true; PathDist[to] = PathDist[from] + 12f; q.Enqueue(to); more = true; }
             }
             if (!more) break;
         }
+        MaxPathDist = 1;
+        foreach (var d in PathDist) if (d > MaxPathDist) MaxPathDist = d;
     }
 
     /// <summary>Cordas extras (ex.: do jogador) consideradas no cálculo da área alcançável.</summary>
@@ -605,6 +625,7 @@ public sealed class CaveLayout
                 if (Mathf.Abs(F[nid] - F[id]) > 0.85f) continue;     // ~40° (o jogador sobe até 50°)
                 if (C[nid] - F[nid] < 1.15f) continue;                // nem agachado passa
                 Reach[nid] = true;
+                PathDist[nid] = PathDist[id] + 1f;
                 q.Enqueue(nid);
             }
         }

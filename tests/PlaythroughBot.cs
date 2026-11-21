@@ -31,6 +31,7 @@ public partial class PlaythroughBot : Node
     double _r2 = -1, _r3 = -1, _r4 = -1, _heart = -1;
     int _sells, _buys, _pulses, _missedAims;
     int _hopperId, _hopperTrips;
+    int _toolBuys, _breaks;
     long _beltSold;
     bool _droneBought;
     readonly HashSet<Crystal> _unaimable = new();
@@ -60,9 +61,10 @@ public partial class PlaythroughBot : Node
                 if (GS.DayOver) { await EndOfDay(); continue; }
                 // uma volta antecipada pelo elevador (com confirmação) no 2º dia
                 if (_days == 1 && _earlyHome == 0 && GS.Data.DayTimeSeconds > 120) { if (GS.InventoryCount > 0) await SellTrip(); await GoHomeAndSleep(); continue; }
-                if (GS.InventoryCount >= GS.Capacity - 2)
+                if (GS.InventoryCount >= GS.Capacity - 2 || (GS.ToolBroken && GS.CanWork))
                 {
-                    await SellTrip();
+                    if (GS.ToolBroken) _breaks++;
+                    if (GS.InventoryCount > 0) await SellTrip();
                     if (GS.CanWork) await SpendTrip();
                     if (_r3 > 0 && _heart > 0 && _r4 > 0) break;
                     continue;
@@ -132,6 +134,8 @@ public partial class PlaythroughBot : Node
         GD.Print($"Construções: esteira={(_hopperId != 0 || _beltSold > 0)} | vendido pela esteira ◈ {_beltSold} | drone={_droneBought}");
         if (_beltSold <= 0) { _errors++; GD.Print("ERRO: a esteira não vendeu nada"); }
         if (!_droneBought) { _errors++; GD.Print("ERRO: drone não construído"); }
+        GD.Print($"Ferramentas: {GS.CurrentTool.NamePt} | compradas {_toolBuys} | voltas por quebra {_breaks}");
+        if (_toolBuys < 3) { _errors++; GD.Print("ERRO: o bot quase não comprou ferramentas"); }
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
         GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
@@ -221,7 +225,7 @@ public partial class PlaythroughBot : Node
         {
             await DismissCompletion();
             if (GS.DayOver) await EndOfDay();
-            else if (GS.InventoryCount >= GS.Capacity - 2) { await SellTrip(); if (GS.CanWork) await SpendTrip(); }
+            else if (GS.InventoryCount >= GS.Capacity - 2 || (GS.ToolBroken && GS.CanWork)) { if (GS.InventoryCount > 0) await SellTrip(); if (GS.CanWork) await SpendTrip(); }
             else await MineOne();
         }
         _secondR2 = GS.IsUnlocked("depths") ? GameMinutes - t0 : -1;
@@ -731,8 +735,8 @@ public partial class PlaythroughBot : Node
             if (P.GlobalPosition.Z > gate.GlobalPosition.Z - 1f) { _errors++; Log("ERRO: jogador não atravessou o portão aberto"); }
             return;
         }
-        // guarda dinheiro se a próxima região está perto
-        if (next != null && GS.Data.Money > next.UnlockCost * 0.6) return;
+        // guarda dinheiro se a próxima região está perto (a não ser que a ferramenta tenha quebrado)
+        if (next != null && GS.Data.Money > next.UnlockCost * 0.6 && !GS.ToolBroken) return;
 
         var region = BestRegion();
         if (!GS.CanWork) return;
@@ -743,6 +747,26 @@ public partial class PlaythroughBot : Node
         // terminal de melhorias não vende: só a Estação de Venda do acampamento
         if (FindButtons(shop).Any(b => b.IsVisibleInTree() && b.Text.Contains("Vender")))
         { _errors++; Log("ERRO: terminal de melhorias permite vender (deveria ser só na Estação de Venda)"); }
+        // ferramenta: repõe a quebrada (a melhor que der) ou troca pela próxima melhor quando sobra dinheiro
+        {
+            Button Tool(int i) => FindButtons(shop).FirstOrDefault(b => b.HasMeta("uid") && (string)b.GetMeta("uid") == "tool_" + i && !b.Disabled);
+            int target = -1;
+            for (int ti = ToolData.All.Count - 1; ti >= 0; ti--)
+            {
+                if (!GS.ToolAvailable(ti) || !GS.CanAfford(ToolData.All[ti].Cost)) continue;
+                if (GS.ToolBroken || (ti > GS.Data.Tool && ToolData.All[ti].Cost <= GS.Data.Money * 0.7)) target = ti;
+                break;
+            }
+            if (target >= 0 && Tool(target) is { } tb)
+            {
+                bool wasBroken = GS.ToolBroken;
+                tb.EmitSignal(BaseButton.SignalName.Pressed);
+                await Frames(2);
+                if (GS.Data.Tool != target || GS.ToolBroken) { _errors++; Log("ERRO: compra de ferramenta não aplicou"); }
+                else { _toolBuys++; Log((wasBroken ? "Repôs a ferramenta: " : "Comprou ") + ToolData.All[target].NamePt); }
+            }
+            else if (GS.ToolBroken) Log("Ferramenta quebrada e sem dinheiro para outra (segue com as mãos)");
+        }
         for (int i = 0; i < 40; i++)
         {
             await Frames(1);
@@ -762,7 +786,7 @@ public partial class PlaythroughBot : Node
         PressAction("pause");
         await Frames(3);
         if (shop.IsOpen) { _errors++; Log("ERRO: Esc não fechou a loja"); }
-        if (_buys > 0 && _buys % 10 == 0) Log($"{_buys} compras; dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0}/s, mochila {GS.Capacity}");
+        if (_buys > 0 && _buys % 10 == 0) Log($"{_buys} compras; {GS.CurrentTool.NamePt} ({GS.ToolDurabilityLeft} golpes), dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0}/s, mochila {GS.Capacity}");
     }
 
     static long ParseCost(string text)

@@ -87,6 +87,8 @@ public partial class Hud : CanvasLayer
     readonly List<(PanelContainer panel, HudIcon gem, Label count)> _slots = new();
     // energia / ressonância
     Label _toolName, _toolStats, _energyPct, _pulseInfo;
+    int _lastWear = -1;
+    bool _lastBroken;
     ProgressBar _energyBar;
     // eventos
     PanelContainer _eventPanel;
@@ -504,8 +506,13 @@ public partial class Hud : CanvasLayer
     void RefreshStats()
     {
         var gs = GameState.Instance;
-        _toolName.Text = GameState.ToolName(gs.ToolTier) + (gs.Data.Essence > 0 ? $"  ✦{gs.Data.Essence}" : "");
-        _toolStats.Text = Loc.F("{0} dano · {1:0.0}/s", GameState.FormatNumber(gs.Damage), gs.SwingsPerSecond);
+        _toolName.Text = gs.ToolLabel + (gs.Data.Essence > 0 ? $"  ✦{gs.Data.Essence}" : "");
+        _toolName.AddThemeColorOverride("font_color", gs.ToolBroken ? UiTheme.Danger : gs.ToolDurability01 < 0.2f ? UiTheme.Gold : UiTheme.Cyan);
+        _toolStats.Text = gs.ToolBroken
+            ? Loc.F("mãos: {0} dano · compre outra no Terminal", GameState.FormatNumber(gs.Damage))
+            : Loc.F("{0} dano · {1:0.0}/s · {2} golpes", GameState.FormatNumber(gs.Damage), gs.SwingsPerSecond, gs.ToolDurabilityLeft);
+        _lastWear = gs.Data.ToolWear;
+        _lastBroken = gs.ToolBroken;
         _pulseInfo.Text = Loc.F("Pulso x{0:0.0} do dano · raio {1:0.0} m", gs.ResonanceMultiplier, gs.ResonanceRadius);
     }
 
@@ -649,6 +656,8 @@ public partial class Hud : CanvasLayer
 
     public override void _Process(double delta)
     {
+        // durabilidade muda a cada golpe: atualiza o texto da ferramenta só quando mudou
+        if (GameState.Instance is { } gsw && (gsw.Data.ToolWear != _lastWear || gsw.ToolBroken != _lastBroken) && _toolName != null) RefreshStats();
         long __t = Core.Prof.Start();
         _ProcessInner(delta);
         Core.Prof.End("hud", __t);

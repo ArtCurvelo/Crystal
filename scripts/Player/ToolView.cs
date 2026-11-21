@@ -1,7 +1,9 @@
 using System;
 using CrystalExcavator.Core;
 using CrystalExcavator.World;
+using CrystalExcavator.Data;
 using Godot;
+using OreArchetypeAlias = CrystalExcavator.Data.OreArchetype;
 
 namespace CrystalExcavator.Player;
 
@@ -43,19 +45,19 @@ public partial class ToolView : Node3D
         _pivot = new Node3D { Position = _restPos };
         AddChild(_pivot);
         Rebuild(GameState.Instance?.ToolTier ?? 0);
-        if (GameState.Instance != null) GameState.Instance.UpgradesChanged += OnUpgrades;
+        if (GameState.Instance != null) { GameState.Instance.UpgradesChanged += OnUpgrades; GameState.Instance.ToolChanged += OnUpgrades; }
         BuildBeam();
     }
 
     public override void _ExitTree()
     {
-        if (GameState.Instance != null) GameState.Instance.UpgradesChanged -= OnUpgrades;
+        if (GameState.Instance != null) { GameState.Instance.UpgradesChanged -= OnUpgrades; GameState.Instance.ToolChanged -= OnUpgrades; }
     }
 
     void OnUpgrades()
     {
         int t = GameState.Instance.ToolTier;
-        if (t != _tier) Rebuild(t);
+        if (t != _tier || GameState.Instance.ToolBroken != _broken) Rebuild(t);
     }
 
     MeshInstance3D Part(Node3D parent, Mesh mesh, Material mat, Vector3 pos, Vector3? rot = null)
@@ -93,12 +95,121 @@ public partial class ToolView : Node3D
     /// núcleo de energia em vidro (ilumina a própria arma), anéis giratórios e pontas emissoras.
     /// Cada nível muda a cor, o número de anéis/pontas e o volume.
     /// </summary>
-    void Rebuild(int tier)
+    /// <summary>Tipo do que está na mão: picareta, broca, laser ou as mãos (ferramenta quebrada).</summary>
+    public enum HeldKind { Pickaxe, Drill, Laser, Hands }
+    public HeldKind Kind { get; private set; } = HeldKind.Pickaxe;
+    bool _broken;
+    Node3D _bit;
+    float _drillSpin;
+
+    void Rebuild(int toolIndex)
     {
-        _tier = tier;
+        var gs = GameState.Instance;
+        _tier = toolIndex;
+        _broken = gs?.ToolBroken ?? false;
         _model?.QueueFree();
         _model = new Node3D();
         _pivot.AddChild(_model);
+        _rings = null; _muzzle = null; _bit = null;
+        _screenMat = _coilMat = _stripMat = _coreMat = null; _coreLight = null; _muzzleLight = null;
+        var t = ToolData.Of(toolIndex);
+        Kind = _broken ? HeldKind.Hands : t.Kind switch { ToolKind.Drill => HeldKind.Drill, ToolKind.Laser => HeldKind.Laser, _ => HeldKind.Pickaxe };
+        switch (Kind)
+        {
+            case HeldKind.Pickaxe: BuildPickaxe(t); break;
+            case HeldKind.Drill: BuildDrill(t); break;
+            case HeldKind.Hands: BuildHands(); break;
+            default: BuildGun(toolIndex >= ToolData.All.Count - 1 ? 5 : 3); break;
+        }
+    }
+
+    static StandardMaterial3D HeadMat(ToolDef t)
+    {
+        var c = ToolData.HeadColor(t);
+        if (t.Ore == null) return Metal(new Color(0.55f, 0.5f, 0.45f), 0.9f, 0f); // madeira: ponta de pedra lascada
+        var m = GameData.Mat(t.Ore);
+        bool gem = m != null && m.Archetype is OreArchetypeAlias.Crystal or OreArchetypeAlias.Shards or OreArchetypeAlias.Geode;
+        var mat = Metal(gem ? c.Darkened(0.25f) : c, gem ? 0.2f : 0.3f, gem ? 0.25f : 0.85f);
+        // pedras preciosas: brilho leve só nas bordas (sem virar uma mancha de cor chapada)
+        if (gem) { mat.RimEnabled = true; mat.Rim = 0.6f; mat.RimTint = 0.8f; mat.EmissionEnabled = true; mat.Emission = ToolData.GlowColor(t) * 0.5f; mat.EmissionEnergyMultiplier = 0.12f; }
+        return mat;
+    }
+
+    /// <summary>Mão com luva segurando o cabo.</summary>
+    void Grip(Vector3 at)
+    {
+        var glove = Metal(new Color(0.1f, 0.1f, 0.12f), 0.8f, 0.1f);
+        var sleeve = Metal(new Color(0.16f, 0.12f, 0.22f), 0.7f, 0.1f);
+        Part(_model, new BoxMesh { Size = new Vector3(0.08f, 0.09f, 0.1f) }, glove, at);
+        Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.11f, 0.24f) }, sleeve, at + new Vector3(0.01f, -0.06f, 0.16f), new Vector3(-0.45f, 0, 0));
+    }
+
+    /// <summary>Picareta: cabo de madeira e cabeça de duas pontas feita do minério da ferramenta.</summary>
+    void BuildPickaxe(ToolDef t)
+    {
+        var wood = Metal(new Color(0.62f, 0.42f, 0.24f), 0.8f, 0f);
+        var band = Metal(new Color(0.25f, 0.22f, 0.2f), 0.5f, 0.6f);
+        var head = HeadMat(t);
+        float tier = t.Index / (float)Math.Max(1, ToolData.All.Count - 1);
+        var shaft = new Node3D { Rotation = new Vector3(-0.55f, 0.15f, 0.18f), Position = new Vector3(0.0f, -0.04f, 0) };
+        _model.AddChild(shaft);
+        var tmp = _model; _model = shaft;
+        Part(_model, new CylinderMesh { TopRadius = 0.016f, BottomRadius = 0.02f, Height = 0.56f, RadialSegments = 8, Rings = 1 }, wood, new Vector3(0, 0.12f, 0));
+        Part(_model, new CylinderMesh { TopRadius = 0.022f, BottomRadius = 0.022f, Height = 0.05f, RadialSegments = 8, Rings = 1 }, band, new Vector3(0, -0.12f, 0));
+        // cabeça: miolo + duas pontas afinando (maior e mais elaborada nas melhores)
+        var top = new Vector3(0, 0.38f, 0);
+        Part(_model, new BoxMesh { Size = new Vector3(0.05f, 0.05f, 0.06f) }, band, top);
+        float len = 0.15f + tier * 0.05f;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            var tip = Part(_model, new CylinderMesh { TopRadius = 0.004f, BottomRadius = 0.026f, Height = len, RadialSegments = t.Ore == null ? 4 : 6, Rings = 1 }, head,
+                top + new Vector3(side * (len * 0.5f + 0.02f), -0.012f, 0), new Vector3(0, 0, side * -1.45f));
+            tip.Scale = new Vector3(1f, 1f, 0.7f);
+        }
+        if (t.Index >= 4)
+            Part(_model, new BoxMesh { Size = new Vector3(0.055f, 0.012f, 0.064f) }, head, top + new Vector3(0, 0.03f, 0)); // reforço
+        _model = tmp;
+        Grip(new Vector3(0.0f, -0.07f, 0.06f));
+        _model.Position = new Vector3(0.02f, -0.08f, 0.02f);
+        _model.Rotation = new Vector3(0.05f, 0.2f, 0f);
+        _model.Scale = Vector3.One * 0.8f;
+    }
+
+    /// <summary>Broca: corpo compacto e ponta cônica do minério que gira ao minerar.</summary>
+    void BuildDrill(ToolDef t)
+    {
+        var body = Metal(new Color(0.2f, 0.21f, 0.25f), 0.35f, 0.85f);
+        var dark = Metal(new Color(0.08f, 0.08f, 0.1f), 0.6f, 0.6f);
+        var head = HeadMat(t);
+        var glow = ToolData.GlowColor(t);
+        Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.1f, 0.22f) }, body, new Vector3(0, 0, 0.06f));
+        Part(_model, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.055f, Height = 0.06f, RadialSegments = 12, Rings = 1 }, dark, new Vector3(0, 0, -0.07f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Part(_model, new BoxMesh { Size = new Vector3(0.104f, 0.012f, 0.16f) }, Neon(glow.Darkened(0.3f), 0.5f), new Vector3(0, 0.051f, 0.06f));
+        _bit = new Node3D { Position = new Vector3(0, 0, -0.1f) };
+        _model.AddChild(_bit);
+        Part(_bit, new CylinderMesh { TopRadius = 0f, BottomRadius = 0.045f, Height = 0.2f, RadialSegments = 6, Rings = 1 }, head, new Vector3(0, 0, -0.1f), new Vector3(-Mathf.Pi / 2, 0, 0));
+        for (int i = 0; i < 3; i++)
+            Part(_bit, new BoxMesh { Size = new Vector3(0.008f, 0.07f, 0.14f) }, dark, new Vector3(0, 0, -0.08f), new Vector3(0, 0, i * Mathf.Pi / 3));
+        Part(_model, new BoxMesh { Size = new Vector3(0.05f, 0.12f, 0.05f) }, Metal(new Color(0.06f, 0.06f, 0.07f), 0.9f, 0f), new Vector3(0, -0.1f, 0.12f), new Vector3(-0.3f, 0, 0));
+        Grip(new Vector3(0.005f, -0.12f, 0.13f));
+        _model.Position = new Vector3(-0.02f, 0.07f, 0.02f);
+        _model.Rotation = new Vector3(0.12f, 0.3f, 0.06f);
+        _model.Scale = Vector3.One * 1.0f;
+    }
+
+    /// <summary>Ferramenta quebrou: só a mão fechada (e o toco do cabo).</summary>
+    void BuildHands()
+    {
+        Grip(new Vector3(0.02f, -0.04f, 0.02f));
+        Part(_model, new CylinderMesh { TopRadius = 0.016f, BottomRadius = 0.02f, Height = 0.12f, RadialSegments = 8, Rings = 1 }, Metal(new Color(0.42f, 0.27f, 0.14f), 0.85f, 0f), new Vector3(0.02f, 0.04f, 0.02f), new Vector3(-0.35f, 0.2f, -0.45f));
+        _model.Position = new Vector3(0.0f, 0.08f, 0.0f);
+        _model.Rotation = new Vector3(0.1f, 0.3f, -0.1f);
+        _model.Scale = Vector3.One * 1.3f;
+    }
+
+    /// <summary>Laser (fim do jogo): o emissor de feixe com faixas neon, núcleo e anéis.</summary>
+    void BuildGun(int tier)
+    {
         var accent = TierColors[tier];
         var second = TierColors[(tier + 2) % TierColors.Length];
         var graphite = Metal(new Color(0.09f, 0.09f, 0.12f), 0.32f, 0.8f);
@@ -254,8 +365,21 @@ public partial class ToolView : Node3D
         }
         float idle = MathF.Sin(_time * 1.6f) * 0.004f;
         float vibrate = Firing ? MathF.Sin(_time * 70f) * 0.0015f : 0f;
-        _pivot.Position = _restPos + new Vector3(bobX - _sway.X + vibrate, -bobY + _sway.Y + idle, kick * 0.035f);
-        _pivot.Rotation = new Vector3(kick * 0.06f, 0, 0);
+        if (Kind is HeldKind.Pickaxe or HeldKind.Hands)
+        {
+            // golpe de picareta: ergue e desce em arco (a cada acerto)
+            float arc = _recoilT < 1f ? MathF.Sin(_recoilT * MathF.PI) : 0f;
+            float raise = _recoilT < 0.35f ? _recoilT / 0.35f : 1f - (_recoilT - 0.35f) / 0.65f;
+            _pivot.Position = _restPos + new Vector3(bobX - _sway.X, -bobY + _sway.Y + idle + raise * 0.06f, -arc * 0.08f);
+            _pivot.Rotation = new Vector3(-raise * 0.9f + arc * 0.5f, 0, raise * 0.15f);
+        }
+        else
+        {
+            _pivot.Position = _restPos + new Vector3(bobX - _sway.X + vibrate * (Kind == HeldKind.Drill ? 2f : 1f), -bobY + _sway.Y + idle, kick * 0.035f);
+            _pivot.Rotation = new Vector3(kick * 0.06f, 0, 0);
+        }
+        _drillSpin = Mathf.Lerp(_drillSpin, Firing ? 40f : 0f, Mathf.Min(1f, dt * 6f));
+        _bit?.RotateObjectLocal(Vector3.Forward, _drillSpin * dt);
 
         // tela e bobinas pulsam com o disparo
         float pulse = Firing ? 1.2f + 0.8f * MathF.Abs(MathF.Sin(_time * 12f)) : 0.6f + 0.3f * MathF.Sin(_time * 2f);
@@ -274,11 +398,13 @@ public partial class ToolView : Node3D
 
     void UpdateBeam(float dt)
     {
-        _beamAlpha = Mathf.MoveToward(_beamAlpha, Firing ? 1f : 0f, dt * (Firing ? 14f : 8f));
+        // só o laser tem feixe; picareta/broca/mãos acertam de perto
+        _beamAlpha = Mathf.MoveToward(_beamAlpha, Firing && Kind == HeldKind.Laser ? 1f : 0f, dt * (Firing ? 14f : 8f));
         bool show = _beamAlpha > 0.01f && _muzzle != null;
         _beam.Visible = _beamCore.Visible = _flare.Visible = _halo.Visible = show;
         if (_muzzleLight != null) _muzzleLight.LightEnergy = _beamAlpha * 2.2f;
         _impactLight.LightEnergy = _beamAlpha * 3f;
+        if (_muzzle == null) { _beam.Visible = _beamCore.Visible = _flare.Visible = _halo.Visible = false; return; }
         if (!show) return;
         var start = _muzzle.GlobalPosition;
         var end = BeamEnd;

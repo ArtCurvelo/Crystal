@@ -202,6 +202,13 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-tools"))
+        {
+            await ToolsTour(p, gs);
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-build"))
         {
             // só a parte das construções (iteração rápida)
@@ -697,6 +704,37 @@ public partial class ScreenshotTour : Node
         gs.Data.Upgrades.Remove(UpgradeIds.Damage);
         gs.RaiseAll();
         root.QueueFree();
+    }
+
+    /// <summary>Ferramentas em primeira pessoa (picaretas, broca, laser, mãos) e a seção do Terminal.</summary>
+    async Task ToolsTour(Player.PlayerController p, GameState gs)
+    {
+        Main.CloseAllForTour();
+        foreach (var r in GameData.Regions) if (!gs.IsUnlocked(r.Id)) gs.Data.UnlockedRegions.Add(r.Id);
+        gs.Data.DayTimeSeconds = 30;
+        var c = Main.World.Crystals.First(x => x.Material.Id == "quartz" && x.GlobalTransform.Basis.Y.Normalized().Y > 0.95f);
+        LookAtPoint(p, c.StandPoint + Vector3.Up * 0.05f, c.Center);
+        foreach (int ti in new[] { 0, 1, 3, 5, 7, 8, 10 })
+        {
+            gs.DebugSetTool(ti);
+            await Wait(0.5f);
+            await Shot($"30_tool_{ti}_{ToolData.All[ti].Id}");
+            // no meio do golpe
+            Input.ActionPress("mine");
+            await Wait(0.18f);
+            await Shot($"30_tool_{ti}_swing");
+            Input.ActionRelease("mine");
+            await Wait(0.3f);
+        }
+        gs.DebugSetTool(2, true);
+        await Wait(0.5f);
+        await Shot("31_hands_broken");
+        gs.AddMoney(5000);
+        gs.Data.UnlockedRegions.RemoveAll(r => r != "caves" && r != "depths");
+        UiBus.RequestShop();
+        await Wait(0.8f);
+        await Shot("32_terminal_tools");
+        Main.CloseAllForTour();
     }
 
     static void LookAtPoint(Player.PlayerController p, Vector3 from, Vector3 target)

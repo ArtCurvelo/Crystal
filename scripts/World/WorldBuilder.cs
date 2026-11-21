@@ -490,7 +490,7 @@ public partial class WorldBuilder : Node3D
                 float a = Mathf.Tau * k / 4 + 0.4f;
                 var p = L.OnGround(s.A.X + Mathf.Cos(a) * s.RA * 0.5f, s.A.Y + Mathf.Sin(a) * s.RA * 0.5f);
                 if (NearPlaced(p, 2.4f)) continue;
-                var mat = GameData.Mat(k % 2 == 0 ? r.RareMaterialId : best);
+                var mat = TreasureFor(r, L, p, k % 2 == 0);
                 // ponto de mineração entre o depósito e a parede da câmara (o centro é o esconderijo do goblin)
                 Vector3 stand2 = default;
                 bool okStand = false;
@@ -514,7 +514,7 @@ public partial class WorldBuilder : Node3D
                 var p = L.OnGround(pit.Center.X + Mathf.Cos(a) * pit.Radius * 0.45f, pit.Center.Y + Mathf.Sin(a) * pit.Radius * 0.45f);
                 if (NearPlaced(p, 2.2f) || p.DistanceTo(pit.RopeBottom) < 1.6f) continue;
                 if (!FindStand(L, p, rng, out var stand) || !ClearShot(stand, p + Vector3.Up * 0.5f, p)) continue;
-                var mat = GameData.Mat(rng.NextDouble() < r.RareChance * 5f ? r.RareMaterialId : best);
+                var mat = TreasureFor(r, L, p, rng.NextDouble() < r.RareChance * 5f);
                 var c = MakeCrystal(root, mat, p, rng, 1.05f, null);
                 c.StandPoint = stand;
                 var pr = r; var pl = L; var pp = p;
@@ -559,9 +559,58 @@ public partial class WorldBuilder : Node3D
     static MaterialDef MaterialFor(RegionDef r, CaveLayout L, Vector3 p, Random rng)
     {
         var f = L.FeatureAt(p.X, p.Z);
-        if (f?.Wing != null && rng.NextDouble() < 0.55) return GameData.Mat(f.Wing.FeaturedMaterialId);
-        if (f?.Kind == CaveKind.Secret && rng.NextDouble() < r.RareChance * 4f) return GameData.Mat(r.RareMaterialId);
-        return PickFor(r, rng);
+        // exploração: quanto mais fundo na caverna, mais raro o que pode aparecer.
+        // Câmaras secretas e alas laterais são desvios do caminho: valem um nível a mais.
+        bool detour = f?.Kind == CaveKind.Secret || f?.Wing != null;
+        int max = MaxRarityAt(r.Index, L.Depth(p.X, p.Z), detour);
+        if (f?.Wing != null && rng.NextDouble() < 0.55 && Allowed(f.Wing.FeaturedMaterialId, max)) return GameData.Mat(f.Wing.FeaturedMaterialId);
+        if (f?.Kind == CaveKind.Secret && rng.NextDouble() < r.RareChance * 4f && Allowed(r.RareMaterialId, max)) return GameData.Mat(r.RareMaterialId);
+        return PickFor(r, rng, max);
+    }
+
+    static bool Allowed(string id, int max) => GameData.Mat(id) is { } m && (int)m.Rarity <= max;
+
+    /// <summary>
+    /// Raridade máxima que pode surgir num ponto: na entrada da região só o mais comum dela; a cada trecho
+    /// mais fundo sobe um nível. Regiões mais avançadas começam mais alto. Lendário só bem no fundo (ou em
+    /// desvios fundos) das regiões a partir da segunda — nunca perto do começo do jogo.
+    /// </summary>
+    public static int MaxRarityAt(int regionIndex, float depth, bool detour = false)
+    {
+        int byDepth = depth < 0.25f ? 0 : depth < 0.5f ? 1 : depth < 0.75f ? 2 : 3;
+        int max = regionIndex + byDepth + (detour ? 1 : 0);
+        if (regionIndex == 0) max = Math.Min(max, (int)Rarity.Epico);
+        return Math.Clamp(max, 0, (int)Rarity.Lendario);
+    }
+
+    /// <summary>Tesouros (câmaras secretas e fundo dos poços): o raro da região se o lugar permitir, senão o melhor permitido.</summary>
+    static MaterialDef TreasureFor(RegionDef r, CaveLayout L, Vector3 p, bool rare)
+    {
+        int max = MaxRarityAt(r.Index, L.Depth(p.X, p.Z), true);
+        if (rare && Allowed(r.RareMaterialId, max)) return GameData.Mat(r.RareMaterialId);
+        return BestAllowed(r, max);
+    }
+
+    static MaterialDef BestAllowed(RegionDef r, int max)
+    {
+        MaterialDef best = null;
+        foreach (var s in r.Spawns)
+        {
+            var m = GameData.Mat(s.MaterialId);
+            if (m != null && (int)m.Rarity <= max && (best == null || m.Value > best.Value)) best = m;
+        }
+        return best ?? LowestOf(r);
+    }
+
+    static MaterialDef LowestOf(RegionDef r)
+    {
+        MaterialDef low = null;
+        foreach (var s in r.Spawns)
+        {
+            var m = GameData.Mat(s.MaterialId);
+            if (m != null && (low == null || m.Rarity < low.Rarity || (m.Rarity == low.Rarity && m.Value < low.Value))) low = m;
+        }
+        return low;
     }
 
     Crystal MakeCrystal(Node3D root, MaterialDef mat, Vector3 pos, Random rng, float size, Basis? basis)
@@ -575,18 +624,21 @@ public partial class WorldBuilder : Node3D
         return c;
     }
 
-    public static MaterialDef PickFor(RegionDef r, Random rng)
+    /// <summary>Sorteia pela tabela da região, só entre os minérios até a raridade <paramref name="maxRarity"/>.</summary>
+    public static MaterialDef PickFor(RegionDef r, Random rng, int maxRarity = (int)Rarity.Lendario)
     {
-        if (rng.NextDouble() < r.RareChance * (GameState.Instance?.RareChanceMultiplier ?? 1f)) return GameData.Mat(r.RareMaterialId);
+        if (rng.NextDouble() < r.RareChance * (GameState.Instance?.RareChanceMultiplier ?? 1f) && Allowed(r.RareMaterialId, maxRarity)) return GameData.Mat(r.RareMaterialId);
         double total = 0;
-        foreach (var s in r.Spawns) total += s.Weight;
+        foreach (var s in r.Spawns) if (Allowed(s.MaterialId, maxRarity)) total += s.Weight;
+        if (total <= 0) return LowestOf(r);
         double roll = rng.NextDouble() * total;
         foreach (var s in r.Spawns)
         {
+            if (!Allowed(s.MaterialId, maxRarity)) continue;
             roll -= s.Weight;
             if (roll <= 0) return GameData.Mat(s.MaterialId);
         }
-        return GameData.Mat(r.Spawns[0].MaterialId);
+        return LowestOf(r);
     }
 
     void BuildHeartPedestal(Node3D root, Vector3 pos, RegionDef r)

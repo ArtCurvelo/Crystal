@@ -11,6 +11,12 @@ public sealed class SaveData
 
     public int Version { get; set; } = CurrentVersion;
     public long Money { get; set; }
+    /// <summary>Ferramenta equipada (índice em ToolData.All), golpes já dados com ela e se quebrou.</summary>
+    public int Tool { get; set; }
+    public int ToolWear { get; set; }
+    public bool ToolBroken { get; set; }
+    /// <summary>Saves de antes das ferramentas (dano/velocidade eram melhorias) já foram convertidos.</summary>
+    public bool ToolsMigrated { get; set; }
     public long TotalEarned { get; set; }
     public Dictionary<string, int> Upgrades { get; set; } = new();
     public List<string> UnlockedRegions { get; set; } = new() { "caves" };
@@ -128,6 +134,8 @@ public sealed class SaveData
         }
         Discovered = Discovered.Where(d => d != null && GameData.Mat(d) != null).Distinct().ToList();
 
+        Tool = System.Math.Clamp(Tool, 0, ToolData.All.Count - 1);
+        ToolWear = System.Math.Max(0, ToolWear);
         Buildings ??= new();
         Buildings = Buildings.Where(b => b != null && BuildData.Of(b.Type) != null
                                          && !float.IsNaN(b.X) && !float.IsNaN(b.Y) && !float.IsNaN(b.Z)

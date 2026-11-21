@@ -14,7 +14,7 @@ namespace CrystalExcavator.Core;
 public partial class Main
 {
     public static readonly string DebugHelp =
-        "dinheiro N · tudo · regioes · melhorias · habilidades · casa · mochila · goblins · curar\n" +
+        "dinheiro N · tudo · regioes · melhorias · habilidades · casa · mochila · goblins · curar · ferramenta N · quebrar\n" +
         "ir 1-6 · ir coracao · ir acampamento · ir goblin · ir poco · hora HH · fimdia · novodia · velocidade N\n" +
         "rebeliao · evento · renascer · construcoes (libera esteira, funil, drone, robô) · ajuda";
 
@@ -54,6 +54,7 @@ public partial class Main
                 return "Casa no máximo";
             case "tudo": case "all":
                 RunDebug("regioes"); RunDebug("melhorias"); RunDebug("habilidades"); RunDebug("casa"); RunDebug("goblins");
+                gs.DebugSetTool(ToolData.All.Count - 1);
                 gs.AddMoney(100_000_000);
                 return "Tudo liberado + ◈ 100 mi";
             case "mochila": case "backpack":
@@ -67,6 +68,16 @@ public partial class Main
                 foreach (var d in GoblinData.All) gs.MarkGoblinFound(d.RegionId);
                 foreach (var c in World.GoblinCamps) c.SyncState();
                 return "Todos os goblins encontrados (fale com eles para contratar)";
+            case "ferramenta": case "tool":
+            {
+                if (!int.TryParse(arg, out int ti) || ti < 1 || ti > ToolData.All.Count)
+                    return "Use: ferramenta 1-" + ToolData.All.Count + "  (" + string.Join(", ", ToolData.All.Select(t => $"{t.Index + 1} {t.NamePt}")) + ")";
+                gs.DebugSetTool(ti - 1);
+                return $"Equipada: {gs.CurrentTool.Name}";
+            }
+            case "quebrar": case "break":
+                gs.DebugSetTool(gs.Data.Tool, true);
+                return $"{gs.CurrentTool.Name} quebrou";
             case "curar": case "heal":
                 Player?.RestoreHp();
                 return "Vida cheia";
