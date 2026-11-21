@@ -441,3 +441,10 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Identidade por minério: forma 3D própria em duas cores para drops/fragmentos e ícones fotografados no HUD (brilho reduzido para o padrão aparecer).
 - Casa: 4 melhorias novas com móveis próprios (suporte de ferramentas, baú do comprador, lampiões, carregador de células); bancada da casa vende ferramentas e munição, baú vende a mochila. Patamar visual com referência fixa para casas antigas não regredirem.
 - Testes: 830/830. Bot: SUCESSO (jornada completa, renascimento, 2ª jornada).
+
+## Minerar clicando, ressonância só com laser, picareta e decoração novas
+- Pedido do diretor: no começo cada clique é um golpe; habilidade "Golpe triplo" (1 clique = 3 golpes) e depois "Mineração contínua" (segurar). Novo ramo TÉCNICA na árvore da casa. Opção de acessibilidade "Minerar segurando o botão".
+- Pulso ressonante só carrega com ferramenta a laser (com munição); o painel some com picareta/broca e o Amplificador só aparece no Terminal quando há laser disponível.
+- Picareta redesenhada: cabeça curva (ponta + lâmina) varrida proceduralmente, cabo com veio, couro e pomo; madeira com pedra amarrada; gemas com pontas de cristal e gema encravada. Golpe em 3 fases (antecipação, impacto sincronizado com o acerto via `ToolView.HitDelay`, volta) e animação ao trocar de ferramenta.
+- Decoração (`World/DecorMeshes.cs`): estalactites/estalagmites com anéis, curva e ponta clara (3 variantes); cogumelos com pé em bulbo, chapéu em cúpula (3 formatos) e lamelas; samambaias com folíolos.
+- Testes 840/840 (novo: clique/golpe triplo/contínua/acessibilidade; ressonância com e sem laser).

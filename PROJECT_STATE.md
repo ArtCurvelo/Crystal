@@ -24,8 +24,8 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Raridade por profundidade**: `CaveLayout.Depth` (distância andando desde a entrada) limita a raridade (`WorldBuilder.MaxRarityAt`); região 1 vai no máximo até Épico; desvios/salas secretas dão +1.
 - **Identidade por minério**: `Mining/OreShapes.cs` gera uma forma 3D própria por minério (aglomerado, lascas, geodo, pepita, bandado, gelo, brasa, coral, pérola) com duas cores; `UI/OreIcons.cs` fotografa cada forma para os ícones do HUD, Terminal, venda e códice.
 - **Casa** (`World/PlayerHouse.cs`, `World/HouseDiorama.cs`): 9 melhorias — Cama, Bancada, Armário, Cozinha, Troféus, **Suporte de ferramentas** (+12% durabilidade; nível 1 libera comprar ferramentas/munição na bancada da casa), **Baú do comprador** (vende a mochila em casa; +5% capacidade), **Lampiões** (+12% alcance da lanterna) e **Carregador de células** (+30 células por manhã com laser). Cada uma tem móvel próprio; o patamar visual (0–4) usa referência fixa de 20 níveis.
-- **Árvore de habilidades**: 7 ramos, 28 habilidades (`UI/SkillTreeView.cs`).
-- **Ressonância**: 10 golpes rítmicos carregam um pulso em área.
+- **Árvore de habilidades**: 8 ramos, 30 habilidades (`UI/SkillTreeView.cs`). Ramo TÉCNICA: Golpe triplo (clique = 3 golpes) → Mineração contínua (segurar). Sem elas, cada clique é um golpe (`PlayerController._queuedSwings`).
+- **Ressonância**: só com ferramenta a laser (`GameState.ResonanceActive`).
 - **Eventos por região**: Eco Luminoso, Maré Gélida, Surto do Núcleo e Maré Luminosa.
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
