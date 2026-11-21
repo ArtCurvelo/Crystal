@@ -104,6 +104,7 @@ xvfb-run -a -s "-screen 0 1280x720x24" $GODOT --path . --resolution 1280x720 -- 
 Argumentos de usuário (após `--`): `--run-tests`, `--shots=<pasta>`, `--bot[=minutos]`, `--autostart`.
 
 ## Publicar atualizações (automáticas para o jogador)
+- **Autorização permanente do diretor (v0.13.0 em diante):** publicar todas as atualizações sem pedir autorização, desde que os testes passem e o bot dê SUCESSO. `BUMP=minor` para atualizações com conteúdo novo; patch para correções.
 - `./tools/publish_update.sh "notas da versão"`: testes → versão +1 (patch) → exportação → `update.json` com SHA-256 → envio forçado ao ramo `updates` → commit da versão no `main`.
 - O jogo (exportado, Windows) lê `https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/update.json` ao abrir.
 - Instaladores manuais (`tools/build_installer.sh` → `dist/`) só para a 1ª instalação ou troca de versão do Godot.
