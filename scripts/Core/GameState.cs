@@ -79,8 +79,10 @@ public partial class GameState : Node
     // ---------------- ferramenta ----------------
     public ToolDef CurrentTool => ToolData.Of(Data.Tool);
     public bool ToolBroken => Data.ToolBroken;
-    public int ToolDurabilityLeft => Math.Max(0, CurrentTool.Durability - Data.ToolWear);
-    public float ToolDurability01 => ToolBroken ? 0f : ToolDurabilityLeft / (float)Math.Max(1, CurrentTool.Durability);
+    /// <summary>Golpes até quebrar (com o bônus do Cabo reforçado).</summary>
+    public int ToolMaxDurability => (int)(CurrentTool.Durability * (HasSkill(SkillIds.ToolGrip) ? 1.25f : 1f));
+    public int ToolDurabilityLeft => Math.Max(0, ToolMaxDurability - Data.ToolWear);
+    public float ToolDurability01 => ToolBroken ? 0f : ToolDurabilityLeft / (float)Math.Max(1, ToolMaxDurability);
     /// <summary>Ferramenta laser na mão (gasta munição em vez de desgastar).</summary>
     public bool IsLaser => CurrentTool.Kind == ToolKind.Laser && !ToolBroken;
     public bool OutOfAmmo => IsLaser && Data.Ammo <= 0;
@@ -105,16 +107,25 @@ public partial class GameState : Node
     public event Action ToolChanged;
 
     public float Damage => BaseDamage * EventDamageMultiplier * EssenceMultiplier
-                           * HouseMul(HouseIds.Workbench) * (HasSkill(SkillIds.FirmStrike) ? 1.15f : 1f);
-    public float SwingsPerSecond => BaseSwings * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f);
+                           * HouseMul(HouseIds.Workbench) * (HasSkill(SkillIds.FirmStrike) ? 1.15f : 1f)
+                           * (!UsingHands && HasSkill(SkillIds.Temper) ? 1.15f : 1f);
+    public float SwingsPerSecond => BaseSwings * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f) * (!UsingHands && HasSkill(SkillIds.Hone) ? 1.10f : 1f);
     public float SwingInterval => 1f / SwingsPerSecond;
     public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f));
-    public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen);
+    public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen) * (HasSkill(SkillIds.LightBoots) ? 1.08f : 1f);
     public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier
-                                    * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f);
+                                    * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f) * (HasSkill(SkillIds.LoyalBuyer) ? 1.10f : 1f);
     public float MagnetRadius => StatValue(UpgradeIds.Reach) * (HasSkill(SkillIds.Magnet) ? 1.3f : 1f);
     public float CritChance => HasSkill(SkillIds.Critical) ? 0.12f : 0f;
-    public const float CritMultiplier = 3f;
+    public float CritMultiplier => HasSkill(SkillIds.Piercing) ? 4f : 3f;
+    /// <summary>Chance de 1 fragmento a mais por depósito (Bolsos fundos).</summary>
+    public float ExtraShardChance => HasSkill(SkillIds.ExtraShards) ? 0.2f : 0f;
+    /// <summary>Multiplicador do tempo de renascimento dos depósitos (Geólogo).</summary>
+    public float RespawnMultiplier => HasSkill(SkillIds.Geologist) ? 0.7f : 1f;
+    /// <summary>Alcance da lanterna do capacete (Lanterna potente).</summary>
+    public float LampRangeMultiplier => HasSkill(SkillIds.BrightLamp) ? 1.35f : 1f;
+    /// <summary>Preço de uma construção para o jogador (Kit de cordas: cordas pela metade).</summary>
+    public long BuildCost(string type) => BuildData.Of(type) is { } bd ? (type == BuildIds.Rope && HasSkill(SkillIds.RopeKit) ? bd.Cost / 2 : bd.Cost) : 0;
     public float RareChanceMultiplier => HasSkill(SkillIds.RareNose) ? 1.5f : 1f;
     public bool DirectCollect => HasSkill(SkillIds.DirectCollect);
     public float MiningReach => 3.2f + Data.Level(UpgradeIds.Reach) * 0.28f;
@@ -156,7 +167,7 @@ public partial class GameState : Node
     public void DebugSetTool(int i, bool broken = false)
     {
         Data.Tool = Math.Clamp(i, 0, ToolData.All.Count - 1);
-        Data.ToolWear = broken ? CurrentTool.Durability : 0;
+        Data.ToolWear = broken ? ToolMaxDurability : 0;
         Data.ToolBroken = broken;
         UpgradesChanged?.Invoke();
         ToolChanged?.Invoke();
@@ -171,7 +182,9 @@ public partial class GameState : Node
             // laser não desgasta: cada disparo gasta uma célula de energia
             if (Data.Ammo <= 0) return;
             int before = Data.Ammo;
-            Data.Ammo = Math.Max(0, Data.Ammo - hits);
+            int spent = hits;
+            if (HasSkill(SkillIds.CellSaver)) { spent = 0; for (int k = 0; k < hits; k++) if (Random.Shared.NextDouble() >= 0.25) spent++; }
+            Data.Ammo = Math.Max(0, Data.Ammo - spent);
             if (before > 20 && Data.Ammo <= 20) Notify("Munição acabando", Loc.F("Restam {0} células de energia. Compre mais no Terminal.", Data.Ammo), NotifyKind.Warning);
             if (Data.Ammo == 0)
             {
@@ -183,9 +196,9 @@ public partial class GameState : Node
             return;
         }
         Data.ToolWear += hits;
-        if (Data.ToolWear == (int)(CurrentTool.Durability * 0.8f))
+        if (Data.ToolWear == (int)(ToolMaxDurability * 0.8f))
             Notify("Ferramenta desgastada", Loc.F("{0}: restam {1} golpes. Compre outra no Terminal.", CurrentTool.Name, ToolDurabilityLeft), NotifyKind.Warning);
-        if (Data.ToolWear >= CurrentTool.Durability)
+        if (Data.ToolWear >= ToolMaxDurability)
         {
             Data.ToolBroken = true;
             Notify(Loc.F("{0} quebrou!", CurrentTool.Name), Loc.T("Você está minerando com as mãos. Volte ao Terminal e compre outra ferramenta."), NotifyKind.Warning);
@@ -259,7 +272,7 @@ public partial class GameState : Node
     {
         var def = BuildData.Of(type);
         if (def == null || BuildingLimitReached(type) || !BuildUnlocked(type)) return null;
-        long cost = def.Cost + Math.Max(0, extraCost);
+        long cost = BuildCost(type) + Math.Max(0, extraCost);
         if (!CanAfford(cost)) return null;
         Data.Money -= cost;
         MoneyChanged?.Invoke();
@@ -332,7 +345,7 @@ public partial class GameState : Node
     }
 
     public long SellPrice(MaterialDef def) =>
-        (long)Math.Round(def.Value * ValueMultiplier * ((def.Rare || def.Special) && HasSkill(SkillIds.Jeweler) ? 1.5f : 1f));
+        Math.Max(1, (long)Math.Round(def.Value * Economy.SellValue * ValueMultiplier * ((def.Rare || def.Special) && HasSkill(SkillIds.Jeweler) ? 1.5f : 1f)));
 
     public long InventoryValue() =>
         Data.Inventory.Sum(kv => GameData.Mat(kv.Key) is { } m ? SellPrice(m) * kv.Value : 0);
@@ -415,7 +428,7 @@ public partial class GameState : Node
     public static float? DayLengthOverride;
     public float DayLength => DayLengthOverride ?? DefaultDayLength
         + HouseLevel(HouseIds.Bed) * HomeData.HouseDef(HouseIds.Bed).PerLevel
-        + (HasSkill(SkillIds.Early) ? 120f : 0f) + (HasSkill(SkillIds.Overtime) ? 120f : 0f);
+        + (HasSkill(SkillIds.Early) ? 120f : 0f) + (HasSkill(SkillIds.Overtime) ? 120f : 0f) + (HasSkill(SkillIds.LongShift) ? 180f : 0f);
     public const float DayWarningSeconds = 60f;
     public bool DayOver => Data.DayOver;
     /// <summary>Fora do turno o jogador só pode vender e voltar para casa.</summary>

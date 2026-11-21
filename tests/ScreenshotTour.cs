@@ -735,6 +735,18 @@ public partial class ScreenshotTour : Node
         await Wait(0.8f);
         await Shot("32_terminal_tools");
         Main.CloseAllForTour();
+        // árvore de habilidades: alguns aprendidos, outros disponíveis e bloqueados
+        gs.AddMoney(2_000_000);
+        foreach (var id in new[] { "magnet", "direct_collect", "early_bird", "firm_strike", "cadence", "haggle", Data.SkillIds.ToolGrip, Data.SkillIds.Temper, Data.SkillIds.BrightLamp, Data.SkillIds.BuildBelt })
+            if (!gs.HasSkill(id)) gs.Data.Skills.Add(id);
+        UiBus.RequestHomePanel();
+        await Wait(0.6f);
+        var home = Main.GetChildren().OfType<UI.HomeScreen>().First();
+        home.ShowSkillsTab();
+        home.SelectSkill(Data.SkillIds.Hone);
+        await Wait(0.5f);
+        await Shot("33_skill_tree");
+        Main.CloseAllForTour();
     }
 
     static void LookAtPoint(Player.PlayerController p, Vector3 from, Vector3 target)

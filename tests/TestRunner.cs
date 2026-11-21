@@ -46,6 +46,7 @@ public partial class TestRunner : Node
             Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
             Run("Renderizador: perfis, testes, escolha, validade e recuperação", TestRendererSelection);
             Run("Ferramentas: picaretas, durabilidade, quebra e compra", TestTools);
+            Run("Árvore: 7 ramos e efeito de cada habilidade nova", TestNewSkills);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);
             Run("Atualização automática", TestUpdater);
@@ -185,7 +186,7 @@ public partial class TestRunner : Node
         int houseSum = GS.Data.House.Values.Sum();
         int skillCount = GS.Data.Skills.Count;
         GS.LoadGame();
-        Check(GS.Data.House.Values.Sum() == houseSum && skillCount == HomeData.Skills.Count(sk => sk.Branch < 4) && GS.Data.Skills.Count == skillCount, "casa e habilidades são salvas");
+        Check(GS.Data.House.Values.Sum() == houseSum && skillCount == HomeData.Skills.Count(sk => sk.Branch < 4 && sk.Tier <= 3) && GS.Data.Skills.Count == skillCount, "casa e habilidades são salvas");
         GS.Data.GameCompleted = true;
         GS.Data.RunEarned = 10_000_000;
         GS.Prestige();
@@ -483,7 +484,8 @@ public partial class TestRunner : Node
         Fresh();
         GS.AddItem("quartz", 10);
         GS.AddItem("amethyst", 5);
-        long expected = 10 * 3 + 5 * 8;
+        long P(int baseValue) => Math.Max(1, (long)Math.Round(baseValue * Economy.SellValue));
+        long expected = 10 * P(3) + 5 * P(8);
         Check(GS.InventoryValue() == expected, $"valor do inventário esperado {expected}, obtido {GS.InventoryValue()}");
         long got = GS.SellAll();
         Check(got == expected, "venda deve pagar o valor do inventário");
@@ -746,6 +748,39 @@ public partial class TestRunner : Node
         InputHints.OnJoyConnection(5, false);
         Check(!InputHints.UsingPad && ev == false, "desconectar: volta para teclado e avisa");
         InputHints.PadConnection -= H;
+    }
+
+    void TestNewSkills()
+    {
+        Fresh();
+        GS.NewGame();
+        Check(HomeData.BranchNames.Length == 7 && HomeData.Skills.Count >= 28, $"árvore com 7 ramos ({HomeData.Skills.Count} habilidades)");
+        Check(HomeData.Skills.All(sk => sk.Requires == null || HomeData.Skill(sk.Requires)?.Branch == sk.Branch && HomeData.Skill(sk.Requires).Tier == sk.Tier - 1), "cada habilidade exige a anterior do mesmo ramo");
+        Check(HomeData.Skills.GroupBy(sk => sk.Branch).All(g => g.Select(x => x.Tier).OrderBy(x => x).SequenceEqual(Enumerable.Range(1, g.Count()))), "níveis contínuos em cada ramo");
+        void Learn(string id) { if (!GS.HasSkill(id)) GS.Data.Skills.Add(id); }
+        int dur = GS.ToolMaxDurability; Learn(SkillIds.ToolGrip);
+        Check(GS.ToolMaxDurability == (int)(dur * 1.25f), "Cabo reforçado: +25% de durabilidade");
+        float dmg = GS.Damage; Learn(SkillIds.Temper);
+        Check(Mathf.IsEqualApprox(GS.Damage, dmg * 1.15f), "Têmpera: +15% de dano");
+        float sw = GS.SwingsPerSecond; Learn(SkillIds.Hone);
+        Check(Mathf.IsEqualApprox(GS.SwingsPerSecond, sw * 1.10f), "Afiação: +10% golpes/s");
+        Check(GS.CritMultiplier == 3f, "crítico normal x3"); Learn(SkillIds.Piercing);
+        Check(GS.CritMultiplier == 4f, "Golpe perfurante: crítico x4");
+        Learn(SkillIds.ExtraShards); Check(GS.ExtraShardChance > 0.1f, "Bolsos fundos: chance de fragmento extra");
+        float day = GS.DayLength; Learn(SkillIds.LongShift); Check(Mathf.IsEqualApprox(GS.DayLength, day + 180f), "Turno dobrado: +3 min");
+        float val = GS.ValueMultiplier; Learn(SkillIds.LoyalBuyer); Check(Mathf.IsEqualApprox(GS.ValueMultiplier, val * 1.10f), "Comprador fiel: +10% venda");
+        float mv = GS.MoveSpeed; Learn(SkillIds.LightBoots); Check(Mathf.IsEqualApprox(GS.MoveSpeed, mv * 1.08f), "Passo leve: +8% velocidade");
+        long rope = GS.BuildCost(BuildIds.Rope); Learn(SkillIds.RopeKit); Check(GS.BuildCost(BuildIds.Rope) == rope / 2, "Kit de cordas: corda pela metade");
+        Learn(SkillIds.Geologist); Check(GS.RespawnMultiplier < 0.8f, "Geólogo: renascimento mais rápido");
+        Learn(SkillIds.BrightLamp); Check(GS.LampRangeMultiplier > 1.3f, "Lanterna potente: alcance maior");
+        // Células eficientes: em média gasta ~75%
+        foreach (var r in GameData.Regions) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+        GS.DebugSetTool(ToolData.All.FindIndex(t => t.Kind == ToolKind.Laser));
+        GS.Data.Ammo = 10000; Learn(SkillIds.CellSaver);
+        GS.WearTool(4000);
+        int spent = 10000 - GS.Data.Ammo;
+        Check(spent > 2700 && spent < 3300, $"Células eficientes: ~25% dos disparos não gastam célula (gastou {spent} de 4000)");
+        Fresh();
     }
 
     void TestTools()
@@ -2357,8 +2392,9 @@ public partial class TestRunner : Node
         string Fmt(double s) => s < 0 ? "não alcançado" : $"{s / 60:0.0} min";
         GD.Print($"      Região 2 em {Fmt(unlock2)}, Região 3 em {Fmt(unlock3)}, Coração viável em {Fmt(heart)}");
         GD.Print($"      Após {Fmt(t)}: {GS.CurrentTool.NamePt}, dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0} golpes/s, cap {GS.Capacity}, valor x{GS.ValueMultiplier:0.00}, ferramentas compradas {toolBuys}, pacotes de munição {ammoBuys}");
-        Check(unlock2 > 4 * 60 && unlock2 < 25 * 60, $"Região 2 deveria levar 4–25 min (simulado {Fmt(unlock2)})");
-        Check(unlock3 > unlock2 + 10 * 60 && unlock3 < 120 * 60, $"Região 3 deveria levar 10–120 min após a 2 (simulado {Fmt(unlock3)})");
+        // ritmo pedido pelo diretor: progressão lenta (economia em Data/GameData.cs → Economy)
+        Check(unlock2 > 20 * 60 && unlock2 < 45 * 60, $"Região 2 deveria levar 20–45 min (simulado {Fmt(unlock2)})");
+        Check(unlock3 > unlock2 + 60 * 60 && unlock3 < unlock2 + 240 * 60, $"Região 3 deveria levar 1–4 h após a 2 (simulado {Fmt(unlock3)})");
         Fresh();
     }
 

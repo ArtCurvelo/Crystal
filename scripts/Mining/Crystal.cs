@@ -227,6 +227,7 @@ public partial class Crystal : StaticBody3D
         if (Material.Rare || Material.Special) AudioManager.Instance?.Play("rare", -4f);
 
         int shards = _rng.Next(Material.ShardsMin, Material.ShardsMax + 1);
+        if (_rng.NextDouble() < (GameState.Instance?.ExtraShardChance ?? 0f)) shards++; // Bolsos fundos
         if (!Material.Special) shards = Math.Max(1, (int)MathF.Round(shards * SizeScale));
         shards = (int)MathF.Round(shards * (GameState.Instance?.EventShardMultiplier ?? 1f));
         if (_sink != null) _sink(Material, shards);
@@ -239,7 +240,7 @@ public partial class Crystal : StaticBody3D
 
         _visual.Visible = false;
         _shape.SetDeferred(CollisionShape3D.PropertyName.Disabled, true);
-        _respawnTimer = Material.RespawnSeconds * (0.85f + (float)_rng.NextDouble() * 0.3f);
+        _respawnTimer = Material.RespawnSeconds * (0.85f + (float)_rng.NextDouble() * 0.3f) * (GameState.Instance?.RespawnMultiplier ?? 1f);
     }
 
     void BeginRegrow()

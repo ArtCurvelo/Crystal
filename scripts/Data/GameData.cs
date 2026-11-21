@@ -171,6 +171,22 @@ public static class UpgradeIds
     public static readonly string[] All = { Capacity, Move, Value, Reach, Resonance };
 }
 
+/// <summary>
+/// Ritmo da economia num lugar só (o diretor pediu progressão mais lenta: ninguém deve "upar" rápido).
+/// Ajuste aqui e confira com a "Simulação de balanceamento" nos testes.
+/// </summary>
+public static class Economy
+{
+    /// <summary>Quanto cada fragmento vale na venda (sobre o valor base do minério).</summary>
+    public const float SellValue = 0.75f;
+    /// <summary>Preço para liberar regiões.</summary>
+    public const float RegionCost = 1.5f;
+    /// <summary>Preço das melhorias do Terminal.</summary>
+    public const float UpgradeCost = 1.5f;
+    /// <summary>Preço das ferramentas e da munição do laser.</summary>
+    public const float ToolCost = 1.6f;
+}
+
 public static class GameData
 {
     public static readonly Dictionary<string, MaterialDef> Materials = new();
@@ -696,6 +712,7 @@ public static class GameData
         r6.Wings.Add(new WingDef { Id = "prism_nave", Name = "Nave dos Prismas", Side = -1, ZOffset = -4, FeaturedMaterialId = "tanzanite", Slots = 11, HalfX = 15, HalfZ = 14 });
         r6.Wings.Add(new WingDef { Id = "diamond_crypt", Name = "Cripta dos Diamantes", Side = 1, ZOffset = 4, FeaturedMaterialId = "diamond", Slots = 11, HalfX = 15, HalfZ = 14 });
         Regions.Add(r6);
+        foreach (var rg in Regions) rg.UnlockCost = (long)Math.Round(rg.UnlockCost * Economy.RegionCost / 100.0) * 100;
 
         // posições em Z: cada região começa onde a anterior termina + túnel (a entrada do acampamento fica em z = 90)
         float top = 90f;
@@ -772,7 +789,11 @@ public static class GameData
     public const float ResonanceWindow = 1.4f;
 
     static void Add(MaterialDef m) => Materials[m.Id] = m;
-    static void AddUp(UpgradeDef u) => Upgrades[u.Id] = u;
+    static void AddUp(UpgradeDef u)
+    {
+        u.BaseCost = (long)Math.Round(u.BaseCost * Economy.UpgradeCost);
+        Upgrades[u.Id] = u;
+    }
 
     public static MaterialDef Mat(string id) => Materials.TryGetValue(id, out var m) ? m : null;
     public static RegionDef Region(string id) => Regions.Find(r => r.Id == id);

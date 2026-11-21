@@ -68,6 +68,9 @@ public static class SkillIds
     public const string FirmStrike = "firm_strike", Cadence = "cadence", Critical = "critical";
     public const string Haggle = "haggle", RareNose = "rare_nose", Jeweler = "jeweler";
     public const string BuildBelt = "build_belt", BuildHopper = "build_hopper", BuildDrone = "build_drone", BuildRobot = "build_robot";
+    public const string ExtraShards = "extra_shards", LongShift = "long_shift", Piercing = "piercing", LoyalBuyer = "loyal_buyer";
+    public const string ToolGrip = "tool_grip", Temper = "temper", Hone = "hone", CellSaver = "cell_saver";
+    public const string BrightLamp = "bright_lamp", LightBoots = "light_boots", RopeKit = "rope_kit", Geologist = "geologist";
 }
 
 public static class HomeData
@@ -81,7 +84,7 @@ public static class HomeData
         new() { Id = HouseIds.Trophies, Name = "Estante de troféus", Description = "Fama de escavador: +4% no valor de venda por nível.", BaseCost = 4000, CostGrowth = 3.4, MaxLevel = 5, PerLevel = 0.04f },
     };
 
-    public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO", "CONSTRUÇÃO" };
+    public static readonly string[] BranchNames = { "COLETA", "TURNO", "MINERAÇÃO", "COMÉRCIO", "CONSTRUÇÃO", "FERRAMENTAS", "EXPLORAÇÃO" };
 
     public static readonly List<SkillDef> Skills = new()
     {
@@ -105,6 +108,24 @@ public static class HomeData
         new() { Id = SkillIds.BuildHopper, Name = "Funil", Description = "Libera o funil: ao lado de uma esteira, puxa fragmentos soltos e despeja nela.", Branch = 4, Tier = 2, Cost = 12000, Requires = SkillIds.BuildBelt },
         new() { Id = SkillIds.BuildDrone, Name = "Drone de área", Description = "Libera o drone: recolhe fragmentos soltos dentro da área da base dele.", Branch = 4, Tier = 3, Cost = 60000, Requires = SkillIds.BuildHopper },
         new() { Id = SkillIds.BuildRobot, Name = "Robô mineiro", Description = "Libera o robô: minera sozinho dentro da área dele, mais devagar que um goblin.", Branch = 4, Tier = 4, Cost = 200000, Requires = SkillIds.BuildDrone },
+
+        // nível 4 dos ramos originais
+        new() { Id = SkillIds.ExtraShards, Name = "Bolsos fundos", Description = "20% de chance de 1 fragmento a mais em cada depósito quebrado.", Branch = 0, Tier = 4, Cost = 1_200_000, Requires = SkillIds.Compactor },
+        new() { Id = SkillIds.LongShift, Name = "Turno dobrado", Description = "+3 min de turno.", Branch = 1, Tier = 4, Cost = 900_000, Requires = SkillIds.ShiftBonus },
+        new() { Id = SkillIds.Piercing, Name = "Golpe perfurante", Description = "O golpe crítico passa a causar dano quádruplo.", Branch = 2, Tier = 4, Cost = 1_300_000, Requires = SkillIds.Critical },
+        new() { Id = SkillIds.LoyalBuyer, Name = "Comprador fiel", Description = "+10% no valor de venda.", Branch = 3, Tier = 4, Cost = 1_500_000, Requires = SkillIds.Jeweler },
+
+        // FERRAMENTAS
+        new() { Id = SkillIds.ToolGrip, Name = "Cabo reforçado", Description = "Picaretas e brocas duram 25% mais golpes.", Branch = 5, Tier = 1, Cost = 3000 },
+        new() { Id = SkillIds.Temper, Name = "Têmpera", Description = "+15% de dano com qualquer ferramenta.", Branch = 5, Tier = 2, Cost = 40_000, Requires = SkillIds.ToolGrip },
+        new() { Id = SkillIds.Hone, Name = "Afiação", Description = "+10% de golpes por segundo com ferramenta.", Branch = 5, Tier = 3, Cost = 350_000, Requires = SkillIds.Temper },
+        new() { Id = SkillIds.CellSaver, Name = "Células eficientes", Description = "25% de chance de um disparo de laser não gastar célula.", Branch = 5, Tier = 4, Cost = 1_500_000, Requires = SkillIds.Hone },
+
+        // EXPLORAÇÃO
+        new() { Id = SkillIds.BrightLamp, Name = "Lanterna potente", Description = "A lanterna do capacete alcança 35% mais longe.", Branch = 6, Tier = 1, Cost = 2500 },
+        new() { Id = SkillIds.LightBoots, Name = "Passo leve", Description = "+8% de velocidade de movimento.", Branch = 6, Tier = 2, Cost = 30_000, Requires = SkillIds.BrightLamp },
+        new() { Id = SkillIds.RopeKit, Name = "Kit de cordas", Description = "Cordas custam metade do preço.", Branch = 6, Tier = 3, Cost = 120_000, Requires = SkillIds.LightBoots },
+        new() { Id = SkillIds.Geologist, Name = "Geólogo", Description = "Depósitos quebrados renascem 30% mais rápido.", Branch = 6, Tier = 4, Cost = 800_000, Requires = SkillIds.RopeKit },
     };
 
     public static HouseUpgradeDef HouseDef(string id) => House.FirstOrDefault(h => h.Id == id);

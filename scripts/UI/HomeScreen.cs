@@ -21,7 +21,8 @@ public partial class HomeScreen : ModalScreen
     SubViewport _viewport;
     HouseDiorama _diorama;
     readonly List<(HouseUpgradeDef def, Label level, Label effect, Button buy)> _houseRows = new();
-    readonly Dictionary<string, Button> _skillButtons = new();
+    SkillTreeView _tree;
+    Control _left;
     Label _skillName, _skillDesc;
     Button _skillBuy;
     string _selectedSkill = SkillIds.Magnet;
@@ -56,6 +57,7 @@ public partial class HomeScreen : ModalScreen
 
         // ---- esquerda: maquete + resumo do dia
         var left = new VBoxContainer { CustomMinimumSize = new Vector2(500, 0) };
+        _left = left;
         left.AddThemeConstantOverride("separation", 8);
         cols.AddChild(left);
         var vpc = new SubViewportContainer { Stretch = true, CustomMinimumSize = new Vector2(500, 300) };
@@ -147,27 +149,8 @@ public partial class HomeScreen : ModalScreen
 
     void BuildSkillTree()
     {
-        var grid = new HBoxContainer();
-        grid.AddThemeConstantOverride("separation", 8);
-        _skillPane.AddChild(grid);
-        for (int b = 0; b < HomeData.BranchNames.Length; b++)
-        {
-            var col = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-            col.AddThemeConstantOverride("separation", 2);
-            grid.AddChild(col);
-            col.AddChild(UiTheme.Label(HomeData.BranchNames[b], 15, UiTheme.Cyan, true, HorizontalAlignment.Center));
-            var nodes = HomeData.Skills.Where(s => s.Branch == b).OrderBy(s => s.Tier).ToList();
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                var def = nodes[i];
-                if (i > 0) col.AddChild(UiTheme.Label("▼", 12, UiTheme.Muted, false, HorizontalAlignment.Center));
-                var btn = UiTheme.Button(def.Name, () => Select(def.Id), 140, 14);
-                btn.CustomMinimumSize = new Vector2(140, 52);
-                btn.ClipText = true;
-                col.AddChild(btn);
-                _skillButtons[def.Id] = btn;
-            }
-        }
+        _tree = new SkillTreeView { OnSelect = Select, SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter };
+        _skillPane.AddChild(_tree);
         var detail = new PanelContainer();
         detail.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(UiTheme.Card, new Color(UiTheme.Cyan, 0.35f), 8, 1, 14, 8));
         _skillPane.AddChild(detail);
@@ -238,6 +221,7 @@ public partial class HomeScreen : ModalScreen
 
         _housePane.Visible = !_showSkills;
         _skillPane.Visible = _showSkills;
+        _left.Visible = !_showSkills; // a árvore usa a largura toda
         _tabHouse.AddThemeColorOverride("font_color", _showSkills ? UiTheme.Muted : UiTheme.Gold);
         _tabSkills.AddThemeColorOverride("font_color", _showSkills ? UiTheme.Gold : UiTheme.Muted);
 
@@ -252,16 +236,8 @@ public partial class HomeScreen : ModalScreen
             buy.Disabled = maxed || !gs.CanAfford(cost);
         }
 
-        foreach (var def in HomeData.Skills)
-        {
-            var btn = _skillButtons[def.Id];
-            bool owned = gs.HasSkill(def.Id);
-            bool avail = gs.SkillAvailable(def.Id);
-            btn.Text = def.Name + "\n" + (owned ? "✓" : GameState.FormatMoney(def.Cost));
-            var col = owned ? UiTheme.Gold : avail ? (gs.CanAfford(def.Cost) ? UiTheme.Success : UiTheme.Text) : UiTheme.Muted;
-            btn.AddThemeColorOverride("font_color", col);
-            btn.Modulate = def.Id == _selectedSkill ? Colors.White : new Color(1, 1, 1, owned || avail ? 0.9f : 0.55f);
-        }
+        _tree.Selected = _selectedSkill;
+        _tree.Refresh();
         var sel = HomeData.Skill(_selectedSkill);
         _skillName.Text = sel.Name + (gs.HasSkill(sel.Id) ? "  ✓" : "");
         string req = sel.Requires != null && !gs.HasSkill(sel.Requires) ? Loc.F("\nRequer: {0}", HomeData.Skill(sel.Requires).Name) : "";

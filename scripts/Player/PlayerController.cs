@@ -301,6 +301,8 @@ public partial class PlayerController : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        // Lanterna potente (habilidade): alcance maior
+        if (Lamp != null && GameState.Instance != null) Lamp.SpotRange = 48f * GameState.Instance.LampRangeMultiplier;
         long __t = Core.Prof.Start();
         _PhysicsInner(delta);
         Core.Prof.End("player", __t);
@@ -481,7 +483,7 @@ public partial class PlayerController : CharacterBody3D
             bool crit = gs.CritChance > 0 && GD.Randf() < gs.CritChance;
             if (crit)
             {
-                dmg *= GameState.CritMultiplier;
+                dmg *= gs.CritMultiplier;
                 Effects.Instance?.FloatText(pos + Vector3.Up * 0.4f, Core.Loc.T("CRÍTICO!"), new Color(1f, 0.85f, 0.3f), 1.1f);
             }
             bool broke = c.IsMineable && c.Hit(dmg, pos, normal);

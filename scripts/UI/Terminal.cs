@@ -374,7 +374,7 @@ public partial class ShopScreen : TerminalScreen
         v.AddChild(bar);
         string info = gs.ToolBroken ? Loc.T("Compre outra abaixo (a mesma ou uma melhor).")
             : t.Kind == ToolKind.Laser ? Loc.F("Células de energia: {0} (1 por disparo) · {1} de dano · {2:0.0} disparos/s", gs.Data.Ammo, GameState.FormatNumber(t.Damage), t.Swings)
-            : Loc.F("Durabilidade: {0}/{1} golpes · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, t.Durability, GameState.FormatNumber(t.Damage), t.Swings);
+            : Loc.F("Durabilidade: {0}/{1} golpes · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, gs.ToolMaxDurability, GameState.FormatNumber(t.Damage), t.Swings);
         if (t.Kind == ToolKind.Laser && !gs.ToolBroken) bar.Fill = Mathf.Clamp(gs.Data.Ammo / (float)ToolData.AmmoPack, 0f, 1f);
         v.AddChild(UiTheme.Label(info, 14, gs.OutOfAmmo ? UiTheme.Danger : UiTheme.Muted));
         return card;

@@ -36,7 +36,7 @@ public static class ToolData
     public const float HandsDamage = 1f, HandsSwings = 1.2f;
     /// <summary>Laser: cada disparo que acerta gasta 1 célula de energia (comprada em pacotes no Terminal).</summary>
     public const int AmmoPack = 200;
-    public const long AmmoPackCost = 120_000;
+    public static readonly long AmmoPackCost = (long)(120_000 * Economy.ToolCost);
     /// <summary>Células que já vêm com um laser novo.</summary>
     public const int AmmoWithLaser = 100;
 
@@ -45,7 +45,7 @@ public static class ToolData
     static ToolData()
     {
         void T(string id, string name, ToolKind k, int region, float dmg, float swings, int dur, long cost, string ore, string desc) =>
-            All.Add(new ToolDef { Index = All.Count, Id = id, Name = name, Kind = k, Region = region, Damage = dmg, Swings = swings, Durability = dur, Cost = cost, Ore = ore, Description = desc });
+            All.Add(new ToolDef { Index = All.Count, Id = id, Name = name, Kind = k, Region = region, Damage = dmg, Swings = swings, Durability = dur, Cost = (long)System.Math.Round(cost * Economy.ToolCost), Ore = ore, Description = desc });
         T("wood", "Picareta de Madeira", ToolKind.Pickaxe, 0, 3, 1.6f, 250, 15, null, "Lasca a rocha mais mole. Quebra rápido.");
         T("copper", "Picareta de Cobre", ToolKind.Pickaxe, 0, 8, 1.9f, 350, 60, "copper", "Cabeça de cobre batido: o dobro da madeira.");
         T("hematite", "Picareta de Hematita", ToolKind.Pickaxe, 0, 18, 2.2f, 450, 200, "hematite", "Ferro avermelhado, pesado e firme.");

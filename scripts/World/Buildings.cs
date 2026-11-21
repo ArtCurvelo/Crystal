@@ -675,7 +675,7 @@ public partial class BuildingManager : Node3D
         {
             _valid = RopeFor(_point, p.GlobalPosition, out _ropeTop, out _ropeBottom, out _ropeExit, out _reason);
             _route = _valid ? new List<Vector3> { _ropeTop + Vector3.Up * 0.3f, _ropeBottom } : null;
-            if (_valid && !gs.CanAfford(Current.Cost)) { _valid = false; _reason = Loc.T("Moeda insuficiente"); }
+            if (_valid && !gs.CanAfford(gs.BuildCost(Current.Id))) { _valid = false; _reason = Loc.T("Moeda insuficiente"); }
             return;
         }
         _route = null;
@@ -784,7 +784,7 @@ public partial class BuildingManager : Node3D
     }
 
 
-    long TotalCost() => Current.Cost + (Current.Id == BuildIds.Belt && _route != null ? BeltCost(PathLength(_route)) : 0);
+    long TotalCost() => GameState.Instance.BuildCost(Current.Id) + (Current.Id == BuildIds.Belt && _route != null ? BeltCost(PathLength(_route)) : 0);
 
     /// <summary>Regras de posição (sem custo). Usado pela prévia e pelos testes.</summary>
     public bool CanPlace(string type, Vector3 pt, out string reason)
@@ -1082,7 +1082,7 @@ public partial class BuildingManager : Node3D
             var def = Current;
             string cost = GameState.FormatMoney(TotalCost());
             if (def.Id == BuildIds.Rope && _valid)
-                cost = Loc.F("{0} · {1:0} m", GameState.FormatMoney(def.Cost), _ropeTop.DistanceTo(_ropeBottom));
+                cost = Loc.F("{0} · {1:0} m", GameState.FormatMoney(gs.BuildCost(def.Id)), _ropeTop.DistanceTo(_ropeBottom));
             if (def.Id == BuildIds.Belt && _route != null && dragging)
                 cost = Loc.F("{0} ({1:0} m)", GameState.FormatMoney(TotalCost()), PathLength(_route));
             title = $"{def.Name} · {cost}";
