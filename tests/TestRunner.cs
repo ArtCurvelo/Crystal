@@ -804,6 +804,27 @@ public partial class TestRunner : Node
         int before = old.Tool;
         GS.MigrateTools();
         Check(old.Tool == before, "conversão só acontece uma vez");
+        // laser: não desgasta, gasta células de energia
+        Fresh();
+        GS.NewGame();
+        GS.IsPlaying = true;
+        GS.Data.DayOver = false;
+        foreach (var r in GameData.Regions) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+        int laser = ToolData.All.FindIndex(t => t.Kind == ToolKind.Laser);
+        GS.AddMoney(ToolData.All[laser].Cost + ToolData.AmmoPackCost * 2);
+        Check(GS.TryBuyTool(laser) && GS.IsLaser && GS.Data.Ammo == ToolData.AmmoWithLaser, "laser novo vem com algumas células");
+        float laserDmg = GS.Damage;
+        GS.WearTool(10);
+        Check(GS.Data.Ammo == ToolData.AmmoWithLaser - 10 && GS.Data.ToolWear == 0 && !GS.ToolBroken, "cada disparo gasta 1 célula (o laser não desgasta)");
+        GS.WearTool(GS.Data.Ammo);
+        Check(GS.OutOfAmmo && GS.UsingHands && GS.Damage < laserDmg && Mathf.IsEqualApprox(GS.BaseDamage, ToolData.HandsDamage), "sem munição: minera com as mãos (não é infinito)");
+        Check(GS.ToolLabel.Contains(Loc.T("sem munição")) || GS.ToolLabel.Contains("sem munição"), "nome mostra que está sem munição");
+        long mA = GS.Data.Money;
+        Check(GS.TryBuyAmmo() && GS.Data.Ammo == ToolData.AmmoPack && GS.Data.Money == mA - ToolData.AmmoPackCost && !GS.OutOfAmmo && Mathf.IsEqualApprox(GS.Damage, laserDmg), "compra pacote de células e volta a disparar");
+        Fresh();
+        GS.NewGame();
+        GS.AddMoney(ToolData.AmmoPackCost * 2);
+        Check(!GS.AnyLaserAvailable && !GS.TryBuyAmmo(), "munição só aparece quando há laser liberado");
         // renascimento volta à madeira
         Fresh();
         GS.DebugSetTool(6);
@@ -2276,7 +2297,7 @@ public partial class TestRunner : Node
         const double walkPerCrystal = 2.2;    // deslocamento entre cristais
         const double sellTrip = 14;           // ida e volta até a estação
         var rng = new Random(5);
-        int guard = 0, toolBuys = 0;
+        int guard = 0, toolBuys = 0, ammoBuys = 0;
         while (t < 6 * 3600 && guard++ < 200000)
         {
             var region = GameData.Regions.Last(r => GS.IsUnlocked(r.Id));
@@ -2294,7 +2315,7 @@ public partial class TestRunner : Node
             GS.WearTool((int)Math.Ceiling(mat.Hp / Math.Max(0.01f, GS.Damage))); // cada golpe gasta a ferramenta
             GS.AddItem(mat.Id, shards);
             // mochila cheia, ou a ferramenta quebrou: volta ao acampamento (vende e compra outra)
-            if (GS.InventoryFull || GS.ToolBroken)
+            if (GS.InventoryFull || GS.UsingHands)
             {
                 t += sellTrip;
                 GS.SellAll();
@@ -2306,6 +2327,8 @@ public partial class TestRunner : Node
                     if (next.Index == 1) unlock2 = t;
                     if (next.Index == 2) unlock3 = t;
                 }
+                // laser: mantém células de energia
+                for (int k = 0; k < 3 && GS.IsLaser && d.Ammo < ToolData.AmmoPack && GS.CanAfford(ToolData.AmmoPackCost); k++) { GS.TryBuyAmmo(); ammoBuys++; }
                 // ferramenta: a melhor liberada que dá para pagar (sempre repõe se quebrou)
                 for (int ti = ToolData.All.Count - 1; ti >= 0; ti--)
                 {
@@ -2333,7 +2356,7 @@ public partial class TestRunner : Node
         }
         string Fmt(double s) => s < 0 ? "não alcançado" : $"{s / 60:0.0} min";
         GD.Print($"      Região 2 em {Fmt(unlock2)}, Região 3 em {Fmt(unlock3)}, Coração viável em {Fmt(heart)}");
-        GD.Print($"      Após {Fmt(t)}: {GS.CurrentTool.NamePt}, dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0} golpes/s, cap {GS.Capacity}, valor x{GS.ValueMultiplier:0.00}, ferramentas compradas {toolBuys}");
+        GD.Print($"      Após {Fmt(t)}: {GS.CurrentTool.NamePt}, dano {GS.Damage:0}, {GS.SwingsPerSecond:0.0} golpes/s, cap {GS.Capacity}, valor x{GS.ValueMultiplier:0.00}, ferramentas compradas {toolBuys}, pacotes de munição {ammoBuys}");
         Check(unlock2 > 4 * 60 && unlock2 < 25 * 60, $"Região 2 deveria levar 4–25 min (simulado {Fmt(unlock2)})");
         Check(unlock3 > unlock2 + 10 * 60 && unlock3 < 120 * 60, $"Região 3 deveria levar 10–120 min após a 2 (simulado {Fmt(unlock3)})");
         Fresh();

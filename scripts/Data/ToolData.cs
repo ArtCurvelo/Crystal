@@ -34,6 +34,11 @@ public static class ToolData
 {
     /// <summary>Sem ferramenta (quebrou): minerar com as mãos.</summary>
     public const float HandsDamage = 1f, HandsSwings = 1.2f;
+    /// <summary>Laser: cada disparo que acerta gasta 1 célula de energia (comprada em pacotes no Terminal).</summary>
+    public const int AmmoPack = 200;
+    public const long AmmoPackCost = 120_000;
+    /// <summary>Células que já vêm com um laser novo.</summary>
+    public const int AmmoWithLaser = 100;
 
     public static readonly List<ToolDef> All = new();
 

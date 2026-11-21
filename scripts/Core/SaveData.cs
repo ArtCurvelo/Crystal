@@ -15,6 +15,8 @@ public sealed class SaveData
     public int Tool { get; set; }
     public int ToolWear { get; set; }
     public bool ToolBroken { get; set; }
+    /// <summary>Células de energia para as ferramentas laser.</summary>
+    public int Ammo { get; set; }
     /// <summary>Saves de antes das ferramentas (dano/velocidade eram melhorias) já foram convertidos.</summary>
     public bool ToolsMigrated { get; set; }
     public long TotalEarned { get; set; }
@@ -136,6 +138,7 @@ public sealed class SaveData
 
         Tool = System.Math.Clamp(Tool, 0, ToolData.All.Count - 1);
         ToolWear = System.Math.Max(0, ToolWear);
+        Ammo = System.Math.Max(0, Ammo);
         Buildings ??= new();
         Buildings = Buildings.Where(b => b != null && BuildData.Of(b.Type) != null
                                          && !float.IsNaN(b.X) && !float.IsNaN(b.Y) && !float.IsNaN(b.Z)

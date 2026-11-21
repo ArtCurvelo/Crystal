@@ -527,7 +527,7 @@ public partial class PlayerController : CharacterBody3D
     {
         Tool.Firing = firing;
         // o zumbido do feixe só existe no laser
-        AudioManager.Instance?.SetBeam(firing && Tool.Kind == ToolView.HeldKind.Laser, TargetCrystal != null ? 1f - TargetCrystal.HpRatio : 0f);
+        AudioManager.Instance?.SetBeam(firing && Tool.Kind == ToolView.HeldKind.Laser && !gs.OutOfAmmo, TargetCrystal != null ? 1f - TargetCrystal.HpRatio : 0f);
         if (!firing) return;
         float reach = gs.MiningReach + 0.6f;
         var hit = RayCast(reach, WorldLayer | CrystalLayer | GoblinLayer);

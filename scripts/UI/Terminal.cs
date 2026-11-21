@@ -279,6 +279,7 @@ public partial class ShopScreen : TerminalScreen
             // ao abrir: ferramenta quebrada → comprar outra; senão a próxima ferramenta melhor (fica no topo)
             int next = gs.Data.Tool + 1;
             _focusId = gs.ToolBroken ? "tool_" + gs.Data.Tool
+                : gs.OutOfAmmo ? "ammo"
                 : next < ToolData.All.Count && gs.ToolAvailable(next) && gs.CanAfford(ToolData.All[next].Cost) ? "tool_" + next
                 : UpgradeIds.All.FirstOrDefault(id => !gs.IsMaxed(id) && gs.CanAfford(gs.UpgradeCost(id))) ?? "tool_" + gs.Data.Tool;
         }
@@ -287,6 +288,7 @@ public partial class ShopScreen : TerminalScreen
         RefreshInventory();
         UiTheme.ClearChildren(_toolBox);
         _toolBox.AddChild(BuildCurrentTool());
+        if (GameState.Instance.AnyLaserAvailable) _toolBox.AddChild(BuildAmmoRow());
         int shownLocked = 0;
         foreach (var t in ToolData.All)
         {
@@ -370,9 +372,44 @@ public partial class ShopScreen : TerminalScreen
         var bar = new SegmentBar { Segments = 20, Fill = gs.ToolDurability01, Color = edge, CustomMinimumSize = new Vector2(260, 10) };
         bar.SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
         v.AddChild(bar);
-        v.AddChild(UiTheme.Label(gs.ToolBroken ? Loc.T("Compre outra abaixo (a mesma ou uma melhor).")
-            : Loc.F("Durabilidade: {0}/{1} golpes · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, t.Durability, GameState.FormatNumber(t.Damage), t.Swings), 14, UiTheme.Muted));
+        string info = gs.ToolBroken ? Loc.T("Compre outra abaixo (a mesma ou uma melhor).")
+            : t.Kind == ToolKind.Laser ? Loc.F("Células de energia: {0} (1 por disparo) · {1} de dano · {2:0.0} disparos/s", gs.Data.Ammo, GameState.FormatNumber(t.Damage), t.Swings)
+            : Loc.F("Durabilidade: {0}/{1} golpes · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, t.Durability, GameState.FormatNumber(t.Damage), t.Swings);
+        if (t.Kind == ToolKind.Laser && !gs.ToolBroken) bar.Fill = Mathf.Clamp(gs.Data.Ammo / (float)ToolData.AmmoPack, 0f, 1f);
+        v.AddChild(UiTheme.Label(info, 14, gs.OutOfAmmo ? UiTheme.Danger : UiTheme.Muted));
         return card;
+    }
+
+    /// <summary>Pacote de células de energia para os lasers.</summary>
+    Control BuildAmmoRow()
+    {
+        var gs = GameState.Instance;
+        bool afford = gs.CanAfford(ToolData.AmmoPackCost);
+        var card = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        card.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.08f, 0.07f, 0.03f, 0.95f), new Color(UiTheme.Gold, afford ? 0.6f : 0.25f), 12, 2, 14, 8));
+        var h = new HBoxContainer();
+        h.AddThemeConstantOverride("separation", 14);
+        card.AddChild(h);
+        h.AddChild(HudIcon.Make(HudIcon.Kind.Bolt, UiTheme.Gold, 30));
+        var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        h.AddChild(v);
+        v.AddChild(UiTheme.Label(Loc.F("Células de energia ×{0}", ToolData.AmmoPack), 18, UiTheme.Text, true));
+        v.AddChild(UiTheme.Label(Loc.F("Munição dos lasers · você tem {0}", gs.Data.Ammo), 14, UiTheme.Muted));
+        var btn = UiTheme.Button(GameState.FormatMoney(ToolData.AmmoPackCost), BuyAmmo, 170, 17);
+        btn.Disabled = !afford;
+        btn.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        if (afford) btn.AddThemeColorOverride("font_color", UiTheme.Gold);
+        btn.SetMeta("uid", "ammo");
+        if (_focusId == "ammo" && (InputHints.UsingPad || _openingFocus) && !btn.Disabled) Callable.From(() => { if (IsInstanceValid(btn)) btn.GrabFocus(); }).CallDeferred();
+        h.AddChild(btn);
+        return card;
+    }
+
+    void BuyAmmo()
+    {
+        _focusId = "ammo";
+        if (GameState.Instance.TryBuyAmmo()) AudioManager.Instance?.Play("buy", -3f);
+        else AudioManager.Instance?.Play("error", -6f);
     }
 
     Control BuildToolRow(ToolDef t, bool avail)

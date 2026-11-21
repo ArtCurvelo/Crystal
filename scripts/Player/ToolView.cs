@@ -399,7 +399,8 @@ public partial class ToolView : Node3D
     void UpdateBeam(float dt)
     {
         // só o laser tem feixe; picareta/broca/mãos acertam de perto
-        _beamAlpha = Mathf.MoveToward(_beamAlpha, Firing && Kind == HeldKind.Laser ? 1f : 0f, dt * (Firing ? 14f : 8f));
+        bool charged = GameState.Instance == null || !GameState.Instance.OutOfAmmo;
+        _beamAlpha = Mathf.MoveToward(_beamAlpha, Firing && Kind == HeldKind.Laser && charged ? 1f : 0f, dt * (Firing ? 14f : 8f));
         bool show = _beamAlpha > 0.01f && _muzzle != null;
         _beam.Visible = _beamCore.Visible = _flare.Visible = _halo.Visible = show;
         if (_muzzleLight != null) _muzzleLight.LightEnergy = _beamAlpha * 2.2f;

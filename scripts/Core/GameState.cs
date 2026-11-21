@@ -81,8 +81,27 @@ public partial class GameState : Node
     public bool ToolBroken => Data.ToolBroken;
     public int ToolDurabilityLeft => Math.Max(0, CurrentTool.Durability - Data.ToolWear);
     public float ToolDurability01 => ToolBroken ? 0f : ToolDurabilityLeft / (float)Math.Max(1, CurrentTool.Durability);
-    public float BaseDamage => ToolBroken ? ToolData.HandsDamage : CurrentTool.Damage;
-    public float BaseSwings => ToolBroken ? ToolData.HandsSwings : CurrentTool.Swings;
+    /// <summary>Ferramenta laser na mão (gasta munição em vez de desgastar).</summary>
+    public bool IsLaser => CurrentTool.Kind == ToolKind.Laser && !ToolBroken;
+    public bool OutOfAmmo => IsLaser && Data.Ammo <= 0;
+    /// <summary>Sem ferramenta utilizável (quebrou ou laser sem munição): minera com as mãos.</summary>
+    public bool UsingHands => ToolBroken || OutOfAmmo;
+    public float BaseDamage => UsingHands ? ToolData.HandsDamage : CurrentTool.Damage;
+    public float BaseSwings => UsingHands ? ToolData.HandsSwings : CurrentTool.Swings;
+    public bool AnyLaserAvailable => ToolData.All.Any(t => t.Kind == ToolKind.Laser && ToolAvailable(t.Index));
+
+    /// <summary>Compra um pacote de células de energia para o laser.</summary>
+    public bool TryBuyAmmo()
+    {
+        if (!AnyLaserAvailable || !RequireWork() || !CanAfford(ToolData.AmmoPackCost)) return false;
+        Data.Money -= ToolData.AmmoPackCost;
+        Data.Ammo += ToolData.AmmoPack;
+        MoneyChanged?.Invoke();
+        UpgradesChanged?.Invoke();
+        ToolChanged?.Invoke();
+        Notify("Munição do laser", Loc.F("+{0} células de energia (total {1})", ToolData.AmmoPack, Data.Ammo), NotifyKind.Success);
+        return true;
+    }
     public event Action ToolChanged;
 
     public float Damage => BaseDamage * EventDamageMultiplier * EssenceMultiplier
@@ -107,7 +126,7 @@ public partial class GameState : Node
     public int ToolTier => Data.Tool;
 
     public static string ToolName(int tier) => ToolData.Of(tier).Name;
-    public string ToolLabel => ToolBroken ? Loc.F("{0} (quebrada)", CurrentTool.Name) : CurrentTool.Name;
+    public string ToolLabel => ToolBroken ? Loc.F("{0} (quebrada)", CurrentTool.Name) : OutOfAmmo ? Loc.F("{0} (sem munição)", CurrentTool.Name) : CurrentTool.Name;
 
     /// <summary>A ferramenta pode ser comprada agora (região do minério dela liberada)?</summary>
     public bool ToolAvailable(int i) => i >= 0 && i < ToolData.All.Count && IsUnlocked(GameData.Regions[Math.Clamp(ToolData.All[i].Region, 0, GameData.Regions.Count - 1)].Id);
@@ -124,6 +143,7 @@ public partial class GameState : Node
         Data.Tool = i;
         Data.ToolWear = 0;
         Data.ToolBroken = false;
+        if (t.Kind == ToolKind.Laser) Data.Ammo += ToolData.AmmoWithLaser;
         MoneyChanged?.Invoke();
         UpgradesChanged?.Invoke();
         ToolChanged?.Invoke();
@@ -146,6 +166,22 @@ public partial class GameState : Node
     public void WearTool(int hits = 1)
     {
         if (ToolBroken) return;
+        if (CurrentTool.Kind == ToolKind.Laser)
+        {
+            // laser não desgasta: cada disparo gasta uma célula de energia
+            if (Data.Ammo <= 0) return;
+            int before = Data.Ammo;
+            Data.Ammo = Math.Max(0, Data.Ammo - hits);
+            if (before > 20 && Data.Ammo <= 20) Notify("Munição acabando", Loc.F("Restam {0} células de energia. Compre mais no Terminal.", Data.Ammo), NotifyKind.Warning);
+            if (Data.Ammo == 0)
+            {
+                Notify("Laser sem munição!", Loc.T("Você está minerando com as mãos. Compre células de energia no Terminal."), NotifyKind.Warning);
+                BigMessage?.Invoke(Loc.T("SEM MUNIÇÃO"));
+                UpgradesChanged?.Invoke();
+                ToolChanged?.Invoke();
+            }
+            return;
+        }
         Data.ToolWear += hits;
         if (Data.ToolWear == (int)(CurrentTool.Durability * 0.8f))
             Notify("Ferramenta desgastada", Loc.F("{0}: restam {1} golpes. Compre outra no Terminal.", CurrentTool.Name, ToolDurabilityLeft), NotifyKind.Warning);
@@ -820,7 +856,7 @@ public partial class GameState : Node
         Data.Money = 0;
         Data.RunEarned = 0;
         Data.Upgrades.Clear();
-        Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; // a jornada recomeça com a picareta de madeira
+        Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; Data.Ammo = 0; // a jornada recomeça com a picareta de madeira
         Data.Skills.Clear(); // a árvore recomeça; a casa é permanente
         Data.Inventory.Clear();
         Data.UnlockedRegions.Clear();
