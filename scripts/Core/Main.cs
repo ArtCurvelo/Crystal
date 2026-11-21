@@ -85,6 +85,7 @@ public partial class Main : Node
     {
         // teste automático de recuperação: simula o jogo caindo antes do menu neste renderizador
         if (args.Contains("--x-boot-crash=" + Rendering.RenderMethods.Current)) { OS.Kill(OS.GetProcessId()); return; }
+        AddChild(new OreIcons { Name = "OreIcons" });
         var world3d = new Node3D { Name = "World3D" };
         world3d.ProcessMode = ProcessModeEnum.Pausable;
         AddChild(world3d);

@@ -496,7 +496,8 @@ public partial class CodexScreen : ModalScreen
         var h = new HBoxContainer();
         h.AddThemeConstantOverride("separation", 12);
         card.AddChild(h);
-        var gem = HudIcon.Make(HudIcon.KindFor(m), known ? m.Glow.Lightened(0.2f) : new Color(0.3f, 0.3f, 0.4f), 40);
+        // coleção: descoberto mostra a forma própria do minério; desconhecido fica como silhueta apagada
+        var gem = known ? HudIcon.MakeOre(m, 40) : HudIcon.Make(HudIcon.KindFor(m), new Color(0.3f, 0.3f, 0.4f), 40);
         h.AddChild(gem);
         var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         v.AddThemeConstantOverride("separation", 1);

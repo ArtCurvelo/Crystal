@@ -40,6 +40,9 @@ public partial class PlaythroughBot : Node
     {
         ProcessMode = ProcessModeEnum.Always;
         SaveSystem.SavePath = "user://bot_save.json";
+        // o bot testa se a jornada inteira FUNCIONA (o ritmo é medido na simulação de balanceamento):
+        // vendas valem mais aqui para caber nos minutos do teste
+        Economy.SellValue = 0.75f * 2.6f;
         SaveSystem.Delete();
         await Frames(10);
         Main.StartGame(false);

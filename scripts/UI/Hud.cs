@@ -488,7 +488,7 @@ public partial class Hud : CanvasLayer
             {
                 var m = GameData.Mat(items[i].Key);
                 gem.Visible = true;
-                gem.Set(HudIcon.KindFor(m), m.Glow.Lightened(0.15f));
+                gem.SetOre(m);
                 count.Text = items[i].Value.ToString();
                 panel.AddThemeStyleboxOverride("panel", UiTheme.ChamferCached(new Color(0.03f, 0.05f, 0.1f, 0.8f), new Color(m.Glow, 0.6f), 10, 2, 4, 4));
                 panel.TooltipText = m.Name;
@@ -723,7 +723,7 @@ public partial class Hud : CanvasLayer
             _targetHp.Value = pct;
             UiTheme.SetBarColor(_targetHp, m.Glow);
             _targetPct.Text = $"{pct * 100:0}%";
-            _targetGem.Set(HudIcon.KindFor(m), m.Glow.Lightened(0.15f));
+            _targetGem.SetOre(m);
             float scale = m.Special ? 1f : c.SizeScale;
             int lo = Math.Max(1, (int)MathF.Round(m.ShardsMin * scale * gs.EventShardMultiplier));
             int hi = Math.Max(lo, (int)MathF.Round(m.ShardsMax * scale * gs.EventShardMultiplier));

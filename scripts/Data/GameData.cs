@@ -177,8 +177,9 @@ public static class UpgradeIds
 /// </summary>
 public static class Economy
 {
-    /// <summary>Quanto cada fragmento vale na venda (sobre o valor base do minério).</summary>
-    public const float SellValue = 0.75f;
+    /// <summary>Quanto cada fragmento vale na venda (sobre o valor base do minério).
+    /// Só o bot de teste muda isso em execução (para percorrer a jornada inteira no tempo do teste).</summary>
+    public static float SellValue = 0.75f;
     /// <summary>Preço para liberar regiões.</summary>
     public const float RegionCost = 1.5f;
     /// <summary>Preço das melhorias do Terminal.</summary>

@@ -20,7 +20,22 @@ public partial class HudIcon : Control
     };
 
     /// <summary>Muda o tipo/cor e redesenha.</summary>
-    public void Set(Kind k, Color c) { Type = k; Color = c; QueueRedraw(); }
+    public void Set(Kind k, Color c) { Type = k; Color = c; Ore = null; QueueRedraw(); }
+
+    /// <summary>Minério mostrado como a foto da forma 3D dele (ícone próprio); null = ícone desenhado.</summary>
+    public Data.MaterialDef Ore;
+    public void SetOre(Data.MaterialDef m) { Type = KindFor(m); Color = m.Glow.Lightened(0.15f); Ore = m; QueueRedraw(); }
+
+    public static HudIcon MakeOre(Data.MaterialDef m, float size)
+    {
+        var i = Make(KindFor(m), m.Glow.Lightened(0.15f), size);
+        i.Ore = m;
+        return i;
+    }
+
+    public override void _EnterTree() => OreIcons.Ready += OnIconReady;
+    public override void _ExitTree() => OreIcons.Ready -= OnIconReady;
+    void OnIconReady() { if (Ore != null) QueueRedraw(); }
     public Kind Type;
     public Color Color = UiTheme.Cyan;
 
@@ -33,6 +48,13 @@ public partial class HudIcon : Control
 
     public override void _Draw()
     {
+        if (Ore != null && OreIcons.Get(Ore) is { } tex)
+        {
+            // a foto vem com margem: amplia um pouco para ocupar o espaço do ícone
+            float m = Mathf.Min(Size.X, Size.Y) * 0.12f;
+            DrawTextureRect(tex, new Rect2(-m, -m, Size.X + 2 * m, Size.Y + 2 * m), false);
+            return;
+        }
         var s = Size;
         float w = s.X, h = s.Y;
         var c = new Vector2(w / 2, h / 2);

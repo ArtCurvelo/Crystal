@@ -202,6 +202,13 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-ores"))
+        {
+            await OresTour(p, gs);
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-tools"))
         {
             await ToolsTour(p, gs);
@@ -704,6 +711,39 @@ public partial class ScreenshotTour : Node
         gs.Data.Upgrades.Remove(UpgradeIds.Damage);
         gs.RaiseAll();
         root.QueueFree();
+    }
+
+    /// <summary>Identidade dos minérios: folha com todos os ícones, fragmentos no chão e a coleção.</summary>
+    async Task OresTour(Player.PlayerController p, GameState gs)
+    {
+        Main.CloseAllForTour();
+        gs.Data.DayTimeSeconds = 30;
+        var mats = GameData.Materials.Values.Where(m => !m.Special).ToList();
+        for (int k = 0; k < 600 && UI.OreIcons.ReadyCount < GameData.Materials.Count; k++) await Wait(0.05f);
+        // folha de contato dos ícones (8 por linha)
+        int cols = 8, cell = 96;
+        var sheet = Image.CreateEmpty(cols * cell, ((mats.Count + cols - 1) / cols) * cell, false, Image.Format.Rgba8);
+        sheet.Fill(new Color(0.05f, 0.06f, 0.1f));
+        for (int i = 0; i < mats.Count; i++)
+        {
+            var tex = UI.OreIcons.Get(mats[i]);
+            if (tex == null) continue;
+            var img = tex.GetImage();
+            img.Convert(Image.Format.Rgba8);
+            sheet.BlendRect(img, new Rect2I(0, 0, img.GetWidth(), img.GetHeight()), new Vector2I((i % cols) * cell, (i / cols) * cell));
+        }
+        sheet.SavePng($"{Dir}/40_ore_icons.png");
+        GD.Print($"[Tour] ícones prontos: {UI.OreIcons.ReadyCount}/{GameData.Materials.Count}");
+        // fragmentos de vários minérios no chão, à frente
+        var L0 = Main.World.Layouts[0];
+        var at = L0.OnGround(Main.World.SpawnPoint.X, Main.World.SpawnPoint.Z - 6f);
+        LookAtPoint(p, at + new Vector3(0, 0.1f, 2.2f), at);
+        var pick = new[] { "quartz", "copper", "amethyst", "hematite", "sapphire", "frostice", "ruby", "magmite", "malachite", "opal", "coralprism", "blackpearl" };
+        for (int i = 0; i < pick.Length; i++)
+            if (GameData.Mat(pick[i]) is { } m) Mining.ShardManager.Instance?.SpawnShards(m, at + new Vector3((i % 4 - 1.5f) * 0.5f, 0.6f, (i / 4 - 1) * 0.5f), 1);
+        await Wait(1.6f);
+        await Shot("41_ore_drops");
+        foreach (var m in GameData.Materials.Values) if (!gs.Data.Discovered.Contains(m.Id)) gs.Data.Discovered.Add(m.Id);
     }
 
     /// <summary>Ferramentas em primeira pessoa (picaretas, broca, laser, mãos) e a seção do Terminal.</summary>

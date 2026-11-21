@@ -139,7 +139,7 @@ public abstract partial class TerminalScreen : ModalScreen
             if (m == null) continue;
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 8);
-            row.AddChild(HudIcon.Make(HudIcon.KindFor(m), m.Glow.Lightened(0.15f), 26));
+            row.AddChild(HudIcon.MakeOre(m, 26));
             var q = UiTheme.Label($"×{kv.Value}", 17, UiTheme.Text, true);
             q.CustomMinimumSize = new Vector2(56, 0);
             row.AddChild(q);
@@ -588,7 +588,7 @@ public partial class SellScreen : TerminalScreen
             if (m == null) continue;
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 10);
-            row.AddChild(HudIcon.Make(HudIcon.KindFor(m), m.Glow.Lightened(0.15f), 24));
+            row.AddChild(HudIcon.MakeOre(m, 24));
             var n = UiTheme.Label(m.Name, 18, m.Glow.Lightened(0.4f), true);
             row.AddChild(n);
             var rb = UiTheme.Label(RarityInfo.Badge(m.Rarity), 13, RarityInfo.Color(m.Rarity), true);
