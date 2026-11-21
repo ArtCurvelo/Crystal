@@ -66,6 +66,13 @@ public partial class Main : Node
             GetTree().Quit(0);
             return;
         }
+        // diagnóstico: qual versão é esta (jogadores x desenvolvedor) — sem abrir o jogo
+        if (args.Contains("--build-info"))
+        {
+            GD.Print($"BUILD exportado={BuildFlavor.IsExported} steam={BuildFlavor.IsSteam} admin={BuildFlavor.DevTools} atualizador={UpdateManager.Supported}");
+            GetTree().Quit(0);
+            return;
+        }
         if (args.Contains("--run-tests"))
         {
             AddChild(new Tests.TestRunner());
@@ -751,7 +758,7 @@ public partial class Main : Node
     public override void _UnhandledInput(InputEvent e)
     {
         // painel de admin: F9 ou Back (controle), durante a partida
-        if (e.IsActionPressed("debug_panel"))
+        if (e.IsActionPressed("debug_panel") && BuildFlavor.DevTools) // versão dos jogadores: F9 não faz nada
         {
             GetViewport().SetInputAsHandled();
             if (_debug.IsOpen) { _debug.Close(); return; }

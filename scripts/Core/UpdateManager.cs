@@ -40,7 +40,7 @@ public partial class UpdateManager : Node
     public static string EngineVersion => $"{Engine.GetVersionInfo()["major"]}.{Engine.GetVersionInfo()["minor"]}.{Engine.GetVersionInfo()["patch"]}";
 
     /// <summary>Atualização automática só faz sentido no executável exportado para Windows.</summary>
-    public static bool Supported => OS.HasFeature("windows") && OS.HasFeature("template") && !OS.HasFeature("editor");
+    public static bool Supported => OS.HasFeature("windows") && OS.HasFeature("template") && !OS.HasFeature("editor") && !BuildFlavor.IsSteam; // na Steam quem atualiza é a Steam
 
     public UpdateManifest Available { get; private set; }
     public bool NeedsFullInstaller { get; private set; }

@@ -30,6 +30,8 @@ public partial class Main
         switch (cmd)
         {
             case "ajuda": case "help": return DebugHelp;
+            case "origem": // fora da ajuda de propósito
+                return CrystalExcavator.World.NoiseTables.Check(out var origin) ? "OK · " + origin : "FALHOU · " + origin;
             case "dinheiro": case "money":
             {
                 long v = (long)Math.Min(Num(1_000_000), 1e15);

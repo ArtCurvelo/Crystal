@@ -46,6 +46,17 @@ public partial class TestRunner : Node
             Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
             Run("Renderizador: perfis, testes, escolha, validade e recuperação", TestRendererSelection);
             Run("Ferramentas: picaretas, durabilidade, quebra e compra", TestTools);
+            Run("Versão dos jogadores x desenvolvedor", () =>
+            {
+                Check(BuildFlavor.DevTools, "rodando do código: ferramentas de desenvolvedor ligadas");
+                Check(!BuildFlavor.Matches("") && !BuildFlavor.Matches("CE-DEV-errada") && !BuildFlavor.Matches("debug"), "chave errada não libera o admin");
+                Check(!BuildFlavor.IsSteam, "build comum não é da Steam");
+            });
+            Run("Tabelas de ruído íntegras", () =>
+            {
+                Check(NoiseTables.Check(out var t) && t.Contains("ArtCurvelo"), "tabela confere");
+                Check(NoiseTables.Salt != 0, "sal definido");
+            });
             Run("Árvore: 8 ramos e efeito de cada habilidade nova", TestNewSkills);
             Run("Conclusão da jornada", TestCompletion);
             Run("Renascimento (prestígio)", TestPrestige);

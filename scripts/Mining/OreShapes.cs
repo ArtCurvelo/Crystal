@@ -49,7 +49,7 @@ public static class OreShapes
     {
         unchecked
         {
-            uint h = 2166136261;
+            uint h = 2166136261u ^ (uint)World.NoiseTables.Salt;
             foreach (char c in s) { h ^= c; h *= 16777619; }
             return (int)(h & 0x7fffffff);
         }

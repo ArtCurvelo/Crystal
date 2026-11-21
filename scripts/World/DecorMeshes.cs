@@ -56,7 +56,7 @@ public static class DecorMeshes
     {
         unchecked
         {
-            uint h = (uint)(seed * 73856093) ^ (uint)(a * 19349663) ^ (uint)(b * 83492791);
+            uint h = (uint)NoiseTables.Salt ^ (uint)(seed * 73856093) ^ (uint)(a * 19349663) ^ (uint)(b * 83492791);
             h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
             return (h & 0xffffff) / (float)0xffffff;
         }

@@ -1,5 +1,7 @@
 # Crystal Excavator
 
+© 2026 ArtCurvelo — todos os direitos reservados. Repositório público só para consulta; veja `LICENSE`.
+
 Jogo incremental 3D em primeira pessoa: explore cavernas luminosas, minere formações de cristal,
 venda os fragmentos, melhore suas ferramentas e desça até o Núcleo Ancestral.
 
