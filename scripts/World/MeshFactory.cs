@@ -163,18 +163,27 @@ public static class MeshFactory
 
     // ===================== Materiais =====================
 
-    /// <summary>Material de rocha com cor de vértice (sombreamento barato, sem texturas).</summary>
-    public static StandardMaterial3D RockMaterial(Color c)
+    static Shader _rockShader;
+
+    /// <summary>
+    /// Material das rochas soltas (decoração, pedregulhos, estalagmites, base dos depósitos): a mesma textura
+    /// procedural da caverna (camadas, placas, rachaduras e granulado), na cor pedida, sem poças por cima,
+    /// mais o sombreamento gravado nos vértices da malha. Antes era uma cor lisa, sem textura.
+    /// </summary>
+    public static Material RockMaterial(Color c)
     {
         string key = "rock" + c.ToHtml();
-        if (MatCache.TryGetValue(key, out var m)) return (StandardMaterial3D)m;
-        var mat = new StandardMaterial3D
-        {
-            AlbedoColor = c,
-            VertexColorUseAsAlbedo = true,
-            Roughness = 0.95f,
-            Metallic = 0f,
-        };
+        if (MatCache.TryGetValue(key, out var m)) return m;
+        _rockShader ??= GD.Load<Shader>("res://shaders/cave.gdshader");
+        var mat = new ShaderMaterial { Shader = _rockShader };
+        mat.SetShaderParameter("rock_color", c);
+        mat.SetShaderParameter("floor_color", c.Darkened(0.08f));
+        mat.SetShaderParameter("accent", new Color(0.35f, 0.9f, 1f));
+        mat.SetShaderParameter("speckle", 0.4f);
+        mat.SetShaderParameter("wetness", 0f);
+        mat.SetShaderParameter("vertex_shade", 1f);
+        mat.SetShaderParameter("noise_tex", CaveTerrain.NoiseTexture);
+        mat.SetShaderParameter("cell_tex", CaveTerrain.CellTexture);
         MatCache[key] = mat;
         return mat;
     }

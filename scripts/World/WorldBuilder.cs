@@ -778,6 +778,11 @@ public partial class WorldBuilder : Node3D
     // =================== Decoração ===================
 
 
+    /// <summary>Pedrinhas até esse tamanho (escala da malha de raio 1) podem ser atravessadas; maiores têm colisão.</summary>
+    public const float MaxWalkThroughPebble = 0.18f;
+    /// <summary>Pedras soltas geradas (posição, escala): conferência nos testes.</summary>
+    public readonly List<(Vector3 pos, float scale)> Pebbles = new();
+
     // =================== Decoração ===================
     void BuildDecoration(Node3D root, RegionDef r, CaveLayout L, Random rng)
     {
@@ -839,7 +844,14 @@ public partial class WorldBuilder : Node3D
         {
             if (!L.RandomFloor(rng, 0.8f, 0.5f, out var p)) continue;
             float s = 0.12f + (float)rng.NextDouble() * 0.35f;
+            // a malha tem raio ~1: acima de ~35 cm de largura a pedra é sólida (e caminhos/depósitos a contornam)
+            if (s > MaxWalkThroughPebble)
+            {
+                if (!FreeSpot(p, s)) continue;
+                Solid(new SphereShape3D { Radius = s * 0.85f }, new Transform3D(Basis.Identity, p + Vector3.Up * s * 0.1f), p, s * 0.9f);
+            }
             pebbles.Add(new Transform3D(new Basis(Vector3.Up, (float)rng.NextDouble() * 6f).ScaleLocal(Vector3.One * s), p + Vector3.Up * s * 0.1f));
+            Pebbles.Add((p + Vector3.Up * s * 0.1f, s));
         }
         AddMulti(root, MeshFactory.Rock(3, 0.3f), rockMat, pebbles);
 

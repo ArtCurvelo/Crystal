@@ -10,6 +10,8 @@ uniform vec3 floor_color : source_color = vec3(0.28, 0.24, 0.22);
 uniform vec3 accent : source_color = vec3(0.35, 0.9, 1.0);
 uniform float speckle = 1.0;
 uniform float wetness = 1.0;
+// rochas soltas (decoração e base dos depósitos): usam o sombreamento gravado nos vértices
+uniform float vertex_shade = 0.0;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D cell_tex : filter_linear_mipmap, repeat_enable;
 
@@ -58,7 +60,7 @@ void fragment() {
 	float wet = smoothstep(0.62, 0.7, tri(noise_tex, p * 0.6 + vec3(13.0), w, 0.05)) * up * wetness;
 	float film = smoothstep(0.45, 0.6, big) * up * wetness * 0.6;
 	col = mix(col, col * 0.55, max(wet, film * 0.5));
-	ALBEDO = col;
+	ALBEDO = col * mix(vec3(1.0), COLOR.rgb, vertex_shade);
 	ROUGHNESS = mix(mix(0.95, 0.7, smoothstep(0.65, 0.9, fine)), 0.06, max(wet, film * 0.6));
 	SPECULAR = mix(0.35, 0.6, wet);
 

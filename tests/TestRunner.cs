@@ -1664,6 +1664,26 @@ public partial class TestRunner : Node
         Check(nearStart.Count >= 5 && nearStart.All(c => c.Material.Rarity == Rarity.Comum), $"perto da entrada só minério comum ({nearStart.Count} depósitos)");
         Check(world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 0).All(c => c.Material.Rarity != Rarity.Lendario || c.Material.Special), "nenhum lendário na região inicial");
 
+        // pedras: todas as rochas soltas usam a textura da caverna; as que não dá para atravessar têm colisão
+        await Frames(2);
+        var space = world.GetWorld3D().DirectSpaceState;
+        int bigPebbles = 0, noCollision = 0, flatRocks = 0;
+        foreach (var mm in FindAll<MultiMeshInstance3D>(world))
+        {
+            var mesh = mm.Multimesh?.Mesh;
+            bool rocky = mesh == MeshFactory.Rock(3, 0.3f) || mesh == MeshFactory.Rock(5, 0.35f) || mesh == MeshFactory.Rock(11, 0.4f);
+            if (rocky && mm.MaterialOverride is not ShaderMaterial) flatRocks++;
+        }
+        foreach (var (pos, sc) in world.Pebbles)
+        {
+            if (sc <= WorldBuilder.MaxWalkThroughPebble) continue;
+            bigPebbles++;
+            var q = new PhysicsPointQueryParameters3D { Position = pos + Vector3.Up * sc * 0.2f, CollisionMask = PlayerController.WorldLayer };
+            if (space.IntersectPoint(q, 1).Count == 0) noCollision++;
+        }
+        Check(flatRocks == 0, $"rochas soltas com a textura da caverna ({flatRocks} sem textura)");
+        Check(bigPebbles > 50 && noCollision == 0, $"pedras maiores que ~35 cm têm colisão ({noCollision} sem colisão de {bigPebbles})");
+
         // regeneração (evento e renascimento normal): 200 renascimentos perto da entrada continuam comuns
         int regrowBad = 0;
         foreach (var c in nearStart.Take(10))
@@ -1902,11 +1922,12 @@ public partial class TestRunner : Node
         Check(bm.SelectId(BuildIds.Belt), "esteira selecionada no modo construção");
         await PFrames(2);
         var st = world.SellStation.GlobalPosition;
-        async Task<bool> LookFrom(Vector3 target, float dist)
+        async Task<bool> LookFrom(Vector3 target, float dist0)
         {
-            for (int k = 0; k < 16; k++)
+            for (int k = 0; k < 48; k++)
             {
-                float ang = k * Mathf.Tau / 16f;
+                float dist = dist0 + (k / 16 == 1 ? -1f : k / 16 == 2 ? 1f : 0f); // 3 distâncias × 16 direções
+                float ang = (k % 16) * Mathf.Tau / 16f;
                 var at = target + new Vector3(Mathf.Cos(ang), 0, Mathf.Sin(ang)) * dist;
                 if (!L0.InGrid(at.X, at.Z) || !L0.Reachable(at.X, at.Z)) continue;
                 player.GlobalPosition = L0.OnGround(at.X, at.Z) + Vector3.Up * 0.05f;
@@ -1952,9 +1973,13 @@ public partial class TestRunner : Node
             "soltar o botão na Estação de Venda constrói a esteira arrastada");
         // clique, clique: segunda esteira emendada na arrastada
         var dmid = BuildingManager.Unflatten(dragged?.Path ?? new List<float>());
+        // ponto do meio da esteira como ela é desenhada (seguindo o chão)
+        var dBelt = dragged != null ? bm.BeltOf(dragged.Id) : null;
+        Vector3 beltMid = default;
+        if (dBelt != null) dBelt.Sample(dBelt.Length * 0.5f, out beltMid, out _);
         Vector3 cs = default;
-        Check(dmid.Count >= 3 && FindBuildSpotNear(bm, L0, BuildIds.Belt, new Vector2(dmid[dmid.Count / 2].X, dmid[dmid.Count / 2].Z), out cs,
-            p => p.DistanceTo(dmid[dmid.Count / 2]) > 6f && p.DistanceTo(dmid[dmid.Count / 2]) < 14f && bm.RouteBetween(p, dmid[dmid.Count / 2]) != null), "acha início para a esteira de clique-clique");
+        Check(dmid.Count >= 3 && FindBuildSpotNear(bm, L0, BuildIds.Belt, new Vector2(beltMid.X, beltMid.Z), out cs,
+            p => p.DistanceTo(beltMid) > 6f && p.DistanceTo(beltMid) < 14f && bm.RouteBetween(p, beltMid) != null), "acha início para a esteira de clique-clique");
         Check(await LookFrom(cs, 3f), "mira no início (clique)");
         Input.ActionPress("mine"); await PFrames(2); Input.ActionRelease("mine"); await PFrames(2);
         Check(bm.BeltStart != null, "clique rápido deixa o início marcado");
@@ -1962,8 +1987,8 @@ public partial class TestRunner : Node
         Check(bm.BeltStart == null && GS.Data.Buildings.Count(b => b.Type == BuildIds.Belt) == count0 + 1, "interagir cancela o início sem construir nem desmontar");
         Check(await LookFrom(cs, 3f), "mira de novo no início");
         Input.ActionPress("mine"); await PFrames(2); Input.ActionRelease("mine"); await PFrames(2);
-        Check(await LookFrom(dmid[dmid.Count / 2], 3.5f), "mira na esteira arrastada");
-        await HoldAim(dmid[dmid.Count / 2], 1200);
+        Check(await LookFrom(beltMid, 3.5f), "mira na esteira arrastada");
+        await HoldAim(beltMid, 1200);
         Input.ActionPress("mine"); await PFrames(2); Input.ActionRelease("mine"); await PFrames(2);
         var clicked = GS.Data.Buildings.Where(b => b.Type == BuildIds.Belt).OrderBy(b => b.Id).LastOrDefault();
         Check(clicked != null && clicked.Id != dragged?.Id && clicked.Feeds == dragged?.Id, "segundo clique na outra esteira constrói a emenda");

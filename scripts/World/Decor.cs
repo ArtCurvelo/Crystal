@@ -341,8 +341,8 @@ public static class Decor
     /// <summary>Ruínas ancestrais: pilares com runas e um grande anel rúnico flutuante.</summary>
     public static void AncientRuins(Node3D root, CaveLayout L, Vector3 heart, Random rng)
     {
-        var stone = Lit(new Color(0.62f, 0.52f, 0.56f), 0.85f);
-        stone.EmissionEnabled = true; stone.Emission = new Color(0.25f, 0.12f, 0.3f); stone.EmissionEnergyMultiplier = 0.6f;
+        // pedra lavrada com a mesma textura da rocha da caverna
+        var stone = MeshFactory.RockMaterial(new Color(0.62f, 0.52f, 0.56f));
         var rune = Glow(new Color(1f, 0.75f, 0.3f), 2.4f);
         // pilares ao longo das laterais
         for (int i = 0; i < 6; i++)
