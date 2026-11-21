@@ -506,7 +506,7 @@ public partial class RegionGate : StationBase
         else
         {
             AudioManager.Instance?.Play("error", -6f);
-            gs.Notify("Moeda insuficiente", Loc.F("{0} custa {1}.", Region.Name, GameState.FormatMoney(Region.UnlockCost)), NotifyKind.Warning);
+            gs.Notify("Lúmens insuficientes", Loc.F("{0} custa {1}.", Region.Name, GameState.FormatMoney(Region.UnlockCost)), NotifyKind.Warning);
         }
     }
 

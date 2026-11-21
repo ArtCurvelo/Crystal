@@ -502,7 +502,7 @@ public partial class ShopScreen : TerminalScreen
         var h = new HBoxContainer();
         h.AddThemeConstantOverride("separation", 12);
         row.AddChild(h);
-        h.AddChild(HudIcon.Make(HudIcon.Kind.Region, r.AccentColor, 34));
+        h.AddChild(HudIcon.Make(HudIcon.RegionKind(r.Id), r.AccentColor, 34));
         var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         h.AddChild(v);
         v.AddChild(UiTheme.Label(r.Name, 19, r.AccentColor.Lightened(0.25f), true));

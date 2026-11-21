@@ -974,7 +974,7 @@ public partial class Main : Node
     {
         var gs = GameState.Instance;
         if (!gs.CanPrestige) return;
-        _confirm.Ask(Loc.F("Renascer recomeça a jornada: dinheiro, melhorias, mochila e regiões voltam ao início. ") +
+        _confirm.Ask(Loc.F("Renascer recomeça a jornada: Lúmens, melhorias, mochila e regiões voltam ao início. ") +
                      Loc.F("Você recebe +{0} Essência Ancestral (bônus permanente de +10% em dano e venda por ponto). ", gs.PendingEssence) +
                      Loc.T("A Coleção e as estatísticas são mantidas. Continuar?"), DoPrestige);
     }

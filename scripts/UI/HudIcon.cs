@@ -5,7 +5,36 @@ namespace CrystalExcavator.UI;
 /// <summary>Ícones vetoriais desenhados por código (sem imagens): moeda, mochila, gema, raio, picareta, região.</summary>
 public partial class HudIcon : Control
 {
-    public enum Kind { Coin, Bag, Gem, Bolt, Pick, Region, Star, Nugget, Orb, Banded, Shard, Ember, Clock }
+    public enum Kind { Coin, Bag, Gem, Bolt, Pick, Region, Star, Nugget, Orb, Banded, Shard, Ember, Clock,
+        RegionCaves, RegionDepths, RegionCore, RegionReservoir, RegionFungal, RegionCathedral }
+
+    /// <summary>Ícone próprio de cada local.</summary>
+    public static Kind RegionKind(string regionId) => regionId switch
+    {
+        "caves" => Kind.RegionCaves,
+        "depths" => Kind.RegionDepths,
+        "core" => Kind.RegionCore,
+        "abyss" => Kind.RegionReservoir,
+        "spore" => Kind.RegionFungal,
+        "cathedral" => Kind.RegionCathedral,
+        _ => Kind.Region,
+    };
+
+    /// <summary>Polígono com contorno suavizado (a borda some o serrilhado do preenchimento).</summary>
+    void Poly(Vector2[] pts, Color fill, Color? edge = null, float width = 1.2f)
+    {
+        DrawColoredPolygon(pts, fill);
+        var loop = new Vector2[pts.Length + 1];
+        pts.CopyTo(loop, 0); loop[^1] = pts[0];
+        DrawPolyline(loop, edge ?? fill, width, true);
+    }
+
+    static Vector2[] Ring(Vector2 c, float r, int n, float rot = 0f, float sy = 1f)
+    {
+        var p = new Vector2[n];
+        for (int i = 0; i < n; i++) { float a = rot + Mathf.Tau * i / n; p[i] = c + new Vector2(Mathf.Cos(a), Mathf.Sin(a) * sy) * r; }
+        return p;
+    }
 
     /// <summary>Ícone conforme o formato do minério (cristal, pepita, esfera, faixas, lasca, brasa).</summary>
     public static Kind KindFor(Data.MaterialDef m) => m.Archetype switch
@@ -62,20 +91,34 @@ public partial class HudIcon : Control
         switch (Type)
         {
             case Kind.Coin:
-                for (int i = 2; i >= 0; i--)
-                {
-                    var center = c + new Vector2(0, (i - 1) * r * 0.42f);
-                    DrawEllipse(center, r * 0.85f, r * 0.32f, Color.Darkened(0.35f));
-                    DrawEllipse(center - new Vector2(0, r * 0.08f), r * 0.85f, r * 0.32f, Color);
-                    DrawEllipse(center - new Vector2(0, r * 0.08f), r * 0.5f, r * 0.17f, Color.Lightened(0.35f));
-                }
+            {
+                // Lúmen: moeda hexagonal de metal com um cristal facetado brilhando no centro
+                var dark = Color.Darkened(0.45f);
+                Poly(Ring(c, r * 0.95f, 6, Mathf.Pi / 6), dark, Color.Darkened(0.2f), r * 0.08f);
+                Poly(Ring(c, r * 0.78f, 6, Mathf.Pi / 6), Color, Color.Lightened(0.3f), r * 0.05f);
+                var gem = UiTheme.Cyan;
+                var top = c + new Vector2(0, -r * 0.5f); var bot = c + new Vector2(0, r * 0.52f);
+                var lft = c + new Vector2(-r * 0.36f, -r * 0.08f); var rgt = c + new Vector2(r * 0.36f, -r * 0.08f);
+                Poly(new[] { top, rgt, bot, lft }, gem.Darkened(0.25f), gem.Lightened(0.2f), r * 0.05f);
+                Poly(new[] { top, rgt, c + new Vector2(0, -r * 0.02f) }, gem.Lightened(0.45f));
+                Poly(new[] { top, c + new Vector2(0, -r * 0.02f), lft }, gem.Lightened(0.15f));
+                DrawCircle(c + new Vector2(-r * 0.12f, -r * 0.28f), r * 0.07f, new Color(1, 1, 1, 0.9f));
                 break;
+            }
             case Kind.Bag:
-                var body = new Rect2(c.X - r * 0.7f, c.Y - r * 0.35f, r * 1.4f, r * 1.2f);
-                DrawRect(body, Color);
-                DrawRect(new Rect2(body.Position.X + r * 0.2f, body.Position.Y + r * 0.45f, r, r * 0.45f), Color.Darkened(0.35f));
-                DrawArc(c - new Vector2(0, r * 0.35f), r * 0.42f, Mathf.Pi, Mathf.Tau, 12, Color, r * 0.18f, true);
+            {
+                // mochila: corpo arredondado, aba, bolso com fivela e alça
+                var body = Color; var shade = Color.Darkened(0.35f);
+                DrawArc(c + new Vector2(0, -r * 0.55f), r * 0.32f, Mathf.Pi, Mathf.Tau, 14, shade, r * 0.14f, true);
+                var bodyPts = new[] {
+                    c + new Vector2(-0.68f, -0.45f) * r, c + new Vector2(0.68f, -0.45f) * r, c + new Vector2(0.78f, 0.75f) * r,
+                    c + new Vector2(0.6f, 0.92f) * r, c + new Vector2(-0.6f, 0.92f) * r, c + new Vector2(-0.78f, 0.75f) * r };
+                Poly(bodyPts, body, shade, r * 0.07f);
+                Poly(new[] { c + new Vector2(-0.7f, -0.47f) * r, c + new Vector2(0.7f, -0.47f) * r, c + new Vector2(0.62f, 0.05f) * r, c + new Vector2(-0.62f, 0.05f) * r }, body.Lightened(0.15f), shade, r * 0.06f);
+                Poly(new[] { c + new Vector2(-0.42f, 0.25f) * r, c + new Vector2(0.42f, 0.25f) * r, c + new Vector2(0.42f, 0.72f) * r, c + new Vector2(-0.42f, 0.72f) * r }, shade);
+                DrawRect(new Rect2(c + new Vector2(-0.09f, -0.06f) * r, new Vector2(0.18f, 0.2f) * r), UiTheme.Gold);
                 break;
+            }
             case Kind.Gem:
                 DrawGem(c, r, Color);
                 break;
@@ -115,11 +158,22 @@ public partial class HudIcon : Control
                 break;
             }
             case Kind.Clock:
-                DrawCircle(c, r * 0.9f, Color);
-                DrawCircle(c, r * 0.72f, new Color(0.05f, 0.06f, 0.1f));
-                DrawLine(c, c + new Vector2(0, -r * 0.55f), Color, r * 0.14f, true);
-                DrawLine(c, c + new Vector2(r * 0.4f, 0), Color, r * 0.14f, true);
+            {
+                // dia: mostrador com sol nascendo no horizonte e ponteiro
+                DrawCircle(c, r * 0.92f, Color.Darkened(0.5f));
+                DrawArc(c, r * 0.86f, 0, Mathf.Tau, 32, Color, r * 0.12f, true);
+                var sun = c + new Vector2(0, r * 0.18f);
+                DrawCircle(sun, r * 0.28f, Color.Lightened(0.25f));
+                for (int i = 0; i < 5; i++)
+                {
+                    float a = Mathf.Pi + Mathf.Pi * (i + 0.5f) / 5f;
+                    var d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                    DrawLine(sun + d * r * 0.38f, sun + d * r * 0.55f, Color.Lightened(0.25f), r * 0.09f, true);
+                }
+                DrawRect(new Rect2(c + new Vector2(-0.7f, 0.2f) * r, new Vector2(1.4f, 0.4f) * r), Color.Darkened(0.5f));
+                DrawLine(c + new Vector2(-0.68f, 0.2f) * r, c + new Vector2(0.68f, 0.2f) * r, Color, r * 0.08f, true);
                 break;
+            }
             case Kind.Bolt:
                 var pts = new Vector2[]
                 {
@@ -137,6 +191,85 @@ public partial class HudIcon : Control
                 DrawColoredPolygon(new[] { c + new Vector2(-0.55f, -0.3f) * r, c + new Vector2(-0.3f, 0.9f) * r, c + new Vector2(-0.85f, 0.9f) * r }, Color.Darkened(0.25f));
                 DrawColoredPolygon(new[] { c + new Vector2(0.6f, -0.4f) * r, c + new Vector2(0.9f, 0.9f) * r, c + new Vector2(0.35f, 0.9f) * r }, Color.Darkened(0.25f));
                 break;
+            case Kind.RegionCaves:
+            {
+                // cavernas: arco de caverna com três cristais
+                DrawArc(c + new Vector2(0, r * 0.9f), r * 0.95f, Mathf.Pi, Mathf.Tau, 20, Color.Darkened(0.45f), r * 0.16f, true);
+                Poly(new[] { c + new Vector2(0, -0.6f) * r, c + new Vector2(0.22f, 0.85f) * r, c + new Vector2(-0.22f, 0.85f) * r }, Color, Color.Lightened(0.3f));
+                Poly(new[] { c + new Vector2(-0.48f, -0.1f) * r, c + new Vector2(-0.25f, 0.85f) * r, c + new Vector2(-0.62f, 0.85f) * r }, Color.Darkened(0.2f));
+                Poly(new[] { c + new Vector2(0.5f, 0.05f) * r, c + new Vector2(0.64f, 0.85f) * r, c + new Vector2(0.28f, 0.85f) * r }, Color.Darkened(0.2f));
+                break;
+            }
+            case Kind.RegionDepths:
+            {
+                // profundezas prismáticas: prisma que abre a luz em leque
+                var a1 = c + new Vector2(-0.15f, -0.75f) * r; var b1 = c + new Vector2(0.45f, 0.55f) * r; var c1 = c + new Vector2(-0.75f, 0.55f) * r;
+                DrawLine(c + new Vector2(-1f, -0.1f) * r, c + new Vector2(-0.38f, -0.05f) * r, Colors.White, r * 0.08f, true);
+                Color[] rays = { new(1f, 0.35f, 0.4f), new(1f, 0.85f, 0.3f), new(0.35f, 1f, 0.6f), new(0.4f, 0.6f, 1f) };
+                for (int i = 0; i < 4; i++) DrawLine(c + new Vector2(0.15f, 0.0f) * r, c + new Vector2(0.95f, -0.35f + i * 0.3f) * r, rays[i], r * 0.08f, true);
+                Poly(new[] { a1, b1, c1 }, new Color(Color, 0.85f), Color.Lightened(0.4f), r * 0.07f);
+                break;
+            }
+            case Kind.RegionCore:
+            {
+                // núcleo ancestral: esfera de magma rachada com chamas
+                for (int i = 0; i < 3; i++)
+                {
+                    float x = -0.4f + i * 0.4f;
+                    Poly(new[] { c + new Vector2(x - 0.18f, -0.2f) * r, c + new Vector2(x, -0.95f + (i == 1 ? -0.05f : 0.15f)) * r, c + new Vector2(x + 0.18f, -0.2f) * r }, new Color(1f, 0.6f, 0.15f));
+                }
+                DrawCircle(c + new Vector2(0, r * 0.2f), r * 0.68f, new Color(0.22f, 0.08f, 0.05f));
+                DrawPolyline(new[] { c + new Vector2(-0.5f, 0.0f) * r, c + new Vector2(-0.1f, 0.25f) * r, c + new Vector2(0.15f, 0.05f) * r, c + new Vector2(0.5f, 0.4f) * r }, Color, r * 0.11f, true);
+                DrawPolyline(new[] { c + new Vector2(-0.1f, 0.25f) * r, c + new Vector2(-0.2f, 0.75f) * r }, Color, r * 0.09f, true);
+                break;
+            }
+            case Kind.RegionReservoir:
+            {
+                // reservatório abissal: gota d'água sobre ondas
+                var drop = new Vector2[18];
+                for (int i = 0; i < 18; i++)
+                {
+                    float a = Mathf.Tau * i / 18f;
+                    float rr = r * 0.48f;
+                    var p = new Vector2(Mathf.Sin(a), -Mathf.Cos(a));
+                    drop[i] = c + new Vector2(0, r * 0.05f) + new Vector2(p.X * rr * (p.Y < 0 ? 1f + p.Y * 0.85f : 1f), p.Y < 0 ? p.Y * r * 0.95f : p.Y * rr);
+                }
+                Poly(drop, Color, Color.Lightened(0.35f), r * 0.07f);
+                DrawCircle(c + new Vector2(-0.15f, 0.12f) * r, r * 0.1f, new Color(1, 1, 1, 0.85f));
+                for (int k = 0; k < 2; k++)
+                {
+                    var wave = new Vector2[12];
+                    for (int i = 0; i < 12; i++) { float x = -0.95f + i * 1.9f / 11f; wave[i] = c + new Vector2(x, 0.72f + k * 0.2f + Mathf.Sin(x * 7f) * 0.06f) * r; }
+                    DrawPolyline(wave, Color.Darkened(0.2f * k), r * 0.08f, true);
+                }
+                break;
+            }
+            case Kind.RegionFungal:
+            {
+                // jardim fúngico: cogumelo grande e um pequeno, com pintas
+                Poly(new[] { c + new Vector2(-0.14f, 0.1f) * r, c + new Vector2(0.14f, 0.1f) * r, c + new Vector2(0.2f, 0.9f) * r, c + new Vector2(-0.2f, 0.9f) * r }, new Color(0.92f, 0.9f, 0.82f));
+                var cap = new Vector2[14];
+                for (int i = 0; i < 14; i++) { float a = Mathf.Pi + Mathf.Pi * i / 13f; cap[i] = c + new Vector2(Mathf.Cos(a) * 0.82f, 0.15f + Mathf.Sin(a) * 0.72f) * r; }
+                Poly(cap, Color, Color.Lightened(0.3f), r * 0.06f);
+                DrawCircle(c + new Vector2(-0.35f, -0.2f) * r, r * 0.11f, new Color(1, 1, 1, 0.85f));
+                DrawCircle(c + new Vector2(0.2f, -0.35f) * r, r * 0.08f, new Color(1, 1, 1, 0.85f));
+                DrawCircle(c + new Vector2(0.75f, 0.68f) * r, r * 0.17f, Color.Darkened(0.2f));
+                DrawLine(c + new Vector2(0.75f, 0.7f) * r, c + new Vector2(0.75f, 0.92f) * r, new Color(0.92f, 0.9f, 0.82f), r * 0.08f, true);
+                break;
+            }
+            case Kind.RegionCathedral:
+            {
+                // catedral de cristal: janela gótica pontiaguda com vitral
+                // ordem: lado esquerdo subindo, direito descendo
+                var win = new Vector2[] { c + new Vector2(-0.65f, 0.9f) * r, c + new Vector2(-0.65f, -0.1f) * r, c + new Vector2(-0.45f, -0.6f) * r, c + new Vector2(0, -0.95f) * r, c + new Vector2(0.45f, -0.6f) * r, c + new Vector2(0.65f, -0.1f) * r, c + new Vector2(0.65f, 0.9f) * r };
+                Poly(win, Color.Darkened(0.45f), Color.Lightened(0.25f), r * 0.08f);
+                DrawLine(c + new Vector2(0, -0.85f) * r, c + new Vector2(0, 0.88f) * r, Color.Lightened(0.25f), r * 0.07f, true);
+                DrawLine(c + new Vector2(-0.6f, 0.1f) * r, c + new Vector2(0.6f, 0.1f) * r, Color.Lightened(0.25f), r * 0.07f, true);
+                DrawCircle(c + new Vector2(0, -0.35f) * r, r * 0.17f, Color.Lightened(0.4f));
+                Poly(new[] { c + new Vector2(-0.4f, 0.25f) * r, c + new Vector2(-0.1f, 0.25f) * r, c + new Vector2(-0.1f, 0.75f) * r, c + new Vector2(-0.4f, 0.75f) * r }, new Color(Color, 0.6f));
+                Poly(new[] { c + new Vector2(0.1f, 0.25f) * r, c + new Vector2(0.4f, 0.25f) * r, c + new Vector2(0.4f, 0.75f) * r, c + new Vector2(0.1f, 0.75f) * r }, new Color(UiTheme.Gold, 0.6f));
+                break;
+            }
             case Kind.Star:
                 var star = new Vector2[10];
                 for (int i = 0; i < 10; i++)

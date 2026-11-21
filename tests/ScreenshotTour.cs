@@ -79,6 +79,7 @@ public partial class ScreenshotTour : Node
             // fotografa de perto instâncias reais de cada malha nova da decoração
             var targets = new (Mesh mesh, string name, float dist, float lift)[]
             {
+                (World.MeshFactory.Rock(5, 0.35f), "boulder", 3.2f, 0.3f),
                 (World.DecorMeshes.MushroomStem(), "mushrooms", 2.2f, 0.3f),
                 (World.DecorMeshes.Frond(0), "ferns", 2.6f, 0.4f),
                 (World.DecorMeshes.Dripstone(3), "stalagmite", 4.5f, 1.0f),

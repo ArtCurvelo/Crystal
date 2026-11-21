@@ -22,16 +22,51 @@ public static class UiTheme
     static Theme _theme;
     static FontVariation _bold;
 
-    public static FontVariation Bold
+    static Font _body, _boldFont, _systemFallback;
+
+    /// <summary>
+    /// Fonte do jogo: Chakra Petch (SIL Open Font License, assets/fonts/OFL.txt) — angular, combina com os
+    /// painéis chanfrados. Símbolos que ela não tem (◈, ◇, ✺, ⚠…) caem na fonte padrão da Godot.
+    /// </summary>
+    public static Font BodyFont
     {
         get
         {
-            if (_bold == null)
-            {
-                _bold = new FontVariation { VariationEmbolden = 0.9f, BaseFont = ThemeDB.FallbackFont };
-            }
-            return _bold;
+            if (_body != null) return _body;
+            _systemFallback ??= ThemeDB.FallbackFont;
+            _body = LoadFont("res://assets/fonts/ChakraPetch-Medium.ttf") ?? _systemFallback;
+            return _body;
         }
+    }
+
+    static Font LoadFont(string path)
+    {
+        if (!ResourceLoader.Exists(path)) return null;
+        var f = GD.Load<FontFile>(path);
+        if (f == null) return null;
+        f = (FontFile)f.Duplicate();
+        f.Fallbacks = new Godot.Collections.Array<Font> { _systemFallback ?? ThemeDB.FallbackFont };
+        f.Antialiasing = TextServer.FontAntialiasing.Gray;
+        f.Hinting = TextServer.Hinting.Light;
+        return f;
+    }
+
+    public static Font Bold
+    {
+        get
+        {
+            if (_boldFont != null) return _boldFont;
+            _ = BodyFont;
+            _boldFont = LoadFont("res://assets/fonts/ChakraPetch-Bold.ttf") ?? new FontVariation { VariationEmbolden = 0.9f, BaseFont = _systemFallback };
+            return _boldFont;
+        }
+    }
+
+    /// <summary>Aplica a fonte do jogo a tudo (inclusive textos 3D sem fonte própria).</summary>
+    public static void ApplyGlobalFont()
+    {
+        var f = BodyFont;
+        ThemeDB.FallbackFont = f;
     }
 
     public static StyleBoxFlat Box(Color bg, Color border, int radius = 10, int borderW = 2, int pad = 12)
@@ -55,7 +90,8 @@ public static class UiTheme
     public static Theme Get()
     {
         if (_theme != null) return _theme;
-        var t = new Theme { DefaultFontSize = 18 };
+        ApplyGlobalFont();
+        var t = new Theme { DefaultFontSize = 18, DefaultFont = BodyFont };
         t.SetColor("font_color", "Label", Text);
         t.SetColor("font_outline_color", "Label", new Color(0, 0, 0, 0.6f));
         t.SetConstant("outline_size", "Label", 0);

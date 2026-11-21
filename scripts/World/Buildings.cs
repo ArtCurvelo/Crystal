@@ -675,13 +675,13 @@ public partial class BuildingManager : Node3D
         {
             _valid = RopeFor(_point, p.GlobalPosition, out _ropeTop, out _ropeBottom, out _ropeExit, out _reason);
             _route = _valid ? new List<Vector3> { _ropeTop + Vector3.Up * 0.3f, _ropeBottom } : null;
-            if (_valid && !gs.CanAfford(gs.BuildCost(Current.Id))) { _valid = false; _reason = Loc.T("Moeda insuficiente"); }
+            if (_valid && !gs.CanAfford(gs.BuildCost(Current.Id))) { _valid = false; _reason = Loc.T("Lúmens insuficientes"); }
             return;
         }
         _route = null;
         _valid = CanPlace(Current.Id, _point, out _reason);
         if (_valid && Current.Id == BuildIds.Hopper && !HopperSpot(_point, out _hopperBelt, out _hopperJoin, out _reason)) _valid = false;
-        if (_valid && !gs.CanAfford(TotalCost())) { _valid = false; _reason = Loc.T("Moeda insuficiente"); }
+        if (_valid && !gs.CanAfford(TotalCost())) { _valid = false; _reason = Loc.T("Lúmens insuficientes"); }
     }
 
     /// <summary>O funil precisa ficar ao lado de uma esteira (sem ficar em cima dela).</summary>
@@ -716,7 +716,7 @@ public partial class BuildingManager : Node3D
         if (PathLength(_route) < BuildData.BeltMinLength) { _valid = false; _reason = Loc.T("Esteira curta demais"); return; }
         if (_beltFeeds < 0) { _valid = false; _reason = Loc.T("Termine na Estação de Venda ou em outra esteira"); return; }
         _valid = gs.CanAfford(TotalCost());
-        _reason = _valid ? "" : Loc.T("Moeda insuficiente");
+        _reason = _valid ? "" : Loc.T("Lúmens insuficientes");
     }
 
     Vector3 _ropeTop, _ropeBottom, _ropeExit;

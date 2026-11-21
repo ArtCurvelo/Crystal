@@ -75,13 +75,16 @@ public static class MeshFactory
         Tri(st, a, c, d, low, high, high);
     }
 
-    /// <summary>Rocha: icosfera deformada com ruído e sombreamento facetado.</summary>
+    /// <summary>
+    /// Rocha: icosfera subdividida 2x, deformada por ruído contínuo (volumes, não "amassado" aleatório)
+    /// e cortada por planos de fratura (faces lascadas de pedra quebrada). Sombreamento nos vértices:
+    /// base e reentrâncias mais escuras, arestas salientes mais claras. Raio máximo ~1 (vezes o achatamento).
+    /// </summary>
     public static ArrayMesh Rock(int seed, float roughness = 0.35f)
     {
         string key = $"rock{seed}_{roughness}";
         if (Cache.TryGetValue(key, out var cached)) return (ArrayMesh)cached;
         var rng = new Random(seed);
-        // icosaedro subdividido 1x
         var verts = new List<Vector3>();
         var tris = new List<int[]>();
         float t = (1f + MathF.Sqrt(5f)) / 2f;
@@ -99,6 +102,7 @@ public static class MeshFactory
             new[]{3,9,4}, new[]{3,4,2}, new[]{3,2,6}, new[]{3,6,8}, new[]{3,8,9},
             new[]{4,9,5}, new[]{2,4,11}, new[]{6,2,10}, new[]{8,6,7}, new[]{9,8,1}
         };
+        tris.AddRange(faces);
         var mid = new Dictionary<long, int>();
         int Mid(int a, int b)
         {
@@ -108,32 +112,64 @@ public static class MeshFactory
             mid[k] = verts.Count - 1;
             return verts.Count - 1;
         }
-        foreach (var f in faces)
+        for (int level = 0; level < 2; level++)
         {
-            int a = Mid(f[0], f[1]), b = Mid(f[1], f[2]), c = Mid(f[2], f[0]);
-            tris.Add(new[] { f[0], a, c }); tris.Add(new[] { f[1], b, a });
-            tris.Add(new[] { f[2], c, b }); tris.Add(new[] { a, b, c });
+            var next = new List<int[]>();
+            foreach (var f in tris)
+            {
+                int a = Mid(f[0], f[1]), b = Mid(f[1], f[2]), c = Mid(f[2], f[0]);
+                next.Add(new[] { f[0], a, c }); next.Add(new[] { f[1], b, a });
+                next.Add(new[] { f[2], c, b }); next.Add(new[] { a, b, c });
+            }
+            tris = next;
+            mid.Clear();
         }
+        // ruído contínuo: soma de ondas em direções aleatórias (volumes grandes + detalhe)
+        var waves = new List<(Vector3 dir, float freq, float phase, float amp)>();
+        for (int w = 0; w < 7; w++)
+        {
+            var d = new Vector3((float)rng.NextDouble() * 2 - 1, (float)rng.NextDouble() * 2 - 1, (float)rng.NextDouble() * 2 - 1).Normalized();
+            float freq = w < 3 ? 1.2f + (float)rng.NextDouble() * 1.2f : 3.5f + (float)rng.NextDouble() * 3f;
+            waves.Add((d, freq, (float)rng.NextDouble() * Mathf.Tau, w < 3 ? 0.55f : 0.16f));
+        }
+        float Noise(Vector3 p) { float n = 0; foreach (var (d, f, ph, a) in waves) n += MathF.Sin(p.Dot(d) * f + ph) * a; return n; }
         var squash = new Vector3(1f + (float)rng.NextDouble() * 0.4f, 0.6f + (float)rng.NextDouble() * 0.4f, 1f + (float)rng.NextDouble() * 0.3f);
+        var disp = new float[verts.Count];
         for (int i = 0; i < verts.Count; i++)
         {
-            float n = 1f + ((float)rng.NextDouble() * 2 - 1) * roughness;
-            verts[i] = verts[i] * n * squash;
+            disp[i] = Noise(verts[i] * 1.3f) * roughness * 0.55f;
+            verts[i] = verts[i] * (1f + disp[i]);
         }
+        // planos de fratura: o que passa do plano é achatado nele (faces planas e arestas vivas)
+        int cuts = 3 + rng.Next(3);
+        for (int k = 0; k < cuts; k++)
+        {
+            var n = new Vector3((float)rng.NextDouble() * 2 - 1, (float)rng.NextDouble() * 1.4f - 0.4f, (float)rng.NextDouble() * 2 - 1).Normalized();
+            float dist = 0.62f + (float)rng.NextDouble() * 0.25f;
+            for (int i = 0; i < verts.Count; i++)
+            {
+                float over = verts[i].Dot(n) - dist;
+                if (over > 0) { verts[i] -= n * over * 0.92f; disp[i] -= over * 0.5f; }
+            }
+        }
+        // apoio: a parte de baixo é achatada (a pedra assenta no chão)
+        for (int i = 0; i < verts.Count; i++)
+            if (verts[i].Y < -0.55f) verts[i] = new Vector3(verts[i].X, -0.55f + (verts[i].Y + 0.55f) * 0.25f, verts[i].Z);
+        for (int i = 0; i < verts.Count; i++) verts[i] *= squash;
+
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
-        foreach (var tr in tris)
+        for (int i = 0; i < verts.Count; i++)
         {
-            var a = verts[tr[0]]; var b = verts[tr[1]]; var c = verts[tr[2]];
-            float shade = 0.75f + (float)rng.NextDouble() * 0.25f;
-            // tons mais escuros na parte de baixo (oclusão falsa)
-            float ya = Mathf.Clamp(0.6f + a.Y * 0.35f, 0.35f, 1f) * shade;
-            float yb = Mathf.Clamp(0.6f + b.Y * 0.35f, 0.35f, 1f) * shade;
-            float yc = Mathf.Clamp(0.6f + c.Y * 0.35f, 0.35f, 1f) * shade;
-            st.SetColor(new Color(ya, ya, ya)); st.AddVertex(a);
-            st.SetColor(new Color(yc, yc, yc)); st.AddVertex(c);
-            st.SetColor(new Color(yb, yb, yb)); st.AddVertex(b);
+            var v = verts[i];
+            float up = Mathf.Clamp(0.55f + (v.Y / squash.Y) * 0.45f, 0.3f, 1f);   // base escura (oclusão falsa)
+            float cav = Mathf.Clamp(1f + disp[i] * 1.6f, 0.6f, 1.15f);             // reentrâncias escuras, saliências claras
+            float speck = 0.92f + 0.08f * MathF.Sin(v.X * 23f + v.Z * 17f + v.Y * 11f);
+            float c = Mathf.Clamp(up * cav * speck, 0.25f, 1.1f);
+            st.SetColor(new Color(c, c, c * 0.98f));
+            st.AddVertex(v);
         }
+        foreach (var tr in tris) { st.AddIndex(tr[0]); st.AddIndex(tr[2]); st.AddIndex(tr[1]); }
         st.GenerateNormals();
         var mesh = st.Commit();
         Cache[key] = mesh;

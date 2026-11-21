@@ -436,6 +436,9 @@ public static partial class LocTables
         list.Add(("Cortador de Pulso", "Pulse Cutter", "Cortador de Pulso"));
         list.Add(("Cristais minerados: {0}   ·   Fragmentos vendidos: {1}\n", "Crystals mined: {0}   ·   Shards sold: {1}\n", "Cristales minados: {0}   ·   Fragmentos vendidos: {1}\n"));
         list.Add(("Créditos:", "Credits:", "Créditos:"));
+        list.Add(("Lúmens", "Lumens", "Lúmenes"));
+        list.Add(("{0} / {1} · CHEIA", "{0} / {1} · FULL", "{0} / {1} · LLENA"));
+        list.Add(("Dia {0} · FIM DO TURNO", "Day {0} · SHIFT OVER", "Día {0} · FIN DEL TURNO"));
         list.Add(("Câmara secreta encontrada", "Secret chamber found", "Cámara secreta encontrada"));
         list.Add(("DERROTADO", "DEFEATED", "DERROTADO"));
         list.Add(("DIA {0}", "DAY {0}", "DÍA {0}"));
@@ -523,7 +526,7 @@ public static partial class LocTables
         list.Add(("Mochila cheia!", "Backpack full!", "¡Mochila llena!"));
         list.Add(("Mochila vazia.\nMinere cristais e volte!", "Backpack empty.\nMine crystals and come back!", "Mochila vacía.\n¡Mina cristales y vuelve!"));
         list.Add(("Modo para daltonismo", "Colorblind mode", "Modo para daltonismo"));
-        list.Add(("Moeda insuficiente", "Not enough credits", "Créditos insuficientes"));
+        list.Add(("Lúmens insuficientes", "Not enough Lumens", "Lúmenes insuficientes"));
         list.Add(("Mostrar FPS", "Show FPS", "Mostrar FPS"));
         list.Add(("Mostrar FPS (F3)", "Show FPS (F3)", "Mostrar FPS (F3)"));
         list.Add(("Mover", "Move", "Moverse"));
@@ -589,7 +592,7 @@ public static partial class LocTables
         list.Add(("Renascer (+{0})", "Rebirth (+{0})", "Renacer (+{0})"));
         list.Add(("Renascer agora", "Rebirth now", "Renacer ahora"));
         list.Add(("Renascer recomeça a jornada e concede +{0} Essência (+10% permanente por ponto). Coleção e estatísticas são mantidas.", "Rebirth restarts the journey and grants +{0} Essence (+10% permanent per point). Collection and stats are kept.", "Renacer reinicia la travesía y otorga +{0} Esencia (+10% permanente por punto). Se conservan la Colección y las estadísticas."));
-        list.Add(("Renascer recomeça a jornada: dinheiro, melhorias, mochila e regiões voltam ao início. ", "Rebirth restarts the journey: credits, upgrades, backpack and regions go back to the start. ", "Renacer reinicia la travesía: dinero, mejoras, mochila y regiones vuelven al inicio. "));
+        list.Add(("Renascer recomeça a jornada: Lúmens, melhorias, mochila e regiões voltam ao início. ", "Rebirth restarts the journey: Lumens, upgrades, backpack and regions go back to the start. ", "Renacer reinicia la travesía: Lúmenes, mejoras, mochila y regiones vuelven al inicio. "));
         list.Add(("Renascimento!", "Rebirth!", "¡Renacimiento!"));
         list.Add(("Rendimento est.:", "Est. yield:", "Rendimiento est.:"));
         list.Add(("Requer região anterior", "Requires previous region", "Requiere la región anterior"));
@@ -657,6 +660,7 @@ public static partial class LocTables
         list.Add(("\nRequer: {0}", "\nRequires: {0}", "\nRequiere: {0}"));
         list.Add(("data desconhecida", "unknown date", "fecha desconocida"));
         list.Add(("v{0}  ·  Feito com Godot e C#", "v{0}  ·  Made with Godot and C#", "v{0}  ·  Hecho con Godot y C#"));
+        list.Add(("v{0}  ·  © ArtCurvelo  ·  Feito com Godot e C#", "v{0}  ·  © ArtCurvelo  ·  Made with Godot and C#", "v{0}  ·  © ArtCurvelo  ·  Hecho con Godot y C#"));
         list.Add(("{0}   ·   {1}h{2:00} de jogo   ·   {3}/{4} regiões   ·   ✦{5}", "{0}   ·   {1}h{2:00} played   ·   {3}/{4} regions   ·   ✦{5}", "{0}   ·   {1}h{2:00} de juego   ·   {3}/{4} regiones   ·   ✦{5}"));
         list.Add(("{0} Contratar {1}, {2} ({3})", "{0} Hire {1}, {2} ({3})", "{0} Contratar a {1}, {2} ({3})"));
         list.Add(("{0} Desbloquear {1}  ({2})", "{0} Unlock {1}  ({2})", "{0} Desbloquear {1}  ({2})"));

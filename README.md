@@ -88,3 +88,6 @@ Veja [`PROJECT_STATE.md`](PROJECT_STATE.md) para a arquitetura completa e [`DEVE
 - Código, malhas, materiais, efeitos, sons e música: originais, gerados por código neste projeto.
 - Motor: [Godot Engine](https://godotengine.org) (licença MIT). Fonte padrão do Godot, distribuída com o motor sob a licença dele.
 - Nenhum asset externo é utilizado.
+
+## Créditos de terceiros
+- Fonte **Chakra Petch** — Copyright 2018 The Chakra Petch Project Authors, licenciada sob a SIL Open Font License 1.1 (`assets/fonts/OFL.txt`).

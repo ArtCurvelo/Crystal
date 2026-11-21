@@ -17,7 +17,7 @@ public partial class MainMenu : CanvasLayer
     Button _continue;
     VBoxContainer _buttons;
     Control _root;
-    Label _title;
+    Control _title;
     float _t;
 
     public override void _Ready()
@@ -42,10 +42,21 @@ public partial class MainMenu : CanvasLayer
         left.AddThemeConstantOverride("separation", 6);
         _root.AddChild(left);
 
-        _title = UiTheme.Shadowed(UiTheme.Label("CRYSTAL", 76, UiTheme.Cyan, true), 14);
+        // logo (emblema + letreiro), desenhado por tools/logo.py; sem a imagem, volta ao texto
+        if (ResourceLoader.Exists("res://assets/ui/logo.png"))
+            _title = new TextureRect
+            {
+                Texture = GD.Load<Texture2D>("res://assets/ui/logo.png"), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspect, CustomMinimumSize = new Vector2(600, 159), MouseFilter = Control.MouseFilterEnum.Ignore,
+            };
+        else
+        {
+            var tv = new VBoxContainer();
+            tv.AddChild(UiTheme.Shadowed(UiTheme.Label("CRYSTAL", 76, UiTheme.Cyan, true), 14));
+            tv.AddChild(UiTheme.Shadowed(UiTheme.Label("EXCAVATOR", 52, UiTheme.Violet, true), 12));
+            _title = tv;
+        }
         left.AddChild(_title);
-        var t2 = UiTheme.Shadowed(UiTheme.Label("EXCAVATOR", 52, UiTheme.Violet, true), 12);
-        left.AddChild(t2);
         left.AddChild(UiTheme.Shadowed(UiTheme.Label("Minere. Venda. Evolua. Desça mais fundo.", 20, UiTheme.Muted), 6));
         left.AddChild(UiTheme.Spacer(14));
 
@@ -59,7 +70,7 @@ public partial class MainMenu : CanvasLayer
         Make("Configurações", () => OnSettings?.Invoke());
         Make("Sair", () => OnQuit?.Invoke());
 
-        _version = UiTheme.Shadowed(UiTheme.Label(Loc.F("v{0}  ·  Feito com Godot e C#", ProjectSettings.GetSetting("application/config/version")), 14, UiTheme.Muted));
+        _version = UiTheme.Shadowed(UiTheme.Label(Loc.F("v{0}  ·  © ArtCurvelo  ·  Feito com Godot e C#", ProjectSettings.GetSetting("application/config/version")), 14, UiTheme.Muted));
         UiTheme.Place(_version, Control.LayoutPreset.BottomLeft, new Vector2(24, -40));
         _root.AddChild(_version);
         _versionBase = _version.Text;
@@ -104,6 +115,6 @@ public partial class MainMenu : CanvasLayer
         if (!Visible) return;
         _t += (float)delta;
         float g = 0.5f + 0.5f * Mathf.Sin(_t * 1.4f);
-        _title.AddThemeColorOverride("font_color", UiTheme.Cyan.Lerp(new Color(0.75f, 0.97f, 1f), g * 0.5f));
+        _title.Modulate = new Color(1f, 1f, 1f).Lerp(new Color(1.12f, 1.15f, 1.2f), g * 0.5f); // pulso de brilho
     }
 }

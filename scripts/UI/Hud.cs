@@ -59,7 +59,7 @@ public partial class Hud : CanvasLayer
     {
         var gs = GameState.Instance;
         bool over = gs.DayOver;
-        string t = over ? Loc.F("Dia {0} · TURNO ENCERRADO", gs.Data.Day) : Loc.F("Dia {0} · {1}", gs.Data.Day, gs.ClockText);
+        string t = over ? Loc.F("Dia {0} · FIM DO TURNO", gs.Data.Day) : Loc.F("Dia {0} · {1}", gs.Data.Day, gs.ClockText);
         if (t != _clockText) { _clockText = t; _clock.Text = t; }
         _clockBar.Value = gs.DayProgress;
         bool late = !over && gs.DayRemaining <= GameState.DayWarningSeconds;
@@ -158,35 +158,27 @@ public partial class Hud : CanvasLayer
     // ============================ Construção ============================
     void BuildTopLeft()
     {
-        // etiqueta de título inclinada
-        var title = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        var st = UiTheme.Chamfer(null, null, 8, 2, 18, 4);
-        st.Skew = new Vector2(0.25f, 0);
-        title.AddThemeStyleboxOverride("panel", st);
-        title.AddChild(UiTheme.Label("Crystal Excavator", 20, UiTheme.Text, true));
-        UiTheme.Place(title, Control.LayoutPreset.TopLeft, new Vector2(22, 16));
-        _root.AddChild(title);
-
+        // (o selo "Crystal Excavator" saiu: a tela fica mais limpa)
         _objectivePanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         _objectivePanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.09f, 0.62f), new Color(UiTheme.Cyan, 0.3f), 8, 1, 12, 8));
-        UiTheme.Place(_objectivePanel, Control.LayoutPreset.TopLeft, new Vector2(20, 66));
+        UiTheme.Place(_objectivePanel, Control.LayoutPreset.TopLeft, new Vector2(18, 16));
         _root.AddChild(_objectivePanel);
-        _objective = UiTheme.Label("", 15, UiTheme.Text);
+        _objective = UiTheme.Label("", 14, UiTheme.Text);
         _objective.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-        _objective.CustomMinimumSize = new Vector2(270, 0);
+        _objective.CustomMinimumSize = new Vector2(250, 0);
         _objectivePanel.AddChild(_objective);
     }
 
     void BuildTopCenter()
     {
-        _regionTag = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        _regionTag = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Modulate = new Color(1, 1, 1, 0) }; // só aparece ao entrar num local
         _regionTag.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 14, 2, 22, 6));
         UiTheme.Place(_regionTag, Control.LayoutPreset.CenterTop, new Vector2(-190, 12), new Vector2(380, 0));
         _root.AddChild(_regionTag);
         var h = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center };
         h.AddThemeConstantOverride("separation", 12);
         _regionTag.AddChild(h);
-        _regionIcon = HudIcon.Make(HudIcon.Kind.Region, UiTheme.Cyan, 34);
+        _regionIcon = HudIcon.Make(HudIcon.Kind.Region, UiTheme.Cyan, 38);
         h.AddChild(_regionIcon);
         var v = new VBoxContainer();
         v.AddThemeConstantOverride("separation", -2);
@@ -213,60 +205,62 @@ public partial class Hud : CanvasLayer
 
     void BuildTopRight()
     {
+        // painel compacto: só ícone + valor (Lúmens, mochila, dia)
         var col = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        col.AddThemeConstantOverride("separation", 8);
-        UiTheme.Place(col, Control.LayoutPreset.TopRight, new Vector2(-322, 14), new Vector2(300, 0));
+        col.AddThemeConstantOverride("separation", 6);
+        UiTheme.Place(col, Control.LayoutPreset.TopRight, new Vector2(-300, 14), new Vector2(282, 0));
+        col.GrowHorizontal = Control.GrowDirection.Begin; // avisos mais largos crescem para a esquerda, nunca para fora da tela
         _root.AddChild(col);
+        var stats = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd, CustomMinimumSize = new Vector2(210, 0) };
+        stats.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.03f, 0.05f, 0.09f, 0.7f), new Color(UiTheme.Cyan, 0.35f), 10, 1, 12, 8));
+        col.AddChild(stats);
+        var sv = new VBoxContainer();
+        sv.AddThemeConstantOverride("separation", 5);
+        stats.AddChild(sv);
 
-        var money = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        money.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 8));
-        col.AddChild(money);
         var mh = new HBoxContainer();
-        mh.AddThemeConstantOverride("separation", 10);
-        money.AddChild(mh);
-        mh.AddChild(HudIcon.Make(HudIcon.Kind.Coin, UiTheme.Gold, 30));
-        var lbl = UiTheme.Label("Créditos:", 20, UiTheme.Text, true);
-        lbl.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        mh.AddChild(lbl);
-        _money = UiTheme.Label("0", 24, UiTheme.Gold, true);
+        mh.AddThemeConstantOverride("separation", 8);
+        sv.AddChild(mh);
+        mh.AddChild(HudIcon.Make(HudIcon.Kind.Coin, UiTheme.Gold, 24));
+        _money = UiTheme.Label("0", 21, UiTheme.Gold, true);
         _money.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         _money.HorizontalAlignment = HorizontalAlignment.Right;
+        _money.TooltipText = Loc.T("Lúmens");
         mh.AddChild(_money);
-        _moneyGain = UiTheme.Shadowed(UiTheme.Label("", 16, UiTheme.Success, true, HorizontalAlignment.Right));
-        col.AddChild(_moneyGain);
+        _moneyGain = UiTheme.Shadowed(UiTheme.Label("", 15, UiTheme.Success, true, HorizontalAlignment.Right));
         _moneyGain.Visible = false;
 
         _capPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        _capPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 8));
-        col.AddChild(_capPanel);
+        _capPanel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+        sv.AddChild(_capPanel);
         var ch = new HBoxContainer();
-        ch.AddThemeConstantOverride("separation", 10);
+        ch.AddThemeConstantOverride("separation", 8);
         _capPanel.AddChild(ch);
-        ch.AddChild(HudIcon.Make(HudIcon.Kind.Bag, new Color(0.75f, 0.85f, 0.95f), 30));
+        ch.AddChild(HudIcon.Make(HudIcon.Kind.Bag, new Color(0.62f, 0.72f, 0.85f), 24));
         var cv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        cv.AddThemeConstantOverride("separation", 4);
+        cv.AddThemeConstantOverride("separation", 2);
         ch.AddChild(cv);
-        _capLabel = UiTheme.Label("Capacidade: 0 / 30", 18, UiTheme.Text, true);
+        _capLabel = UiTheme.Label("0 / 30", 15, UiTheme.Text, true, HorizontalAlignment.Right);
         cv.AddChild(_capLabel);
-        _capBar = UiTheme.Bar(UiTheme.Cyan, 210, 9);
+        _capBar = UiTheme.Bar(UiTheme.Cyan, 150, 5);
         cv.AddChild(_capBar);
 
-        // relógio do turno
         _clockPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        _clockPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, null, 12, 2, 16, 6));
-        col.AddChild(_clockPanel);
+        _clockPanel.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+        sv.AddChild(_clockPanel);
         var kh = new HBoxContainer();
-        kh.AddThemeConstantOverride("separation", 10);
+        kh.AddThemeConstantOverride("separation", 8);
         _clockPanel.AddChild(kh);
-        _clockIcon = HudIcon.Make(HudIcon.Kind.Clock, UiTheme.Gold, 30);
+        _clockIcon = HudIcon.Make(HudIcon.Kind.Clock, UiTheme.Gold, 24);
         kh.AddChild(_clockIcon);
         var kv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        kv.AddThemeConstantOverride("separation", 4);
+        kv.AddThemeConstantOverride("separation", 2);
         kh.AddChild(kv);
-        _clock = UiTheme.Label("", 18, UiTheme.Text, true);
+        _clock = UiTheme.Label("", 15, UiTheme.Text, true, HorizontalAlignment.Right);
         kv.AddChild(_clock);
-        _clockBar = UiTheme.Bar(UiTheme.Gold, 210, 7);
+        _clockBar = UiTheme.Bar(UiTheme.Gold, 150, 4);
         kv.AddChild(_clockBar);
+        col.AddChild(_moneyGain);
 
         // vida (aparece quando há perigo ou dano)
         _hpPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
@@ -409,7 +403,11 @@ public partial class Hud : CanvasLayer
         _toolStats = UiTheme.Label("", 14, UiTheme.Text);
         th.AddChild(_toolStats);
 
-        _keys = UiTheme.Shadowed(UiTheme.Label(InputHints.Footer, 14, UiTheme.Muted, false, HorizontalAlignment.Center));
+        _keys = UiTheme.Shadowed(UiTheme.Label(InputHints.Footer, 13, UiTheme.Muted, false, HorizontalAlignment.Center));
+        // a linha de controles ajuda no começo e depois some (volta no menu de pausa / ajuda)
+        var kt = _keys.CreateTween();
+        kt.TweenInterval(150f);
+        kt.TweenProperty(_keys, "modulate:a", 0f, 2f);
         InputHints.Changed += OnHintsChanged;
         UiTheme.Place(_keys, Control.LayoutPreset.CenterBottom, new Vector2(-300, -30), new Vector2(600, 0));
         _root.AddChild(_keys);
@@ -475,7 +473,7 @@ public partial class Hud : CanvasLayer
         var gs = GameState.Instance;
         int cnt = gs.InventoryCount, cap = gs.Capacity;
         bool full = cnt >= cap;
-        _capLabel.Text = full ? Loc.F("Capacidade: {0} / {1}  CHEIA", cnt, cap) : Loc.F("Capacidade: {0} / {1}", cnt, cap);
+        _capLabel.Text = full ? Loc.F("{0} / {1} · CHEIA", cnt, cap) : $"{cnt} / {cap}";
         _capLabel.AddThemeColorOverride("font_color", full ? UiTheme.Danger : UiTheme.Text);
         _capBar.Value = cap > 0 ? (double)cnt / cap : 0;
         UiTheme.SetBarColor(_capBar, full ? UiTheme.Danger : cnt > cap * 0.75f ? UiTheme.Gold : UiTheme.Cyan);
@@ -632,20 +630,26 @@ public partial class Hud : CanvasLayer
         _regionSub.Text = "◇ " + house.Subtitle;
     }
 
+    Tween _regionTween;
+
     public void ShowRegionBanner(RegionDef r)
     {
         _regionName.Text = r.Name;
         _regionSub.Text = Loc.F("◇ Região {0} de {1} · {2}", r.Index + 1, GameData.Regions.Count, r.Subtitle);
-        _regionIcon.Color = r.AccentColor;
-        _regionIcon.QueueRedraw();
+        _regionIcon.Set(r.Id == null ? HudIcon.Kind.Star : HudIcon.RegionKind(r.Id), r.AccentColor);
         _regionTag.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, new Color(r.AccentColor, 0.85f), 14, 2, 22, 6));
         _regionName.AddThemeColorOverride("font_color", r.AccentColor.Lightened(0.45f));
         _regionTag.PivotOffset = new Vector2(190, 30);
         _regionTag.Scale = new Vector2(1.25f, 1.25f);
         _regionTag.Modulate = new Color(1.6f, 1.6f, 1.6f);
         var tw = _regionTag.CreateTween().SetParallel();
+        _regionTween?.Kill();
+        _regionTween = tw;
         tw.TweenProperty(_regionTag, "scale", Vector2.One, 0.6f).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
         tw.TweenProperty(_regionTag, "modulate", Colors.White, 1.2f);
+        // depois de alguns segundos o nome do local some (a tela fica limpa)
+        tw.Chain().TweenInterval(3.2f);
+        tw.Chain().TweenProperty(_regionTag, "modulate:a", 0f, 1.0f);
     }
 
     public void FlashFull()
