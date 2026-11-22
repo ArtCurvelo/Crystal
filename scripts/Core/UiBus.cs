@@ -22,6 +22,11 @@ public static class UiBus
     public static event Action PrestigeRequested;
     public static void RequestPrestige() => PrestigeRequested?.Invoke();
     public static void EnterRegion(string id) => RegionEntered?.Invoke(id);
+    public static event Action<bool> Door;
+    /// <summary>Porta da casa: true = entrar, false = sair para a vila.</summary>
+    public static void RequestDoor(bool toInside) => Door?.Invoke(toInside);
+    public static event Action OpenMissions;
+    public static void RequestMissions() => OpenMissions?.Invoke();
     public static event Action<World.GoblinCamp> OpenGoblin;
     public static void RequestGoblin(World.GoblinCamp camp) => OpenGoblin?.Invoke(camp);
 }

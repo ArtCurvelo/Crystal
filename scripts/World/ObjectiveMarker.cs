@@ -93,8 +93,18 @@ public partial class ObjectiveMarker : Node3D
         _targetHeight = 2.2f;
         if (PlayerHouse.Contains(PlayerPos()) && World.House != null)
         {
-            _target = gs.DayOver ? World.House.Bed : World.House.ElevatorDown;
-            _targetHeight = gs.DayOver ? 1.6f : 3.0f;
+            // em casa: de noite a cama; de dia a porta (o elevador fica na vila)
+            _target = gs.DayOver ? World.House.Bed : World.House.DoorInside;
+            _targetHeight = gs.DayOver ? 1.6f : 2.4f;
+            return;
+        }
+        if (Town.Contains(PlayerPos()) && World.Town != null)
+        {
+            // na vila: de noite, encomendas prontas ou a casa; de dia, o elevador
+            bool deliver = false;
+            for (int i = 0; i < gs.Data.Contracts.Count; i++) deliver |= gs.CanDeliver(i);
+            _target = gs.DayOver ? (deliver ? World.Town.Board : World.Town.DoorOutside) : World.Town.Elevator;
+            _targetHeight = gs.DayOver ? 2.8f : 6.5f;
             return;
         }
         if (gs.DayOver)

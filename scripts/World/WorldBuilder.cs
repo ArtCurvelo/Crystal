@@ -26,6 +26,8 @@ public partial class WorldBuilder : Node3D
     public Vector3 SpawnPoint = new(0, 0.1f, 15f);
     public MineElevator Elevator;
     public PlayerHouse House;
+    /// <summary>Vila dos Ferreiros (superfície, em volta da casa).</summary>
+    public Town Town;
     public GoblinCamp Goblins;
     public SellStation SellStation;
     /// <summary>Pontos com água (cachoeiras, poças, lago) — para capturas e testes.</summary>
@@ -121,6 +123,8 @@ public partial class WorldBuilder : Node3D
 
         House = new PlayerHouse { Name = "PlayerHouse" };
         AddChild(House);
+        Town = new Town { Name = "Town" };
+        AddChild(Town);
 
         // agrupa malhas estáticas por material em cada região e túnel (o terreno fica de fora)
         int saved = 0;

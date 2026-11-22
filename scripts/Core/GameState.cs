@@ -513,6 +513,67 @@ public partial class GameState : Node
     }
 
     /// <summary>Começa um novo dia (depois de dormir em casa).</summary>
+    // ================= Encomendas (quadro de missões da vila) =================
+    public const int ContractSlots = 3;
+    public event Action ContractsChanged;
+
+    /// <summary>Recompensa: o dobro do valor de venda + um bônus fixo, arredondada.</summary>
+    public long ContractReward(MaterialDef m, int amount)
+    {
+        double v = SellPrice(m) * (double)amount * 2.0 + 40;
+        return v > 1000 ? (long)(Math.Round(v / 50.0) * 50) : (long)(Math.Round(v / 10.0) * 10);
+    }
+
+    /// <summary>Quantidade pedida por raridade (comum pede muito, lendário pede 1).</summary>
+    public static int ContractAmount(MaterialDef m, Random rng)
+    {
+        int b = m.Rarity switch { Rarity.Comum => 20, Rarity.Incomum => 12, Rarity.Raro => 6, Rarity.Epico => 3, _ => 1 };
+        return Math.Max(1, (int)Math.Round(b * (0.75 + rng.NextDouble() * 0.5)));
+    }
+
+    /// <summary>Preenche as vagas vazias (e troca as entregues se renew) com minérios já descobertos.</summary>
+    public void EnsureContracts(bool renew = false)
+    {
+        Data.Contracts ??= new List<ContractSave>();
+        if (renew) Data.Contracts.RemoveAll(c => c.Done);
+        var pool = Data.Discovered.Select(GameData.Mat).Where(m => m != null && !m.Special).ToList();
+        if (pool.Count == 0) pool.Add(GameData.Mat("quartz"));
+        var rng = new Random(Data.Day * 7919 + Data.Contracts.Count * 31 + Data.TotalEarned.GetHashCode());
+        while (Data.Contracts.Count < ContractSlots)
+        {
+            // comuns aparecem mais; não repete minério já pedido
+            var options = pool.Where(m => Data.Contracts.All(c => c.Mat != m.Id)).ToList();
+            if (options.Count == 0) options = pool;
+            double total = options.Sum(m => 1.0 / (1 + (int)m.Rarity));
+            double pick = rng.NextDouble() * total;
+            var chosen = options[^1];
+            foreach (var m in options) { pick -= 1.0 / (1 + (int)m.Rarity); if (pick <= 0) { chosen = m; break; } }
+            int amount = ContractAmount(chosen, rng);
+            Data.Contracts.Add(new ContractSave { Mat = chosen.Id, Amount = amount, Reward = ContractReward(chosen, amount) });
+        }
+        ContractsChanged?.Invoke();
+    }
+
+    public int InventoryOf(string matId) => Data.Inventory.TryGetValue(matId, out int c) ? c : 0;
+    public bool CanDeliver(int slot) => slot >= 0 && slot < Data.Contracts.Count && !Data.Contracts[slot].Done && InventoryOf(Data.Contracts[slot].Mat) >= Data.Contracts[slot].Amount;
+
+    /// <summary>Entrega a encomenda: tira os fragmentos da mochila e paga a recompensa.</summary>
+    public bool TryDeliver(int slot)
+    {
+        if (!CanDeliver(slot)) return false;
+        var c = Data.Contracts[slot];
+        Data.Inventory[c.Mat] -= c.Amount;
+        if (Data.Inventory[c.Mat] <= 0) Data.Inventory.Remove(c.Mat);
+        c.Done = true;
+        Data.ShardsSold += c.Amount;
+        Data.DayEarned += c.Reward;
+        AddMoney(c.Reward);
+        InventoryChanged?.Invoke();
+        ContractsChanged?.Invoke();
+        Notify("Encomenda entregue!", Loc.F("+{0} pela entrega de {1}x {2}.", FormatMoney(c.Reward), c.Amount, GameData.Mat(c.Mat)?.Name ?? c.Mat), NotifyKind.Success);
+        return true;
+    }
+
     public void StartNewDay()
     {
         Data.Day++;
@@ -521,6 +582,7 @@ public partial class GameState : Node
         Data.DayEarned = 0;
         Data.DayCrystals = 0;
         Data.DayBonus = 0;
+        EnsureContracts(renew: true); // encomendas entregues são trocadas por novas
         int charged = ChargerAmmoPerDay;
         if (charged > 0)
         {
@@ -808,9 +870,12 @@ public partial class GameState : Node
     }
 
     /// <summary>Avisa e devolve false quando a ação exige o turno aberto.</summary>
+    /// <summary>Jogador está na vila (ou em casa): dá para comprar mesmo com o turno encerrado.</summary>
+    public bool InTown { get; set; }
+
     public bool RequireWork()
     {
-        if (CanWork) return true;
+        if (CanWork || InTown) return true;
         Notify("Turno encerrado", "Agora você só pode vender e voltar para casa pelo elevador.", NotifyKind.Warning);
         return false;
     }

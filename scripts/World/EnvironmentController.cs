@@ -48,6 +48,31 @@ public partial class EnvironmentController : WorldEnvironment
 
     public override void _ExitTree() => Settings.Changed -= ApplyQuality;
 
+    bool _town, _townNight;
+    Sky _sky;
+    ProceduralSkyMaterial _skyMat;
+
+    /// <summary>Superfície (vila/casa): céu aberto, noite estrelada depois do turno e manhã depois de dormir.</summary>
+    public void SetTown(bool on, bool night)
+    {
+        _town = on; _townNight = night;
+        var e = Environment;
+        if (on)
+        {
+            _skyMat ??= new ProceduralSkyMaterial();
+            _sky ??= new Sky { SkyMaterial = _skyMat };
+            _skyMat.SkyTopColor = night ? new Color(0.02f, 0.03f, 0.09f) : new Color(0.25f, 0.42f, 0.7f);
+            _skyMat.SkyHorizonColor = night ? new Color(0.12f, 0.1f, 0.2f) : new Color(0.95f, 0.7f, 0.5f);
+            _skyMat.GroundBottomColor = new Color(0.03f, 0.03f, 0.04f);
+            _skyMat.GroundHorizonColor = night ? new Color(0.1f, 0.09f, 0.14f) : new Color(0.55f, 0.45f, 0.4f);
+            _skyMat.SunAngleMax = night ? 0f : 30f;
+            e.BackgroundMode = Godot.Environment.BGMode.Sky;
+            e.Sky = _sky;
+        }
+        else e.BackgroundMode = Godot.Environment.BGMode.Color;
+        Push();
+    }
+
     void ApplyQuality()
     {
         // perfil central: renderizador em uso × qualidade (cada um liga só o que suporta)
@@ -135,6 +160,14 @@ public partial class EnvironmentController : WorldEnvironment
         e.FogLightColor = _fog.Lerp(OverlayFog, _overlay);
         e.FogDensity = Mathf.Lerp(_density, OverlayFogDensity, _overlay);
         e.BackgroundColor = _fog.Darkened(0.7f);
+        if (_town)
+        {
+            // ar livre: luz ambiente do céu, névoa leve de vale
+            e.AmbientLightColor = _townNight ? new Color(0.35f, 0.4f, 0.6f) : new Color(0.75f, 0.72f, 0.7f);
+            e.AmbientLightEnergy = (_townNight ? 0.55f : 0.9f) * amb;
+            e.FogLightColor = _townNight ? new Color(0.12f, 0.12f, 0.2f) : new Color(0.7f, 0.6f, 0.55f);
+            e.FogDensity = 0.004f;
+        }
         e.VolumetricFogAlbedo = _fog.Lightened(0.55f);
         e.VolumetricFogEmission = _fog * 0.35f;
     }

@@ -7,7 +7,7 @@ namespace CrystalExcavator.World;
 
 /// <summary>
 /// Casa do escavador, no topo do elevador da mina: um cômodo onde se anda de verdade.
-/// Cama (dormir → novo dia), painel (melhorias da casa e habilidades) e elevador para descer à mina.
+/// Cama (dormir → novo dia), painel (melhorias da casa e habilidades) e porta para a Vila dos Ferreiros.
 /// Os móveis mudam conforme as melhorias compradas (HouseDiorama em modo interior).
 /// </summary>
 public partial class PlayerHouse : Node3D
@@ -16,7 +16,8 @@ public partial class PlayerHouse : Node3D
     public HouseDiorama Room;
     public HouseBed Bed;
     public HouseTerminal Panel;
-    public MineElevator ElevatorDown;
+    /// <summary>Porta por dentro: sai para a Vila dos Ferreiros (o elevador agora fica na estação da vila).</summary>
+    public HouseDoor DoorInside;
     public HouseToolBench ToolBench;
     public HouseChest Chest;
 
@@ -37,8 +38,8 @@ public partial class PlayerHouse : Node3D
         AddChild(Bed);
         Panel = new HouseTerminal { Name = "HousePanel", Position = new Vector3(-1.7f, 0, 2.05f), Rotation = new Vector3(0, Mathf.Pi, 0) };
         AddChild(Panel);
-        ElevatorDown = new MineElevator { Name = "ElevatorDown", GoesDown = true, Position = new Vector3(1.7f, 0, 1.78f), Rotation = new Vector3(0, Mathf.Pi, 0), Scale = Vector3.One * 0.72f };
-        AddChild(ElevatorDown);
+        DoorInside = new HouseDoor { Name = "HouseDoorInside", ToInside = false, Position = new Vector3(-2.75f, 0, 1.4f), Rotation = new Vector3(0, Mathf.Pi / 2, 0) };
+        AddChild(DoorInside);
         ToolBench = new HouseToolBench { Name = "ToolBench", Position = new Vector3(0.2f, 0, -2.05f) };
         AddChild(ToolBench);
         Chest = new HouseChest { Name = "Chest", Position = new Vector3(-0.55f, 0, 2.1f), Rotation = new Vector3(0, Mathf.Pi, 0) };
@@ -60,7 +61,7 @@ public partial class HouseBed : StationBase
 
     public override string GetPrompt() => GameState.Instance.DayOver
         ? Loc.F("{0} Dormir (começar o Dia {1})", InputHints.Interact, GameState.Instance.Data.Day + 1)
-        : Loc.T("Você já descansou. Desça pelo elevador para trabalhar.");
+        : Loc.T("Você já descansou. Saia de casa e pegue o elevador da vila para trabalhar.");
 
     public override void Interact(PlayerController player) => UiBus.RequestSleep();
 }

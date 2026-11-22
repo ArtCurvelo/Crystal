@@ -146,7 +146,7 @@ public partial class PlaythroughBot : Node
         if (_toolBuys < 3) { _errors++; GD.Print("ERRO: o bot quase não comprou ferramentas"); }
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
-        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys}");
+        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys} | Encomendas entregues: {_contracts}");
         bool ok = _days >= 2 && _houseBuys > 0 && _skillBuys > 0 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && (_pulses > 0 || !_usedLaser);
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
@@ -376,6 +376,7 @@ public partial class PlaythroughBot : Node
     }
 
     bool _checkedNightElevator;
+    int _contracts;
 
     /// <summary>Elevador da mina → casa (andando lá dentro) → painel → cama → elevador de volta à mina.</summary>
     async Task GoHomeAndSleep()
@@ -413,8 +414,54 @@ public partial class PlaythroughBot : Node
         }
         await Frames(60); // transição
         var house = Main.World.House;
-        if (!PlayerHouse.Contains(P.GlobalPosition) || !GS.DayOver || !P.InputEnabled) { _errors++; Log("ERRO: elevador não levou o jogador para casa"); return; }
-        if (Main.World.RegionRoots.Any(r => r.Visible) || !house.Visible) { _errors++; Log("ERRO: visibilidade errada dentro de casa"); }
+        var town = Main.World.Town;
+        if (!Town.Contains(P.GlobalPosition) || PlayerHouse.Contains(P.GlobalPosition) || !GS.DayOver || !P.InputEnabled) { _errors++; Log("ERRO: elevador não levou o jogador para a vila"); return; }
+        if (Main.World.RegionRoots.Any(r => r.Visible) || !town.Visible || !house.Visible) { _errors++; Log("ERRO: visibilidade errada na vila"); }
+        if (!GS.InTown) { _errors++; Log("ERRO: jogo não sabe que o jogador está na vila"); }
+
+        // anda um pouco pela vila (chão e colisões)
+        P.SetLook(Town.ArriveYaw, 0);
+        Input.ActionPress("move_forward");
+        await Frames(45);
+        Input.ActionRelease("move_forward");
+        if (!Town.Contains(P.GlobalPosition) || P.GlobalPosition.Y < -1f) { _errors++; Log("ERRO: jogador caiu ou saiu da vila"); return; }
+
+        // de noite o elevador da vila não desce
+        if (!_checkedNightElevator)
+        {
+            _checkedNightElevator = true;
+            if (await UseStationNode(town.Elevator))
+            {
+                await Frames(60);
+                if (!Town.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: desceu para a mina sem dormir"); return; }
+            }
+        }
+
+        // quadro de encomendas: entrega o que der
+        GS.EnsureContracts();
+        if (await UseStationNode(town.Board))
+        {
+            var ms = Main.GetChildren().OfType<MissionScreen>().First();
+            if (!ms.IsOpen) { _errors++; Log("ERRO: quadro de encomendas não abriu"); return; }
+            for (int k = 0; k < GS.Data.Contracts.Count; k++)
+            {
+                if (!GS.CanDeliver(k)) continue;
+                long before = GS.Data.Money, reward = GS.Data.Contracts[k].Reward;
+                var btn = FindButtons(ms).FirstOrDefault(b => b.HasMeta("contract") && (int)b.GetMeta("contract") == k);
+                btn?.EmitSignal(BaseButton.SignalName.Pressed);
+                await Frames(2);
+                if (!GS.Data.Contracts[k].Done || GS.Data.Money < before + reward) { _errors++; Log("ERRO: entrega da encomenda não pagou"); }
+                else { _contracts++; if (_contracts <= 2) Log($"Entregou encomenda: {GS.Data.Contracts[k].Amount}x {GameData.Mat(GS.Data.Contracts[k].Mat).Name} (+{GameState.FormatMoney(reward)})"); }
+            }
+            PressAction("pause");
+            await Frames(3);
+            if (ms.IsOpen || !P.InputEnabled) { _errors++; Log("ERRO: Esc não fechou o quadro de encomendas"); return; }
+        }
+
+        // porta: entra em casa
+        if (!await UseStationNode(town.DoorOutside)) { _errors++; Log("ERRO: porta da casa (lado de fora) não funcionou"); return; }
+        await Frames(60);
+        if (!PlayerHouse.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: a porta não levou para dentro de casa"); return; }
 
         // anda um pouco dentro de casa (colisões do cômodo)
         P.SetLook(0, 0);
@@ -422,17 +469,6 @@ public partial class PlaythroughBot : Node
         await Frames(60);
         Input.ActionRelease("move_forward");
         if (!PlayerHouse.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: jogador atravessou a parede da casa"); return; }
-
-        if (!_checkedNightElevator)
-        {
-            // de noite o elevador da casa não desce
-            _checkedNightElevator = true;
-            if (await UseStationNode(house.ElevatorDown))
-            {
-                await Frames(60);
-                if (!PlayerHouse.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: desceu para a mina sem dormir"); return; }
-            }
-        }
 
         // painel da casa: melhorias e habilidades
         if (await UseStationNode(house.Panel))
@@ -451,11 +487,14 @@ public partial class PlaythroughBot : Node
         if (GS.DayOver || GS.Data.Day != day + 1 || GS.Data.DayTimeSeconds > 2 || !P.InputEnabled || !PlayerHouse.Contains(P.GlobalPosition))
         { _errors++; Log("ERRO: dormir não começou um novo dia corretamente"); return; }
 
-        // elevador da casa → mina
-        if (!await UseStationNode(house.ElevatorDown)) return;
+        // sai de casa e pega o elevador da vila → mina
+        if (!await UseStationNode(house.DoorInside)) { _errors++; Log("ERRO: porta da casa (lado de dentro) não funcionou"); return; }
         await Frames(60);
-        if (P.GlobalPosition.DistanceTo(Main.World.SpawnPoint) > 1.5f || !Main.World.RegionRoots[0].Visible || house.Visible)
-        { _errors++; Log("ERRO: elevador da casa não levou o jogador à mina"); return; }
+        if (!Town.Contains(P.GlobalPosition) || PlayerHouse.Contains(P.GlobalPosition)) { _errors++; Log("ERRO: a porta não levou para a vila"); return; }
+        if (!await UseStationNode(town.Elevator)) return;
+        await Frames(60);
+        if (P.GlobalPosition.DistanceTo(Main.World.SpawnPoint) > 1.5f || !Main.World.RegionRoots[0].Visible || house.Visible || town.Visible)
+        { _errors++; Log("ERRO: elevador da vila não levou o jogador à mina"); return; }
         _days++;
         if (_days <= 2 || _days % 3 == 0) Log($"Dia {GS.Data.Day} começou (saldo {GameState.FormatMoney(GS.Data.Money)})");
     }

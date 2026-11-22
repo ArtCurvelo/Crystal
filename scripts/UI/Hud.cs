@@ -63,7 +63,7 @@ public partial class Hud : CanvasLayer
         if (t != _clockText) { _clockText = t; _clock.Text = t; }
         _clockBar.Value = gs.DayProgress;
         bool late = !over && gs.DayRemaining <= GameState.DayWarningSeconds;
-        bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
+        bool inHouse = Player != null && IsInstanceValid(Player) && (World.PlayerHouse.Contains(Player.GlobalPosition) || World.Town.Contains(Player.GlobalPosition));
         if (over != _clockOver || inHouse != _inHouse) { _clockOver = over; _inHouse = inHouse; RefreshObjective(); }
         var col = over ? UiTheme.Danger : late ? new Color(1f, 0.6f, 0.25f) : UiTheme.Text;
         _clock.Modulate = (over || late) ? new Color(1, 1, 1, 0.75f + 0.25f * Mathf.Abs(Mathf.Sin(Time.GetTicksMsec() / 250f))) : Colors.White;
@@ -525,14 +525,19 @@ public partial class Hud : CanvasLayer
         string text;
         var d = gs.Data;
         bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
+        bool inTown = !inHouse && Player != null && IsInstanceValid(Player) && World.Town.Contains(Player.GlobalPosition);
         if (inHouse)
             text = gs.DayOver
                 ? Loc.T("CASA\nUse o PAINEL para melhorias e habilidades. Durma na CAMA para começar o próximo dia.")
-                : Loc.T("NOVO DIA\nDesça pelo ELEVADOR para voltar à mina.");
+                : Loc.T("NOVO DIA\nSaia de casa e pegue o ELEVADOR da vila para voltar à mina.");
+        else if (inTown)
+            text = gs.DayOver
+                ? Loc.T("VILA DOS FERREIROS\nVenda ao FERREIRO, entregue as ENCOMENDAS do quadro e durma em CASA.")
+                : Loc.T("NOVO DIA\nPegue o ELEVADOR na estação da vila para descer à mina.");
         else if (gs.DayOver)
             text = gs.InventoryCount > 0
-                ? Loc.T("FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento e pegue o ELEVADOR para casa.")
-                : Loc.T("FIM DO TURNO\nPegue o ELEVADOR no acampamento para ir para casa.");
+                ? Loc.T("FIM DO TURNO\nVenda os minérios na ESTAÇÃO DE VENDA do acampamento (ou ao ferreiro da vila) e pegue o ELEVADOR.")
+                : Loc.T("FIM DO TURNO\nPegue o ELEVADOR no acampamento para subir à vila.");
         else if (d.CrystalsMined == 0) text = Loc.T("OBJETIVO\nMire em um cristal e clique com o botão esquerdo para minerar (um golpe por clique).");
         else if (d.ShardsSold == 0 && gs.InventoryCount < 8) text = Loc.T("OBJETIVO\nColete os fragmentos. Eles são atraídos até você.");
         else if (d.ShardsSold == 0) text = Loc.T("OBJETIVO\nVá até a ESTAÇÃO DE VENDA (verde) e pressione E.");
@@ -623,6 +628,13 @@ public partial class Hud : CanvasLayer
     }
 
     /// <summary>Atualiza a etiqueta de região e anima a entrada.</summary>
+    public void ShowTownBanner()
+    {
+        var town = new RegionDef { Name = "Vila dos Ferreiros", Subtitle = "Venda, encomendas e a estação da mina", AccentColor = new Color(1f, 0.65f, 0.35f) };
+        ShowRegionBanner(town);
+        _regionSub.Text = "◇ " + Loc.T(town.Subtitle);
+    }
+
     public void ShowHouseBanner()
     {
         var house = new RegionDef { Name = "Casa do Escavador", Subtitle = "Descanso, melhorias e habilidades", AccentColor = UiTheme.Gold };

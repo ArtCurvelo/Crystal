@@ -106,7 +106,7 @@ public partial class Main : Node
         World = new WorldBuilder { Name = "World" };
         world3d.AddChild(World);
         Buildings = new BuildingManager { Name = "Buildings", World = World, GetPlayer = () => Player };
-        Buildings.CanUseBuildMode = () => CurrentMode == Mode.Playing && Player != null && Player.InputEnabled && !AnyModal() && !_fading && !PlayerInHouse;
+        Buildings.CanUseBuildMode = () => CurrentMode == Mode.Playing && Player != null && Player.InputEnabled && !AnyModal() && !_fading && !PlayerInTown;
         world3d.AddChild(Buildings);
         _shards.FindSink = Buildings.FindSink;
         Events = new RegionEvents { Name = "RegionEvents", Env = _env, World = World, CurrentRegion = () => _currentRegion };
@@ -192,6 +192,9 @@ public partial class Main : Node
         _choice = new ChoiceScreen();
         _choice.Closed += ReturnToGameplay;
         AddChild(_choice);
+        _missions = new MissionScreen();
+        _missions.Closed += ReturnToGameplay;
+        AddChild(_missions);
         _home = new HomeScreen { OnSleep = () => { _home.CloseSilently(); SleepAtHome(); } };
         _home.Closed += ReturnToGameplay;
         AddChild(_home);
@@ -212,6 +215,8 @@ public partial class Main : Node
         UiBus.OpenHome += OpenHome;
         UiBus.OpenHomePanel += OpenHomePanel;
         UiBus.Sleep += SleepAtHome;
+        UiBus.Door += UseHouseDoor;
+        UiBus.OpenMissions += OpenMissions;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
@@ -392,6 +397,8 @@ public partial class Main : Node
         UiBus.OpenHome -= OpenHome;
         UiBus.OpenHomePanel -= OpenHomePanel;
         UiBus.Sleep -= SleepAtHome;
+        UiBus.Door -= UseHouseDoor;
+        UiBus.OpenMissions -= OpenMissions;
         UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
@@ -447,7 +454,7 @@ public partial class Main : Node
             {
                 camp.PlayerPos = () => Player.GlobalPosition;
                 camp.DamagePlayer = (d, from) => { if (CurrentMode == Mode.Playing && !_fading) Player.TakeDamage(d, from); };
-                camp.PlayerInMine = () => CurrentMode == Mode.Playing && !PlayerInHouse && !_fading;
+                camp.PlayerInMine = () => CurrentMode == Mode.Playing && !PlayerInTown && !_fading;
                 camp.Discovered += c => GetTree().CreateTimer(2.6f).Timeout += () => Hud.ShowBigMessage("GOBLIN ENCONTRADO!"); // depois de "PASSAGEM SECRETA!"
             }
             _shards.PlayerPosition = () => Player.BodyCenter;
@@ -508,8 +515,9 @@ public partial class Main : Node
         Player.StopClimb(false);
         int ri = WorldBuilder.RegionAt(Player.GlobalPosition).Index;
         var L = World.Layouts[ri];
-        var to = ri == 0 || PlayerInHouse ? World.SpawnPoint : L.OnGround(L.Entrance.X, L.Entrance.Z - 4f, 0.2f);
+        var to = ri == 0 || PlayerInTown ? World.SpawnPoint : L.OnGround(L.Entrance.X, L.Entrance.Z - 4f, 0.2f);
         if (PlayerInHouse) to = World.House.WakePoint;
+        else if (PlayerInTown) to = World.Town.ArrivePoint;
         Player.GlobalPosition = to;
         Player.Velocity = Vector3.Zero;
         UpdateRegion(true);
@@ -648,11 +656,11 @@ public partial class Main : Node
         Input.MouseMode = Input.MouseModeEnum.Captured;
         FadeThrough(() =>
         {
-            PlaceTo(World.House.ArrivePoint, 0);
-            Hud.ShowBigMessage("CASA");
+            PlaceTo(World.Town.ArrivePoint, Town.ArriveYaw);
+            Hud.ShowBigMessage("VILA DOS FERREIROS");
             gs.Notify(Loc.F("Fim do Dia {0}", gs.Data.Day),
                 Loc.F("Ganho no dia: {0}", GameState.FormatMoney(gs.Data.DayEarned)) + (bonus > 0 ? Loc.F(" (+{0} de bônus)", GameState.FormatMoney(bonus)) : "") +
-                Loc.T(". Use o PAINEL para melhorias e a CAMA para dormir."), NotifyKind.Success);
+                Loc.T(". Venda ao FERREIRO, veja as ENCOMENDAS e durma em CASA."), NotifyKind.Success);
         });
     }
 
@@ -678,7 +686,7 @@ public partial class Main : Node
             Events.ResetAll();
             PlaceTo(World.House.WakePoint, Mathf.Pi);
             Hud.ShowBigMessage(Loc.F("DIA {0}", gs.Data.Day));
-            gs.Notify("Bom dia!", "Desça pelo ELEVADOR para voltar à mina.", NotifyKind.Info);
+            gs.Notify("Bom dia!", "Saia de casa e pegue o ELEVADOR da vila para voltar à mina.", NotifyKind.Info);
         });
     }
 
@@ -709,6 +717,31 @@ public partial class Main : Node
     }
 
     public bool PlayerInHouse => Player != null && PlayerHouse.Contains(Player.GlobalPosition);
+    /// <summary>Na superfície: Vila dos Ferreiros ou dentro de casa (mina escondida, sem construir, compras liberadas).</summary>
+    public bool PlayerInTown => Player != null && (PlayerHouse.Contains(Player.GlobalPosition) || Town.Contains(Player.GlobalPosition));
+
+    MissionScreen _missions;
+
+    void OpenMissions()
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        Player.InputEnabled = false;
+        AudioManager.Instance?.SetBeam(false);
+        _missions.Open();
+    }
+
+    /// <summary>Porta da casa: entra (perto da porta, olhando para dentro) ou sai para a vila.</summary>
+    void UseHouseDoor(bool toInside)
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
+        AudioManager.Instance?.SetBeam(false);
+        FadeThrough(() =>
+        {
+            if (toInside) PlaceTo(PlayerHouse.Origin + new Vector3(-1.9f, 0.1f, 1.4f), -Mathf.Pi / 2);
+            else PlaceTo(Town.HouseOutsidePoint, Town.HouseOutsideYaw);
+        });
+    }
 
     public bool HomeOpen => _home.IsOpen;
 
@@ -735,13 +768,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
+    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -864,7 +897,7 @@ public partial class Main : Node
         if (_cullTimer <= 0) { _cullTimer = 0.5f; UpdateRegionCulling(); CheckSecrets(); }
     }
 
-    bool _bannerHouse;
+    int _bannerPlace = -1;
 
     // ---------------- acessibilidade: sons-guia e narração do que a mira encontra ----------------
     AudioStreamPlayer3D _cuePlayer;
@@ -939,12 +972,16 @@ public partial class Main : Node
         if (Player == null) return;
         var r = WorldBuilder.RegionAt(Player.GlobalPosition);
         bool inHouse = PlayerInHouse;
-        if (r == _currentRegion && inHouse == _bannerHouse) return;
-        _bannerHouse = inHouse;
+        bool inTown = PlayerInTown;
+        int place = inHouse ? 2 : inTown ? 1 : 0;
+        GameState.Instance.InTown = inTown;
+        if (r == _currentRegion && place == _bannerPlace) return;
+        _bannerPlace = place;
         _currentRegion = r;
         GameState.Instance.CurrentRegionId = r.Id;
         _env.SetRegion(r, instant);
-        if (inHouse) Hud.ShowHouseBanner(); else Hud.ShowRegionBanner(r);
+        _env.SetTown(inTown, World.Town?.Night ?? true);
+        if (inHouse) Hud.ShowHouseBanner(); else if (inTown) Hud.ShowTownBanner(); else Hud.ShowRegionBanner(r);
         AudioManager.Instance?.PlayMusic(r.Index);
         UiBus.EnterRegion(r.Id);
     }
@@ -954,8 +991,9 @@ public partial class Main : Node
     {
         if (Player == null || CurrentMode != Mode.Playing) return;
         var r = WorldBuilder.RegionAt(Player.GlobalPosition);
-        bool inHouse = PlayerInHouse;
+        bool inHouse = PlayerInTown; // casa e vila são a superfície: a mina some
         if (World.House.Visible != inHouse) World.House.Visible = inHouse;
+        if (World.Town.Visible != inHouse) World.Town.Visible = inHouse;
         for (int i = 0; i < World.RegionRoots.Count; i++)
         {
             bool visible = !inHouse && Mathf.Abs(i - r.Index) <= 1;

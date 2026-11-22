@@ -69,6 +69,38 @@ public partial class TestRunner : Node
                 Check(GameData.Mat("quartz").Hp > 30f, "vida dos minérios aumentada (x1,6)");
                 Fresh();
             });
+            Run("Vila: encomendas do quadro", () =>
+            {
+                Fresh(); GS.NewGame();
+                GS.Data.Discovered.Add("quartz"); GS.Data.Discovered.Add("amethyst");
+                GS.EnsureContracts();
+                Check(GS.Data.Contracts.Count == GameState.ContractSlots, $"{GameState.ContractSlots} encomendas abertas");
+                Check(GS.Data.Contracts.All(c => GS.Data.Discovered.Contains(c.Mat)), "só pede minérios já descobertos");
+                var c0 = GS.Data.Contracts[0];
+                var m0 = GameData.Mat(c0.Mat);
+                Check(c0.Reward > GS.SellPrice(m0) * c0.Amount, "encomenda paga mais que a venda comum");
+                Check(!GS.CanDeliver(0), "sem os fragmentos não dá para entregar");
+                GS.AddItem(c0.Mat, c0.Amount + 2);
+                long money = GS.Data.Money;
+                Check(GS.TryDeliver(0) && GS.Data.Contracts[0].Done, "entrega com os fragmentos na mochila");
+                Check(GS.Data.Money == money + c0.Reward && GS.InventoryOf(c0.Mat) == 2, "entrega paga e tira só a quantidade pedida");
+                Check(!GS.TryDeliver(0), "encomenda entregue não paga duas vezes");
+                // salva e carrega
+                var json = System.Text.Json.JsonSerializer.Serialize(GS.Data);
+                var back = System.Text.Json.JsonSerializer.Deserialize<SaveData>(json);
+                back.Sanitize();
+                Check(back.Contracts.Count == GameState.ContractSlots && back.Contracts[0].Done, "encomendas ficam no save");
+                GS.Data.DayOver = true;
+                GS.StartNewDay();
+                Check(GS.Data.Contracts.Count == GameState.ContractSlots && GS.Data.Contracts.All(c => !c.Done), "no dia seguinte a entregue vira uma nova");
+                // na vila dá para comprar mesmo depois do turno
+                GS.Data.DayOver = true; GS.InTown = false;
+                Check(!GS.RequireWork(), "na mina, depois do turno, não compra");
+                GS.InTown = true;
+                Check(GS.RequireWork(), "na vila compra mesmo depois do turno");
+                GS.InTown = false;
+                Fresh();
+            });
             Run("Versão dos jogadores x desenvolvedor", () =>
             {
                 Check(BuildFlavor.DevTools, "rodando do código: ferramentas de desenvolvedor ligadas");
@@ -102,6 +134,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: minerar, coletar, renascer", TestMiningIntegration);
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: casa (melhorias novas, bancada e baú)", TestHouseUpgrades);
+            await RunAsync("Integração: Vila dos Ferreiros", TestTown);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: clique, golpe triplo e mineração contínua", TestClickMining);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
@@ -1257,6 +1290,38 @@ public partial class TestRunner : Node
         await Frames(2);
     }
 
+    async Task TestTown()
+    {
+        Fresh();
+        GS.NewGame();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new ShardManager());
+        var house = new PlayerHouse();
+        root.AddChild(house);
+        var town = new Town();
+        root.AddChild(town);
+        await Frames(3);
+        Check(town.Elevator != null && town.Smith != null && town.SmithBench != null && town.Board != null && town.DoorOutside != null, "vila com elevador, ferreiro, bancada, quadro e porta da casa");
+        Check(house.DoorInside != null, "casa com porta por dentro");
+        Check(Town.Contains(town.ArrivePoint) && !PlayerHouse.Contains(town.ArrivePoint), "chegada do elevador fica na vila, fora de casa");
+        Check(Town.Contains(Town.HouseOutsidePoint) && !PlayerHouse.Contains(Town.HouseOutsidePoint), "saída da casa fica na vila");
+        Check(!Town.Contains(new Vector3(0, 0, 15f)), "a mina não é a vila");
+        // chão firme na chegada (o jogador não cai)
+        var space = town.GetWorld3D().DirectSpaceState;
+        var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(town.ArrivePoint + Vector3.Up * 2f, town.ArrivePoint + Vector3.Down * 3f, PlayerController.WorldLayer));
+        Check(hit.Count > 0, "há chão na chegada da vila");
+        bool door = false; void OnDoor(bool inside) => door = inside;
+        UiBus.Door += OnDoor; town.DoorOutside.Interact(null); UiBus.Door -= OnDoor;
+        Check(door, "porta de fora leva para dentro de casa");
+        bool missions = false; void OnM() => missions = true;
+        UiBus.OpenMissions += OnM; town.Board.Interact(null); UiBus.OpenMissions -= OnM;
+        Check(missions, "quadro abre as encomendas");
+        root.QueueFree();
+        await Frames(2);
+        Fresh();
+    }
+
     async Task TestHouseUpgrades()
     {
         Fresh();
@@ -1779,7 +1844,7 @@ public partial class TestRunner : Node
         Check(world.Crystals.Where(c => WorldBuilder.RegionAt(c.GlobalPosition).Index == 0).All(c => c.RespawnRate < 1.5f), "outras regiões não são afetadas");
         // casa onde se entra andando
         var house = world.House;
-        Check(house != null && house.Bed != null && house.Panel != null && house.ElevatorDown != null, "casa com cama, painel e elevador");
+        Check(house != null && house.Bed != null && house.Panel != null && house.DoorInside != null, "casa com cama, painel e porta para a vila");
         Check(PlayerHouse.Contains(house.ArrivePoint) && PlayerHouse.Contains(house.WakePoint) && !PlayerHouse.Contains(world.SpawnPoint), "pontos da casa ficam dentro dela");
         player.GlobalPosition = house.ArrivePoint;
         player.Velocity = Vector3.Zero;

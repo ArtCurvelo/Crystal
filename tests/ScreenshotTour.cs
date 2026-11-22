@@ -184,6 +184,38 @@ public partial class ScreenshotTour : Node
                     }
                 }
             }
+            // Vila dos Ferreiros: noite (depois do turno) e manhã
+            {
+                var tw = Main.World.Town;
+                gs.EndDay();
+                gs.EnsureContracts();
+                var c0 = World.Town.PlazaCenter;
+                var views = new (Vector3 from, Vector3 at, string name)[]
+                {
+                    (tw.ArrivePoint, c0 + new Vector3(4f, 1.5f, 0), "town_arrive"),
+                    (c0 + new Vector3(2f, 0.1f, -2f), c0 + new Vector3(0, 1.8f, -11f), "town_smith"),
+                    (c0 + new Vector3(4f, 0.1f, 6f), World.PlayerHouse.Origin + new Vector3(0, 2.5f, 0), "town_house"),
+                    (c0 + new Vector3(-4f, 0.1f, 2f), c0 + new Vector3(3f, 1.6f, 9f), "town_board"),
+                    (c0 + new Vector3(10f, 0.1f, 8f), c0 + new Vector3(-10f, 3f, -2f), "town_wide"),
+                };
+                foreach (var (from, at, name) in views)
+                {
+                    LookAtPoint(p, from, at);
+                    await Wait(1.0f);
+                    await Shot($"36_{name}_night");
+                }
+                gs.StartNewDay();
+                LookAtPoint(p, views[4].from, views[4].at);
+                await Wait(1.2f);
+                await Shot("36_town_wide_day");
+                LookAtPoint(p, World.Town.PlazaCenter + new Vector3(-6f, 0.1f, 0), World.Town.PlazaCenter + new Vector3(-11.5f, 4f, 0));
+                await Wait(0.6f);
+                await Shot("36_town_station_day");
+                UiBus.RequestMissions();
+                await Wait(0.6f);
+                await Shot("36_town_missions_ui");
+                Main.CloseAllForTour();
+            }
             // elevador da mina (torre de içamento)
             {
                 var els = new System.Collections.Generic.List<World.MineElevator>();

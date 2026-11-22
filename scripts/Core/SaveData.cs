@@ -26,6 +26,8 @@ public sealed class SaveData
     public List<string> UnlockedRegions { get; set; } = new() { "caves" };
     public Dictionary<string, int> Inventory { get; set; } = new();
     public List<string> Discovered { get; set; } = new();
+    /// <summary>Encomendas do quadro de missões da vila.</summary>
+    public List<ContractSave> Contracts { get; set; } = new();
     public long CrystalsMined { get; set; }
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
@@ -77,6 +79,9 @@ public sealed class SaveData
         UnlockedRegions ??= new();
         Inventory ??= new();
         Discovered ??= new();
+        Contracts ??= new();
+        Contracts.RemoveAll(c => c == null || GameData.Mat(c.Mat) == null || c.Amount <= 0 || c.Reward < 0);
+        if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
         if (Money < 0) Money = 0;
         if (TotalEarned < Money) TotalEarned = Money;
         if (CrystalsMined < 0) CrystalsMined = 0;
@@ -232,4 +237,13 @@ public sealed class BuildingSave
     public float JoinS { get; set; }
     /// <summary>Formato: 0 = funil antigo com esteira automática; 1 = sistema de construção atual.</summary>
     public int Ver { get; set; }
+}
+
+/// <summary>Encomenda da vila: entregar N fragmentos de um minério em troca de uma recompensa.</summary>
+public class ContractSave
+{
+    public string Mat { get; set; } = "quartz";
+    public int Amount { get; set; } = 10;
+    public long Reward { get; set; }
+    public bool Done { get; set; }
 }
