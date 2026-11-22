@@ -486,8 +486,28 @@ public partial class GoblinCamp : Node3D
         _hutLabel.Position = new Vector3(0, lv >= 2 ? (lv >= 3 ? 4.3f : 3.2f) : 2.3f, 0.4f);
         if (lv <= 1)
         {
+            // barraca: lona com remendos, cumeeira, varas da frente, porta aberta e cordas até as estacas
             M(new PrismMesh { Size = new Vector3(2.4f, 1.7f, 2.4f) }, cloth, new Vector3(0, 0.85f, 0.4f));
-            M(new BoxMesh { Size = new Vector3(0.5f, 0.5f, 0.02f) }, new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.35f, 0.2f) }, new Vector3(0.4f, 0.7f, -0.82f));
+            var flap = new StandardMaterial3D { AlbedoColor = new Color(0.08f, 0.06f, 0.05f), CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+            M(new PrismMesh { Size = new Vector3(0.9f, 1.05f, 0.02f) }, flap, new Vector3(0, 0.52f, -0.81f)); // abertura escura da porta
+            M(new PrismMesh { Size = new Vector3(0.5f, 0.6f, 0.02f) }, cloth, new Vector3(-0.42f, 0.32f, -0.86f), new Vector3(0, 0.5f, 0)); // aba dobrada
+            M(new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.035f, Height = 2.7f, RadialSegments = 6 }, darkWood, new Vector3(0, 1.72f, 0.4f), new Vector3(Mathf.Pi / 2, 0, 0)); // cumeeira
+            foreach (float z in new[] { -0.82f, 1.62f })
+                M(new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.045f, Height = 1.8f, RadialSegments = 6 }, darkWood, new Vector3(0, 0.88f, z));
+            var patch = new StandardMaterial3D { AlbedoColor = cloth.AlbedoColor.Darkened(0.3f).Lerp(new Color(0.6f, 0.45f, 0.3f), 0.3f), CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+            M(new BoxMesh { Size = new Vector3(0.35f, 0.3f, 0.01f) }, patch, new Vector3(0.75f, 0.55f, 0.2f), new Vector3(0, Mathf.Pi / 2, -0.6f));
+            M(new BoxMesh { Size = new Vector3(0.25f, 0.22f, 0.01f) }, patch, new Vector3(-0.6f, 0.9f, 0.9f), new Vector3(0, Mathf.Pi / 2, 0.6f));
+            var rope = new StandardMaterial3D { AlbedoColor = new Color(0.7f, 0.62f, 0.45f), Roughness = 1f };
+            foreach (var (x, z) in new[] { (-1.6f, -1.3f), (1.6f, -1.3f), (-1.6f, 2.1f), (1.6f, 2.1f) })
+            {
+                var top = new Vector3(0, 1.7f, z < 0 ? -0.82f : 1.62f);
+                var peg = new Vector3(x, 0.05f, z);
+                var mid = (top + peg) * 0.5f;
+                var dir = (top - peg).Normalized();
+                var lx = dir.Cross(Vector3.Forward).Normalized();
+                _hutVisual.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.008f, BottomRadius = 0.008f, Height = top.DistanceTo(peg), RadialSegments = 4 }, MaterialOverride = rope, Transform = new Transform3D(new Basis(lx, dir, lx.Cross(dir)), mid), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+                M(new CylinderMesh { TopRadius = 0.02f, BottomRadius = 0.035f, Height = 0.25f, RadialSegments = 5 }, darkWood, peg + new Vector3(0, 0.07f, 0), new Vector3(0.3f, 0, 0));
+            }
             Fire(fireAt);
             if (lv == 1)
             {
@@ -501,11 +521,46 @@ public partial class GoblinCamp : Node3D
             return;
         }
         // cabanas (nível 2+): paredes, telhado, porta, janela acesa
-        var wallMat = lv >= 4 ? metal : wood;
-        M(new BoxMesh { Size = new Vector3(2.6f, 1.8f, 2.4f) }, wallMat, new Vector3(0, 0.9f, 0.4f));
-        M(new PrismMesh { Size = new Vector3(3.0f, 1.0f, 2.8f) }, lv >= 4 ? MeshFactory.Metal(new Color(0.18f, 0.2f, 0.24f), 0.4f) : darkWood, new Vector3(0, 2.3f, 0.4f));
-        M(new BoxMesh { Size = new Vector3(0.7f, 1.3f, 0.04f) }, darkWood, new Vector3(0.5f, 0.65f, -0.82f));
-        M(new BoxMesh { Size = new Vector3(0.5f, 0.4f, 0.04f) }, MeshFactory.Emissive(new Color(1f, 0.8f, 0.45f), new Color(1f, 0.75f, 0.4f), 2f), new Vector3(-0.6f, 1.1f, -0.82f));
+        // paredes: troncos empilhados (madeira) ou chapas com nervuras (neon); quinas com pontas de tronco
+        if (lv >= 4)
+        {
+            M(new BoxMesh { Size = new Vector3(2.6f, 1.8f, 2.4f) }, metal, new Vector3(0, 0.9f, 0.4f));
+            for (int k = 0; k < 6; k++)
+                M(new BoxMesh { Size = new Vector3(0.05f, 1.8f, 0.05f) }, MeshFactory.Metal(new Color(0.2f, 0.22f, 0.26f), 0.4f), new Vector3(-1.1f + k * 0.44f, 0.9f, -0.82f));
+        }
+        else
+        {
+            M(new BoxMesh { Size = new Vector3(2.5f, 1.8f, 2.3f) }, darkWood, new Vector3(0, 0.9f, 0.4f)); // miolo (fecha as frestas)
+            for (int k = 0; k < 7; k++)
+            {
+                float y = 0.13f + k * 0.26f;
+                var log = k % 2 == 0 ? wood : new StandardMaterial3D { AlbedoColor = new Color(0.43f, 0.29f, 0.17f), Roughness = 0.9f };
+                foreach (float z in new[] { -0.8f, 1.6f })
+                    M(new CylinderMesh { TopRadius = 0.13f, BottomRadius = 0.13f, Height = 2.9f, RadialSegments = 8 }, log, new Vector3(0, y, z), new Vector3(0, 0, Mathf.Pi / 2));
+                foreach (float x in new[] { -1.25f, 1.25f })
+                    M(new CylinderMesh { TopRadius = 0.13f, BottomRadius = 0.13f, Height = 2.75f, RadialSegments = 8 }, log, new Vector3(x, y + 0.13f, 0.4f), new Vector3(Mathf.Pi / 2, 0, 0));
+            }
+        }
+        // telhado de tábuas: duas águas com beiral e cumeeira
+        var roofMat = lv >= 4 ? MeshFactory.Metal(new Color(0.18f, 0.2f, 0.24f), 0.4f) : darkWood;
+        foreach (float sgn in new[] { -1f, 1f })
+        {
+            M(new BoxMesh { Size = new Vector3(1.75f, 0.08f, 3.1f) }, roofMat, new Vector3(sgn * 0.72f, 2.25f, 0.4f), new Vector3(0, 0, sgn * -0.55f));
+            if (lv < 4)
+                for (int k = 0; k < 4; k++) // ripas
+                    M(new BoxMesh { Size = new Vector3(0.04f, 0.03f, 3.12f) }, wood, new Vector3(sgn * (0.25f + k * 0.38f), 2.55f - k * 0.23f, 0.4f), new Vector3(0, 0, sgn * -0.55f));
+        }
+        M(new CylinderMesh { TopRadius = 0.07f, BottomRadius = 0.07f, Height = 3.2f, RadialSegments = 8 }, wood, new Vector3(0, 2.72f, 0.4f), new Vector3(Mathf.Pi / 2, 0, 0));
+        M(new PrismMesh { Size = new Vector3(2.5f, 0.85f, 0.04f) }, darkWood, new Vector3(0, 2.2f, -0.82f)); // empena da frente
+        // porta com batente e maçaneta; janela com moldura em cruz; degrau
+        M(new BoxMesh { Size = new Vector3(0.84f, 1.42f, 0.06f) }, wood, new Vector3(0.5f, 0.71f, -0.9f));
+        M(new BoxMesh { Size = new Vector3(0.7f, 1.3f, 0.06f) }, darkWood, new Vector3(0.5f, 0.65f, -0.93f));
+        M(new SphereMesh { Radius = 0.04f, Height = 0.08f }, metal, new Vector3(0.75f, 0.68f, -0.97f));
+        M(new BoxMesh { Size = new Vector3(0.62f, 0.52f, 0.06f) }, wood, new Vector3(-0.6f, 1.1f, -0.9f));
+        M(new BoxMesh { Size = new Vector3(0.5f, 0.4f, 0.04f) }, MeshFactory.Emissive(new Color(1f, 0.8f, 0.45f), new Color(1f, 0.75f, 0.4f), 2f), new Vector3(-0.6f, 1.1f, -0.92f));
+        M(new BoxMesh { Size = new Vector3(0.04f, 0.42f, 0.03f) }, darkWood, new Vector3(-0.6f, 1.1f, -0.95f));
+        M(new BoxMesh { Size = new Vector3(0.52f, 0.04f, 0.03f) }, darkWood, new Vector3(-0.6f, 1.1f, -0.95f));
+        M(new BoxMesh { Size = new Vector3(1.0f, 0.12f, 0.4f) }, wood, new Vector3(0.5f, 0.06f, -1.12f));
         _hutVisual.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.75f, 0.45f), LightEnergy = 1.0f, OmniRange = 6f, Position = new Vector3(-0.6f, 1.2f, -1.5f) });
         Fire(fireAt);
         if (lv >= 3)
