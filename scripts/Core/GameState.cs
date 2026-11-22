@@ -81,7 +81,7 @@ public partial class GameState : Node
     public bool ToolBroken => Data.ToolBroken;
     /// <summary>Golpes até quebrar (com o bônus do Cabo reforçado).</summary>
     public int ToolMaxDurability => (int)(CurrentTool.Durability * (HasSkill(SkillIds.ToolGrip) ? 1.25f : 1f) * HouseMul(HouseIds.ToolRack));
-    public int ToolDurabilityLeft => Math.Max(0, ToolMaxDurability - Data.ToolWear);
+    public int ToolDurabilityLeft => Math.Max(0, (int)Math.Ceiling(ToolMaxDurability - Data.ToolWear));
     public float ToolDurability01 => ToolBroken ? 0f : ToolDurabilityLeft / (float)Math.Max(1, ToolMaxDurability);
     /// <summary>Ferramenta laser na mão (gasta munição em vez de desgastar).</summary>
     public bool IsLaser => CurrentTool.Kind == ToolKind.Laser && !ToolBroken;
@@ -166,7 +166,7 @@ public partial class GameState : Node
         MoneyChanged?.Invoke();
         UpgradesChanged?.Invoke();
         ToolChanged?.Invoke();
-        Notify(Loc.F("{0} equipada", t.Name), Loc.F("{0} de dano · {1:0.0} golpes/s · {2} golpes de durabilidade", FormatNumber(t.Damage), t.Swings, t.Durability), NotifyKind.Success);
+        Notify(Loc.F("{0} equipada", t.Name), Loc.F("{0} de dano · {1:0.0} golpes/s · {2} de resistência", FormatNumber(t.Damage), t.Swings, t.Durability), NotifyKind.Success);
         if (upgrade) BigMessage?.Invoke(t.Name.ToUpper());
         return true;
     }
@@ -182,6 +182,35 @@ public partial class GameState : Node
     }
 
     /// <summary>Um golpe que acertou um depósito gasta a ferramenta; no fim da durabilidade ela quebra.</summary>
+    /// <summary>
+    /// Golpe de picareta/broca que acertou um minério: gasta a resistência na proporção do dano
+    /// (o minério inteiro tira ToolData.WearFor). Laser: cada disparo gasta uma célula.
+    /// </summary>
+    public void WearTool(MaterialDef ore, float fractionOfOre)
+    {
+        if (ToolBroken) return;
+        if (CurrentTool.Kind == ToolKind.Laser) { WearTool(1); return; }
+        AddWear(ToolData.WearFor(ore) * Math.Clamp(fractionOfOre, 0f, 1f));
+    }
+
+    void AddWear(float amount)
+    {
+        float max = ToolMaxDurability;
+        float before = Data.ToolWear;
+        Data.ToolWear += amount;
+        if (before < max * 0.8f && Data.ToolWear >= max * 0.8f && Data.ToolWear < max)
+            Notify("Ferramenta desgastada", Loc.F("{0}: resta {1} de resistência. Compre outra no Terminal.", CurrentTool.Name, ToolDurabilityLeft), NotifyKind.Warning);
+        if (Data.ToolWear >= max)
+        {
+            Data.ToolBroken = true;
+            Notify(Loc.F("{0} quebrou!", CurrentTool.Name), Loc.T("Você está minerando com as mãos. Volte ao Terminal e compre outra ferramenta."), NotifyKind.Warning);
+            BigMessage?.Invoke(Loc.T("FERRAMENTA QUEBROU"));
+            UpgradesChanged?.Invoke();
+            ToolChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Gasta resistência direto (testes/admin) ou células do laser.</summary>
     public void WearTool(int hits = 1)
     {
         if (ToolBroken) return;
@@ -203,17 +232,7 @@ public partial class GameState : Node
             }
             return;
         }
-        Data.ToolWear += hits;
-        if (Data.ToolWear == (int)(ToolMaxDurability * 0.8f))
-            Notify("Ferramenta desgastada", Loc.F("{0}: restam {1} golpes. Compre outra no Terminal.", CurrentTool.Name, ToolDurabilityLeft), NotifyKind.Warning);
-        if (Data.ToolWear >= ToolMaxDurability)
-        {
-            Data.ToolBroken = true;
-            Notify(Loc.F("{0} quebrou!", CurrentTool.Name), Loc.T("Você está minerando com as mãos. Volte ao Terminal e compre outra ferramenta."), NotifyKind.Warning);
-            BigMessage?.Invoke(Loc.T("FERRAMENTA QUEBROU"));
-            UpgradesChanged?.Invoke();
-            ToolChanged?.Invoke();
-        }
+        AddWear(hits);
     }
 
     /// <summary>
@@ -222,6 +241,15 @@ public partial class GameState : Node
     /// </summary>
     public void MigrateTools()
     {
+        // desgaste antigo (golpes) vira resistência na mesma proporção
+        if (Data.WearVersion < 1)
+        {
+            Data.WearVersion = 1;
+            int t = Math.Clamp(Data.Tool, 0, ToolData.OldHitDurability.Length - 1);
+            if (Data.ToolWear > 0 && !Data.ToolBroken)
+                Data.ToolWear = Math.Min(0.95f, Data.ToolWear / ToolData.OldHitDurability[t]) * Math.Max(1, ToolData.Of(Data.Tool).Durability);
+            else if (Data.ToolBroken) Data.ToolWear = ToolData.Of(Data.Tool).Durability;
+        }
         if (Data.ToolsMigrated) return;
         Data.ToolsMigrated = true;
         int lvl = Data.Level(UpgradeIds.Damage);
@@ -790,7 +818,7 @@ public partial class GameState : Node
     // ================= Sessão / Save =================
     public void NewGame()
     {
-        Data = new SaveData { ToolsMigrated = true }; // começa com a picareta de madeira
+        Data = new SaveData { ToolsMigrated = true, WearVersion = 1 }; // começa com a picareta de madeira
         Data.Sanitize();
         _autosaveTimer = 0;
         SessionActive = true;

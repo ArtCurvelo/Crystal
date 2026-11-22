@@ -437,6 +437,11 @@ public static partial class LocTables
         list.Add(("Cristais minerados: {0}   ·   Fragmentos vendidos: {1}\n", "Crystals mined: {0}   ·   Shards sold: {1}\n", "Cristales minados: {0}   ·   Fragmentos vendidos: {1}\n"));
         list.Add(("Créditos:", "Credits:", "Créditos:"));
         list.Add(("Lúmens", "Lumens", "Lúmenes"));
+        list.Add(("{0}: resta {1} de resistência. Compre outra no Terminal.", "{0}: {1} durability left. Buy another at the Terminal.", "{0}: queda {1} de resistencia. Compra otra en la Terminal."));
+        list.Add(("Resistência: {0}/{1} · {2} de dano · {3:0.0} golpes/s", "Durability: {0}/{1} · {2} damage · {3:0.0} hits/s", "Resistencia: {0}/{1} · {2} de daño · {3:0.0} golpes/s"));
+        list.Add(("{0} de dano · {1:0.0} golpes/s · resistência {2} · {3}", "{0} damage · {1:0.0} hits/s · durability {2} · {3}", "{0} de daño · {1:0.0} golpes/s · resistencia {2} · {3}"));
+        list.Add(("{0} dano · {1:0.0}/s · resistência {2}", "{0} dmg · {1:0.0}/s · durability {2}", "{0} daño · {1:0.0}/s · resistencia {2}"));
+        list.Add(("{0} de dano · {1:0.0} golpes/s · {2} de resistência", "{0} damage · {1:0.0} hits/s · {2} durability", "{0} de daño · {1:0.0} golpes/s · {2} de resistencia"));
         list.Add(("{0} / {1} · CHEIA", "{0} / {1} · FULL", "{0} / {1} · LLENA"));
         list.Add(("Dia {0} · FIM DO TURNO", "Day {0} · SHIFT OVER", "Día {0} · FIN DEL TURNO"));
         list.Add(("Câmara secreta encontrada", "Secret chamber found", "Cámara secreta encontrada"));

@@ -498,8 +498,10 @@ public partial class PlayerController : CharacterBody3D
                 dmg *= gs.CritMultiplier;
                 Effects.Instance?.FloatText(pos + Vector3.Up * 0.4f, Core.Loc.T("CRÍTICO!"), new Color(1f, 0.85f, 0.3f), 1.1f);
             }
+            float hpBefore = c.Hp;
             bool broke = c.IsMineable && c.Hit(dmg, pos, normal);
-            gs.WearTool(); // cada golpe que acerta gasta a ferramenta
+            // desgaste proporcional ao dano: o minério inteiro tira a resistência da raridade dele
+            gs.WearTool(c.Material, c.MaxHp > 0 ? Mathf.Min(dmg, hpBefore) / c.MaxHp : 0f);
             _shakeAmount = Mathf.Min(1.5f, _shakeAmount + (broke ? 1.2f : 0.45f));
             _fovKick = broke ? 3f : 1f;
             CrystalHit?.Invoke(c, broke);

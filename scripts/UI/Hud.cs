@@ -512,8 +512,8 @@ public partial class Hud : CanvasLayer
             ? Loc.F("mãos: {0} dano · compre outra no Terminal", GameState.FormatNumber(gs.Damage))
             : gs.OutOfAmmo ? Loc.F("mãos: {0} dano · compre munição no Terminal", GameState.FormatNumber(gs.Damage))
             : gs.IsLaser ? Loc.F("{0} dano · {1:0.0}/s · {2} células", GameState.FormatNumber(gs.Damage), gs.SwingsPerSecond, gs.Data.Ammo)
-            : Loc.F("{0} dano · {1:0.0}/s · {2} golpes", GameState.FormatNumber(gs.Damage), gs.SwingsPerSecond, gs.ToolDurabilityLeft);
-        _lastWear = gs.Data.ToolWear + gs.Data.Ammo * 100000;
+            : Loc.F("{0} dano · {1:0.0}/s · resistência {2}", GameState.FormatNumber(gs.Damage), gs.SwingsPerSecond, gs.ToolDurabilityLeft);
+        _lastWear = gs.ToolDurabilityLeft + gs.Data.Ammo * 100000;
         _lastBroken = gs.ToolBroken;
         _pulseInfo.Text = Loc.F("Pulso x{0:0.0} do dano · raio {1:0.0} m", gs.ResonanceMultiplier, gs.ResonanceRadius);
     }
@@ -665,7 +665,7 @@ public partial class Hud : CanvasLayer
     public override void _Process(double delta)
     {
         // durabilidade muda a cada golpe: atualiza o texto da ferramenta só quando mudou
-        if (GameState.Instance is { } gsw && (gsw.Data.ToolWear + gsw.Data.Ammo * 100000 != _lastWear || gsw.ToolBroken != _lastBroken) && _toolName != null) RefreshStats();
+        if (GameState.Instance is { } gsw && (gsw.ToolDurabilityLeft + gsw.Data.Ammo * 100000 != _lastWear || gsw.ToolBroken != _lastBroken) && _toolName != null) RefreshStats();
         long __t = Core.Prof.Start();
         _ProcessInner(delta);
         Core.Prof.End("hud", __t);

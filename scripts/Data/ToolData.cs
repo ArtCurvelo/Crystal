@@ -46,18 +46,32 @@ public static class ToolData
     {
         void T(string id, string name, ToolKind k, int region, float dmg, float swings, int dur, long cost, string ore, string desc) =>
             All.Add(new ToolDef { Index = All.Count, Id = id, Name = name, Kind = k, Region = region, Damage = dmg, Swings = swings, Durability = dur, Cost = (long)System.Math.Round(cost * Economy.ToolCost), Ore = ore, Description = desc });
-        T("wood", "Picareta de Madeira", ToolKind.Pickaxe, 0, 3, 1.6f, 250, 15, null, "Lasca a rocha mais mole. Quebra rápido.");
-        T("copper", "Picareta de Cobre", ToolKind.Pickaxe, 0, 8, 1.9f, 350, 60, "copper", "Cabeça de cobre batido: o dobro da madeira.");
-        T("hematite", "Picareta de Hematita", ToolKind.Pickaxe, 0, 18, 2.2f, 450, 200, "hematite", "Ferro avermelhado, pesado e firme.");
-        T("amethyst", "Picareta de Ametista", ToolKind.Pickaxe, 0, 40, 2.5f, 550, 800, "amethyst", "Ponta de cristal que racha os depósitos fundos da primeira caverna.");
-        T("silver", "Picareta de Prata", ToolKind.Pickaxe, 1, 90, 2.8f, 650, 4500, "silver", "Leve e afiada para o gelo das Profundezas.");
-        T("sapphire", "Picareta de Safira", ToolKind.Pickaxe, 1, 200, 3.1f, 750, 16000, "sapphire", "Safira lapidada: corta cristais resistentes.");
-        T("obsidian", "Picareta de Obsidiana", ToolKind.Pickaxe, 2, 450, 3.4f, 850, 60000, "obsidian", "Vidro vulcânico: aguenta o calor do Núcleo.");
-        T("ruby", "Picareta de Rubi", ToolKind.Pickaxe, 2, 1000, 3.7f, 950, 220000, "ruby", "A melhor picareta: rubi forjado na lava.");
+        T("wood", "Picareta de Madeira", ToolKind.Pickaxe, 0, 3, 1.6f, 25, 15, null, "Lasca a rocha mais mole. Quebra rápido.");
+        T("copper", "Picareta de Cobre", ToolKind.Pickaxe, 0, 8, 1.9f, 50, 60, "copper", "Cabeça de cobre batido: o dobro da madeira.");
+        T("hematite", "Picareta de Hematita", ToolKind.Pickaxe, 0, 18, 2.2f, 90, 200, "hematite", "Ferro avermelhado, pesado e firme.");
+        T("amethyst", "Picareta de Ametista", ToolKind.Pickaxe, 0, 40, 2.5f, 150, 800, "amethyst", "Ponta de cristal que racha os depósitos fundos da primeira caverna.");
+        T("silver", "Picareta de Prata", ToolKind.Pickaxe, 1, 90, 2.8f, 240, 4500, "silver", "Leve e afiada para o gelo das Profundezas.");
+        T("sapphire", "Picareta de Safira", ToolKind.Pickaxe, 1, 200, 3.1f, 380, 16000, "sapphire", "Safira lapidada: corta cristais resistentes.");
+        T("obsidian", "Picareta de Obsidiana", ToolKind.Pickaxe, 2, 450, 3.4f, 560, 60000, "obsidian", "Vidro vulcânico: aguenta o calor do Núcleo.");
+        T("ruby", "Picareta de Rubi", ToolKind.Pickaxe, 2, 1000, 3.7f, 800, 220000, "ruby", "A melhor picareta: rubi forjado na lava.");
         T("titanium", "Broca de Titânio", ToolKind.Drill, 3, 2200, 4.2f, 1100, 850000, "titanium", "Broca giratória para a rocha do abismo.");
-        T("peridot", "Broca de Peridoto", ToolKind.Drill, 4, 4500, 4.8f, 1250, 3200000, "peridot", "Broca com ponta de peridoto, rápida e precisa.");
-        T("diamond_laser", "Cortador Laser de Diamante", ToolKind.Laser, 5, 9000, 5.5f, 1500, 7500000, "diamond", "Feixe concentrado por um diamante: derrete qualquer cristal.");
-        T("prism_lance", "Lança Prismática", ToolKind.Laser, 5, 18000, 6.5f, 1800, 18000000, "eternaldiamond", "O feixe definitivo, guiado por um diamante eterno.");
+        T("peridot", "Broca de Peridoto", ToolKind.Drill, 4, 4500, 4.8f, 1500, 3200000, "peridot", "Broca com ponta de peridoto, rápida e precisa.");
+        T("diamond_laser", "Cortador Laser de Diamante", ToolKind.Laser, 5, 9000, 5.5f, 0, 7500000, "diamond", "Feixe concentrado por um diamante: derrete qualquer cristal.");
+        T("prism_lance", "Lança Prismática", ToolKind.Laser, 5, 18000, 6.5f, 0, 18000000, "eternaldiamond", "O feixe definitivo, guiado por um diamante eterno.");
+    }
+
+    /// <summary>Resistência antiga (golpes) de cada ferramenta, para converter o desgaste de saves antigos.</summary>
+    public static readonly int[] OldHitDurability = { 250, 350, 450, 550, 650, 750, 850, 950, 1100, 1250, 1500, 1800 };
+
+    /// <summary>
+    /// Resistência que um minério inteiro tira da ferramenta: comum 1, incomum 2, raro 4, épico 7, lendário 12;
+    /// formações especiais 3x. Cada golpe tira a parte proporcional ao dano causado.
+    /// </summary>
+    public static float WearFor(MaterialDef m)
+    {
+        if (m == null) return 1f;
+        float w = m.Rarity switch { Rarity.Comum => 1f, Rarity.Incomum => 2f, Rarity.Raro => 4f, Rarity.Epico => 7f, _ => 12f };
+        return m.Special ? w * 3f : w;
     }
 
     public static ToolDef Of(int i) => i >= 0 && i < All.Count ? All[i] : All[0];

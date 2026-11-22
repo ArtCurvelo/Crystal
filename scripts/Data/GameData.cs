@@ -186,6 +186,8 @@ public static class Economy
     public const float UpgradeCost = 1.5f;
     /// <summary>Preço das ferramentas e da munição do laser.</summary>
     public const float ToolCost = 1.6f;
+    /// <summary>Vida de todos os minérios (aplicada ao registrar cada um).</summary>
+    public const float OreHp = 1.6f;
 }
 
 public static class GameData
@@ -789,7 +791,7 @@ public static class GameData
     /// <summary>Janela (s) entre golpes para manter o ritmo.</summary>
     public const float ResonanceWindow = 1.4f;
 
-    static void Add(MaterialDef m) => Materials[m.Id] = m;
+    static void Add(MaterialDef m) { m.Hp *= Economy.OreHp; Materials[m.Id] = m; } // vida dos minérios: x1,6 (pedido do diretor)
     static void AddUp(UpgradeDef u)
     {
         u.BaseCost = (long)Math.Round(u.BaseCost * Economy.UpgradeCost);

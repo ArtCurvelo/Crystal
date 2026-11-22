@@ -11,9 +11,11 @@ public sealed class SaveData
 
     public int Version { get; set; } = CurrentVersion;
     public long Money { get; set; }
-    /// <summary>Ferramenta equipada (índice em ToolData.All), golpes já dados com ela e se quebrou.</summary>
+    /// <summary>Ferramenta equipada (índice em ToolData.All), resistência já gasta e se quebrou.</summary>
     public int Tool { get; set; }
-    public int ToolWear { get; set; }
+    public float ToolWear { get; set; }
+    /// <summary>1 = desgaste em pontos de resistência (antes eram golpes).</summary>
+    public int WearVersion { get; set; }
     public bool ToolBroken { get; set; }
     /// <summary>Células de energia para as ferramentas laser.</summary>
     public int Ammo { get; set; }
@@ -137,7 +139,7 @@ public sealed class SaveData
         Discovered = Discovered.Where(d => d != null && GameData.Mat(d) != null).Distinct().ToList();
 
         Tool = System.Math.Clamp(Tool, 0, ToolData.All.Count - 1);
-        ToolWear = System.Math.Max(0, ToolWear);
+        ToolWear = float.IsFinite(ToolWear) ? System.Math.Max(0f, ToolWear) : 0f;
         Ammo = System.Math.Max(0, Ammo);
         Buildings ??= new();
         Buildings = Buildings.Where(b => b != null && BuildData.Of(b.Type) != null

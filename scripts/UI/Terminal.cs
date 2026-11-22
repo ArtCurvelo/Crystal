@@ -374,7 +374,7 @@ public partial class ShopScreen : TerminalScreen
         v.AddChild(bar);
         string info = gs.ToolBroken ? Loc.T("Compre outra abaixo (a mesma ou uma melhor).")
             : t.Kind == ToolKind.Laser ? Loc.F("Células de energia: {0} (1 por disparo) · {1} de dano · {2:0.0} disparos/s", gs.Data.Ammo, GameState.FormatNumber(t.Damage), t.Swings)
-            : Loc.F("Durabilidade: {0}/{1} golpes · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, gs.ToolMaxDurability, GameState.FormatNumber(t.Damage), t.Swings);
+            : Loc.F("Resistência: {0}/{1} · {2} de dano · {3:0.0} golpes/s", gs.ToolDurabilityLeft, gs.ToolMaxDurability, GameState.FormatNumber(t.Damage), t.Swings);
         if (t.Kind == ToolKind.Laser && !gs.ToolBroken) bar.Fill = Mathf.Clamp(gs.Data.Ammo / (float)ToolData.AmmoPack, 0f, 1f);
         v.AddChild(UiTheme.Label(info, 14, gs.OutOfAmmo ? UiTheme.Danger : UiTheme.Muted));
         return card;
@@ -430,7 +430,7 @@ public partial class ShopScreen : TerminalScreen
         h.AddChild(v);
         string kind = t.Kind switch { ToolKind.Drill => Loc.T("broca"), ToolKind.Laser => Loc.T("laser"), _ => Loc.T("picareta") };
         v.AddChild(UiTheme.Label(t.Name + (current ? "  ★" : ""), 18, UiTheme.Text, true));
-        v.AddChild(UiTheme.Label(avail ? Loc.F("{0} de dano · {1:0.0} golpes/s · {2} golpes · {3}", GameState.FormatNumber(t.Damage), t.Swings, t.Durability, kind)
+        v.AddChild(UiTheme.Label(avail ? Loc.F("{0} de dano · {1:0.0} golpes/s · resistência {2} · {3}", GameState.FormatNumber(t.Damage), t.Swings, t.Durability, kind)
                                        : Loc.F("Libere a região {0} para comprar", GameData.Regions[Math.Clamp(t.Region, 0, GameData.Regions.Count - 1)].Name), 14, UiTheme.Muted));
         if (avail) v.AddChild(UiTheme.Label(t.Description, 13, UiTheme.Muted));
         string label = !avail ? Loc.T("Bloqueada") : current && !gs.ToolBroken ? Loc.F("Outra · {0}", GameState.FormatMoney(t.Cost)) : GameState.FormatMoney(t.Cost);

@@ -46,6 +46,29 @@ public partial class TestRunner : Node
             Run("Desempenho: padrões de alto FPS, migração e resolução dinâmica", TestFpsSettings);
             Run("Renderizador: perfis, testes, escolha, validade e recuperação", TestRendererSelection);
             Run("Ferramentas: picaretas, durabilidade, quebra e compra", TestTools);
+            Run("Resistência das ferramentas (desgaste por minério)", () =>
+            {
+                Fresh(); GS.NewGame();
+                var common = GameData.Materials.Values.First(m => m.Rarity == Rarity.Comum && !m.Special);
+                var rare = GameData.Materials.Values.First(m => m.Rarity == Rarity.Raro && !m.Special);
+                Check(ToolData.WearFor(rare) > ToolData.WearFor(common), "minério raro gasta mais a ferramenta que o comum");
+                bool rising = true;
+                for (int i = 1; i < ToolData.All.Count; i++) if (ToolData.All[i].Kind != ToolKind.Laser) rising &= ToolData.All[i].Durability > ToolData.All[i - 1].Durability;
+                Check(rising, "cada picareta/broca melhor tem mais resistência");
+                float before = GS.Data.ToolWear;
+                for (int k = 0; k < 4; k++) GS.WearTool(common, 0.25f); // 4 golpes de 1/4 do minério
+                Check(Mathf.IsEqualApprox(GS.Data.ToolWear - before, ToolData.WearFor(common)), $"minério comum inteiro gasta {ToolData.WearFor(common)} ({GS.Data.ToolWear - before:0.00})");
+                GS.WearTool(rare, 0.5f);
+                Check(Mathf.IsEqualApprox(GS.Data.ToolWear - before, ToolData.WearFor(common) + ToolData.WearFor(rare) * 0.5f), "metade de um raro gasta metade da resistência dele");
+                while (!GS.ToolBroken) GS.WearTool(common, 1f);
+                Check(GS.ToolBroken && GS.UsingHands, "sem resistência a ferramenta quebra");
+                // save antigo: 125 de 250 golpes gastos na madeira → metade da resistência nova
+                GS.Data.Tool = 0; GS.Data.ToolBroken = false; GS.Data.ToolWear = 125; GS.Data.WearVersion = 0;
+                GS.MigrateTools();
+                Check(Mathf.IsEqualApprox(GS.Data.ToolWear, ToolData.All[0].Durability * 0.5f), $"desgaste antigo convertido na mesma proporção ({GS.Data.ToolWear})");
+                Check(GameData.Mat("quartz").Hp > 30f, "vida dos minérios aumentada (x1,6)");
+                Fresh();
+            });
             Run("Versão dos jogadores x desenvolvedor", () =>
             {
                 Check(BuildFlavor.DevTools, "rodando do código: ferramentas de desenvolvedor ligadas");
@@ -712,8 +735,8 @@ public partial class TestRunner : Node
         for (int i = 0; i < GameData.JourneyRegions; i++) if (!GS.IsUnlocked(GameData.Regions[i].Id)) GS.Data.UnlockedRegions.Add(GameData.Regions[i].Id);
         GS.AddItem("heart", 1);
         Check(GS.JourneyComplete, "jornada conclui sem as regiões de fim de jogo");
-        var dmg = GameData.Upgrades[UpgradeIds.Damage];
-        float maxDmg = dmg.ValueAt(dmg.MaxLevel), midDmg = dmg.ValueAt(20);
+        // dano das ferramentas reais: a melhor (laser final) e a picareta de rubi como meio do caminho
+        float maxDmg = ToolData.All[^1].Damage, midDmg = ToolData.All.First(t => t.Id == "ruby").Damage;
         for (int i = GameData.JourneyRegions; i < GameData.Regions.Count; i++)
         {
             var r = GameData.Regions[i];
@@ -725,7 +748,7 @@ public partial class TestRunner : Node
             foreach (var sp in r.Spawns.Select(x => GameData.Mat(x.MaterialId)).Append(GameData.Mat(r.RareMaterialId)))
             {
                 float hitsMax = sp.Hp / maxDmg, hitsMid = sp.Hp / midDmg;
-                Check(hitsMax <= 25f && hitsMid >= 3f, $"{sp.NamePt}: {hitsMid:0} golpes no nível 20, {hitsMax:0.0} no máximo");
+                Check(hitsMax <= 40f && hitsMid >= 3f, $"{sp.NamePt}: {hitsMid:0} golpes com a picareta de rubi, {hitsMax:0.0} com o melhor laser");
                 Check(sp.Value / (float)sp.Hp is > 0.05f and < 0.4f, $"{sp.NamePt}: valor por resistência coerente");
             }
         }
@@ -2491,7 +2514,7 @@ public partial class TestRunner : Node
             double time = mat.Hp / GS.DamagePerSecond + walkPerCrystal;
             int shards = (mat.ShardsMin + mat.ShardsMax) / 2;
             t += time;
-            GS.WearTool((int)Math.Ceiling(mat.Hp / Math.Max(0.01f, GS.Damage))); // cada golpe gasta a ferramenta
+            GS.WearTool(mat, 1f); // o minério inteiro gasta a resistência da raridade dele
             GS.AddItem(mat.Id, shards);
             // mochila cheia, ou a ferramenta quebrou: volta ao acampamento (vende e compra outra)
             if (GS.InventoryFull || GS.UsingHands)
