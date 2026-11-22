@@ -464,3 +464,10 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Voltar da mina chega na estação da vila; a casa tem porta para a vila (`HouseDoor`). Marcador de objetivo e HUD guiam pela vila. Compras funcionam na vila mesmo após o turno (`GameState.InTown`).
 - Bug achado pelo bot: abrir o quadro travava o jogo (a tela se atualizava → `EnsureContracts` avisava mudança → a tela se atualizava de novo, sem fim). Agora só avisa quando algo muda e a tela tem trava contra reentrada; novo teste abre a tela e entrega pela interface.
 - Testes 877/877.
+
+## Etapa 2: Forja do ferreiro + HQ de abertura (v0.25.0)
+- Forja (`Data/GearData.cs`, `GameState` seção Forja, `UI/ForgeScreen.cs`, estação `ForgeAnvil` na vila entre o balcão e a bancada): 4 peças (Capacete: lanterna + chance de raros; Luvas: dano; Botas: velocidade; Bolsa: mochila) em 6 níveis (Cobre, Prata, Ouro, Titânio, Jade, Tanzanita). Cada nível pede o metal + uma gema da região de mesmo número e uma taxa; precisa da região liberada. Ao renascer, o equipamento fica para trás. Salvo em `SaveData.Gear`.
+- Conserto na forja: devolve a resistência da ferramenta (taxa = até 35% do preço + 12 fragmentos do minério dela; madeira só taxa). Lasers não consertam.
+- HQ de abertura (`UI/IntroComic.cs`, quadros em `assets/story`, gerados por `tools/comic.py` em estilo cartoon): o escavador pegou Lúmens emprestados da Guilda dos Ferreiros, a oficina faliu, a dívida cresceu e ele virou escravo da guilda nas minas; o objetivo é o Coração Ancestral, que pode comprar a liberdade. Aparece ao iniciar um novo jogo; clique/Espaço/A avança, Esc/B ou "Pular história" encerra; fala lida pela narração de acessibilidade.
+- Bot: guarda minérios para a forja antes de vender, forja e conserta pela tela (8 peças e 2 consertos numa partida).
+- Testes 908/908.
