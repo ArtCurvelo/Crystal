@@ -49,19 +49,51 @@ public static class Decor
         var trim = Lit(new Color(0.9f, 0.5f, 0.15f), 0.5f);
         var dark = Lit(new Color(0.18f, 0.18f, 0.22f), 0.6f);
         var window = Glow(new Color(1f, 0.7f, 0.35f), 2.2f);
+        var steel = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.44f, 0.5f), Roughness = 0.4f, Metallic = 0.55f };
+        var rz = new Vector3(0, 0, Mathf.Pi / 2);
         for (int i = 0; i < 2; i++)
         {
             var m = new Vector3(i * 4.6f, 0, 0);
-            // módulo cilíndrico deitado
-            Mesh(node, new CylinderMesh { TopRadius = 1.4f, BottomRadius = 1.4f, Height = 4f, RadialSegments = 12, Rings = 1 }, hull, m + new Vector3(0, 1.5f, 0), new Vector3(0, 0, Mathf.Pi / 2));
-            Mesh(node, new BoxMesh { Size = new Vector3(4.1f, 0.25f, 2.6f) }, dark, m + new Vector3(0, 0.12f, 0));
+            var axis = m + new Vector3(0, 1.5f, 0);
+            // casco: cilindro deitado mais redondo, tampas abauladas nas pontas de fora
+            Mesh(node, new CylinderMesh { TopRadius = 1.4f, BottomRadius = 1.4f, Height = 4f, RadialSegments = 24, Rings = 1 }, hull, axis, rz);
+            float capX = i == 0 ? -2f : 2f;
+            Mesh(node, new SphereMesh { Radius = 1.4f, Height = 2.8f, RadialSegments = 24, Rings = 10 }, hull, axis + new Vector3(capX, 0, 0), null, new Vector3(0.35f, 1, 1));
+            // nervuras escuras ao longo do casco e anéis laranja nas pontas
+            for (int r = 0; r < 4; r++)
+                Mesh(node, new CylinderMesh { TopRadius = 1.43f, BottomRadius = 1.43f, Height = 0.07f, RadialSegments = 24, Rings = 1 }, dark, axis + new Vector3(-1.2f + r * 0.8f, 0, 0), rz);
             for (int k = -1; k <= 1; k += 2)
-                Mesh(node, new CylinderMesh { TopRadius = 1.45f, BottomRadius = 1.45f, Height = 0.22f, RadialSegments = 12, Rings = 1 }, trim, m + new Vector3(k * 2f, 1.5f, 0), new Vector3(0, 0, Mathf.Pi / 2));
-            // janelas acesas
+                Mesh(node, new CylinderMesh { TopRadius = 1.47f, BottomRadius = 1.47f, Height = 0.2f, RadialSegments = 24, Rings = 1 }, trim, axis + new Vector3(k * 1.95f, 0, 0), rz);
+            // linha de rebites no topo
+            for (int r = 0; r < 12; r++)
+                Mesh(node, new SphereMesh { Radius = 0.035f, Height = 0.07f, RadialSegments = 6, Rings = 3 }, steel, axis + new Vector3(-1.75f + r * 0.32f, 1.41f, 0));
+            // janelas com moldura
             for (int w = 0; w < 3; w++)
-                Mesh(node, new BoxMesh { Size = new Vector3(0.7f, 0.32f, 0.05f) }, window, m + new Vector3(-1.1f + w * 1.1f, 1.75f, 1.38f));
+            {
+                var wp = m + new Vector3(-1.1f + w * 1.1f, 1.75f, 1.36f);
+                Mesh(node, new BoxMesh { Size = new Vector3(0.82f, 0.44f, 0.06f) }, dark, wp + new Vector3(0, 0, -0.01f));
+                Mesh(node, new BoxMesh { Size = new Vector3(0.7f, 0.32f, 0.05f) }, window, wp + new Vector3(0, 0, 0.02f));
+            }
+            // trilhos e pés de apoio
+            foreach (float z in new[] { -0.9f, 0.9f })
+            {
+                Mesh(node, new BoxMesh { Size = new Vector3(4.3f, 0.16f, 0.24f) }, dark, m + new Vector3(0, 0.08f, z));
+                foreach (float x in new[] { -1.5f, 1.5f })
+                    Mesh(node, new BoxMesh { Size = new Vector3(0.14f, 0.35f, 0.14f) }, steel, m + new Vector3(x, 0.3f, z * 0.85f));
+            }
             Collider(node, m + new Vector3(0, 1.4f, 0), new Vector3(4.2f, 2.8f, 2.8f));
         }
+        // túnel de ligação entre os módulos
+        Mesh(node, new CylinderMesh { TopRadius = 0.75f, BottomRadius = 0.75f, Height = 0.8f, RadialSegments = 18, Rings = 1 }, steel, new Vector3(2.3f, 1.45f, 0), rz);
+        foreach (float x in new[] { 1.95f, 2.65f })
+            Mesh(node, new CylinderMesh { TopRadius = 0.82f, BottomRadius = 0.82f, Height = 0.08f, RadialSegments = 18, Rings = 1 }, dark, new Vector3(x, 1.45f, 0), rz);
+        // escotilha com luz e degrau no módulo da direita
+        var hatch = new Vector3(4.6f + 1.4f, 0, 1.25f);
+        Mesh(node, new BoxMesh { Size = new Vector3(0.95f, 1.6f, 0.2f) }, dark, hatch + new Vector3(0, 1.05f, 0.08f));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.75f, 1.4f, 0.06f) }, steel, hatch + new Vector3(0, 1.05f, 0.2f));
+        Mesh(node, new CylinderMesh { TopRadius = 0.13f, BottomRadius = 0.13f, Height = 0.03f, RadialSegments = 12, Rings = 1 }, window, hatch + new Vector3(0, 1.45f, 0.24f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.8f, 0.04f, 0.04f) }, trim, hatch + new Vector3(0, 1.88f, 0.2f));
+        Mesh(node, new BoxMesh { Size = new Vector3(1.0f, 0.18f, 0.45f) }, steel, hatch + new Vector3(0, 0.09f, 0.4f));
         // antena parabólica
         var dishPos = new Vector3(2.3f, 2.9f, -0.3f);
         Mesh(node, new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.08f, Height = 1.4f, RadialSegments = 6, Rings = 1 }, dark, dishPos + new Vector3(0, 0.5f, 0));

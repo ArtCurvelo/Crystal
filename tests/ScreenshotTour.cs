@@ -102,6 +102,22 @@ public partial class ScreenshotTour : Node
                 LookAtPoint(p, ss.GlobalPosition + f * 2.6f - sd * 2.6f, ss.GlobalPosition + Vector3.Up * 0.8f - sd * 0.8f);
                 await Wait(0.9f);
                 await Shot("35_decor_sell_1");
+                // posto avançado inteiro, de longe (fica atrás da venda)
+                LookAtPoint(p, ss.GlobalPosition + f * 8.5f + sd * 2.5f, ss.GlobalPosition - f * 2.5f + Vector3.Up * 1.4f);
+                await Wait(0.9f);
+                await Shot("35_decor_outpost_0");
+            }
+            var terms = new System.Collections.Generic.List<World.ShopTerminal>();
+            void FindTerm(Node n) { foreach (Node c in n.GetChildren()) { if (c is World.ShopTerminal tt) terms.Add(tt); FindTerm(c); } }
+            FindTerm(Main.World);
+            if (terms.Count > 0)
+            {
+                var tt = terms[0];
+                var f = tt.GlobalTransform.Basis.Z; var sd = tt.GlobalTransform.Basis.X;
+                LookAtPoint(p, tt.GlobalPosition + f * 3.2f - sd * 1.2f, tt.GlobalPosition + Vector3.Up * 1.4f);
+                await Wait(0.9f);
+                await Shot("35_decor_terminal_0");
+
             }
             // geodos: um comum e um especial (colossal)
             int gshot = 0;

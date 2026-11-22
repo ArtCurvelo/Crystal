@@ -65,6 +65,28 @@ public abstract partial class StationBase : StaticBody3D, IInteractable
         if (Label != null) Label.Position = new Vector3(0, Label.Position.Y + Mathf.Sin(Time * 2f) * 0.0015f, 0);
     }
 
+    /// <summary>
+    /// Balcão das estações (venda e melhorias): rodapé escuro recuado, corpo com três painéis embutidos e
+    /// frisos acesos, tampo com borda arredondada de aço. Topo em y≈1.02.
+    /// </summary>
+    protected void BuildCounter(Material body, Material dark, Material trim)
+    {
+        var steel = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.57f, 0.62f), Roughness = 0.35f, Metallic = 0.6f };
+        AddMesh(new BoxMesh { Size = new Vector3(2.3f, 0.12f, 0.9f) }, dark, new Vector3(0, 0.06f, 0.03f));
+        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.83f, 1.0f) }, body, new Vector3(0, 0.535f, 0.05f));
+        for (int i = 0; i < 3; i++)
+        {
+            float x = -0.78f + i * 0.78f;
+            AddMesh(new BoxMesh { Size = new Vector3(0.66f, 0.56f, 0.02f) }, dark, new Vector3(x, 0.52f, 0.555f));
+            AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.5f, 0.02f) }, body, new Vector3(x, 0.52f, 0.565f));
+            AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.025f, 0.012f) }, trim, new Vector3(x, 0.3f, 0.578f));
+        }
+        foreach (float x in new[] { -1.2f, 1.2f })
+            AddMesh(new BoxMesh { Size = new Vector3(0.04f, 0.8f, 1.02f) }, dark, new Vector3(x, 0.53f, 0.05f)); // quinas
+        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.07f, 1.08f) }, dark, new Vector3(0, 0.985f, 0.04f));
+        AddMesh(new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.045f, Height = 2.5f, RadialSegments = 10, Rings = 1 }, steel, new Vector3(0, 0.985f, 0.58f), new Vector3(0, 0, Mathf.Pi / 2));
+    }
+
     public abstract string GetPrompt();
     public abstract void Interact(PlayerController player);
 }
@@ -81,19 +103,8 @@ public partial class SellStation : StationBase
         var body = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.37f, 0.42f), Roughness = 0.6f, Metallic = 0.2f };
         var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.19f), Roughness = 0.7f };
         var trim = MeshFactory.Emissive(orange, orange, 1.6f);
-        // balcão: rodapé escuro recuado, corpo com painéis embutidos e frisos acesos, tampo com borda arredondada
+        BuildCounter(body, dark, trim);
         var steel = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.57f, 0.62f), Roughness = 0.35f, Metallic = 0.6f };
-        AddMesh(new BoxMesh { Size = new Vector3(2.3f, 0.12f, 0.9f) }, dark, new Vector3(0, 0.06f, 0.03f));
-        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.83f, 1.0f) }, body, new Vector3(0, 0.535f, 0.05f));
-        for (int i = 0; i < 3; i++)
-        {
-            float x = -0.78f + i * 0.78f;
-            AddMesh(new BoxMesh { Size = new Vector3(0.66f, 0.56f, 0.02f) }, dark, new Vector3(x, 0.52f, 0.555f));
-            AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.5f, 0.02f) }, body, new Vector3(x, 0.52f, 0.565f));
-            AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.025f, 0.012f) }, trim, new Vector3(x, 0.3f, 0.578f));
-        }
-        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.07f, 1.08f) }, dark, new Vector3(0, 0.985f, 0.04f));
-        AddMesh(new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.045f, Height = 2.5f, RadialSegments = 10, Rings = 1 }, steel, new Vector3(0, 0.985f, 0.58f), new Vector3(0, 0, Mathf.Pi / 2));
         // balança de cristais (prato aceso) no tampo
         var sp = new Vector3(-0.05f, 1.02f, 0.25f);
         AddMesh(new CylinderMesh { TopRadius = 0.09f, BottomRadius = 0.12f, Height = 0.05f, RadialSegments = 12, Rings = 1 }, steel, sp + new Vector3(0, 0.025f, 0));
@@ -241,12 +252,7 @@ public partial class ShopTerminal : StationBase
         var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.19f), Roughness = 0.7f };
         var trim = MeshFactory.Emissive(orange, orange, 1.6f);
         var glow = MeshFactory.Emissive(new Color(0.05f, 0.2f, 0.25f), cyan, 1.4f);
-        // mesa/console
-        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.95f, 1.0f) }, body, new Vector3(0, 0.475f, 0.05f));
-        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.08f, 1.1f) }, dark, new Vector3(0, 0.99f, 0.05f));
-        for (int i = -1; i <= 1; i += 2)
-            AddMesh(new BoxMesh { Size = new Vector3(0.06f, 0.5f, 0.04f) }, trim, new Vector3(i * 1.0f, 0.5f, 0.56f));
-        AddMesh(new BoxMesh { Size = new Vector3(1.6f, 0.05f, 0.04f) }, trim, new Vector3(0, 0.82f, 0.56f));
+        BuildCounter(body, dark, new StandardMaterial3D { AlbedoColor = new Color(1f, 0.75f, 0.3f), EmissionEnabled = true, Emission = new Color(1f, 0.75f, 0.3f), EmissionEnergyMultiplier = 1.4f });
         // tela inclinada com moldura
         var screenRoot = new Node3D { Position = new Vector3(0, 1.65f, -0.25f), Rotation = new Vector3(-0.25f, 0, 0) };
         AddChild(screenRoot);
@@ -275,11 +281,21 @@ public partial class ShopTerminal : StationBase
             AddMesh(new CylinderMesh { TopRadius = 0.105f, BottomRadius = 0.105f, Height = 0.015f, RadialSegments = 8, Rings = 1 }, trim, p + new Vector3(0, 0.085f, 0));
             AddMesh(MeshFactory.CrystalPrism(6, 1, 1, 0.35f), MeshFactory.Emissive(colors[i], colors[i], 1.8f), p + new Vector3(0, 0.09f, 0), new Vector3(0.07f, 0.24f - i * 0.03f, 0.07f));
         }
-        // tablet sobre a mesa
-        var tab = AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.02f, 0.34f) }, dark, new Vector3(0.55f, 1.05f, 0.3f));
-        tab.Rotation = new Vector3(0, 0.3f, 0);
-        var tabScreen = AddMesh(new BoxMesh { Size = new Vector3(0.44f, 0.005f, 0.28f) }, glow, new Vector3(0.55f, 1.063f, 0.3f));
-        tabScreen.Rotation = new Vector3(0, 0.3f, 0);
+        // teclado inclinado com teclas acesas
+        var kb = new Node3D { Position = new Vector3(0.45f, 1.06f, 0.3f), Rotation = new Vector3(0.18f, 0, 0) };
+        AddChild(kb);
+        kb.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.9f, 0.05f, 0.34f) }, MaterialOverride = dark });
+        var keyMat = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.27f, 0.32f), Roughness = 0.5f };
+        for (int row = 0; row < 3; row++)
+            for (int col = 0; col < 9; col++)
+                kb.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.075f, 0.02f, 0.075f) }, MaterialOverride = (row == 1 && col == 7) ? glow : keyMat, Position = new Vector3(-0.38f + col * 0.095f, 0.032f, -0.1f + row * 0.1f) });
+        // holograma girando acima da tela: seta de "melhoria" dentro de um anel
+        var holoMat = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, AlbedoColor = new Color(1f, 0.78f, 0.35f, 0.85f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        Ring = new StationRing { Position = new Vector3(0, 2.42f, 0) }; // tipo próprio: o StaticBatcher não mescla (precisa girar)
+        AddChild(Ring);
+        Ring.AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.2f, OuterRadius = 0.23f, Rings = 24, RingSegments = 4 }, MaterialOverride = holoMat, Rotation = new Vector3(Mathf.Pi / 2, 0, 0) });
+        Ring.AddChild(new MeshInstance3D { Mesh = MeshFactory.Spike(3, 0.12f, 0.16f), MaterialOverride = holoMat, Position = new Vector3(0, 0.0f, 0), Scale = new Vector3(1, 1, 0.25f) });
+        Ring.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.07f, 0.14f, 0.02f) }, MaterialOverride = holoMat, Position = new Vector3(0, -0.07f, 0) });
         var light = new OmniLight3D { LightColor = new Color(0.5f, 0.85f, 1f), LightEnergy = 1.3f, OmniRange = 6f, Position = new Vector3(0, 2f, 1.2f) };
         AddChild(light);
         Label = MakeLabel("MELHORIAS", new Color(1f, 0.75f, 0.3f), 2.75f);
@@ -520,3 +536,6 @@ public partial class RegionGate : StationBase
 
     public bool IsOpen => _open;
 }
+
+/// <summary>Peça animada de estação (holograma que gira). Tipo próprio para o StaticBatcher não mesclá-la.</summary>
+public partial class StationRing : Node3D { }
