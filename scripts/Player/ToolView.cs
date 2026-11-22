@@ -136,13 +136,24 @@ public partial class ToolView : Node3D
         return mat;
     }
 
-    /// <summary>Mão com luva segurando o cabo.</summary>
+    /// <summary>Mão com luva fechada segurando o cabo: palma, quatro dedos curvados, polegar, punho e manga.</summary>
     void Grip(Vector3 at)
     {
-        var glove = Metal(new Color(0.1f, 0.1f, 0.12f), 0.8f, 0.1f);
-        var sleeve = Metal(new Color(0.16f, 0.12f, 0.22f), 0.7f, 0.1f);
-        Part(_model, new BoxMesh { Size = new Vector3(0.08f, 0.09f, 0.1f) }, glove, at);
-        Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.11f, 0.24f) }, sleeve, at + new Vector3(0.01f, -0.06f, 0.16f), new Vector3(-0.45f, 0, 0));
+        var glove = Metal(new Color(0.3f, 0.28f, 0.27f), 0.75f, 0.05f);
+        var leather = Metal(new Color(0.35f, 0.22f, 0.13f), 0.8f, 0f);
+        var sleeve = Metal(new Color(0.18f, 0.14f, 0.26f), 0.7f, 0.05f);
+        var stripe = Metal(new Color(0.95f, 0.55f, 0.15f), 0.6f, 0.1f);
+        // palma (atrás do cabo) e dedos curvados à frente
+        Part(_model, new CapsuleMesh { Radius = 0.035f, Height = 0.1f, RadialSegments = 10, Rings = 3 }, glove, at + new Vector3(0.028f, 0, 0.01f));
+        for (int f = 0; f < 4; f++)
+            Part(_model, new CapsuleMesh { Radius = 0.014f, Height = 0.055f, RadialSegments = 8, Rings = 2 }, glove,
+                at + new Vector3(-0.012f, 0.035f - f * 0.023f, -0.02f), new Vector3(Mathf.Pi / 2, 0, 0.15f));
+        Part(_model, new BoxMesh { Size = new Vector3(0.012f, 0.085f, 0.03f) }, leather, at + new Vector3(-0.026f, 0.0f, -0.024f)); // reforço de couro nos nós dos dedos
+        Part(_model, new CapsuleMesh { Radius = 0.013f, Height = 0.05f, RadialSegments = 8, Rings = 2 }, glove, at + new Vector3(0.01f, 0.05f, 0.012f), new Vector3(0.3f, 0, -0.9f)); // polegar
+        // punho e manga
+        Part(_model, new CylinderMesh { TopRadius = 0.036f, BottomRadius = 0.04f, Height = 0.04f, RadialSegments = 10, Rings = 1 }, leather, at + new Vector3(0.03f, -0.065f, 0.04f), new Vector3(-0.45f, 0, 0));
+        Part(_model, new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.055f, Height = 0.22f, RadialSegments = 10, Rings = 1 }, sleeve, at + new Vector3(0.035f, -0.12f, 0.13f), new Vector3(-1.1f, 0, 0));
+        Part(_model, new CylinderMesh { TopRadius = 0.047f, BottomRadius = 0.05f, Height = 0.02f, RadialSegments = 10, Rings = 1 }, stripe, at + new Vector3(0.033f, -0.095f, 0.085f), new Vector3(-1.1f, 0, 0));
     }
 
     /// <summary>
@@ -280,34 +291,70 @@ public partial class ToolView : Node3D
         _model.Scale = Vector3.One * 0.8f;
     }
 
-    /// <summary>Broca: corpo compacto e ponta cônica do minério que gira ao minerar.</summary>
+    /// <summary>
+    /// Broca de mão: motor cilíndrico com aletas e grade de ventilação, anel aceso na cor do minério,
+    /// empunhadura de pistola com gatilho, alça lateral, mandril e broca longa em espiral (gira ao minerar).
+    /// </summary>
     void BuildDrill(ToolDef t)
     {
-        var body = Metal(new Color(0.2f, 0.21f, 0.25f), 0.35f, 0.85f);
-        var dark = Metal(new Color(0.08f, 0.08f, 0.1f), 0.6f, 0.6f);
-        var head = HeadMat(t);
+        // metal claro e pouco metálico: na caverna escura o metálico puro ficava preto
+        var body = Metal(new Color(0.55f, 0.57f, 0.62f), 0.4f, 0.4f);
+        body.RimEnabled = true; body.Rim = 0.3f; body.RimTint = 0.5f;
+        var dark = Metal(new Color(0.18f, 0.18f, 0.21f), 0.6f, 0.2f);
+        var steel = Metal(new Color(0.75f, 0.77f, 0.82f), 0.3f, 0.45f);
+        var rubber = Metal(new Color(0.12f, 0.12f, 0.13f), 0.9f, 0f);
+        var shell = HeadMat(t);
         var glow = ToolData.GlowColor(t);
-        Part(_model, new BoxMesh { Size = new Vector3(0.1f, 0.1f, 0.22f) }, body, new Vector3(0, 0, 0.06f));
-        Part(_model, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.055f, Height = 0.06f, RadialSegments = 12, Rings = 1 }, dark, new Vector3(0, 0, -0.07f), new Vector3(Mathf.Pi / 2, 0, 0));
-        Part(_model, new BoxMesh { Size = new Vector3(0.104f, 0.012f, 0.16f) }, Neon(glow.Darkened(0.3f), 0.5f), new Vector3(0, 0.051f, 0.06f));
-        _bit = new Node3D { Position = new Vector3(0, 0, -0.1f) };
+        var rx = new Vector3(Mathf.Pi / 2, 0, 0);
+        // motor (eixo ao longo de Z, broca para −Z)
+        Part(_model, new CylinderMesh { TopRadius = 0.055f, BottomRadius = 0.06f, Height = 0.2f, RadialSegments = 16, Rings = 1 }, body, new Vector3(0, 0, 0.06f), rx);
+        Part(_model, new CylinderMesh { TopRadius = 0.062f, BottomRadius = 0.062f, Height = 0.07f, RadialSegments = 16, Rings = 1 }, shell, new Vector3(0, 0, 0.0f), rx); // capa na cor do minério
+        for (int k = 0; k < 4; k++) // aletas de refrigeração
+            Part(_model, new CylinderMesh { TopRadius = 0.064f, BottomRadius = 0.064f, Height = 0.008f, RadialSegments = 16, Rings = 1 }, dark, new Vector3(0, 0, 0.09f + k * 0.022f), rx);
+        Part(_model, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.058f, Height = 0.03f, RadialSegments = 16, Rings = 1 }, dark, new Vector3(0, 0, 0.175f), rx); // tampa traseira
+        Part(_model, new BoxMesh { Size = new Vector3(0.05f, 0.012f, 0.06f) }, dark, new Vector3(0, 0.058f, 0.12f)); // grade
+        Part(_model, new TorusMesh { InnerRadius = 0.058f, OuterRadius = 0.066f, Rings = 16, RingSegments = 6 }, Neon(glow.Darkened(0.2f), 0.6f), new Vector3(0, 0, -0.035f), rx);
+        // mandril
+        Part(_model, new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.045f, Height = 0.05f, RadialSegments = 12, Rings = 1 }, steel, new Vector3(0, 0, -0.065f), rx);
+        // empunhadura de pistola, gatilho e alça lateral
+        Part(_model, new BoxMesh { Size = new Vector3(0.04f, 0.12f, 0.05f) }, rubber, new Vector3(0, -0.09f, 0.12f), new Vector3(-0.25f, 0, 0));
+        Part(_model, new BoxMesh { Size = new Vector3(0.012f, 0.03f, 0.012f) }, Neon(new Color(1f, 0.5f, 0.15f), 0.4f), new Vector3(0, -0.06f, 0.085f));
+        Part(_model, new CylinderMesh { TopRadius = 0.014f, BottomRadius = 0.014f, Height = 0.12f, RadialSegments = 8, Rings = 1 }, rubber, new Vector3(-0.1f, -0.01f, -0.01f), new Vector3(0, 0, Mathf.Pi / 2));
+        // broca: núcleo cônico + faixas helicoidais (gira)
+        _bit = new Node3D { Position = new Vector3(0, 0, -0.09f) };
         _model.AddChild(_bit);
-        Part(_bit, new CylinderMesh { TopRadius = 0f, BottomRadius = 0.045f, Height = 0.2f, RadialSegments = 6, Rings = 1 }, head, new Vector3(0, 0, -0.1f), new Vector3(-Mathf.Pi / 2, 0, 0));
-        for (int i = 0; i < 3; i++)
-            Part(_bit, new BoxMesh { Size = new Vector3(0.008f, 0.07f, 0.14f) }, dark, new Vector3(0, 0, -0.08f), new Vector3(0, 0, i * Mathf.Pi / 3));
-        Part(_model, new BoxMesh { Size = new Vector3(0.05f, 0.12f, 0.05f) }, Metal(new Color(0.06f, 0.06f, 0.07f), 0.9f, 0f), new Vector3(0, -0.1f, 0.12f), new Vector3(-0.3f, 0, 0));
-        Grip(new Vector3(0.005f, -0.12f, 0.13f));
-        _model.Position = new Vector3(-0.02f, 0.07f, 0.02f);
+        Part(_bit, new CylinderMesh { TopRadius = 0f, BottomRadius = 0.028f, Height = 0.24f, RadialSegments = 10, Rings = 1 }, shell, new Vector3(0, 0, -0.12f), new Vector3(-Mathf.Pi / 2, 0, 0));
+        for (int k = 0; k < 9; k++)
+        {
+            float u = k / 9f;
+            float r = 0.032f * (1f - u * 0.85f);
+            Part(_bit, new TorusMesh { InnerRadius = r * 0.55f, OuterRadius = r, Rings = 12, RingSegments = 4 }, steel,
+                new Vector3(0, 0, -0.02f - u * 0.2f), new Vector3(Mathf.Pi / 2 + 0.35f, k * 0.7f, 0));
+        }
+        Grip(new Vector3(0.005f, -0.1f, 0.12f));
+        _model.Position = new Vector3(0.03f, 0.02f, -0.02f);
         _model.Rotation = new Vector3(0.12f, 0.3f, 0.06f);
-        _model.Scale = Vector3.One * 1.0f;
+        _model.Scale = Vector3.One * 0.95f;
     }
 
-    /// <summary>Ferramenta quebrou: só a mão fechada (e o toco do cabo).</summary>
+    /// <summary>Ferramenta quebrou: a mão fechada segurando o toco do cabo, com farpas na ponta quebrada.</summary>
     void BuildHands()
     {
-        Grip(new Vector3(0.02f, -0.04f, 0.02f));
-        Part(_model, new CylinderMesh { TopRadius = 0.016f, BottomRadius = 0.02f, Height = 0.12f, RadialSegments = 8, Rings = 1 }, Metal(new Color(0.42f, 0.27f, 0.14f), 0.85f, 0f), new Vector3(0.02f, 0.04f, 0.02f), new Vector3(-0.35f, 0.2f, -0.45f));
-        _model.Position = new Vector3(0.0f, 0.08f, 0.0f);
+        var wood = Metal(new Color(0.5f, 0.33f, 0.18f), 0.85f, 0f);
+        var splinter = Metal(new Color(0.75f, 0.58f, 0.36f), 0.9f, 0f);
+        var stump = new Node3D { Position = new Vector3(0.0f, 0.0f, 0.0f), Rotation = new Vector3(-0.45f, 0.2f, 0.25f) };
+        _model.AddChild(stump);
+        var keep = _model; _model = stump;
+        Part(_model, new CylinderMesh { TopRadius = 0.017f, BottomRadius = 0.02f, Height = 0.2f, RadialSegments = 10, Rings = 1 }, wood, new Vector3(0, 0.04f, 0));
+        for (int k = 0; k < 5; k++)
+        {
+            float a = Mathf.Tau * k / 5f;
+            Part(_model, new CylinderMesh { TopRadius = 0f, BottomRadius = 0.007f, Height = 0.03f + (k % 3) * 0.015f, RadialSegments = 4, Rings = 1 }, splinter,
+                new Vector3(Mathf.Cos(a) * 0.011f, 0.15f + (k % 3) * 0.006f, Mathf.Sin(a) * 0.011f), new Vector3(Mathf.Sin(a) * 0.25f, 0, -Mathf.Cos(a) * 0.25f));
+        }
+        _model = keep;
+        Grip(new Vector3(0.0f, -0.04f, 0.02f));
+        _model.Position = new Vector3(0.0f, 0.06f, 0.0f);
         _model.Rotation = new Vector3(0.1f, 0.3f, -0.1f);
         _model.Scale = Vector3.One * 1.3f;
     }
