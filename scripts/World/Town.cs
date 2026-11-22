@@ -35,6 +35,7 @@ public partial class Town : Node3D
     public HouseDoor DoorOutside;
     public BlacksmithCounter Smith;
     public BlacksmithBench SmithBench;
+    public ForgeAnvil Anvil;
     public MissionBoard Board;
     DirectionalLight3D _sun;
     MultiMeshInstance3D _stars;
@@ -331,13 +332,9 @@ public partial class Town : Node3D
             Position = forge + Vector3.Up * 1.1f, EmissionShape = CpuParticles3D.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.7f, 0.05f, 0.4f),
             MaterialOverride = Glow(new Color(1f, 0.6f, 0.2f), 3f),
         });
-        // bigorna sobre tora
-        var anvil = p + new Vector3(0.2f, 0, -0.4f);
-        M(this, new CylinderMesh { TopRadius = 0.32f, BottomRadius = 0.36f, Height = 0.6f, RadialSegments = 10 }, wood, anvil + Vector3.Up * 0.5f);
-        M(this, new BoxMesh { Size = new Vector3(0.7f, 0.18f, 0.3f) }, iron, anvil + Vector3.Up * 0.88f);
-        M(this, new BoxMesh { Size = new Vector3(0.35f, 0.2f, 0.22f) }, iron, anvil + Vector3.Up * 0.72f);
-        M(this, new CylinderMesh { TopRadius = 0f, BottomRadius = 0.09f, Height = 0.3f, RadialSegments = 6 }, iron, anvil + new Vector3(0.48f, 0.88f, 0), new Vector3(0, 0, -Mathf.Pi / 2));
-        Solid(anvil + Vector3.Up * 0.5f, new Vector3(0.9f, 1f, 0.6f));
+        // bigorna sobre tora: é a estação da forja (equipamentos e conserto)
+        Anvil = new ForgeAnvil { Name = "ForgeAnvil", Position = p + new Vector3(0.6f, 0.2f, 1.6f) };
+        AddChild(Anvil);
         // tina de têmpera e prateleira de ferramentas
         M(this, new CylinderMesh { TopRadius = 0.45f, BottomRadius = 0.4f, Height = 0.6f, RadialSegments = 12 }, wood, p + new Vector3(2.0f, 0.5f, -1.8f));
         M(this, new CylinderMesh { TopRadius = 0.4f, BottomRadius = 0.4f, Height = 0.02f, RadialSegments = 12 }, Mat(new Color(0.1f, 0.2f, 0.25f), 0.1f), p + new Vector3(2.0f, 0.78f, -1.8f));
@@ -465,6 +462,35 @@ public partial class BlacksmithBench : StationBase
     }
     public override string GetPrompt() => Loc.F("{0} Ferreiro: ferramentas, munição e melhorias", InputHints.Interact);
     public override void Interact(PlayerController player) => UiBus.RequestShop();
+}
+
+/// <summary>Bigorna do ferreiro: abre a forja (equipamentos feitos com minérios e conserto da ferramenta).</summary>
+public partial class ForgeAnvil : StationBase
+{
+    public override void _Ready()
+    {
+        SetupBody(new Vector3(0.9f, 1.0f, 0.6f));
+        var wood = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.28f, 0.17f), Roughness = 0.85f };
+        var iron = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.32f, 0.36f), Roughness = 0.45f, Metallic = 0.55f };
+        var hot = MeshFactory.Emissive(new Color(1f, 0.45f, 0.12f), new Color(1f, 0.45f, 0.1f), 2.2f);
+        AddMesh(new CylinderMesh { TopRadius = 0.32f, BottomRadius = 0.36f, Height = 0.6f, RadialSegments = 10 }, wood, new Vector3(0, 0.3f, 0));
+        AddMesh(new BoxMesh { Size = new Vector3(0.35f, 0.2f, 0.22f) }, iron, new Vector3(0, 0.7f, 0));
+        AddMesh(new BoxMesh { Size = new Vector3(0.7f, 0.18f, 0.3f) }, iron, new Vector3(0, 0.88f, 0));
+        var horn = AddMesh(new CylinderMesh { TopRadius = 0f, BottomRadius = 0.09f, Height = 0.3f, RadialSegments = 6 }, iron, new Vector3(0.48f, 0.88f, 0));
+        horn.Rotation = new Vector3(0, 0, -Mathf.Pi / 2);
+        // lâmina em brasa sobre a bigorna
+        AddMesh(new BoxMesh { Size = new Vector3(0.42f, 0.03f, 0.09f) }, hot, new Vector3(-0.05f, 0.99f, 0.02f));
+        Label = MakeLabel("FORJA", new Color(1f, 0.6f, 0.3f), 1.9f, 48);
+    }
+    public override string GetPrompt()
+    {
+        var gs = GameState.Instance;
+        int ready = 0;
+        foreach (var s in GearData.Slots) if (gs.CanForge(s)) ready++;
+        if (gs.CanRepair && (gs.ToolBroken || gs.ToolDurability01 < 0.5f)) return Loc.F("{0} Forja: consertar {1}", InputHints.Interact, gs.CurrentTool.Name);
+        return ready > 0 ? Loc.F("{0} Forja ({1} peça(s) prontas para forjar!)", InputHints.Interact, ready) : Loc.F("{0} Forja: equipamentos e conserto", InputHints.Interact);
+    }
+    public override void Interact(PlayerController player) => UiBus.RequestForge();
 }
 
 /// <summary>Quadro de missões: encomendas de minério.</summary>

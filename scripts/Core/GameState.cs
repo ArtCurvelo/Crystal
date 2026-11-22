@@ -116,11 +116,11 @@ public partial class GameState : Node
 
     public float Damage => BaseDamage * EventDamageMultiplier * EssenceMultiplier
                            * HouseMul(HouseIds.Workbench) * (HasSkill(SkillIds.FirmStrike) ? 1.15f : 1f)
-                           * (!UsingHands && HasSkill(SkillIds.Temper) ? 1.15f : 1f);
+                           * (!UsingHands && HasSkill(SkillIds.Temper) ? 1.15f : 1f) * (1f + GearBonus(GearSlot.Gloves));
     public float SwingsPerSecond => BaseSwings * (HasSkill(SkillIds.Cadence) ? 1.10f : 1f) * (!UsingHands && HasSkill(SkillIds.Hone) ? 1.10f : 1f);
     public float SwingInterval => 1f / SwingsPerSecond;
-    public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * HouseMul(HouseIds.Chest) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f));
-    public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen) * (HasSkill(SkillIds.LightBoots) ? 1.08f : 1f);
+    public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * HouseMul(HouseIds.Chest) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f) * (1f + GearBonus(GearSlot.Bag)));
+    public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen) * (HasSkill(SkillIds.LightBoots) ? 1.08f : 1f) * (1f + GearBonus(GearSlot.Boots));
     public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier
                                     * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f) * (HasSkill(SkillIds.LoyalBuyer) ? 1.10f : 1f);
     public float MagnetRadius => StatValue(UpgradeIds.Reach) * (HasSkill(SkillIds.Magnet) ? 1.3f : 1f);
@@ -131,10 +131,10 @@ public partial class GameState : Node
     /// <summary>Multiplicador do tempo de renascimento dos depósitos (Geólogo).</summary>
     public float RespawnMultiplier => HasSkill(SkillIds.Geologist) ? 0.7f : 1f;
     /// <summary>Alcance da lanterna do capacete (Lanterna potente).</summary>
-    public float LampRangeMultiplier => (HasSkill(SkillIds.BrightLamp) ? 1.35f : 1f) * HouseMul(HouseIds.Lanterns);
+    public float LampRangeMultiplier => (HasSkill(SkillIds.BrightLamp) ? 1.35f : 1f) * HouseMul(HouseIds.Lanterns) * (1f + GearBonus(GearSlot.Helmet));
     /// <summary>Preço de uma construção para o jogador (Kit de cordas: cordas pela metade).</summary>
     public long BuildCost(string type) => BuildData.Of(type) is { } bd ? (type == BuildIds.Rope && HasSkill(SkillIds.RopeKit) ? bd.Cost / 2 : bd.Cost) : 0;
-    public float RareChanceMultiplier => HasSkill(SkillIds.RareNose) ? 1.5f : 1f;
+    public float RareChanceMultiplier => (HasSkill(SkillIds.RareNose) ? 1.5f : 1f) * (1f + (GearData.Of(GearSlot.Helmet, GearTier(GearSlot.Helmet))?.Bonus2 ?? 0f));
     public bool DirectCollect => HasSkill(SkillIds.DirectCollect);
     public float MiningReach => 3.2f + Data.Level(UpgradeIds.Reach) * 0.28f;
     public float DamagePerSecond => Damage * SwingsPerSecond;
@@ -578,6 +578,68 @@ public partial class GameState : Node
         return true;
     }
 
+    // ================= Forja (ferreiro da vila) =================
+    public event Action GearChanged;
+
+    /// <summary>Nível forjado da peça (−1 = nenhum).</summary>
+    public int GearTier(GearSlot s) => Data.Gear.TryGetValue(GearData.SlotId(s), out int t) ? t : -1;
+    public float GearBonus(GearSlot s) => GearData.Of(s, GearTier(s))?.Bonus ?? 0f;
+    /// <summary>Próximo nível que dá para forjar (null = já no máximo).</summary>
+    public GearTierDef NextGear(GearSlot s) => GearData.Of(s, GearTier(s) + 1);
+    /// <summary>O nível usa minérios da região de mesmo número: ela precisa estar liberada.</summary>
+    public bool GearTierAvailable(GearTierDef d) => d != null && d.Tier < GameData.Regions.Count && IsUnlocked(GameData.Regions[d.Tier].Id);
+    public bool HasForgeCosts(IEnumerable<ForgeCost> costs) => costs.All(c => InventoryOf(c.Mat) >= c.Amount);
+    public bool CanForge(GearSlot s) => NextGear(s) is { } d && GearTierAvailable(d) && CanAfford(d.Fee) && HasForgeCosts(d.Costs);
+
+    void PayForgeCosts(IEnumerable<ForgeCost> costs)
+    {
+        foreach (var c in costs)
+        {
+            Data.Inventory[c.Mat] -= c.Amount;
+            if (Data.Inventory[c.Mat] <= 0) Data.Inventory.Remove(c.Mat);
+        }
+    }
+
+    public bool TryForge(GearSlot s)
+    {
+        if (!CanForge(s) || !RequireWork()) return false;
+        var d = NextGear(s);
+        Data.Money -= d.Fee;
+        PayForgeCosts(d.Costs);
+        Data.Gear[GearData.SlotId(s)] = d.Tier;
+        MoneyChanged?.Invoke();
+        InventoryChanged?.Invoke();
+        UpgradesChanged?.Invoke();
+        GearChanged?.Invoke();
+        Notify(Loc.F("{0} forjado!", d.Name), GearData.BonusText(d), NotifyKind.Success);
+        BigMessage?.Invoke(d.Name.ToUpper());
+        return true;
+    }
+
+    /// <summary>Conserto da ferramenta na forja: taxa (parte do preço) + fragmentos do minério dela. Lasers não se consertam.</summary>
+    public bool RepairAvailable => CurrentTool.Kind != ToolKind.Laser && (ToolBroken || Data.ToolWear > 0.5f);
+    public long RepairFee => Math.Max(5, (long)Math.Round(CurrentTool.Cost * GearData.RepairFeeFraction * Math.Clamp(ToolBroken ? 1f : Data.ToolWear / Math.Max(1f, ToolMaxDurability), 0.2f, 1f)));
+    public List<ForgeCost> RepairCosts => CurrentTool.Ore != null && GameData.Mat(CurrentTool.Ore) != null
+        ? new List<ForgeCost> { new(CurrentTool.Ore, GearData.RepairOreAmount) } : new List<ForgeCost>();
+    public bool CanRepair => RepairAvailable && CanAfford(RepairFee) && HasForgeCosts(RepairCosts);
+
+    public bool TryRepair()
+    {
+        if (!CanRepair || !RequireWork()) return false;
+        long fee = RepairFee;
+        Data.Money -= fee;
+        PayForgeCosts(RepairCosts);
+        Data.ToolWear = 0;
+        Data.ToolBroken = false;
+        MoneyChanged?.Invoke();
+        InventoryChanged?.Invoke();
+        UpgradesChanged?.Invoke();
+        ToolChanged?.Invoke();
+        GearChanged?.Invoke();
+        Notify(Loc.F("{0} consertada", CurrentTool.Name), Loc.F("Resistência restaurada: {0}.", ToolMaxDurability), NotifyKind.Success);
+        return true;
+    }
+
     public void StartNewDay()
     {
         Data.Day++;
@@ -990,6 +1052,7 @@ public partial class GameState : Node
         Data.Upgrades.Clear();
         Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; Data.Ammo = 0; // a jornada recomeça com a picareta de madeira
         Data.Skills.Clear(); // a árvore recomeça; a casa é permanente
+        Data.Gear.Clear(); // o equipamento forjado fica para trás, como as ferramentas
         Data.Inventory.Clear();
         Data.UnlockedRegions.Clear();
         Data.UnlockedRegions.Add("caves");

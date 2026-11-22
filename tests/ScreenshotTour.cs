@@ -215,6 +215,19 @@ public partial class ScreenshotTour : Node
                 await Wait(0.6f);
                 await Shot("36_town_missions_ui");
                 Main.CloseAllForTour();
+                await Wait(0.3f);
+                // forja: bigorna e tela (com minérios para as luvas e as botas)
+                foreach (var gsl in new[] { GearSlot.Gloves, GearSlot.Boots })
+                    foreach (var fc in GearData.Of(gsl, 0).Costs) gs.Data.Inventory[fc.Mat] = gs.InventoryOf(fc.Mat) + fc.Amount;
+                gs.AddMoney(5000);
+                gs.RaiseAll();
+                LookAtPoint(p, c0 + new Vector3(0.6f, 0.1f, -6.4f), c0 + new Vector3(0.6f, 1.0f, -9.4f));
+                await Wait(0.8f);
+                await Shot("36_town_anvil_day");
+                UiBus.RequestForge();
+                await Wait(0.6f);
+                await Shot("36_town_forge_ui");
+                Main.CloseAllForTour();
             }
             // elevador da mina (torre de içamento)
             {
@@ -289,6 +302,24 @@ public partial class ScreenshotTour : Node
                     }
                     if (shot >= 2) break;
                 }
+            }
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-intro"))
+        {
+            var ic = new CrystalExcavator.UI.IntroComic();
+            AddChild(ic);
+            await Wait(0.2f);
+            ic.Play();
+            for (int i = 0; i < CrystalExcavator.UI.IntroComic.Captions.Length; i++)
+            {
+                await Wait(i == 0 ? 0.6f : 0.4f);
+                ic.Advance(); // completa a fala
+                await Wait(0.5f);
+                await Shot($"40_intro_{i + 1}");
+                ic.Advance();
             }
             SaveSystem.Delete();
             GameState.Instance.QuitClean();

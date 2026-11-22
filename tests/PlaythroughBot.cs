@@ -146,7 +146,7 @@ public partial class PlaythroughBot : Node
         if (_toolBuys < 3) { _errors++; GD.Print("ERRO: o bot quase não comprou ferramentas"); }
         GD.Print($"Miras perdidas: {_missedAims}");
         if (_missedAims > 5) { _errors++; GD.Print("ERRO: muitos depósitos impossíveis de mirar"); }
-        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys} | Encomendas entregues: {_contracts}");
+        GD.Print($"Dias completos: {_days} (voltas antecipadas: {_earlyHome}) | Casa: {_houseBuys} compras | Habilidades: {_skillBuys} | Encomendas entregues: {_contracts} | Forja: {_forged} peças, {_repairs} consertos");
         bool ok = _days >= 2 && _houseBuys > 0 && _skillBuys > 0 && _errors == 0 && _r2 > 0 && _r3 > 0 && _r4 > 0 && _sawCompletion && _prestiged && _secondR2 > 0 && _sells > 0 && _buys > 0 && saveOk && (_pulses > 0 || !_usedLaser);
         GD.Print(ok ? "BOT: SUCESSO" : $"BOT: FALHA (erros={_errors})");
         SaveSystem.Delete();
@@ -376,7 +376,7 @@ public partial class PlaythroughBot : Node
     }
 
     bool _checkedNightElevator;
-    int _contracts;
+    int _contracts, _forged, _repairs;
 
     /// <summary>Elevador da mina → casa (andando lá dentro) → painel → cama → elevador de volta à mina.</summary>
     async Task GoHomeAndSleep()
@@ -456,6 +456,35 @@ public partial class PlaythroughBot : Node
             PressAction("pause");
             await Frames(3);
             if (ms.IsOpen || !P.InputEnabled) { _errors++; Log("ERRO: Esc não fechou o quadro de encomendas"); return; }
+        }
+
+        // forja: forja o que der e conserta a ferramenta gasta
+        bool canAny = GearData.Slots.Any(s => GS.CanForge(s)) || (GS.CanRepair && GS.ToolDurability01 < 0.6f);
+        if (canAny && await UseStationNode(town.Anvil))
+        {
+            var fs = Main.GetChildren().OfType<ForgeScreen>().First();
+            if (!fs.IsOpen) { _errors++; Log("ERRO: forja não abriu"); return; }
+            foreach (var s in GearData.Slots)
+            {
+                if (!GS.CanForge(s)) continue;
+                int tier = GS.GearTier(s);
+                var b = FindButtons(fs).FirstOrDefault(x => x.HasMeta("forge") && (int)x.GetMeta("forge") == (int)s);
+                b?.EmitSignal(BaseButton.SignalName.Pressed);
+                await Frames(2);
+                if (GS.GearTier(s) != tier + 1) { _errors++; Log("ERRO: forjar pela tela não funcionou"); }
+                else { _forged++; Log($"Forjou {GearData.Of(s, tier + 1).NamePt}"); }
+            }
+            if (GS.CanRepair && GS.ToolDurability01 < 0.6f)
+            {
+                var b = FindButtons(fs).FirstOrDefault(x => x.HasMeta("repair"));
+                b?.EmitSignal(BaseButton.SignalName.Pressed);
+                await Frames(2);
+                if (GS.Data.ToolWear > 0 || GS.ToolBroken) { _errors++; Log("ERRO: conserto na forja não funcionou"); }
+                else { _repairs++; if (_repairs <= 2) Log($"Consertou {GS.CurrentTool.NamePt} na forja"); }
+            }
+            PressAction("pause");
+            await Frames(3);
+            if (fs.IsOpen || !P.InputEnabled) { _errors++; Log("ERRO: Esc não fechou a forja"); return; }
         }
 
         // porta: entra em casa
@@ -733,11 +762,25 @@ public partial class PlaythroughBot : Node
         var sell = Main.GetChildren().OfType<SellScreen>().First();
         if (!sell.IsOpen) { _errors++; Log("ERRO: tela de venda não abriu"); return; }
         long before = GS.Data.Money;
+        // como um jogador que guarda minério para a forja: separa o que as próximas peças pedem antes de vender
+        var keep = new Dictionary<string, int>();
+        foreach (var s in GearData.Slots)
+            if (GS.NextGear(s) is { } nd && GS.GearTierAvailable(nd))
+                foreach (var c in nd.Costs) keep[c.Mat] = Math.Max(keep.GetValueOrDefault(c.Mat), c.Amount);
+        foreach (var k in keep.Keys.ToList())
+        {
+            int have = GS.InventoryOf(k), held = Math.Min(have, keep[k]);
+            keep[k] = held;
+            if (held > 0) { GS.Data.Inventory[k] = have - held; if (GS.Data.Inventory[k] == 0) GS.Data.Inventory.Remove(k); }
+        }
+        bool nothingToSell = GS.InventoryCount == 0; // tudo o que trouxe é para a forja
         var btn = FindButtons(sell).First(b => b.Text == "VENDER TUDO");
         btn.EmitSignal(BaseButton.SignalName.Pressed);
         await Frames(2);
+        foreach (var kv in keep) if (kv.Value > 0) GS.Data.Inventory[kv.Key] = GS.InventoryOf(kv.Key) + kv.Value;
+        if (keep.Values.Sum() > 0) GS.RaiseAll();
         long gained = GS.Data.Money - before;
-        if (gained <= 0) { _errors++; Log("ERRO: venda não rendeu"); }
+        if (gained <= 0 && !nothingToSell) { _errors++; Log("ERRO: venda não rendeu"); }
         _sells++;
         // troca de aba Vender → Melhorias e volta
         var shopTab = FindButtons(sell).First(b => b.Text.Contains("Melhorias"));

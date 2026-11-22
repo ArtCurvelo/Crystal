@@ -28,6 +28,8 @@ public sealed class SaveData
     public List<string> Discovered { get; set; } = new();
     /// <summary>Encomendas do quadro de missões da vila.</summary>
     public List<ContractSave> Contracts { get; set; } = new();
+    /// <summary>Equipamento forjado na vila: peça ("helmet", "gloves", "boots", "bag") → nível 0..5 (ausente = nenhum).</summary>
+    public Dictionary<string, int> Gear { get; set; } = new();
     public long CrystalsMined { get; set; }
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
@@ -82,6 +84,12 @@ public sealed class SaveData
         Contracts ??= new();
         Contracts.RemoveAll(c => c == null || GameData.Mat(c.Mat) == null || c.Amount <= 0 || c.Reward < 0);
         if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
+        Gear ??= new();
+        foreach (var key in Gear.Keys.ToList())
+        {
+            if (System.Array.IndexOf(new[] { "helmet", "gloves", "boots", "bag" }, key) < 0 || Gear[key] < 0) { Gear.Remove(key); continue; }
+            Gear[key] = System.Math.Min(Gear[key], GearData.Tiers - 1);
+        }
         if (Money < 0) Money = 0;
         if (TotalEarned < Money) TotalEarned = Money;
         if (CrystalsMined < 0) CrystalsMined = 0;

@@ -101,6 +101,64 @@ public partial class TestRunner : Node
                 GS.InTown = false;
                 Fresh();
             });
+            Run("Forja: equipamentos e conserto", () =>
+            {
+                Fresh(); GS.NewGame();
+                // todas as receitas usam minérios que existem e nascem na região do nível
+                bool recipesOk = true;
+                foreach (var s in GearData.Slots)
+                    for (int t = 0; t < GearData.Tiers; t++)
+                    {
+                        var d = GearData.Of(s, t);
+                        foreach (var c in d.Costs)
+                            if (GameData.Mat(c.Mat) == null || !GameData.Regions[t].Spawns.Any(sp => sp.MaterialId == c.Mat)) { recipesOk = false; GD.Print($"      receita ruim: {d.NamePt} {c.Mat}"); }
+                        if (t > 0 && (d.Bonus <= GearData.Of(s, t - 1).Bonus || d.Fee <= GearData.Of(s, t - 1).Fee)) recipesOk = false;
+                    }
+                Check(recipesOk, "receitas: minérios da região certa, bônus e taxa crescem por nível");
+                var g = GearData.Of(GearSlot.Gloves, 0);
+                Check(GS.NextGear(GearSlot.Gloves) == g && !GS.CanForge(GearSlot.Gloves), "sem minérios não forja");
+                foreach (var c in g.Costs) GS.Data.Inventory[c.Mat] = c.Amount + 1;
+                GS.Data.Money = g.Fee - 1;
+                Check(!GS.CanForge(GearSlot.Gloves), "sem a taxa não forja");
+                GS.Data.Money = g.Fee;
+                float dmg = GS.Damage, spd = GS.MoveSpeed; int cap = GS.Capacity; float lamp = GS.LampRangeMultiplier, rare = GS.RareChanceMultiplier;
+                Check(GS.TryForge(GearSlot.Gloves), "forja as luvas de cobre");
+                Check(GS.Data.Money == 0 && g.Costs.All(c => GS.InventoryOf(c.Mat) == 1), "cobra a taxa e só os minérios da receita");
+                Check(Math.Abs(GS.Damage - dmg * (1f + g.Bonus)) < 0.01f, "luvas aumentam o dano");
+                var g1 = GearData.Of(GearSlot.Gloves, 1);
+                Check(GS.NextGear(GearSlot.Gloves) == g1 && !GS.GearTierAvailable(g1), "próximo nível pede a região 2 liberada");
+                foreach (var s in new[] { GearSlot.Boots, GearSlot.Bag, GearSlot.Helmet })
+                {
+                    var d = GearData.Of(s, 0);
+                    foreach (var c in d.Costs) GS.Data.Inventory[c.Mat] = GS.InventoryOf(c.Mat) + c.Amount;
+                    GS.Data.Money += d.Fee;
+                    GS.TryForge(s);
+                }
+                Check(GS.MoveSpeed > spd && GS.Capacity > cap && GS.LampRangeMultiplier > lamp && GS.RareChanceMultiplier > rare, "botas, bolsa e capacete dão os bônus");
+                // conserto
+                GS.DebugSetTool(2);
+                Check(!GS.RepairAvailable, "ferramenta inteira não precisa de conserto");
+                GS.Data.ToolWear = GS.ToolMaxDurability; GS.Data.ToolBroken = true;
+                Check(GS.RepairAvailable && GS.RepairFee < GS.CurrentTool.Cost, "conserto da quebrada custa menos que uma nova");
+                Check(!GS.CanRepair, "conserto pede os fragmentos do minério da ferramenta");
+                GS.Data.Inventory["hematite"] = GearData.RepairOreAmount;
+                GS.Data.Money = GS.RepairFee;
+                Check(GS.TryRepair() && !GS.ToolBroken && GS.Data.ToolWear == 0 && GS.InventoryOf("hematite") == 0, "conserta a ferramenta quebrada");
+                GS.DebugSetTool(0);
+                GS.Data.ToolWear = 10;
+                GS.Data.Money = 1000;
+                Check(GS.RepairCosts.Count == 0 && GS.TryRepair(), "picareta de madeira conserta só com a taxa");
+                // save e renascimento
+                var json = System.Text.Json.JsonSerializer.Serialize(GS.Data);
+                var back = System.Text.Json.JsonSerializer.Deserialize<SaveData>(json);
+                back.Gear["lixo"] = 3; back.Gear["boots"] = 99;
+                back.Sanitize();
+                Check(back.Gear.Count == 4 && back.Gear["gloves"] == 0 && back.Gear["boots"] == GearData.Tiers - 1 && !back.Gear.ContainsKey("lixo"), "equipamento fica no save e é saneado");
+                GS.Data.GameCompleted = true; GS.Data.RunEarned = 50_000_000;
+                if (GS.CanPrestige) GS.Prestige();
+                Check(GS.GearTier(GearSlot.Gloves) == -1, "ao renascer o equipamento fica para trás");
+                Fresh();
+            });
             Run("Versão dos jogadores x desenvolvedor", () =>
             {
                 Check(BuildFlavor.DevTools, "rodando do código: ferramentas de desenvolvedor ligadas");
@@ -135,6 +193,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: portões e estações", TestGatesIntegration);
             await RunAsync("Integração: casa (melhorias novas, bancada e baú)", TestHouseUpgrades);
             await RunAsync("Integração: Vila dos Ferreiros", TestTown);
+            await RunAsync("HQ de abertura", TestIntroComic);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: clique, golpe triplo e mineração contínua", TestClickMining);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
@@ -1336,9 +1395,69 @@ public partial class TestRunner : Node
         Check(GS.Data.Contracts[0].Done, "entrega pela tela funciona");
         ms.CloseSilently();
         ms.QueueFree();
+        // forja: a bigorna abre a tela, forjar e consertar pela interface
+        bool forge = false; void OnF() => forge = true;
+        UiBus.OpenForge += OnF; town.Anvil.Interact(null); UiBus.OpenForge -= OnF;
+        Check(forge, "bigorna abre a forja");
+        Check(town.Anvil.GetPrompt().Contains("Forja"), "bigorna mostra o aviso da forja");
+        var fs = new ForgeScreen();
+        AddChild(fs);
+        await Frames(2);
+        var g0 = GearData.Of(GearSlot.Gloves, 0);
+        foreach (var c in g0.Costs) GS.Data.Inventory[c.Mat] = GS.InventoryOf(c.Mat) + c.Amount;
+        GS.Data.Money += g0.Fee;
+        fs.Open();
+        await Frames(2);
+        var fbtn = FindAll<Button>(fs).FirstOrDefault(b => b.HasMeta("forge") && (int)b.GetMeta("forge") == (int)GearSlot.Gloves);
+        Check(fbtn != null && !fbtn.Disabled, "botão Forjar das luvas liberado com os minérios");
+        float dmg = GS.Damage;
+        fbtn?.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(2);
+        Check(GS.GearTier(GearSlot.Gloves) == 0 && GS.Damage > dmg * 1.09f, "luvas forjadas pela tela aumentam o dano");
+        GS.DebugSetTool(1);
+        GS.Data.ToolWear = GS.ToolMaxDurability * 0.6f;
+        GS.Data.Inventory["copper"] = GearData.RepairOreAmount;
+        GS.Data.Money += GS.RepairFee;
+        fs.Refresh();
+        await Frames(2);
+        var rbtn = FindAll<Button>(fs).FirstOrDefault(b => b.HasMeta("repair"));
+        Check(rbtn != null && !rbtn.Disabled, "botão Consertar liberado");
+        rbtn?.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(2);
+        Check(GS.Data.ToolWear == 0 && !GS.ToolBroken, "conserto pela tela restaura a resistência");
+        fs.CloseSilently();
+        fs.QueueFree();
         root.QueueFree();
         await Frames(2);
         Fresh();
+    }
+
+    async Task TestIntroComic()
+    {
+        for (int i = 1; i <= IntroComic.Captions.Length; i++)
+            Check(ResourceLoader.Exists($"res://assets/story/panel_{i}.png"), $"quadro {i} da HQ existe");
+        var ic = new IntroComic();
+        AddChild(ic);
+        await Frames(2);
+        bool done = false;
+        ic.Finished += () => done = true;
+        ic.Play();
+        await Frames(2);
+        Check(ic.IsPlaying && ic.Visible && ic.Index == 0, "HQ começa no primeiro quadro");
+        ic.Advance(); // completa a frase
+        ic.Advance(); // próximo quadro
+        Check(ic.Index == 1, "avançar completa a fala e depois passa o quadro");
+        for (int k = 0; k < 20 && ic.IsPlaying; k++) { ic.Advance(); ic.Advance(); await Frames(1); }
+        await Frames(40);
+        Check(done && !ic.IsPlaying && !ic.Visible, "HQ termina depois do último quadro");
+        done = false;
+        ic.Play();
+        await Frames(2);
+        ic.Skip();
+        await Frames(40);
+        Check(done && !ic.IsPlaying, "Pular encerra a HQ");
+        ic.QueueFree();
+        await Frames(1);
     }
 
     async Task TestHouseUpgrades()
