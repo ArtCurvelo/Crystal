@@ -312,7 +312,8 @@ public partial class RegionGate : StationBase
     public RegionDef Region;
     CollisionShape3D _shape;
     MeshInstance3D _barrier;
-    StandardMaterial3D _barrierMat;
+    ShaderMaterial _barrierMat;
+    static Shader _fieldShader;
     bool _open;
     float _width = 7f, _height = 5f;
 
@@ -331,21 +332,17 @@ public partial class RegionGate : StationBase
             Position = new Vector3(0, _height / 2, 0),
         };
         AddChild(_shape);
-        _barrierMat = new StandardMaterial3D
-        {
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            AlbedoColor = new Color(Region.AccentColor, 0.35f),
-        };
+        // campo de força em favos (shader próprio); a força vai a 0 ao abrir
+        _fieldShader ??= GD.Load<Shader>("res://shaders/forcefield.gdshader");
+        _barrierMat = new ShaderMaterial { Shader = _fieldShader };
+        _barrierMat.SetShaderParameter("color", Region.AccentColor);
+        _barrierMat.SetShaderParameter("size", new Vector2(_width, _height));
+        _barrierMat.SetShaderParameter("strength", 1f);
         _barrier = AddMesh(new QuadMesh { Size = new Vector2(_width, _height) }, _barrierMat, new Vector3(0, _height / 2, 0));
-        // grade de linhas para dar textura sem imagens
-        var lineMat = MeshFactory.Unshaded(Region.AccentColor.Lightened(0.3f));
-        for (int i = 0; i < 6; i++)
-        {
-            AddMesh(new BoxMesh { Size = new Vector3(_width, 0.04f, 0.04f) }, lineMat, new Vector3(0, 0.4f + i * (_height - 0.6f) / 5f, 0));
-        }
+        // trilhos do campo em cima e embaixo
+        var railMat = MeshFactory.Emissive(new Color(0.18f, 0.19f, 0.24f), Region.AccentColor, 0.9f);
+        AddMesh(new BoxMesh { Size = new Vector3(_width, 0.14f, 0.3f) }, railMat, new Vector3(0, 0.07f, 0));
+        AddMesh(new BoxMesh { Size = new Vector3(_width, 0.18f, 0.34f) }, railMat, new Vector3(0, _height - 0.09f, 0));
         // pilares
         var pillar = MeshFactory.Emissive(new Color(0.2f, 0.2f, 0.25f), Region.AccentColor, 0.8f);
         AddMesh(new BoxMesh { Size = new Vector3(0.5f, _height, 0.6f) }, pillar, new Vector3(-_width / 2, _height / 2, 0));
@@ -448,7 +445,7 @@ public partial class RegionGate : StationBase
                 AudioManager.Instance?.Play("unlock", -2f);
                 Effects.Instance?.Burst(GlobalPosition + Vector3.Up * 2.5f, Region.AccentColor, 3f);
                 var tw = CreateTween();
-                tw.TweenProperty(_barrierMat, "albedo_color:a", 0f, 1.2f);
+                tw.TweenProperty(_barrierMat, "shader_parameter/strength", 0f, 1.2f);
                 tw.TweenCallback(Callable.From(HideBarrier));
             }
             else HideBarrier();
@@ -462,7 +459,7 @@ public partial class RegionGate : StationBase
                 if (c is MeshInstance3D m) m.Visible = true;
             Label.Visible = true;
             _backLabel.Visible = true;
-            _barrierMat.AlbedoColor = new Color(Region.AccentColor, 0.35f);
+            _barrierMat.SetShaderParameter("strength", 1f);
         }
         RefreshText();
         UpdateBeacon();
@@ -503,11 +500,7 @@ public partial class RegionGate : StationBase
             _holo.RotateY((float)delta * (_open ? 1.2f : 0.3f));
             _holo.Position = new Vector3(0, 3.4f + Mathf.Sin(Time * 1.5f) * 0.12f, 0);
         }
-        if (!_open && _barrierMat != null)
-        {
-            float a = 0.28f + 0.1f * Mathf.Sin(Time * 2.2f);
-            _barrierMat.AlbedoColor = new Color(Region.AccentColor, a);
-        }
+        // (o pulso do campo é feito no shader)
     }
 
     public override string GetPrompt()

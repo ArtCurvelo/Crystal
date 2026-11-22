@@ -136,6 +136,15 @@ public partial class ScreenshotTour : Node
                     await Shot("35_decor_deposit_0");
                 }
             }
+            // portão de região (campo de força)
+            if (Main.World.Gates.Count > 0)
+            {
+                var gt = Main.World.Gates[0];
+                var gf = gt.GlobalTransform.Basis.Z;
+                LookAtPoint(p, gt.GlobalPosition + gf * 7.5f, gt.GlobalPosition + Vector3.Up * 2.2f);
+                await Wait(0.9f);
+                await Shot("35_decor_gate_0");
+            }
             // geodos: um comum e um especial (colossal)
             int gshot = 0;
             foreach (bool special in new[] { false, true })
