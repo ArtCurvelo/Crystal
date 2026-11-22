@@ -990,6 +990,7 @@ public partial class ScreenshotTour : Node
         UiBus.RequestHomePanel();
         await Wait(0.6f);
         var home = Main.GetChildren().OfType<UI.HomeScreen>().First();
+        await Shot("33a_home_upgrades");
         home.ShowSkillsTab();
         home.SelectSkill(Data.SkillIds.Hone);
         await Wait(0.5f);

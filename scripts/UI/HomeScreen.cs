@@ -136,7 +136,11 @@ public partial class HomeScreen : ModalScreen
         top.AddChild(UiTheme.Label(def.Name, 18, UiTheme.Text, true));
         var level = UiTheme.Label("", 16, UiTheme.Gold, true);
         top.AddChild(level);
-        v.AddChild(UiTheme.Label(def.Description, 14, UiTheme.Muted));
+        // a descrição quebra a linha (textos longos passavam da borda da tela)
+        var desc = UiTheme.Label(def.Description, 14, UiTheme.Muted);
+        desc.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        desc.CustomMinimumSize = new Vector2(200, 0);
+        v.AddChild(desc);
         var effect = UiTheme.Label("", 14, UiTheme.Success);
         v.AddChild(effect);
         Button buy = null;
