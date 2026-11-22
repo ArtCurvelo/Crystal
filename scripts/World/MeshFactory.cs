@@ -129,8 +129,8 @@ public static class MeshFactory
         for (int w = 0; w < 7; w++)
         {
             var d = new Vector3((float)rng.NextDouble() * 2 - 1, (float)rng.NextDouble() * 2 - 1, (float)rng.NextDouble() * 2 - 1).Normalized();
-            float freq = w < 3 ? 1.2f + (float)rng.NextDouble() * 1.2f : 3.5f + (float)rng.NextDouble() * 3f;
-            waves.Add((d, freq, (float)rng.NextDouble() * Mathf.Tau, w < 3 ? 0.55f : 0.16f));
+            float freq = w < 3 ? 1.2f + (float)rng.NextDouble() * 1.2f : 4.5f + (float)rng.NextDouble() * 4f;
+            waves.Add((d, freq, (float)rng.NextDouble() * Mathf.Tau, w < 3 ? 0.55f : 0.3f)); // detalhe fino mais forte: pedra, não "pétala" lisa
         }
         float Noise(Vector3 p) { float n = 0; foreach (var (d, f, ph, a) in waves) n += MathF.Sin(p.Dot(d) * f + ph) * a; return n; }
         var squash = new Vector3(1f + (float)rng.NextDouble() * 0.4f, 0.6f + (float)rng.NextDouble() * 0.4f, 1f + (float)rng.NextDouble() * 0.3f);

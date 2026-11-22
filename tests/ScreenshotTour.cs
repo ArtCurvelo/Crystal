@@ -119,6 +119,23 @@ public partial class ScreenshotTour : Node
                 await Shot("35_decor_terminal_0");
 
             }
+            // lago do Reservatório Abissal e um depósito comum da região 2
+            {
+                var La = Main.World.Layouts[GameData.Regions.FindIndex(r => r.Id == "abyss")];
+                if (La.Lake != null)
+                {
+                    LookAtPoint(p, La.OnGround(La.Lake.A.X + La.Lake.RA * 0.7f, La.Lake.A.Y, 0.1f), new Vector3(La.Lake.A.X, La.Lake.Level + 4f, La.Lake.A.Y));
+                    await Wait(1.0f);
+                    await Shot("35_decor_lake_0");
+                }
+                var dep = Main.World.Crystals.FirstOrDefault(x => x.IsMineable && x.Material.Archetype == OreArchetype.Crystal && World.WorldBuilder.RegionAt(x.GlobalPosition).Id == "depths");
+                if (dep != null)
+                {
+                    LookAtPoint(p, dep.StandPoint + Vector3.Up * 0.3f, dep.GlobalPosition + Vector3.Up * 0.2f);
+                    await Wait(0.9f);
+                    await Shot("35_decor_deposit_0");
+                }
+            }
             // geodos: um comum e um especial (colossal)
             int gshot = 0;
             foreach (bool special in new[] { false, true })

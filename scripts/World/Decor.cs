@@ -306,7 +306,10 @@ public static class Decor
     /// <summary>Lago luminoso cobrindo o piso (o jogador caminha pela água rasa).</summary>
     public static void Lake(Node3D root, Vector3 center, float radius, Color glow)
     {
-        var mat = Water(glow, new Color(0.01f, 0.06f, 0.1f), new Color(0.06f, 0.35f, 0.45f));
+        // água escura e funda; a cor da região só tinge as cáusticas (fracas) e o brilho da borda
+        var tint = glow.Lerp(new Color(0.3f, 0.8f, 1f), 0.5f);
+        var mat = Water(tint, new Color(0.02f, 0.07f, 0.13f), new Color(0.06f, 0.3f, 0.42f));
+        mat.SetShaderParameter("caustics", 0.55f);
         mat.SetShaderParameter("depth_fade", 0.7f);
         mat.SetShaderParameter("foam_width", 0.12f);
         // superfície subdividida (marolas); a borda fica escondida sob as paredes e o relevo
