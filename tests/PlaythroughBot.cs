@@ -169,7 +169,7 @@ public partial class PlaythroughBot : Node
         // prefere o Coração quando o dano permite quebrá-lo em tempo razoável
         Crystal target = null;
         var heart = Main.World.Crystals.FirstOrDefault(c => c.Material.Id == "heart" && c.IsMineable);
-        if (heart != null && GS.IsUnlocked("core") && heart.Hp / GS.DamagePerSecond < 45) target = heart;
+        if (heart != null && GS.IsUnlocked("core") && heart.Hp / GS.DamagePerSecond < 120) target = heart; // Coração com vida x1,6: a broca de titânio já serve
         target ??= Main.World.Crystals
             .Where(c => c.IsMineable && !c.Material.Special && c.GetParent() == root && !_unaimable.Contains(c))
             .OrderBy(c => c.GlobalPosition.DistanceTo(P.GlobalPosition))
