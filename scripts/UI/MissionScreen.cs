@@ -31,9 +31,17 @@ public partial class MissionScreen : ModalScreen
         if (GameState.Instance != null) { GameState.Instance.ContractsChanged -= OnChanged; GameState.Instance.InventoryChanged -= OnChanged; }
     }
 
-    void OnChanged() { if (IsOpen) Refresh(); }
+    bool _refreshing;
+    void OnChanged() { if (IsOpen && !_refreshing) Refresh(); }
 
     public override void Refresh()
+    {
+        if (_refreshing) return;
+        _refreshing = true;
+        try { Build(); } finally { _refreshing = false; }
+    }
+
+    void Build()
     {
         var gs = GameState.Instance;
         gs.EnsureContracts();

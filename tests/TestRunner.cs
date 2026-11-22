@@ -1317,6 +1317,25 @@ public partial class TestRunner : Node
         bool missions = false; void OnM() => missions = true;
         UiBus.OpenMissions += OnM; town.Board.Interact(null); UiBus.OpenMissions -= OnM;
         Check(missions, "quadro abre as encomendas");
+        // a tela de encomendas abre, mostra os pedidos e entrega (antes, abrir travava o jogo num laço sem fim)
+        GS.Data.Contracts.Clear();
+        GS.Data.Discovered.Add("quartz");
+        var ms = new MissionScreen();
+        AddChild(ms);
+        await Frames(2);
+        ms.Open();
+        await Frames(2);
+        Check(ms.IsOpen && GS.Data.Contracts.Count == GameState.ContractSlots, "tela de encomendas abre com 3 pedidos");
+        var c0 = GS.Data.Contracts[0];
+        GS.AddItem(c0.Mat, c0.Amount);
+        await Frames(2);
+        var btn = FindAll<Button>(ms).FirstOrDefault(b => b.HasMeta("contract") && (int)b.GetMeta("contract") == 0);
+        Check(btn != null && !btn.Disabled, "botão Entregar liberado com os fragmentos na mochila");
+        btn?.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(2);
+        Check(GS.Data.Contracts[0].Done, "entrega pela tela funciona");
+        ms.CloseSilently();
+        ms.QueueFree();
         root.QueueFree();
         await Frames(2);
         Fresh();

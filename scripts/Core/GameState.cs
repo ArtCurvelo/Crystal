@@ -535,7 +535,9 @@ public partial class GameState : Node
     public void EnsureContracts(bool renew = false)
     {
         Data.Contracts ??= new List<ContractSave>();
+        int before = Data.Contracts.Count;
         if (renew) Data.Contracts.RemoveAll(c => c.Done);
+        bool changed = Data.Contracts.Count != before;
         var pool = Data.Discovered.Select(GameData.Mat).Where(m => m != null && !m.Special).ToList();
         if (pool.Count == 0) pool.Add(GameData.Mat("quartz"));
         var rng = new Random(Data.Day * 7919 + Data.Contracts.Count * 31 + Data.TotalEarned.GetHashCode());
@@ -550,8 +552,10 @@ public partial class GameState : Node
             foreach (var m in options) { pick -= 1.0 / (1 + (int)m.Rarity); if (pick <= 0) { chosen = m; break; } }
             int amount = ContractAmount(chosen, rng);
             Data.Contracts.Add(new ContractSave { Mat = chosen.Id, Amount = amount, Reward = ContractReward(chosen, amount) });
+            changed = true;
         }
-        ContractsChanged?.Invoke();
+        // só avisa quando algo mudou (a tela de encomendas chama isto ao se atualizar: avisar sempre virava um laço sem fim)
+        if (changed) ContractsChanged?.Invoke();
     }
 
     public int InventoryOf(string matId) => Data.Inventory.TryGetValue(matId, out int c) ? c : 0;
