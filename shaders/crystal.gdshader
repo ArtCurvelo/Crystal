@@ -52,7 +52,9 @@ void fragment() {
 	float fres = pow(1.0 - clamp(dot(n, normalize(VIEW)), 0.0, 1.0), 2.2);
 	float h = clamp(UV.y, 0.0, 1.0);
 	vec3 facet = base_color.rgb * COLOR.rgb;
-	ALBEDO = facet * (0.45 + 0.55 * h);
+	// cada face com luz própria (as normais do prisma são por face): as facetas aparecem, em vez de uma mancha
+	float face = 0.5 + 0.5 * pow(abs(dot(n, normalize(vec3(0.45, 0.75, 0.5)))), 1.4);
+	ALBEDO = facet * (0.45 + 0.55 * h) * face;
 
 	// rachaduras: projeção lateral (xz/y) para cobrir o prisma.
 	// Só calcula o Voronoi (caro) em cristal danificado: a grande maioria está inteira.
@@ -72,7 +74,7 @@ void fragment() {
 	float glint = step(0.93, gh) * smoothstep(0.82, 1.0, tw) * (0.4 + fres);
 
 	float inner = glow_energy * (0.25 + 0.75 * h * h);
-	EMISSION = glow_color.rgb * (inner + fres * 1.1)
+	EMISSION = glow_color.rgb * (inner * face + fres * 0.7)
 		+ mix(glow_color.rgb, vec3(1.0), 0.45) * crack * (1.5 + 2.5 * damage)
 		+ mix(glow_color.rgb, vec3(1.0), 0.6) * glint * 2.2
 		+ vec3(flash) * 0.6;

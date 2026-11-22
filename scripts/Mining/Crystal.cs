@@ -83,7 +83,7 @@ public partial class Crystal : StaticBody3D
         bool special = mat.Special;
         float s = special ? mat.SpecialScale : SizeScale;
         // brilho forte (o bloom faz os minérios "acenderem" nas cavernas escuras)
-        _baseEnergy = mat.Rare ? 1.5f : special ? 0.35f : 0.95f;
+        _baseEnergy = mat.Rare ? 1.3f : special ? 0.35f : 0.8f; // um pouco menos: o bloom engolia as facetas
 
         // formato e textura próprios do tipo de minério
         var built = OreVisuals.Build(_visual, mat, _rng, s);
