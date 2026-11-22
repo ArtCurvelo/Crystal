@@ -260,6 +260,8 @@ public static class Settings
         vp.Msaa3D = aa == 4 || (aa == 1 && !f.Smaa) ? f.Msaa : Viewport.Msaa.Disabled;
         vp.Scaling3DMode = aa == 3 && f.Fsr2 ? Viewport.Scaling3DModeEnum.Fsr2 : f.Fsr1 ? Viewport.Scaling3DModeEnum.Fsr : Viewport.Scaling3DModeEnum.Bilinear;
         vp.FsrSharpness = 0.35f;
+        // a única sombra dinâmica é a da lanterna: atlas de 2048 basta (o padrão 4096 custava memória e tempo de GPU)
+        vp.PositionalShadowAtlasSize = 2048;
         vp.UseTaa = false;
         // cavernas escuras: gradientes suaves sem faixas
         vp.UseDebanding = f.Debanding;

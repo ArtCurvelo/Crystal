@@ -1150,25 +1150,8 @@ public partial class WorldBuilder : Node3D
         root.AddChild(body);
     }
 
-    static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms, float lowFraction = 0.6f)
-    {
-        if (xforms.Count == 0) return;
-        var mm = new MultiMesh
-        {
-            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-            Mesh = mesh,
-            InstanceCount = xforms.Count,
-        };
-        for (int i = 0; i < xforms.Count; i++) mm.SetInstanceTransform(i, xforms[i]);
-        var mmi = new MultiMeshInstance3D
-        {
-            Multimesh = mm,
-            MaterialOverride = mat,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-        };
-        mmi.SetMeta(LowFractionMeta, lowFraction);
-        root.AddChild(mmi);
-    }
+    static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms, float lowFraction = 0.6f, float range = ChunkedMulti.DefaultRange)
+        => ChunkedMulti.Add(root, mesh, mat, xforms, lowFraction, range);
 
     /// <summary>Região em que um ponto está (por coordenada Z).</summary>
     public static RegionDef RegionAt(Vector3 p)

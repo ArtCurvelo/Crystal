@@ -559,7 +559,7 @@ public static class Decor
                     solid?.Invoke(new CylinderShape3D { Radius = rad * 0.85f, Height = h * 0.9f }, new Transform3D(axis, basePos + off + dir * h * 0.45f), basePos, 0f);
                 }
             }
-            AddMulti(root, mesh, mat, xf);
+            AddMulti(root, mesh, mat, xf, 0.6f, 180f); // formações gigantes: vistas de longe
         }
     }
 
@@ -606,7 +606,7 @@ public static class Decor
             }
         }
         var stemMat = new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.84f, 0.76f), VertexColorUseAsAlbedo = true, Roughness = 0.8f, RimEnabled = true, Rim = 0.25f };
-        AddMulti(root, DecorMeshes.MushroomStem(), stemMat, stems, 1f);
+        AddMulti(root, DecorMeshes.MushroomStem(), stemMat, stems, 1f, 160f);
         for (int k = 0; k < capColors.Length; k++)
         {
             // lamelas: escuras, com um brilho fraco da cor do chapéu
@@ -616,26 +616,19 @@ public static class Decor
                 Roughness = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             };
             gillMat.VertexColorUseAsAlbedo = true;
-            AddMulti(root, DecorMeshes.MushroomGills(), gillMat, gillsBy[k], 1f);
+            AddMulti(root, DecorMeshes.MushroomGills(), gillMat, gillsBy[k], 1f, 160f);
             // chapéu: topo claro e borda mais escura (cor do vértice), brilho moderado para a forma aparecer
             var capMat = new StandardMaterial3D
             {
                 AlbedoColor = capColors[k], VertexColorUseAsAlbedo = true, EmissionEnabled = true, Emission = capColors[k], EmissionEnergyMultiplier = 0.45f,
                 Roughness = 0.45f, RimEnabled = true, Rim = 0.5f, RimTint = 0.6f,
             };
-            for (int v = 0; v < 3; v++) AddMulti(root, DecorMeshes.MushroomCap(v), capMat, capsBy[k * 3 + v], 1f);
+            for (int v = 0; v < 3; v++) AddMulti(root, DecorMeshes.MushroomCap(v), capMat, capsBy[k * 3 + v], 1f, 160f);
         }
     }
 
-    static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms, float lowFraction = 0.6f)
-    {
-        if (xforms.Count == 0) return;
-        var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = xforms.Count };
-        for (int i = 0; i < xforms.Count; i++) mm.SetInstanceTransform(i, xforms[i]);
-        var mmi = new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        mmi.SetMeta(WorldBuilder.LowFractionMeta, lowFraction);
-        root.AddChild(mmi);
-    }
+    static void AddMulti(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms, float lowFraction = 0.6f, float range = ChunkedMulti.DefaultRange)
+        => ChunkedMulti.Add(root, mesh, mat, xforms, lowFraction, range);
 }
 
 /// <summary>Água-viva: flutua, pulsa e deriva lentamente.</summary>

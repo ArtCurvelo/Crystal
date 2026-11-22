@@ -45,7 +45,7 @@ public sealed record RenderFeatures(
         {
             case RenderMethods.ForwardPlus:
                 return new RenderFeatures(method, q,
-                    Ssao: !low, Ssr: !low, SsrSteps: high ? 96 : 48, Ssil: high, VolumetricFog: high,
+                    Ssao: !low, Ssr: !low, SsrSteps: high ? 56 : 40, Ssil: high, VolumetricFog: high,
                     LampShadows: high, Glow: true, GlowIntensity: glow,
                     Smaa: true, Fxaa: false, Msaa: Viewport.Msaa.Disabled, Fsr1: true, Fsr2: true, Debanding: true,
                     AmbientBoost: low ? 1.5f : 1.0f);

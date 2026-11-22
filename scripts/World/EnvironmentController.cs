@@ -74,6 +74,24 @@ public partial class EnvironmentController : WorldEnvironment
         e.SsrDepthTolerance = 0.3f;
         e.SsilEnabled = f.Ssil;
         e.SsilIntensity = 1.2f;
+        ApplyEffectCosts();
+    }
+
+    /// <summary>
+    /// Desempenho (meta 120 FPS na Alta): os efeitos de tela usavam a qualidade padrão da Godot (cara).
+    /// Aqui cada um usa a versão barata que quase não muda a imagem: SSAO/SSIL em meia resolução,
+    /// SSR com rugosidade simplificada, névoa volumétrica em grade menor sem filtro extra e sombra da
+    /// lanterna com filtro suave mais barato.
+    /// </summary>
+    public static void ApplyEffectCosts()
+    {
+        RenderingServer.EnvironmentSetSsaoQuality(RenderingServer.EnvironmentSsaoQuality.Medium, true, 0.5f, 2, 50f, 300f);
+        RenderingServer.EnvironmentSetSsilQuality(RenderingServer.EnvironmentSsilQuality.Low, true, 0.5f, 2, 50f, 300f);
+        RenderingServer.EnvironmentSetSsrRoughnessQuality(RenderingServer.EnvironmentSsrRoughnessQuality.Low);
+        RenderingServer.EnvironmentSetVolumetricFogVolumeSize(48, 48);
+        RenderingServer.EnvironmentSetVolumetricFogFilterActive(false);
+        RenderingServer.PositionalSoftShadowFilterSetQuality(RenderingServer.ShadowQuality.SoftLow);
+        RenderingServer.ScreenSpaceRoughnessLimiterSetActive(false, 0.25f, 0.18f);
     }
 
     /// <summary>Sobreposição temporária de evento (névoa/cor/energia). Intensidade 0 = desligado.</summary>
