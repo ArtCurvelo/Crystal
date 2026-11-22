@@ -124,6 +124,7 @@ O bot multiplica a venda por 2,6 (`Economy.SellValue`) só para cobrir a jornada
 Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo simulado.
 
 ## Problemas pendentes
+- **FPS na RTX 3060 do irmão do diretor (Alta)**: era 85; meta 120. Otimizações da v0.22 publicadas, aguardando a medição (F3).
 - **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
 
 ## Próxima ação recomendada

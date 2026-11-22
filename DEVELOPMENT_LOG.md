@@ -448,3 +448,11 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Picareta redesenhada: cabeça curva (ponta + lâmina) varrida proceduralmente, cabo com veio, couro e pomo; madeira com pedra amarrada; gemas com pontas de cristal e gema encravada. Golpe em 3 fases (antecipação, impacto sincronizado com o acerto via `ToolView.HitDelay`, volta) e animação ao trocar de ferramenta.
 - Decoração (`World/DecorMeshes.cs`): estalactites/estalagmites com anéis, curva e ponta clara (3 variantes); cogumelos com pé em bulbo, chapéu em cúpula (3 formatos) e lamelas; samambaias com folíolos.
 - Testes 840/840 (novo: clique/golpe triplo/contínua/acessibilidade; ressonância com e sem laser).
+
+## Rodadas de melhoria gráfica (v0.15–v0.22) e resistência das ferramentas
+- Visual: HUD compacto (nome do local só ao entrar), moeda Lúmens, fonte Chakra Petch (OFL), ícones por local, ícone e logo do jogo (tools/icon.py, tools/logo.py); picareta acerta com a ponta; scanner, caixotes, balcões (BuildCounter), terminal com holograma, posto avançado, portões com campo de força (shaders/forcefield.gdshader), lampiões, geodos com casca, lago do Reservatório, broca/luva/mãos, colunas colossais na Catedral, cogumelos gigantes, rochas com volume e fraturas, cristais com facetas.
+- Atalhos antigos ganham o ícone novo (Core/ShortcutIcon.cs), pois o atualizador nunca troca o .exe.
+- Versão dos jogadores sem admin (F9 só com chave de desenvolvedor, Core/BuildFlavor.cs); predefinição Steam sem atualizador; LICENSE e marca de autoria assinada (World/NoiseTables.cs).
+- Ferramentas com resistência: desgaste por golpe proporcional ao dano; minério inteiro tira comum 1, incomum 2, raro 4, épico 7, lendário 12 (especial 3x). Vida dos minérios x1,6 (Economy.OreHp). Saves antigos convertidos na mesma proporção.
+- Otimização (meta 120 FPS na Alta): decoração dividida em blocos de 32 m com distância de desenho (World/ChunkedMulti.cs) — triângulos por vista caíram até 12x; SSAO/SSIL em meia resolução, SSR 56 passos, névoa volumétrica menor, sombra da lanterna mais barata (EnvironmentController.ApplyEffectCosts). FPS real na RTX 3060 ainda a confirmar pelo diretor (F3).
+- Lição: variações visuais nunca podem consumir o gerador do mundo (mudou a caverna inteira uma vez); usar DecorMeshes.PosHash.
