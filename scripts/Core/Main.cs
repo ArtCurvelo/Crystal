@@ -813,6 +813,7 @@ public partial class Main : Node
             if (_confirm.IsOpen) { _confirm.Close(); return; }
             if (_choice.IsOpen) { _choice.Decline(); return; }
             if (_home.IsOpen) { _home.Close(); return; }
+            if (_missions?.IsOpen ?? false) { _missions.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
@@ -833,6 +834,7 @@ public partial class Main : Node
             else if (_confirm.IsOpen) _confirm.Close();
             else if (_choice.IsOpen) _choice.Decline();
             else if (_home.IsOpen) _home.Close();
+            else if (_missions?.IsOpen ?? false) _missions.Close();
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
             else if (_help.IsOpen) _help.Close();
