@@ -145,6 +145,45 @@ public partial class ScreenshotTour : Node
                 await Wait(0.9f);
                 await Shot("35_decor_gate_0");
             }
+            // Catedral: colunas colossais
+            for (int ci = 0; ci < Mathf.Min(2, Main.World.CathedralColumns.Count); ci++)
+            {
+                var col = Main.World.CathedralColumns[ci];
+                var Lc = Main.World.Layouts[GameData.Regions.FindIndex(r => r.Id == "cathedral")];
+                Vector3? st = null;
+                for (int d = 0; d < 8 && st == null; d++)
+                {
+                    var q = col + new Vector3(Mathf.Cos(d * 0.785f), 0, Mathf.Sin(d * 0.785f)) * 11f;
+                    if (Lc.WallDist(q.X, q.Z) < -1.5f) st = Lc.OnGround(q.X, q.Z, 0.1f);
+                }
+                if (st == null) continue;
+                LookAtPoint(p, st.Value, col + Vector3.Up * 5f);
+                await Wait(1.0f);
+                await Shot($"35_decor_cathedral_{ci}");
+            }
+            // cogumelo gigante (Jardim Fúngico): instância de caule mais alta
+            {
+                MultiMeshInstance3D best = null; int bi = -1; float bh = 0;
+                void FindStem(Node n) { foreach (Node c in n.GetChildren()) { if (c is MultiMeshInstance3D mm && mm.Multimesh?.Mesh == World.DecorMeshes.MushroomStem()) for (int i = 0; i < mm.Multimesh.InstanceCount; i++) { float h = mm.Multimesh.GetInstanceTransform(i).Basis.Y.Length(); if (h > bh) { bh = h; best = mm; bi = i; } } FindStem(c); } }
+                FindStem(Main.World);
+                if (best != null && bh > 3f)
+                {
+                    var bp = best.GlobalTransform * best.Multimesh.GetInstanceTransform(bi).Origin;
+                    var Lr = Main.World.Layouts[GameData.Regions.IndexOf(World.WorldBuilder.RegionAt(bp))];
+                    Vector3? st = null;
+                    for (int d = 0; d < 8 && st == null; d++)
+                    {
+                        var q = bp + new Vector3(Mathf.Cos(d * 0.785f), 0, Mathf.Sin(d * 0.785f)) * 9f;
+                        if (Lr.WallDist(q.X, q.Z) < -1.2f) st = Lr.OnGround(q.X, q.Z, 0.1f);
+                    }
+                    if (st != null)
+                    {
+                        LookAtPoint(p, st.Value, bp + Vector3.Up * bh * 0.7f);
+                        await Wait(1.0f);
+                        await Shot("35_decor_giant_mushroom");
+                    }
+                }
+            }
             // geodos: um comum e um especial (colossal)
             int gshot = 0;
             foreach (bool special in new[] { false, true })

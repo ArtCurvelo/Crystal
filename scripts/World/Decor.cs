@@ -570,8 +570,9 @@ public static class Decor
         var stems = new List<Transform3D>();
         var gillsBy = new List<Transform3D>[capColors.Length];
         for (int k = 0; k < capColors.Length; k++) gillsBy[k] = new List<Transform3D>();
-        var capsBy = new List<Transform3D>[capColors.Length];
-        for (int k = 0; k < capColors.Length; k++) capsBy[k] = new List<Transform3D>();
+        // chapéus por cor e por formato (3 formatos; o formato sai da posição, sem gastar o rng do mundo)
+        var capsBy = new List<Transform3D>[capColors.Length * 3];
+        for (int k = 0; k < capsBy.Length; k++) capsBy[k] = new List<Transform3D>();
         for (int c = 0, tries = 0; c < count && tries < count * 8; tries++)
         {
             if (!L.RandomFloor(rng, 4f, 0.25f, out var p)) continue;
@@ -584,11 +585,12 @@ public static class Decor
             float stemR = 0.35f + h * 0.04f;
             var lean = new Basis(new Vector3((float)rng.NextDouble() - 0.5f, 0, (float)rng.NextDouble() - 0.5f).Normalized(), (float)rng.NextDouble() * 0.18f);
             var up = lean * Vector3.Up;
-            stems.Add(new Transform3D(lean.ScaleLocal(new Vector3(stemR, h, stemR)), p + up * h * 0.5f));
+            stems.Add(new Transform3D(lean.ScaleLocal(new Vector3(stemR * 0.85f, h, stemR * 0.85f)), p));
             var top = p + up * h;
             int ci = rng.Next(capColors.Length);
-            capsBy[ci].Add(new Transform3D(lean.ScaleLocal(new Vector3(capR, capR * 0.55f, capR)), top - up * 0.15f));
-            gillsBy[ci].Add(new Transform3D(lean.ScaleLocal(new Vector3(capR * 0.95f, 0.06f, capR * 0.95f)), top - up * 0.18f));
+            int shape = (int)(DecorMeshes.PosHash(p) * 3f) % 3;
+            capsBy[ci * 3 + shape].Add(new Transform3D(lean.ScaleLocal(new Vector3(capR, capR * 0.8f, capR)), top - up * 0.25f));
+            gillsBy[ci].Add(new Transform3D(lean.ScaleLocal(new Vector3(capR * 0.97f, capR * 0.6f, capR * 0.97f)), top - up * 0.25f));
             solid?.Invoke(new CylinderShape3D { Radius = stemR * 1.05f, Height = h }, new Transform3D(lean, p + up * h * 0.5f), p, 1.2f);
             // cogumelos menores em volta da base
             int small = rng.Next(2, 5);
@@ -598,11 +600,13 @@ public static class Decor
                 var q = new Vector3(p.X + Mathf.Cos(a) * d, 0, p.Z + Mathf.Sin(a) * d);
                 q.Y = L.Ground(q.X, q.Z) - 0.05f;
                 float sh = 0.5f + (float)rng.NextDouble() * 1.2f, sr = 0.3f + (float)rng.NextDouble() * 0.4f;
-                stems.Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(0.09f, sh, 0.09f)), q + Vector3.Up * sh * 0.5f));
-                capsBy[rng.Next(capColors.Length)].Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(sr, sr * 0.55f, sr)), q + Vector3.Up * sh));
+                stems.Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(0.08f, sh, 0.08f)), q));
+                int sc = rng.Next(capColors.Length);
+                capsBy[sc * 3 + (int)(DecorMeshes.PosHash(q) * 3f) % 3].Add(new Transform3D(Basis.Identity.ScaleLocal(new Vector3(sr, sr * 0.8f, sr)), q + Vector3.Up * (sh - 0.04f)));
             }
         }
-        AddMulti(root, new CylinderMesh { TopRadius = 0.8f, BottomRadius = 1.2f, Height = 1, RadialSegments = 10, Rings = 2 }, Lit(new Color(0.82f, 0.8f, 0.72f), 0.85f), stems, 1f);
+        var stemMat = new StandardMaterial3D { AlbedoColor = new Color(0.86f, 0.84f, 0.76f), VertexColorUseAsAlbedo = true, Roughness = 0.8f, RimEnabled = true, Rim = 0.25f };
+        AddMulti(root, DecorMeshes.MushroomStem(), stemMat, stems, 1f);
         for (int k = 0; k < capColors.Length; k++)
         {
             // lamelas: escuras, com um brilho fraco da cor do chapéu
@@ -611,13 +615,15 @@ public static class Decor
                 AlbedoColor = capColors[k].Darkened(0.75f), EmissionEnabled = true, Emission = capColors[k], EmissionEnergyMultiplier = 0.18f,
                 Roughness = 0.9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             };
-            AddMulti(root, new CylinderMesh { TopRadius = 1, BottomRadius = 1, Height = 1, RadialSegments = 20, Rings = 1 }, gillMat, gillsBy[k], 1f);
+            gillMat.VertexColorUseAsAlbedo = true;
+            AddMulti(root, DecorMeshes.MushroomGills(), gillMat, gillsBy[k], 1f);
+            // chapéu: topo claro e borda mais escura (cor do vértice), brilho moderado para a forma aparecer
             var capMat = new StandardMaterial3D
             {
-                AlbedoColor = capColors[k].Darkened(0.35f), EmissionEnabled = true, Emission = capColors[k], EmissionEnergyMultiplier = 0.75f,
-                Roughness = 0.5f, RimEnabled = true, Rim = 0.5f,
+                AlbedoColor = capColors[k], VertexColorUseAsAlbedo = true, EmissionEnabled = true, Emission = capColors[k], EmissionEnergyMultiplier = 0.45f,
+                Roughness = 0.45f, RimEnabled = true, Rim = 0.5f, RimTint = 0.6f,
             };
-            AddMulti(root, new SphereMesh { Radius = 1, Height = 1, IsHemisphere = true, RadialSegments = 20, Rings = 6 }, capMat, capsBy[k], 1f);
+            for (int v = 0; v < 3; v++) AddMulti(root, DecorMeshes.MushroomCap(v), capMat, capsBy[k * 3 + v], 1f);
         }
     }
 

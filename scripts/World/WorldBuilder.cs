@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using CrystalExcavator.Core;
 using CrystalExcavator.Data;
@@ -210,7 +211,66 @@ public partial class WorldBuilder : Node3D
         BuildChamberSigns(root, r, L);
         L.Reflood(); // obstáculos sólidos mudam o que é alcançável a pé
         BuildCrystals(root, r, L, rng, reserved);
+        if (r.Id == "cathedral") BuildCathedralColumns(root, L);
     }
+
+    /// <summary>
+    /// Catedral de Cristal: colunas colossais de cristal do chão ao teto no centro das maiores câmaras, com luz própria.
+    /// Feitas depois dos depósitos e com gerador próprio: não mudam nada do resto do mundo; evitam o caminho principal e os depósitos.
+    /// </summary>
+    void BuildCathedralColumns(Node3D root, CaveLayout L)
+    {
+        var rng = new Random(7711);
+        var shader = GD.Load<Shader>("res://shaders/crystal.gdshader");
+        var palette = new[] { new Color(0.85f, 0.8f, 1f), new Color(0.62f, 0.5f, 1f), new Color(1f, 0.82f, 0.5f) };
+        var mesh = MeshFactory.CrystalPrism(6, 1, 1, 0.22f);
+        var byColor = new List<Transform3D>[palette.Length];
+        for (int k = 0; k < palette.Length; k++) byColor[k] = new List<Transform3D>();
+        int made = 0;
+        foreach (var c in L.Chambers.OrderByDescending(ch => ch.Radius))
+        {
+            if (made >= 3) break;
+            if (c == L.Heart || c == L.Camp || c.Radius < 9f) continue;
+            var basePos = L.OnGround(c.A.X, c.A.Y);
+            float clear = L.Ceiling(basePos.X, basePos.Z) - basePos.Y;
+            if (clear < 8f) continue;
+            // longe do caminho principal e dos depósitos já colocados
+            if (L.PathPoints.Any(q => new Vector2(q.X - basePos.X, q.Z - basePos.Z).Length() < 5f)) continue;
+            if (Crystals.Any(x => x.GlobalPosition.DistanceTo(basePos) < 5f)) continue;
+            made++;
+            int prisms = 4 + rng.Next(3);
+            for (int i = 0; i < prisms; i++)
+            {
+                bool main = i == 0;
+                float h = main ? clear + 0.8f : clear * (0.35f + (float)rng.NextDouble() * 0.35f);
+                float rad = main ? 1.1f + (float)rng.NextDouble() * 0.3f : 0.45f + (float)rng.NextDouble() * 0.35f;
+                var off = main ? Vector3.Zero : new Vector3((float)rng.NextDouble() - 0.5f, -0.3f, (float)rng.NextDouble() - 0.5f) * 3.2f;
+                var dir = (Vector3.Up * 3f + (main ? Vector3.Zero : off.Normalized())).Normalized();
+                var x = dir.Cross(Vector3.Forward).Normalized();
+                var z = x.Cross(dir).Normalized();
+                var axis = new Basis(x, dir, z);
+                byColor[main ? 0 : 1 + rng.Next(2)].Add(new Transform3D(axis.ScaleLocal(new Vector3(rad, h, rad)), basePos + off));
+                Solid(new CylinderShape3D { Radius = rad * 0.9f, Height = h * 0.95f }, new Transform3D(axis, basePos + off + dir * h * 0.47f), basePos + off, main ? rad + 0.6f : 0f);
+            }
+            root.AddChild(new OmniLight3D { LightColor = new Color(0.8f, 0.75f, 1f), LightEnergy = 1.4f, OmniRange = 16f, OmniAttenuation = 1.1f, Position = basePos + Vector3.Up * Mathf.Min(clear * 0.5f, 6f) + new Vector3(2.5f, 0, 2.5f) });
+            CathedralColumns.Add(basePos);
+        }
+        for (int k = 0; k < palette.Length; k++)
+        {
+            if (byColor[k].Count == 0) continue;
+            var mat = new ShaderMaterial { Shader = shader };
+            mat.SetShaderParameter("base_color", palette[k].Lightened(0.1f));
+            mat.SetShaderParameter("glow_color", palette[k]);
+            mat.SetShaderParameter("glow_energy", 0.7f);
+            mat.SetShaderParameter("seed", 3f + k * 7f);
+            var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = mesh, InstanceCount = byColor[k].Count };
+            for (int i = 0; i < byColor[k].Count; i++) mm.SetInstanceTransform(i, byColor[k][i]);
+            root.AddChild(new MultiMeshInstance3D { Multimesh = mm, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        }
+    }
+
+    /// <summary>Centros das colunas colossais da Catedral (para testes e capturas).</summary>
+    public readonly List<Vector3> CathedralColumns = new();
 
     public readonly List<GoblinCamp> GoblinCamps = new();
     public readonly List<Rope> PitRopes = new();
