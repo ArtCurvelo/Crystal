@@ -27,6 +27,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Árvore de habilidades**: 8 ramos, 30 habilidades (`UI/SkillTreeView.cs`). Ramo TÉCNICA: Golpe triplo (clique = 3 golpes) → Mineração contínua (segurar). Sem elas, cada clique é um golpe (`PlayerController._queuedSwings`).
 - **Ressonância**: só com ferramenta a laser (`GameState.ResonanceActive`).
 - **Eventos por região**: Eco Luminoso, Maré Gélida, Surto do Núcleo e Maré Luminosa.
+- **Vila dos Ferreiros** (`World/Town.cs`): fim do elevador da mina; casa do jogador, ferreiro (vende minérios e ferramentas) e Quadro de Encomendas (3 pedidos por dia, `GameState.EnsureContracts`, `UI/MissionScreen.cs`). Próximas etapas do plano: forja (criar equipamentos com minérios), níveis mais fundos com inimigos pelo elevador, história e calibrar a duração para 4–6 h.
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
@@ -128,7 +129,7 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 - **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
 
 ## Próxima ação recomendada
-Polimento final e regressão; aguardar o resultado do teste no Windows e ajustar o desempenho conforme o FPS real.
+Etapa 2 do plano de conteúdo: forja no ferreiro (equipamentos feitos com minérios). Aguardar o FPS real da RTX 3060.
 
 ## Renderização (v0.4.0)
 - Forward+ (Vulkan) com fallback automático para OpenGL. `Settings.Advanced` = Forward+ ativo. Testes/capturas locais usam Mesa lavapipe (`/home/user/tools/vk`, variáveis em `env.sh`).

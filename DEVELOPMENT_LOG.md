@@ -456,3 +456,11 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Ferramentas com resistência: desgaste por golpe proporcional ao dano; minério inteiro tira comum 1, incomum 2, raro 4, épico 7, lendário 12 (especial 3x). Vida dos minérios x1,6 (Economy.OreHp). Saves antigos convertidos na mesma proporção.
 - Otimização (meta 120 FPS na Alta): decoração dividida em blocos de 32 m com distância de desenho (World/ChunkedMulti.cs) — triângulos por vista caíram até 12x; SSAO/SSIL em meia resolução, SSR 56 passos, névoa volumétrica menor, sombra da lanterna mais barata (EnvironmentController.ApplyEffectCosts). FPS real na RTX 3060 ainda a confirmar pelo diretor (F3).
 - Lição: variações visuais nunca podem consumir o gerador do mundo (mudou a caverna inteira uma vez); usar DecorMeshes.PosHash.
+
+## Etapa 1 do plano de conteúdo: Vila dos Ferreiros (v0.24.0)
+- Pedido do diretor: tirar o elevador de dentro da casa; a mina leva a uma estação numa vila de ferreiros onde se vende e se pegam missões; depois forja, níveis mais fundos com inimigos e história; meta de 4–6 h de jogo. Decisões: etapa 1 primeiro; venda na vila e na mina; a casa vira uma construção da vila.
+- `World/Town.cs`: vila ao lado da casa (praça com monumento de cristal, lampiões, pinheiros, montanhas, cerca, paredes invisíveis), casa por fora com porta, Estação da Mina (elevador desce para a mina), ferreiro com forja animada (balcão vende, bancada abre a loja de ferramentas) e Quadro de Encomendas. Céu de dia e de noite com estrelas e lua (`EnvironmentController.SetTown`).
+- Encomendas (`GameState.EnsureContracts/TryDeliver`, `UI/MissionScreen.cs`): 3 pedidos de minérios já descobertos; recompensa = 2× o valor de venda + 40; entregues são renovados a cada novo dia. Salvas em `SaveData.Contracts`.
+- Voltar da mina chega na estação da vila; a casa tem porta para a vila (`HouseDoor`). Marcador de objetivo e HUD guiam pela vila. Compras funcionam na vila mesmo após o turno (`GameState.InTown`).
+- Bug achado pelo bot: abrir o quadro travava o jogo (a tela se atualizava → `EnsureContracts` avisava mudança → a tela se atualizava de novo, sem fim). Agora só avisa quando algo muda e a tela tem trava contra reentrada; novo teste abre a tela e entrega pela interface.
+- Testes 877/877.
