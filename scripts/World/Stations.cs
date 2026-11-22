@@ -197,6 +197,41 @@ public partial class MineElevator : StationBase
         // cabos
         foreach (float x in new[] { -0.4f, 0.4f })
             AddMesh(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.03f, Height = 3.8f, RadialSegments = 6, Rings = 1 }, dark, new Vector3(x, 2.1f, -0.5f));
+        // travessas em X no fundo do poço
+        foreach (float sgn in new[] { -1f, 1f })
+        {
+            var brace = AddMesh(new BoxMesh { Size = new Vector3(0.08f, 4.2f, 0.06f) }, steel, new Vector3(0, 2.0f, -0.68f));
+            brace.Rotation = new Vector3(0, 0, sgn * 0.62f);
+        }
+        // piso de chapa xadrez com faixa de alerta na borda
+        for (int i = 0; i < 7; i++)
+            for (int j = 0; j < 4; j++)
+                AddMesh(new BoxMesh { Size = new Vector3(0.18f, 0.012f, 0.05f) }, steel, new Vector3(-1.2f + i * 0.4f, 0.125f, -0.5f + j * 0.35f)).Rotation = new Vector3(0, (i + j) % 2 == 0 ? 0.6f : -0.6f, 0);
+        for (int i = 0; i < 8; i++)
+            AddMesh(new BoxMesh { Size = new Vector3(0.35f, 0.02f, 0.12f) }, i % 2 == 0 ? yellow : dark, new Vector3(-1.23f + i * 0.35f, 0.13f, 0.66f));
+        // luminária dentro da cabine
+        AddMesh(new BoxMesh { Size = new Vector3(0.7f, 0.06f, 0.2f) }, dark, new Vector3(0, 3.82f, -0.2f));
+        AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.03f, 0.14f) }, MeshFactory.Emissive(new Color(1f, 0.85f, 0.6f), new Color(1f, 0.8f, 0.5f), 1.6f), new Vector3(0, 3.78f, -0.2f));
+        if (!GoesDown)
+        {
+            // torre de içamento com polia: os cabos sobem até a roda
+            foreach (float sgn in new[] { -1f, 1f })
+            {
+                var leg = AddMesh(new BoxMesh { Size = new Vector3(0.22f, 2.1f, 0.22f) }, steel, new Vector3(sgn * 0.85f, 5.2f, -0.1f));
+                leg.Rotation = new Vector3(0, 0, sgn * 0.55f);
+            }
+            AddMesh(new BoxMesh { Size = new Vector3(0.9f, 0.18f, 0.3f) }, steel, new Vector3(0, 6.05f, -0.1f));
+            var wheel = new Node3D { Position = new Vector3(0, 5.65f, -0.1f) };
+            AddChild(wheel);
+            wheel.AddChild(new MeshInstance3D { Mesh = new TorusMesh { InnerRadius = 0.42f, OuterRadius = 0.55f, Rings = 24, RingSegments = 8 }, MaterialOverride = dark, Rotation = new Vector3(Mathf.Pi / 2, 0, 0) });
+            wheel.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.1f, BottomRadius = 0.1f, Height = 0.2f, RadialSegments = 10, Rings = 1 }, MaterialOverride = yellow, Rotation = new Vector3(Mathf.Pi / 2, 0, 0) });
+            for (int k = 0; k < 6; k++)
+                wheel.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.04f, 0.88f, 0.04f) }, MaterialOverride = steel, Rotation = new Vector3(0, 0, k * Mathf.Pi / 6) });
+            foreach (float x in new[] { -0.4f, 0.4f })
+                AddMesh(new CylinderMesh { TopRadius = 0.025f, BottomRadius = 0.025f, Height = 1.5f, RadialSegments = 6, Rings = 1 }, dark, new Vector3(x * 1.25f, 4.85f, -0.1f));
+            // luz de alerta no topo da torre
+            AddMesh(new SphereMesh { Radius = 0.1f, Height = 0.2f, RadialSegments = 10, Rings = 5 }, MeshFactory.Emissive(orange, orange, 2.2f), new Vector3(0, 6.22f, -0.1f));
+        }
         // painel com botão e lâmpada de status
         AddMesh(new BoxMesh { Size = new Vector3(0.36f, 0.6f, 0.12f) }, dark, new Vector3(1.95f, 1.3f, 0.7f));
         AddMesh(new BoxMesh { Size = new Vector3(0.3f, 0.04f, 0.13f) }, trim, new Vector3(1.95f, 1.62f, 0.7f));
@@ -205,7 +240,7 @@ public partial class MineElevator : StationBase
         AddMesh(new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.06f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, MeshFactory.Emissive(orange, orange, 2f), new Vector3(1.95f, 1.12f, 0.78f)).Rotation = new Vector3(Mathf.Pi / 2, 0, 0);
         var light = new OmniLight3D { LightColor = new Color(1f, 0.8f, 0.5f), LightEnergy = 1.1f, OmniRange = 6f, Position = new Vector3(0, 3.6f, 1.2f) };
         AddChild(light);
-        Label = MakeLabel(GoesDown ? Loc.T("ELEVADOR · MINA") : Loc.T("ELEVADOR · CASA"), new Color(1f, 0.82f, 0.4f), GoesDown ? 3.75f : 5.25f);
+        Label = MakeLabel(GoesDown ? Loc.T("ELEVADOR · MINA") : Loc.T("ELEVADOR · CASA"), new Color(1f, 0.82f, 0.4f), GoesDown ? 3.75f : 6.75f);
         StaticBatcher.Batch(this);
     }
 

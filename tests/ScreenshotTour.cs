@@ -184,6 +184,20 @@ public partial class ScreenshotTour : Node
                     }
                 }
             }
+            // elevador da mina (torre de içamento)
+            {
+                var els = new System.Collections.Generic.List<World.MineElevator>();
+                void FindEl(Node n) { foreach (Node c in n.GetChildren()) { if (c is World.MineElevator me && !me.GoesDown) els.Add(me); FindEl(c); } }
+                FindEl(Main.World);
+                if (els.Count > 0)
+                {
+                    var el = els[0];
+                    var ef = el.GlobalTransform.Basis.Z;
+                    LookAtPoint(p, el.GlobalPosition + ef * 7.5f, el.GlobalPosition + Vector3.Up * 3.2f);
+                    await Wait(0.9f);
+                    await Shot("35_decor_elevator_0");
+                }
+            }
             // geodos: um comum e um especial (colossal)
             int gshot = 0;
             foreach (bool special in new[] { false, true })

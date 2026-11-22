@@ -43,7 +43,7 @@ public partial class PlaythroughBot : Node
         SaveSystem.SavePath = "user://bot_save.json";
         // o bot testa se a jornada inteira FUNCIONA (o ritmo é medido na simulação de balanceamento):
         // vendas valem mais aqui para caber nos minutos do teste
-        Economy.SellValue = 0.75f * 2.6f;
+        Economy.SellValue = 0.75f * 3.6f; // compensa a vida x1,6 dos minérios (só o bot, para cobrir a jornada no tempo do teste)
         SaveSystem.Delete();
         await Frames(10);
         Main.StartGame(false);
