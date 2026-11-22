@@ -394,8 +394,25 @@ public partial class WorldBuilder : Node3D
         {
             float a = Mathf.Tau * i / 6 + 0.3f;
             var p = pos + new Vector3(Mathf.Cos(a) * 8.5f, 0, Mathf.Sin(a) * 8.5f);
-            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.07f, Height = 1.6f, RadialSegments = 6, Rings = 1 }, MeshFactory.Metal(new Color(0.3f, 0.25f, 0.2f)), p + new Vector3(0, 0.8f, 0));
-            AddMeshOnly(root, new SphereMesh { Radius = 0.14f, Height = 0.28f, RadialSegments = 8, Rings = 4 }, lantern, p + new Vector3(0, 1.7f, 0));
+            // poste de lampião de mineração: base, haste, braço com gancho e lampião com gaiola
+            var post = MeshFactory.Metal(new Color(0.28f, 0.24f, 0.2f));
+            var iron = MeshFactory.Metal(new Color(0.14f, 0.14f, 0.16f));
+            var outward = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.16f, BottomRadius = 0.2f, Height = 0.08f, RadialSegments = 10, Rings = 1 }, iron, p + new Vector3(0, 0.04f, 0));
+            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.065f, Height = 2.1f, RadialSegments = 8, Rings = 1 }, post, p + new Vector3(0, 1.05f, 0));
+            var arm = p + new Vector3(0, 2.05f, 0) - outward * 0.2f;
+            var armMesh = AddMeshOnly(root, new BoxMesh { Size = new Vector3(0.04f, 0.04f, 0.44f) }, post, arm);
+            armMesh.Basis = Basis.LookingAt(outward, Vector3.Up);
+            var hang = p + new Vector3(0, 0, 0) - outward * 0.4f;
+            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.006f, BottomRadius = 0.006f, Height = 0.12f, RadialSegments = 4, Rings = 1 }, iron, hang + new Vector3(0, 1.98f, 0));
+            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.13f, Height = 0.08f, RadialSegments = 10, Rings = 1 }, iron, hang + new Vector3(0, 1.88f, 0));
+            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.1f, BottomRadius = 0.1f, Height = 0.24f, RadialSegments = 10, Rings = 1 }, lantern, hang + new Vector3(0, 1.72f, 0));
+            for (int b = 0; b < 4; b++)
+            {
+                float ba = Mathf.Tau * b / 4 + 0.4f;
+                AddMeshOnly(root, new BoxMesh { Size = new Vector3(0.015f, 0.26f, 0.015f) }, iron, hang + new Vector3(Mathf.Cos(ba) * 0.105f, 1.72f, Mathf.Sin(ba) * 0.105f));
+            }
+            AddMeshOnly(root, new CylinderMesh { TopRadius = 0.12f, BottomRadius = 0.08f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, iron, hang + new Vector3(0, 1.58f, 0));
         }
         var warm = new OmniLight3D { LightColor = new Color(1f, 0.75f, 0.45f), LightEnergy = 1.3f, OmniRange = 11f, Position = pos + new Vector3(0, 3.5f, 0) };
         root.AddChild(warm);
