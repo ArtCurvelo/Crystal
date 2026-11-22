@@ -52,6 +52,13 @@ public partial class TestRunner : Node
                 Check(!BuildFlavor.Matches("") && !BuildFlavor.Matches("CE-DEV-errada") && !BuildFlavor.Matches("debug"), "chave errada não libera o admin");
                 Check(!BuildFlavor.IsSteam, "build comum não é da Steam");
             });
+            Run("Ícone do atalho (Windows)", () =>
+            {
+                var sc = ShortcutIcon.Script(@"C:\Users\Ana O'Neil\AppData\Local\Programs\CrystalExcavator\CrystalExcavator.exe", @"C:\X\icone.ico");
+                Check(sc.Contains("'C:\\Users\\Ana O''Neil") && sc.Contains("IconLocation") && sc.Contains("-ieq $exe"), "comando escapa aspas e só mexe em atalhos do jogo");
+                Check(!ShortcutIcon.Supported, "fora do Windows exportado não roda");
+                Check(FileAccess.FileExists("res://icon.ico"), "icon.ico existe no projeto");
+            });
             Run("Tabelas de ruído íntegras", () =>
             {
                 Check(NoiseTables.Check(out var t) && t.Contains("ArtCurvelo"), "tabela confere");

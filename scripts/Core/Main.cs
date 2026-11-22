@@ -69,7 +69,8 @@ public partial class Main : Node
         // diagnóstico: qual versão é esta (jogadores x desenvolvedor) — sem abrir o jogo
         if (args.Contains("--build-info"))
         {
-            GD.Print($"BUILD exportado={BuildFlavor.IsExported} steam={BuildFlavor.IsSteam} admin={BuildFlavor.DevTools} atualizador={UpdateManager.Supported}");
+            var ico = FileAccess.GetFileAsBytes("res://icon.ico");
+            GD.Print($"BUILD exportado={BuildFlavor.IsExported} steam={BuildFlavor.IsSteam} admin={BuildFlavor.DevTools} atualizador={UpdateManager.Supported} icone={ico?.Length ?? 0}");
             GetTree().Quit(0);
             return;
         }
@@ -93,6 +94,7 @@ public partial class Main : Node
         // teste automático de recuperação: simula o jogo caindo antes do menu neste renderizador
         if (args.Contains("--x-boot-crash=" + Rendering.RenderMethods.Current)) { OS.Kill(OS.GetProcessId()); return; }
         AddChild(new OreIcons { Name = "OreIcons" });
+        ShortcutIcon.Apply(); // atalhos antigos passam a mostrar o ícone novo (só no Windows exportado)
         var world3d = new Node3D { Name = "World3D" };
         world3d.ProcessMode = ProcessModeEnum.Pausable;
         AddChild(world3d);

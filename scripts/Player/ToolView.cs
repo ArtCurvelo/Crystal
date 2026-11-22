@@ -240,6 +240,12 @@ public partial class ToolView : Node3D
             Part(_model, new CylinderMesh { TopRadius = 0.026f, BottomRadius = 0.023f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, steel, top + new Vector3(0, -0.055f, 0));
             Part(_model, new BoxMesh { Size = new Vector3(0.012f, 0.012f, 0.03f) }, woodDark, top + new Vector3(0, 0.036f, 0));
         }
+        // a cabeça fica num nó próprio girado 90° no eixo do cabo: a ponta aponta para FRENTE (para o alvo)
+        // e o golpe acerta com a ponta, não de lado
+        var headNode = new Node3D { Position = top, Rotation = new Vector3(0, Mathf.Pi / 2, 0) };
+        _model.AddChild(headNode);
+        _model = headNode;
+        top = Vector3.Zero;
         // miolo (olho) da cabeça
         Part(_model, new BoxMesh { Size = new Vector3(0.062f, 0.064f, 0.058f) }, core, top);
         Part(_model, new BoxMesh { Size = new Vector3(0.07f, 0.014f, 0.064f) }, stone ? core : steel, top + new Vector3(0, 0.028f, 0));
@@ -513,13 +519,15 @@ public partial class ToolView : Node3D
         {
             var (raise, chop, reach, jolt) = PickPose(_recoilT);
             float shake = jolt * MathF.Sin(_time * 90f) * 0.006f;
-            _pivot.Position = _restPos + new Vector3(bobX - _sway.X + shake - raise * 0.02f,
-                -bobY + _sway.Y + idle + raise * 0.07f - reach * 0.25f - equip * 0.35f,
-                -reach + raise * 0.03f);
-            // +X puxa a cabeça para trás (antecipação), −X a leva para frente (golpe)
-            _pivot.Rotation = new Vector3(raise * 0.7f - chop * 0.5f + breathe - equip * 0.9f - jolt * 0.04f,
-                raise * 0.12f - _sway.X * 2f,
-                raise * 0.22f + walkRoll + _sway.X * 1.5f);
+            float strike = Mathf.Max(0f, chop);
+            _pivot.Position = _restPos + new Vector3(bobX - _sway.X + shake - raise * 0.01f - strike * 0.05f,
+                -bobY + _sway.Y + idle + raise * 0.05f - reach * 0.2f - equip * 0.35f,
+                -reach * 0.8f + raise * 0.01f);
+            // +X puxa a cabeça para trás (antecipação), −X a leva para frente (golpe);
+            // no golpe a ferramenta vira um pouco para o centro da tela (a ponta cai perto da mira)
+            _pivot.Rotation = new Vector3(raise * 0.42f - chop * 0.5f + breathe - equip * 0.9f - jolt * 0.04f,
+                raise * 0.06f + strike * 0.18f - _sway.X * 2f,
+                raise * 0.1f + walkRoll + _sway.X * 1.5f);
         }
         else
         {

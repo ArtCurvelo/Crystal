@@ -88,6 +88,22 @@ public partial class ScreenshotTour : Node
             var all = new System.Collections.Generic.List<MultiMeshInstance3D>();
             void Collect(Node n) { foreach (Node c in n.GetChildren()) { if (c is MultiMeshInstance3D mm) all.Add(mm); Collect(c); } }
             Collect(Main.World);
+            // scanner de minério (tripé)
+            var scanners = new System.Collections.Generic.List<World.ScannerNode>();
+            void FindScanners(Node n) { foreach (Node c in n.GetChildren()) { if (c is World.ScannerNode sn) scanners.Add(sn); FindScanners(c); } }
+            FindScanners(Main.World);
+            if (scanners.Count > 0)
+            {
+                var sc = scanners[0];
+                var fwd = -sc.GlobalTransform.Basis.Z;
+                var side = sc.GlobalTransform.Basis.X;
+                LookAtPoint(p, sc.GlobalPosition + side * 2.2f + fwd * 0.6f, sc.GlobalPosition + Vector3.Up * 1.1f + fwd * 0.4f);
+                await Wait(0.9f);
+                await Shot("35_decor_scanner_0");
+                LookAtPoint(p, sc.GlobalPosition - fwd * 2.0f + side * 0.8f, sc.GlobalPosition + Vector3.Up * 1.0f + fwd * 1.5f);
+                await Wait(0.9f);
+                await Shot("35_decor_scanner_1");
+            }
             foreach (var (mesh, name, dist, lift) in targets)
             {
                 int shot = 0;

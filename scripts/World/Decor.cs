@@ -128,23 +128,69 @@ public static class Decor
     {
         var node = new ScannerNode { Position = pos, Rotation = new Vector3(0, yaw, 0) };
         root.AddChild(node);
-        var dark = Lit(new Color(0.18f, 0.19f, 0.23f), 0.7f);
-        var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.5f);
+        var dark = Lit(new Color(0.16f, 0.17f, 0.2f), 0.55f);
+        var metal = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.57f, 0.62f), Roughness = 0.35f, Metallic = 0.6f };
+        var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.45f);
+        var rubber = Lit(new Color(0.08f, 0.08f, 0.09f), 0.9f);
+        var cyan = new Color(0.35f, 0.9f, 1f);
+        // tripé: pernas redondas afinando, pés de borracha e coluna central
         for (int i = 0; i < 3; i++)
         {
             float a = Mathf.Tau * i / 3;
-            Mesh(node, new BoxMesh { Size = new Vector3(0.06f, 1.2f, 0.06f) }, dark, new Vector3(Mathf.Cos(a) * 0.3f, 0.55f, Mathf.Sin(a) * 0.3f), new Vector3(Mathf.Sin(a) * 0.3f, 0, -Mathf.Cos(a) * 0.3f));
-            Mesh(node, new BoxMesh { Size = new Vector3(0.12f, 0.1f, 0.12f) }, orange, new Vector3(Mathf.Cos(a) * 0.48f, 0.05f, Mathf.Sin(a) * 0.48f));
+            var foot = new Vector3(Mathf.Cos(a) * 0.5f, 0.03f, Mathf.Sin(a) * 0.5f);
+            var hub = new Vector3(0, 0.95f, 0);
+            var mid = (foot + hub) * 0.5f;
+            var dir = (hub - foot).Normalized();
+            var leg = Mesh(node, new CylinderMesh { TopRadius = 0.022f, BottomRadius = 0.032f, Height = foot.DistanceTo(hub), RadialSegments = 8, Rings = 1 }, dark, mid);
+            var lx = dir.Cross(Vector3.Forward).Normalized();
+            leg.Basis = new Basis(lx, dir, lx.Cross(dir).Normalized()); // eixo do cilindro (Y) ao longo da perna
+            Mesh(node, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.07f, Height = 0.05f, RadialSegments = 10, Rings = 1 }, rubber, foot);
+            Mesh(node, new BoxMesh { Size = new Vector3(0.05f, 0.03f, 0.05f) }, orange, foot + dir * 0.32f); // trava da perna
         }
-        var head = new Node3D { Position = new Vector3(0, 1.2f, 0) };
+        Mesh(node, new CylinderMesh { TopRadius = 0.055f, BottomRadius = 0.07f, Height = 0.12f, RadialSegments = 12, Rings = 1 }, metal, new Vector3(0, 0.95f, 0));
+        Mesh(node, new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.03f, Height = 0.25f, RadialSegments = 8, Rings = 1 }, metal, new Vector3(0, 1.1f, 0));
+        var head = new Node3D { Position = new Vector3(0, 1.25f, 0) };
         node.AddChild(head);
         node.Head = head;
-        Mesh(head, new BoxMesh { Size = new Vector3(0.45f, 0.3f, 0.4f) }, orange, Vector3.Zero);
-        Mesh(head, new CylinderMesh { TopRadius = 0.12f, BottomRadius = 0.12f, Height = 0.12f, RadialSegments = 10, Rings = 1 }, dark, new Vector3(0, 0, -0.24f), new Vector3(Mathf.Pi / 2, 0, 0));
-        Mesh(head, new CylinderMesh { TopRadius = 0.08f, BottomRadius = 0.08f, Height = 0.02f, RadialSegments = 10, Rings = 1 }, Glow(new Color(0.35f, 0.9f, 1f), 3f), new Vector3(0, 0, -0.3f), new Vector3(Mathf.Pi / 2, 0, 0));
-        Mesh(head, new BoxMesh { Size = new Vector3(0.02f, 0.3f, 0.02f) }, dark, new Vector3(0.15f, 0.3f, 0.1f));
-        var cone = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, CullMode = BaseMaterial3D.CullModeEnum.Disabled, AlbedoColor = new Color(0.3f, 0.85f, 1f, 0.18f) };
-        Mesh(head, new CylinderMesh { TopRadius = 0.05f, BottomRadius = 1.1f, Height = 3f, RadialSegments = 4, Rings = 1, CapTop = false, CapBottom = false }, cone, new Vector3(0, 0, -1.8f), new Vector3(-Mathf.Pi / 2, 0, 0));
+        // cabeça arredondada: corpo em cápsula deitada, faixa laranja, painel e alças
+        Mesh(head, new CapsuleMesh { Radius = 0.13f, Height = 0.46f, RadialSegments = 14, Rings = 4 }, dark, Vector3.Zero, new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(head, new CylinderMesh { TopRadius = 0.137f, BottomRadius = 0.137f, Height = 0.06f, RadialSegments = 14, Rings = 1 }, orange, new Vector3(0, 0, 0.05f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(head, new BoxMesh { Size = new Vector3(0.12f, 0.07f, 0.01f) }, Glow(new Color(1f, 0.65f, 0.25f), 1.2f), new Vector3(0.0f, 0.04f, 0.23f));
+        foreach (float x in new[] { -0.14f, 0.14f })
+            Mesh(head, new BoxMesh { Size = new Vector3(0.02f, 0.06f, 0.18f) }, metal, new Vector3(x, 0, 0));
+        // lente: cano, anel brilhante e vidro
+        Mesh(head, new CylinderMesh { TopRadius = 0.1f, BottomRadius = 0.12f, Height = 0.1f, RadialSegments = 16, Rings = 1 }, metal, new Vector3(0, 0, -0.27f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(head, new TorusMesh { InnerRadius = 0.075f, OuterRadius = 0.095f, Rings = 18, RingSegments = 6 }, Glow(cyan, 1.6f), new Vector3(0, 0, -0.325f), new Vector3(Mathf.Pi / 2, 0, 0));
+        Mesh(head, new SphereMesh { Radius = 0.07f, Height = 0.05f, RadialSegments = 14, Rings = 4 }, new StandardMaterial3D { AlbedoColor = new Color(0.05f, 0.2f, 0.28f), Roughness = 0.05f, Metallic = 0.3f, EmissionEnabled = true, Emission = cyan, EmissionEnergyMultiplier = 0.6f }, new Vector3(0, 0, -0.325f));
+        // antena com luz piscando
+        Mesh(head, new CylinderMesh { TopRadius = 0.006f, BottomRadius = 0.01f, Height = 0.28f, RadialSegments = 6, Rings = 1 }, metal, new Vector3(0.08f, 0.24f, 0.12f));
+        var blinkMat = Glow(new Color(1f, 0.3f, 0.2f), 2f);
+        Mesh(head, new SphereMesh { Radius = 0.018f, Height = 0.036f, RadialSegments = 8, Rings = 4 }, blinkMat, new Vector3(0.08f, 0.39f, 0.12f));
+        node.Blink = blinkMat;
+        // varredura: leque fino de luz que some com a distância + linha de leitura que corre por ele
+        var fanMat = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, CullMode = BaseMaterial3D.CullModeEnum.Disabled, VertexColorUseAsAlbedo = true, AlbedoColor = cyan };
+        var st = new SurfaceTool();
+        st.Begin(Godot.Mesh.PrimitiveType.Triangles);
+        const int n = 12; const float len = 2.8f, half = 0.42f;
+        for (int k = 0; k < n; k++)
+        {
+            float a0 = -half + 2 * half * k / n, a1 = -half + 2 * half * (k + 1) / n;
+            var p0 = new Vector3(Mathf.Sin(a0) * len, 0, -Mathf.Cos(a0) * len);
+            var p1 = new Vector3(Mathf.Sin(a1) * len, 0, -Mathf.Cos(a1) * len);
+            // forte no sensor, some até a ponta
+            st.SetColor(new Color(1, 1, 1, 0.22f)); st.AddVertex(Vector3.Zero);
+            st.SetColor(new Color(1, 1, 1, 0f)); st.AddVertex(p0);
+            st.SetColor(new Color(1, 1, 1, 0f)); st.AddVertex(p1);
+        }
+        var fan = new MeshInstance3D { Mesh = st.Commit(), MaterialOverride = fanMat, Position = new Vector3(0, 0, -0.33f), Rotation = new Vector3(-0.35f, 0, 0), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        head.AddChild(fan);
+        var lineMat = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, AlbedoColor = new Color(cyan, 0.8f) };
+        var line = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(1f, 0.008f, 0.02f) }, MaterialOverride = lineMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        fan.AddChild(line);
+        node.ScanLine = line;
+        node.ScanMat = lineMat;
+        node.HalfAngle = half;
+        node.Length = len;
     }
 
     /// <summary>Grade de piso (decal metálico) com faixa luminosa.</summary>
@@ -543,11 +589,24 @@ public partial class JellyNode : Node3D
 public partial class ScannerNode : Node3D
 {
     public Node3D Head;
+    public MeshInstance3D ScanLine;
+    public StandardMaterial3D ScanMat, Blink;
+    public float HalfAngle = 0.4f, Length = 2.8f;
     float _t;
     public override void _Process(double delta)
     {
         _t += (float)delta;
-        if (Head != null) Head.Rotation = new Vector3(-0.15f, Mathf.Sin(_t * 0.6f) * 0.6f, 0);
+        if (Head != null) Head.Rotation = new Vector3(-0.1f, Mathf.Sin(_t * 0.6f) * 0.6f, 0);
+        if (ScanLine != null)
+        {
+            // linha de leitura corre do sensor até a ponta do leque e recomeça
+            float u = (_t * 0.7f) % 1f;
+            float d = Mathf.Lerp(0.15f, Length * 0.95f, u);
+            ScanLine.Position = new Vector3(0, 0, -d);
+            ScanLine.Scale = new Vector3(2f * d * Mathf.Tan(HalfAngle), 1, 1);
+            ScanMat.AlbedoColor = new Color(ScanMat.AlbedoColor, 0.75f * (1f - u));
+        }
+        if (Blink != null) Blink.EmissionEnergyMultiplier = (_t % 1.2f) < 0.15f ? 4f : 0.3f;
     }
 }
 
