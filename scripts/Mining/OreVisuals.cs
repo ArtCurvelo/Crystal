@@ -153,19 +153,18 @@ public static class OreVisuals
     // ---------------------------------------------------------------- geodo
     static void BuildGeode(Node3D parent, MaterialDef m, Random rng, float s, Result r)
     {
-        // casca de rocha arredondada com abertura no topo; cristais (ou esferas) brotando do centro
-        var shell = new SurfaceTool();
-        shell.Begin(Mesh.PrimitiveType.Triangles);
-        var rock = MeshFactory.Rock(rng.Next(0, 6), 0.22f);
-        int seg = 7;
-        for (int i = 0; i < seg; i++)
+        // casca de geodo: tigela de rocha com borda quebrada irregular, faixa clara de quartzo na borda
+        // e forro interno na cor do minério; cristais (ou esferas) brotam do fundo
+        int variant = rng.Next(0, 6); // mesmo número de sorteios de antes (a sequência do depósito não muda)
+        var (outer, lining) = GeodeShell(s, variant, m);
+        Add(parent, outer, OreMat(m, rng, r, 0, new Color(0.42f, 0.38f, 0.36f), new Color(0.9f, 0.88f, 0.84f), 2.5f));
+        var liningMat = new StandardMaterial3D
         {
-            float a = Mathf.Tau * i / seg;
-            shell.AppendFrom(rock, 0, new Transform3D(new Basis(Vector3.Up, -a).ScaleLocal(new Vector3(0.34f, 0.32f, 0.2f) * s),
-                new Vector3(MathF.Cos(a) * 0.58f * s, 0.2f * s, MathF.Sin(a) * 0.58f * s)));
-        }
-        shell.AppendFrom(rock, 0, new Transform3D(Basis.Identity.ScaleLocal(new Vector3(0.6f, 0.18f, 0.6f) * s), new Vector3(0, 0.08f * s, 0)));
-        Add(parent, shell.Commit(), OreMat(m, rng, r, 0, new Color(0.42f, 0.38f, 0.36f), Colors.White, 2.5f));
+            AlbedoColor = m.Color.Darkened(0.35f), VertexColorUseAsAlbedo = true, Roughness = 0.25f, Metallic = 0.15f,
+            EmissionEnabled = true, Emission = m.Glow, EmissionEnergyMultiplier = 0.35f, RimEnabled = true, Rim = 0.5f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+        };
+        Add(parent, lining, liningMat);
         var inner = new SurfaceTool();
         inner.Begin(Mesh.PrimitiveType.Triangles);
         bool spheres = m.GeodeSpheres;
@@ -185,6 +184,66 @@ public static class OreVisuals
         Material innerMat = spheres ? OreMat(m, rng, r, 4, m.Color, m.Glow, 3f) : CrystalMat(m, rng, r);
         Add(parent, inner.Commit(), innerMat);
         r.Height = 0.9f * s; r.Radius = 0.62f * s;
+    }
+
+    /// <summary>
+    /// Casca do geodo: superfície externa (rocha, com faixa de quartzo clara na borda via cor do vértice) e
+    /// forro interno (drusa). Borda com altura irregular, como uma pedra rachada ao meio.
+    /// </summary>
+    static (ArrayMesh outer, ArrayMesh lining) GeodeShell(float s, int variant, MaterialDef m)
+    {
+        const int seg = 30, rings = 7;
+        float R = 0.72f * s, wall = 0.13f * s, baseY = 0.02f * s;
+        float RimH(int k)
+        {
+            float a = Mathf.Tau * k / seg;
+            float n = MathF.Sin(a * 3f + variant) * 0.5f + MathF.Sin(a * 7f + variant * 2.3f) * 0.3f + MathF.Sin(a * 13f + variant * 0.7f) * 0.15f;
+            return ((m.Special ? 0.3f : 0.5f) + n * (m.Special ? 0.1f : 0.14f)) * s; // formações especiais: borda baixa, o tesouro aparece
+        }
+        Vector3 P(int k, float t, float rad)
+        {
+            // t: 0 = fundo, 1 = borda; perfil de tigela (raio cresce rápido e fecha um pouco perto da borda)
+            float a = Mathf.Tau * (k % seg) / seg;
+            float y = baseY + RimH(k % seg) * t;
+            float rr = rad * (0.55f + 0.45f * MathF.Sin(MathF.PI * 0.5f * MathF.Min(1f, t * 1.6f))) * (1f - 0.08f * t * t);
+            float bump = 1f + 0.06f * MathF.Sin(a * 5f + t * 4f + variant);
+            return new Vector3(MathF.Cos(a) * rr * bump, y, MathF.Sin(a) * rr * bump);
+        }
+        var rockCol = new Color(0.62f, 0.62f, 0.62f);
+        var quartz = new Color(1f, 0.98f, 0.94f); // faixa clara (a rocha fica abaixo de 1)
+        var o = new SurfaceTool(); o.Begin(Mesh.PrimitiveType.Triangles);
+        var li = new SurfaceTool(); li.Begin(Mesh.PrimitiveType.Triangles);
+        void Quad(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color ca, Color cb, Color cc, Color cd, bool flip)
+        {
+            if (!flip) { st.SetColor(ca); st.AddVertex(a); st.SetColor(cb); st.AddVertex(b); st.SetColor(cc); st.AddVertex(c); st.SetColor(ca); st.AddVertex(a); st.SetColor(cc); st.AddVertex(c); st.SetColor(cd); st.AddVertex(d); }
+            else { st.SetColor(ca); st.AddVertex(a); st.SetColor(cc); st.AddVertex(c); st.SetColor(cb); st.AddVertex(b); st.SetColor(ca); st.AddVertex(a); st.SetColor(cd); st.AddVertex(d); st.SetColor(cc); st.AddVertex(c); }
+        }
+        for (int k = 0; k < seg; k++)
+        {
+            int k2 = k + 1;
+            for (int i = 0; i < rings; i++)
+            {
+                float t0 = i / (float)rings, t1 = (i + 1) / (float)rings;
+                // lado de fora (rocha, mais escura embaixo)
+                var c0 = rockCol * (0.65f + 0.35f * t0); var c1 = rockCol * (0.65f + 0.35f * t1);
+                Quad(o, P(k, t0, R), P(k2, t0, R), P(k2, t1, R), P(k, t1, R), c0, c0, c1, c1, false);
+                // forro interno (drusa): mais claro perto da borda
+                var l0 = new Color(0.7f + 0.5f * t0, 0.7f + 0.5f * t0, 0.7f + 0.5f * t0); var l1 = new Color(0.7f + 0.5f * t1, 0.7f + 0.5f * t1, 0.7f + 0.5f * t1);
+                Quad(li, P(k, t0, R - wall), P(k2, t0, R - wall), P(k2, t1, R - wall), P(k, t1, R - wall), l0, l0, l1, l1, false);
+            }
+            // borda: faixa de quartzo entre o lado de fora e o forro
+            Quad(o, P(k, 1, R), P(k2, 1, R), P(k2, 1, R - wall), P(k, 1, R - wall), quartz, quartz, quartz, quartz, false);
+        }
+        // fundo do forro
+        var center = new Vector3(0, baseY + 0.02f * s, 0);
+        for (int k = 0; k < seg; k++)
+        {
+            li.SetColor(new Color(0.6f, 0.6f, 0.6f)); li.AddVertex(center);
+            li.SetColor(new Color(0.7f, 0.7f, 0.7f)); li.AddVertex(P(k + 1, 0, R - wall));
+            li.SetColor(new Color(0.7f, 0.7f, 0.7f)); li.AddVertex(P(k, 0, R - wall));
+        }
+        o.GenerateNormals(); li.GenerateNormals();
+        return (o.Commit(), li.Commit());
     }
 
     // ---------------------------------------------------------------- rocha em faixas

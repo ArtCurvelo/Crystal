@@ -81,19 +81,48 @@ public static class Decor
     }
 
     // ------------------------------------------------------------------
-    /// <summary>Caixote de armazenamento: painéis cinza, cantos laranja e faixa luminosa.</summary>
+    /// <summary>Caixote de mineração: tábuas de madeira, armação de aço nas arestas, cantoneiras e etiqueta acesa.</summary>
     public static void Crate(Node3D root, Vector3 pos, float yaw, float scale = 1f, bool collide = false)
     {
         var node = new Node3D { Position = pos, Rotation = new Vector3(0, yaw, 0), Scale = Vector3.One * scale };
         root.AddChild(node);
-        var grey = Lit(new Color(0.45f, 0.46f, 0.52f), 0.6f);
-        var dark = Lit(new Color(0.18f, 0.19f, 0.23f), 0.7f);
+        var wood = Lit(new Color(0.5f, 0.33f, 0.19f), 0.85f);
+        var woodDark = Lit(new Color(0.3f, 0.19f, 0.11f), 0.9f);
+        var steel = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.34f, 0.38f), Roughness = 0.45f, Metallic = 0.55f };
         var orange = Lit(new Color(0.95f, 0.5f, 0.15f), 0.5f);
-        Mesh(node, new BoxMesh { Size = new Vector3(1.1f, 0.7f, 0.75f) }, grey, new Vector3(0, 0.35f, 0));
-        Mesh(node, new BoxMesh { Size = new Vector3(1.14f, 0.12f, 0.79f) }, dark, new Vector3(0, 0.7f, 0));
-        for (int sx = -1; sx <= 1; sx += 2)
-            Mesh(node, new BoxMesh { Size = new Vector3(0.1f, 0.74f, 0.8f) }, orange, new Vector3(sx * 0.5f, 0.37f, 0));
-        Mesh(node, new BoxMesh { Size = new Vector3(0.6f, 0.07f, 0.02f) }, Glow(new Color(1f, 0.6f, 0.2f), 2f), new Vector3(0, 0.5f, 0.38f));
+        var size = new Vector3(1.1f, 0.7f, 0.75f);
+        var c = new Vector3(0, size.Y / 2, 0);
+        Mesh(node, new BoxMesh { Size = size - new Vector3(0.02f, 0.02f, 0.02f) }, wood, c);
+        // frestas entre as tábuas (frente/trás e laterais)
+        for (int k = 1; k < 4; k++)
+        {
+            float y = size.Y * k / 4f;
+            foreach (float z in new[] { -size.Z / 2 - 0.002f, size.Z / 2 + 0.002f })
+                Mesh(node, new BoxMesh { Size = new Vector3(size.X - 0.08f, 0.012f, 0.004f) }, woodDark, new Vector3(0, y, z));
+            foreach (float x in new[] { -size.X / 2 - 0.002f, size.X / 2 + 0.002f })
+                Mesh(node, new BoxMesh { Size = new Vector3(0.004f, 0.012f, size.Z - 0.08f) }, woodDark, new Vector3(x, y, 0));
+        }
+        // armação de aço: 12 arestas
+        float e = 0.045f;
+        foreach (float y in new[] { e / 2, size.Y - e / 2 })
+        {
+            foreach (float z in new[] { -size.Z / 2 + e / 2, size.Z / 2 - e / 2 })
+                Mesh(node, new BoxMesh { Size = new Vector3(size.X + 0.01f, e, e) }, steel, new Vector3(0, y, z));
+            foreach (float x in new[] { -size.X / 2 + e / 2, size.X / 2 - e / 2 })
+                Mesh(node, new BoxMesh { Size = new Vector3(e, e, size.Z + 0.01f) }, steel, new Vector3(x, y, 0));
+        }
+        foreach (float x in new[] { -size.X / 2 + e / 2, size.X / 2 - e / 2 })
+            foreach (float z in new[] { -size.Z / 2 + e / 2, size.Z / 2 - e / 2 })
+            {
+                Mesh(node, new BoxMesh { Size = new Vector3(e, size.Y + 0.01f, e) }, steel, new Vector3(x, size.Y / 2, z));
+                // cantoneira laranja em cima
+                Mesh(node, new BoxMesh { Size = new Vector3(e * 1.7f, e * 1.4f, e * 1.7f) }, orange, new Vector3(x, size.Y - e * 0.5f, z));
+            }
+        // alças de corda nas laterais e etiqueta acesa na frente
+        foreach (float x in new[] { -size.X / 2 - 0.02f, size.X / 2 + 0.02f })
+            Mesh(node, new TorusMesh { InnerRadius = 0.05f, OuterRadius = 0.07f, Rings = 10, RingSegments = 5 }, woodDark, new Vector3(x, size.Y * 0.62f, 0), new Vector3(0, 0, Mathf.Pi / 2));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.3f, 0.12f, 0.01f) }, Lit(new Color(0.85f, 0.82f, 0.72f), 0.8f), new Vector3(0.18f, size.Y * 0.55f, size.Z / 2 + 0.006f));
+        Mesh(node, new BoxMesh { Size = new Vector3(0.2f, 0.025f, 0.012f) }, Glow(new Color(1f, 0.6f, 0.2f), 1.2f), new Vector3(0.18f, size.Y * 0.55f, size.Z / 2 + 0.01f));
         if (collide) Collider(node, new Vector3(0, 0.35f, 0), new Vector3(1.1f, 0.7f, 0.75f));
     }
 

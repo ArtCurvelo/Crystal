@@ -88,6 +88,38 @@ public partial class ScreenshotTour : Node
             var all = new System.Collections.Generic.List<MultiMeshInstance3D>();
             void Collect(Node n) { foreach (Node c in n.GetChildren()) { if (c is MultiMeshInstance3D mm) all.Add(mm); Collect(c); } }
             Collect(Main.World);
+            // estação de venda (balcão e caixotes)
+            var sells = new System.Collections.Generic.List<World.SellStation>();
+            void FindSell(Node n) { foreach (Node c in n.GetChildren()) { if (c is World.SellStation ss) sells.Add(ss); FindSell(c); } }
+            FindSell(Main.World);
+            if (sells.Count > 0)
+            {
+                var ss = sells[0];
+                var f = ss.GlobalTransform.Basis.Z; var sd = ss.GlobalTransform.Basis.X;
+                LookAtPoint(p, ss.GlobalPosition + f * 3.6f, ss.GlobalPosition + Vector3.Up * 1.0f);
+                await Wait(0.9f);
+                await Shot("35_decor_sell_0");
+                LookAtPoint(p, ss.GlobalPosition + f * 2.6f - sd * 2.6f, ss.GlobalPosition + Vector3.Up * 0.8f - sd * 0.8f);
+                await Wait(0.9f);
+                await Shot("35_decor_sell_1");
+            }
+            // geodos: um comum e um especial (colossal)
+            int gshot = 0;
+            foreach (bool special in new[] { false, true })
+            {
+                var g = Main.World.Crystals.FirstOrDefault(x => x.IsMineable && x.Material.Archetype == OreArchetype.Geode && x.Material.Special == special);
+                if (g == null) continue;
+                float dist = special ? 7f : 2.4f;
+                var from = g.StandPoint;
+                var dir = (from - g.GlobalPosition); dir.Y = 0;
+                if (dir.LengthSquared() < 0.01f) dir = Vector3.Back;
+                from = g.GlobalPosition + dir.Normalized() * dist;
+                var L = Main.World.Layouts[GameData.Regions.IndexOf(World.WorldBuilder.RegionAt(from))];
+                from = L.OnGround(from.X, from.Z, 0.1f) + Vector3.Up * (special ? 2.5f : 0.6f);
+                LookAtPoint(p, from, g.GlobalPosition + Vector3.Up * (special ? 1.5f : 0.2f));
+                await Wait(0.9f);
+                await Shot($"35_decor_geode_{gshot++}");
+            }
             // scanner de minério (tripé)
             var scanners = new System.Collections.Generic.List<World.ScannerNode>();
             void FindScanners(Node n) { foreach (Node c in n.GetChildren()) { if (c is World.ScannerNode sn) scanners.Add(sn); FindScanners(c); } }

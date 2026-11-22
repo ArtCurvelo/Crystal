@@ -81,16 +81,24 @@ public partial class SellStation : StationBase
         var body = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.37f, 0.42f), Roughness = 0.6f, Metallic = 0.2f };
         var dark = new StandardMaterial3D { AlbedoColor = new Color(0.14f, 0.15f, 0.19f), Roughness = 0.7f };
         var trim = MeshFactory.Emissive(orange, orange, 1.6f);
-        // balcão
-        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.95f, 1.0f) }, body, new Vector3(0, 0.475f, 0.05f));
-        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.08f, 1.1f) }, dark, new Vector3(0, 0.99f, 0.05f));
-        for (int i = 0; i < 2; i++)
-            AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.05f, 0.04f) }, trim, new Vector3(-0.55f + i * 1.1f, 0.3f, 0.56f));
-        // estandarte laranja com picareta
-        AddMesh(new BoxMesh { Size = new Vector3(0.5f, 0.62f, 0.015f) }, new StandardMaterial3D { AlbedoColor = new Color(0.9f, 0.42f, 0.12f), Roughness = 0.9f }, new Vector3(0.05f, 0.62f, 0.565f));
-        var pickMat = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.85f, 0.7f), Roughness = 0.8f };
-        AddMesh(new BoxMesh { Size = new Vector3(0.04f, 0.38f, 0.01f) }, pickMat, new Vector3(0.05f, 0.58f, 0.575f)).Rotation = new Vector3(0, 0, 0.6f);
-        AddMesh(new BoxMesh { Size = new Vector3(0.3f, 0.04f, 0.01f) }, pickMat, new Vector3(0.12f, 0.69f, 0.575f)).Rotation = new Vector3(0, 0, -0.35f);
+        // balcão: rodapé escuro recuado, corpo com painéis embutidos e frisos acesos, tampo com borda arredondada
+        var steel = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.57f, 0.62f), Roughness = 0.35f, Metallic = 0.6f };
+        AddMesh(new BoxMesh { Size = new Vector3(2.3f, 0.12f, 0.9f) }, dark, new Vector3(0, 0.06f, 0.03f));
+        AddMesh(new BoxMesh { Size = new Vector3(2.4f, 0.83f, 1.0f) }, body, new Vector3(0, 0.535f, 0.05f));
+        for (int i = 0; i < 3; i++)
+        {
+            float x = -0.78f + i * 0.78f;
+            AddMesh(new BoxMesh { Size = new Vector3(0.66f, 0.56f, 0.02f) }, dark, new Vector3(x, 0.52f, 0.555f));
+            AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.5f, 0.02f) }, body, new Vector3(x, 0.52f, 0.565f));
+            AddMesh(new BoxMesh { Size = new Vector3(0.6f, 0.025f, 0.012f) }, trim, new Vector3(x, 0.3f, 0.578f));
+        }
+        AddMesh(new BoxMesh { Size = new Vector3(2.5f, 0.07f, 1.08f) }, dark, new Vector3(0, 0.985f, 0.04f));
+        AddMesh(new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.045f, Height = 2.5f, RadialSegments = 10, Rings = 1 }, steel, new Vector3(0, 0.985f, 0.58f), new Vector3(0, 0, Mathf.Pi / 2));
+        // balança de cristais (prato aceso) no tampo
+        var sp = new Vector3(-0.05f, 1.02f, 0.25f);
+        AddMesh(new CylinderMesh { TopRadius = 0.09f, BottomRadius = 0.12f, Height = 0.05f, RadialSegments = 12, Rings = 1 }, steel, sp + new Vector3(0, 0.025f, 0));
+        AddMesh(new CylinderMesh { TopRadius = 0.015f, BottomRadius = 0.015f, Height = 0.18f, RadialSegments = 6, Rings = 1 }, steel, sp + new Vector3(0, 0.14f, 0));
+        AddMesh(new CylinderMesh { TopRadius = 0.16f, BottomRadius = 0.12f, Height = 0.025f, RadialSegments = 16, Rings = 1 }, MeshFactory.Emissive(new Color(0.2f, 0.5f, 0.45f), accent, 1.1f), sp + new Vector3(0, 0.24f, 0));
         // painel holográfico "cristal → moeda"
         var screenRoot = new Node3D { Position = new Vector3(0, 1.65f, -0.25f), Rotation = new Vector3(-0.2f, 0, 0) };
         AddChild(screenRoot);
