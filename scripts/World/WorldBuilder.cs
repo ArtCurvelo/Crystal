@@ -207,6 +207,7 @@ public partial class WorldBuilder : Node3D
             root.AddChild(rope);
             PitRopes.Add(rope);
         }
+        BuildDiaries(root, L, index, reserved);
         BeginSolids(root, L, reserved);
         BuildDecoration(root, r, L, rng);
         BuildLights(root, r, L);
@@ -277,6 +278,39 @@ public partial class WorldBuilder : Node3D
     public readonly List<Vector3> CathedralColumns = new();
 
     public readonly List<GoblinCamp> GoblinCamps = new();
+    public readonly List<DiaryNote> Diaries = new();
+
+    /// <summary>
+    /// Dois diários por região, no fundo de câmaras secretas (não a do goblin), virados para a entrada do túnel.
+    /// Posição só pela geometria da caverna: não consome o gerador do mundo.
+    /// </summary>
+    void BuildDiaries(Node3D root, CaveLayout L, int index, List<Vector3> reserved)
+    {
+        int n = L.Secrets.Count;
+        if (n == 0) return;
+        int goblin = index % n;
+        int slot = 0;
+        for (int k = 1; k <= n && slot < 2; k++)
+        {
+            int si = (index + k) % n;
+            if (si == goblin && n > 1) continue;
+            var def = DiaryData.At(index, slot);
+            if (def == null) break;
+            var sc = L.Secrets[si];
+            // direção da entrada: o túnel baixo que chega nesta câmara
+            var dir = Vector2.Right;
+            foreach (var c in L.Crawls)
+                if (c.B.DistanceTo(sc.A) < sc.RA + 1f) { dir = (sc.A - c.A).Normalized(); break; }
+            var p2 = sc.A + dir * (sc.RA * 0.45f);
+            var note = new DiaryNote { Name = "Diary_" + def.Id, DiaryId = def.Id };
+            root.AddChild(note);
+            note.Position = L.OnGround(p2.X, p2.Y);
+            note.Rotation = new Vector3(0, Mathf.Atan2(-dir.X, -dir.Y), 0);
+            Diaries.Add(note);
+            reserved.Add(note.Position);
+            slot++;
+        }
+    }
     public readonly List<Rope> PitRopes = new();
 
     void BuildGoblinCamp(RegionDef r, CaveLayout L, int index, Vector3 hut, float yaw, List<Vector3> reserved)

@@ -578,6 +578,20 @@ public partial class GameState : Node
         return true;
     }
 
+    // ================= Diários escondidos =================
+    public event Action DiariesChanged;
+    public List<DiaryDef> FoundDiaries() => DiaryData.All.Where(d => Data.Diaries.Contains(d.Id)).ToList();
+
+    /// <summary>Marca o diário como lido; na primeira vez avisa quantos já foram achados.</summary>
+    public bool ReadDiary(string id)
+    {
+        if (DiaryData.Of(id) == null || Data.Diaries.Contains(id)) return false;
+        Data.Diaries.Add(id);
+        DiariesChanged?.Invoke();
+        Notify("Diário encontrado", Loc.F("Diários de escravos: {0}/{1}", Data.Diaries.Count, DiaryData.All.Count), NotifyKind.Rare);
+        return true;
+    }
+
     // ================= Forja (ferreiro da vila) =================
     public event Action GearChanged;
 

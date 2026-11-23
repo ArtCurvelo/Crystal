@@ -1302,6 +1302,37 @@ public partial class TestRunner : Node
         Check(world.Crystals.Count >= 60, $"mundo deve ter cristais suficientes ({world.Crystals.Count})");
         Check(world.Gates.Count == GameData.Regions.Count - 1, "deve existir um portão por região desbloqueável");
         Check(world.Crystals.Any(c => c.Material.Special), "deve existir a formação especial");
+        // diários escondidos: 12, cada um numa câmara secreta, em chão firme, sem repetir câmara
+        Check(world.Diaries.Count == DiaryData.All.Count, $"{DiaryData.All.Count} diários escondidos na mina ({world.Diaries.Count})");
+        bool diariesOk = true;
+        var usedChambers = new System.Collections.Generic.HashSet<CaveFeature>();
+        var dspace = world.GetWorld3D().DirectSpaceState;
+        foreach (var dn in world.Diaries)
+        {
+            var L = world.Layouts[GameData.Regions.IndexOf(WorldBuilder.RegionAt(dn.GlobalPosition))];
+            var sc = L.SecretAt(dn.GlobalPosition);
+            var floor = dspace.IntersectRay(PhysicsRayQueryParameters3D.Create(dn.GlobalPosition + Vector3.Up * 0.3f, dn.GlobalPosition + Vector3.Down * 1.5f, PlayerController.WorldLayer, new Godot.Collections.Array<Rid> { dn.GetRid() }));
+            if (sc == null || !usedChambers.Add(sc) || floor.Count == 0) { diariesOk = false; GD.Print($"      diário mal colocado: {dn.DiaryId} câmara={(sc != null)} chão={floor.Count > 0}"); }
+            if (world.GoblinCamps.Any(gc => gc.GlobalPosition.DistanceTo(dn.GlobalPosition) < 1.5f)) diariesOk = false;
+        }
+        Check(diariesOk, "cada diário está numa câmara secreta própria, em chão firme");
+        Check(DiaryData.All.Select(d => d.Region).Distinct().Count() == GameData.Regions.Count, "dois diários por região");
+        string readId = null; void OnDiary(string id) => readId = id;
+        UiBus.OpenDiary += OnDiary; world.Diaries[0].Interact(null); UiBus.OpenDiary -= OnDiary;
+        Check(readId == world.Diaries[0].DiaryId, "interagir com o diário abre a leitura");
+        Check(GS.ReadDiary(readId) && GS.Data.Diaries.Count == 1 && !GS.ReadDiary(readId), "diário conta uma vez só na coleção");
+        var dscr = new DiaryScreen();
+        AddChild(dscr);
+        await Frames(1);
+        dscr.Show(readId);
+        await Frames(2);
+        Check(dscr.IsOpen, "tela do diário abre");
+        dscr.CloseSilently();
+        dscr.QueueFree();
+        var dj = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
+        dj.Diaries.Add("diario_falso"); dj.Sanitize();
+        Check(dj.Diaries.Count == 1 && dj.Diaries[0] == readId, "diários ficam no save (e os inválidos saem)");
+        GS.Data.Diaries.Clear();
 
         var crystal = world.Crystals.Where(c => c.Material.Id == "quartz" && c.GlobalTransform.Basis.Y.Normalized().Y > 0.95f).OrderBy(c => c.GlobalPosition.DistanceTo(world.SpawnPoint)).First();
         // posiciona o jogador ao lado e olhando para o cristal

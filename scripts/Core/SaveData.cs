@@ -30,6 +30,8 @@ public sealed class SaveData
     public List<ContractSave> Contracts { get; set; } = new();
     /// <summary>Equipamento forjado na vila: peça ("helmet", "gloves", "boots", "bag") → nível 0..5 (ausente = nenhum).</summary>
     public Dictionary<string, int> Gear { get; set; } = new();
+    /// <summary>Diários de outros escravos já encontrados na mina (ficam ao renascer).</summary>
+    public List<string> Diaries { get; set; } = new();
     public long CrystalsMined { get; set; }
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
@@ -85,6 +87,7 @@ public sealed class SaveData
         Contracts.RemoveAll(c => c == null || GameData.Mat(c.Mat) == null || c.Amount <= 0 || c.Reward < 0);
         if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
         Gear ??= new();
+        Diaries = (Diaries ?? new()).Where(d => DiaryData.Of(d) != null).Distinct().ToList();
         foreach (var key in Gear.Keys.ToList())
         {
             if (System.Array.IndexOf(new[] { "helmet", "gloves", "boots", "bag" }, key) < 0 || Gear[key] < 0) { Gear.Remove(key); continue; }

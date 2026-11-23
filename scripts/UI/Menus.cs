@@ -449,6 +449,8 @@ public partial class CodexScreen : ModalScreen
 {
     GridContainer _grid;
     Label _progress;
+    VBoxContainer _diaries;
+    Label _diaryText;
 
     public override void _Ready()
     {
@@ -458,10 +460,22 @@ public partial class CodexScreen : ModalScreen
         Body.AddChild(_progress);
         var scroll = new ScrollContainer { FollowFocus = true, CustomMinimumSize = new Vector2(0, 400), HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         Body.AddChild(scroll);
+        var col = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        col.AddThemeConstantOverride("separation", 14);
+        scroll.AddChild(col);
         _grid = new GridContainer { Columns = 2, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _grid.AddThemeConstantOverride("h_separation", 10);
         _grid.AddThemeConstantOverride("v_separation", 10);
-        scroll.AddChild(_grid);
+        col.AddChild(_grid);
+        // diários de escravos achados na mina (leitura aqui mesmo)
+        col.AddChild(UiTheme.Label("DIÁRIOS", 22, new Color(0.95f, 0.78f, 0.5f), true));
+        _diaries = new VBoxContainer();
+        _diaries.AddThemeConstantOverride("separation", 6);
+        col.AddChild(_diaries);
+        _diaryText = UiTheme.Label("", 16, new Color(0.9f, 0.85f, 0.75f));
+        _diaryText.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _diaryText.CustomMinimumSize = new Vector2(820, 0);
+        col.AddChild(_diaryText);
         var footer = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
         Body.AddChild(footer);
         footer.AddChild(UiTheme.Button("Voltar", Close, 160));
@@ -486,6 +500,18 @@ public partial class CodexScreen : ModalScreen
             }
         }
         _progress.Text = Loc.F("Descobertos: {0}/{1}   ·   Cristais minerados: {2}   ·   Fragmentos vendidos: {3}", found, GameData.Materials.Count, gs.Data.CrystalsMined, gs.Data.ShardsSold);
+        UiTheme.ClearChildren(_diaries);
+        _diaryText.Text = "";
+        var list = gs.FoundDiaries();
+        if (list.Count == 0) _diaries.AddChild(UiTheme.Label("Nenhum diário encontrado ainda. Procure nas câmaras secretas da mina: alguém deixou uma vela acesa.", 15, UiTheme.Muted));
+        foreach (var d in list)
+        {
+            var dd = d;
+            var b = UiTheme.Button(Loc.F("{0} · {1}", d.Title, d.Author), () => _diaryText.Text = dd.Title + "\n\n" + dd.Text, 0, 16);
+            b.Alignment = HorizontalAlignment.Left;
+            b.SetMeta("diary", d.Id);
+            _diaries.AddChild(b);
+        }
     }
 
     Control Card(MaterialDef m, RegionDef r, bool known)

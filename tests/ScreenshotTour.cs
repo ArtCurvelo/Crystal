@@ -307,6 +307,26 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-diary"))
+        {
+            foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
+            gs.RaiseAll();
+            for (int di = 0; di < 3; di++)
+            {
+                var dn = Main.World.Diaries[di * 4];
+                var fwd = new Vector3(0, 0, 1).Rotated(Vector3.Up, dn.Rotation.Y);
+                LookAtPoint(p, dn.GlobalPosition + fwd * 2.4f + Vector3.Up * 0.1f, dn.GlobalPosition + Vector3.Up * 0.5f);
+                await Wait(1.2f);
+                await Shot($"41_diary_{di}");
+            }
+            UiBus.RequestDiary(Main.World.Diaries[4].DiaryId);
+            await Wait(0.6f);
+            await Shot("41_diary_ui");
+            Main.CloseAllForTour();
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-intro"))
         {
             var ic = new CrystalExcavator.UI.IntroComic();

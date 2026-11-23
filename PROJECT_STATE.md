@@ -30,6 +30,8 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Vila dos Ferreiros** (`World/Town.cs`): fim do elevador da mina; casa do jogador, ferreiro (vende minérios e ferramentas) e Quadro de Encomendas (3 pedidos por dia, `GameState.EnsureContracts`, `UI/MissionScreen.cs`). Próximas etapas do plano: forja (criar equipamentos com minérios), níveis mais fundos com inimigos pelo elevador, história e calibrar a duração para 4–6 h.
 - **Forja** (`Data/GearData.cs`, `UI/ForgeScreen.cs`, bigorna `ForgeAnvil` na vila): capacete/luvas/botas/bolsa em 6 níveis com minérios de cada região + taxa; conserto de ferramentas. Zera ao renascer.
 - **HQ de abertura** (`UI/IntroComic.cs`, `assets/story/panel_1..6.png` gerados por `tools/comic.py`): história da dívida com a Guilda dos Ferreiros, mostrada no novo jogo.
+- **Vila viva** (`World/Humanoid.cs`, `World/TownLife.cs`, `World/TownVillage.cs`): moradores com rotina dia/noite, vigia, feirantes, galinhas, pássaros; casas enxaimel, feira, poço, árvores, bandeirolas.
+- **Diários de escravos** (`Data/DiaryData.cs`, `World/DiaryNote.cs`, `UI/DiaryScreen.cs`): 12 em câmaras secretas contando a história do Coração, do Povo Lúmen e da Guilda (gancho: "quebrar a Guilda").
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
@@ -131,7 +133,7 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 - **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
 
 ## Próxima ação recomendada
-Etapa 3 do plano de conteúdo: níveis mais fundos com inimigos pelo elevador (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.
+Etapa 3 do plano de conteúdo: níveis mais fundos com inimigos pelo elevador (a história já aponta para enfrentar a Guilda) (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.
 
 ## Renderização (v0.4.0)
 - Forward+ (Vulkan) com fallback automático para OpenGL. `Settings.Advanced` = Forward+ ativo. Testes/capturas locais usam Mesa lavapipe (`/home/user/tools/vk`, variáveis em `env.sh`).

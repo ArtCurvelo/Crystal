@@ -198,6 +198,9 @@ public partial class Main : Node
         _forge = new ForgeScreen();
         _forge.Closed += ReturnToGameplay;
         AddChild(_forge);
+        _diary = new DiaryScreen();
+        _diary.Closed += ReturnToGameplay;
+        AddChild(_diary);
         _home = new HomeScreen { OnSleep = () => { _home.CloseSilently(); SleepAtHome(); } };
         _home.Closed += ReturnToGameplay;
         AddChild(_home);
@@ -221,6 +224,7 @@ public partial class Main : Node
         UiBus.Door += UseHouseDoor;
         UiBus.OpenMissions += OpenMissions;
         UiBus.OpenForge += OpenForge;
+        UiBus.OpenDiary += OpenDiary;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
@@ -404,6 +408,7 @@ public partial class Main : Node
         UiBus.Door -= UseHouseDoor;
         UiBus.OpenMissions -= OpenMissions;
         UiBus.OpenForge -= OpenForge;
+        UiBus.OpenDiary -= OpenDiary;
         UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
@@ -743,6 +748,17 @@ public partial class Main : Node
 
     MissionScreen _missions;
     ForgeScreen _forge;
+    DiaryScreen _diary;
+
+    void OpenDiary(string id)
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        Player.InputEnabled = false;
+        AudioManager.Instance?.SetBeam(false);
+        if (GameState.Instance.ReadDiary(id)) Hud.ShowBigMessage("DIÁRIO ENCONTRADO");
+        _diary.Show(id);
+    }
 
     void OpenForge()
     {
@@ -799,13 +815,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _forge, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _forge, _diary, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
+    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -846,6 +862,7 @@ public partial class Main : Node
             if (_home.IsOpen) { _home.Close(); return; }
             if (_missions?.IsOpen ?? false) { _missions.Close(); return; }
             if (_forge?.IsOpen ?? false) { _forge.Close(); return; }
+            if (_diary?.IsOpen ?? false) { _diary.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
@@ -868,6 +885,7 @@ public partial class Main : Node
             else if (_home.IsOpen) _home.Close();
             else if (_missions?.IsOpen ?? false) _missions.Close();
             else if (_forge?.IsOpen ?? false) _forge.Close();
+            else if (_diary?.IsOpen ?? false) _diary.Close();
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
             else if (_help.IsOpen) _help.Close();
