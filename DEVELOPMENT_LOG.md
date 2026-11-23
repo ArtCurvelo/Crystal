@@ -503,3 +503,10 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Vida máxima = 100 + armadura. Inimigos agrupados por área (só a área atual processa/desenha).
 - Bug achado pelo teste: a Brasa explodia mas o estado "recuperando" sobrescrevia a morte (ficava viva invisível).
 - Testes 1099/1099 (o script de testes passou a ter 15 min de limite: o mundo ficou maior).
+
+## Ato 3 final: Trono de Corvo, o chefão e a Semente (v0.28.0)
+- 6ª Profundeza (Trono de Corvo): Servos do Corvo e Crias de Lúmen; o Mestre Corvo dorme no salão mais fundo (arena) até a conversa de chegada.
+- Chefão (`EnemyDef.Boss`, `Enemy.Phase`): 4,5 mi de vida; fase 1 pancada em área com anel; fase 2 também rajada em leque (5 raios) e crias; fase 3 enfurecido (mais rápido, 7 raios). Barra no topo da tela. Não renasce; derrotado em outra sessão some (`Retire`).
+- História: etapas novas `SeedFound` (Corvo largou a Semente) → `PlantSeed` (Bram manda plantar no monumento da praça) → `Freed` (HQ final de 4 quadros, a Semente brota com feixe de luz, venda +25% sem a taxa da Guilda). Falas do Corvo antes e depois da luta, com retrato.
+- Feedback do diretor (capturas a 12–19 FPS na Baixa): a qualidade Baixa desligava todas as luzes e o chão ficava preto → luz ambiente mais forte; decoração desenhada a 50% da distância na Baixa (80% na Média): -33% de triângulos no acampamento. Comparação no ambiente de testes: v0.26 11,8 FPS · antes desta correção 10,2 · agora 11,6.
+- Testes 1134/1134.

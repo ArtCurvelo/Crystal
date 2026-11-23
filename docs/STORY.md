@@ -35,3 +35,9 @@
 4. **Poço dos Acorrentados** — escravos que Corvo levou e foram corrompidos.
 5. **Ninho de Lúmen Bruto** — o Lúmen sem forma, o que corrompeu Corvo.
 6. **Trono de Corvo** — o chefão.
+
+## Final (implementado)
+- Trono de Corvo: conversa de chegada (Corvo acusa Bram de covarde e diz que a Semente é dele); luta em 3 fases; ao cair, Corvo pede que a Semente volte para o povo e pede desculpas ao Bram.
+- O Velho Bram reconhece a Semente e manda plantá-la no monumento de cristal da praça, construído sobre o lugar sagrado do Povo Lúmen.
+- HQ final: o Corvo caído e a Semente; a Semente plantada diante da vila; as correntes se partem e os livros de dívida viram pó; amanhecer, "MINA LIVRE", FIM.
+- Depois do final o jogo continua: tudo vende 25% mais caro (sem a taxa da Guilda).

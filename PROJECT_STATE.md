@@ -33,7 +33,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Vila viva** (`World/Humanoid.cs`, `World/TownLife.cs`, `World/TownVillage.cs`): moradores com rotina dia/noite, vigia, feirantes, galinhas, pássaros; casas enxaimel, feira, poço, árvores, bandeirolas.
 - **Diários de escravos** (`Data/DiaryData.cs`, `World/DiaryNote.cs`, `UI/DiaryScreen.cs`): 12 em câmaras secretas contando a história do Coração, do Povo Lúmen e da Guilda (gancho: "quebrar a Guilda").
 - **Ato 2 — A Chave Falsa** (`docs/STORY.md`, `Data/StoryData.cs`): Velho Bram (vila) → flashback em HQ → portão selado no fundo da Catedral (`World/SealedGate.cs`) → molde do selo → chave falsa forjada à noite → portão aberto (as Profundezas Proibidas ainda não existem).
-- **Ato 3 — Profundezas Proibidas**: `RegionDef.Deep` (5 áreas depois das 6 da mina, sem túnel), inimigos com comportamentos (`World/Enemies.cs`), Guardião por área que abre a passagem para a próxima, armas e armaduras por combinação de minérios (`Data/WeaponData.cs`, tecla X). Falta a 6ª área (Trono de Corvo), o chefão e a Semente do Povo Lúmen.
+- **Ato 3 — Profundezas Proibidas**: `RegionDef.Deep` (5 áreas depois das 6 da mina, sem túnel), inimigos com comportamentos (`World/Enemies.cs`), Guardião por área que abre a passagem para a próxima, armas e armaduras por combinação de minérios (`Data/WeaponData.cs`, tecla X). Trono de Corvo com o chefão Mestre Corvo (3 fases) e o final: a Semente plantada no monumento da praça (`SeedAltar`), HQ final e venda +25%.
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
@@ -135,7 +135,7 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 - **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
 
 ## Próxima ação recomendada
-Ato 3, fase 3: o Trono de Corvo (6ª área), o chefão Mestre Corvo e o final com a Semente do Povo Lúmen (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.
+Desempenho em PCs fracos (aguardando dados do diretor sobre a máquina das capturas a 12–19 FPS na Baixa) e calibrar a duração total (meta 4–6 h) (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.
 
 ## Renderização (v0.4.0)
 - Forward+ (Vulkan) com fallback automático para OpenGL. `Settings.Advanced` = Forward+ ativo. Testes/capturas locais usam Mesa lavapipe (`/home/user/tools/vk`, variáveis em `env.sh`).
