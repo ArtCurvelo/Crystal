@@ -510,3 +510,16 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - História: etapas novas `SeedFound` (Corvo largou a Semente) → `PlantSeed` (Bram manda plantar no monumento da praça) → `Freed` (HQ final de 4 quadros, a Semente brota com feixe de luz, venda +25% sem a taxa da Guilda). Falas do Corvo antes e depois da luta, com retrato.
 - Feedback do diretor (capturas a 12–19 FPS na Baixa): a qualidade Baixa desligava todas as luzes e o chão ficava preto → luz ambiente mais forte; decoração desenhada a 50% da distância na Baixa (80% na Média): -33% de triângulos no acampamento. Comparação no ambiente de testes: v0.26 11,8 FPS · antes desta correção 10,2 · agora 11,6.
 - Testes 1134/1134.
+
+## HQs animadas (v0.28.0)
+- Pedido do diretor: animações nas cutscenes ("cenas passando").
+- `tools/comic2.py` agora salva cada quadro em 3 camadas: cenário (`_bg`), personagens (`_fg`) e onomatopeias (`_fx`), além do quadro pronto (usado como reserva).
+- `UI/IntroComic.cs` reescrito (vale para a abertura, o flashback do Bram e o final):
+  - câmera lenta no cenário com os personagens em paralaxe e "respirando";
+  - as onomatopeias estouram com quique;
+  - partículas por cena: chuva, faíscas da forja, brasas, estilhaços e luz;
+  - tremida nas cenas fortes, que respeita "Reduzir tremidas";
+  - transições variadas: empurrão, clarão com zoom, cortina com traço de tinta, queda com quique e esmaecer;
+  - a moldura de HQ fica parada enquanto o conteúdo treme.
+- Cenários e quadros prontos importados com compressão com perda (WebP 85%): as HQs ocupam ~5 MB no jogo.
+- Tour `--shots-intro` fotografa as 3 HQs, inclusive no meio de cada transição.

@@ -23,6 +23,8 @@ def light(c, k=0.3): return mix(c[:3], (255, 250, 235), k)
 class Canvas:
     def __init__(self, bg):
         self.img = bg.convert("RGBA")
+        # camadas para a cutscene animada: cenário (bg), personagens (fg) e textos de efeito (fx)
+        self.layers = {"bg": self.img, "fg": Image.new("RGBA", self.img.size, (0, 0, 0, 0)), "fx": Image.new("RGBA", self.img.size, (0, 0, 0, 0))}
         self.light = (-0.6, -0.8)      # luz vindo de cima/esquerda (sombra para baixo/direita)
         self.rim = None                # cor da luz de contorno (do outro lado)
 
@@ -113,13 +115,19 @@ class Canvas:
         lay = lay.filter(ImageFilter.GaussianBlur(size * 0.13))
         self.img.alpha_composite(lay, (s(cx) - size // 2, s(cy) - size // 2))
 
-    def text(self, t, x, y, size, fill, angle=0, stroke=None):
+    def layer(self, name):
+        """A partir daqui, desenha na camada 'bg', 'fg' ou 'fx'."""
+        self.img = self.layers[name]
+
+    def text(self, t, x, y, size, fill, angle=0, stroke=None, scene=False):
+        """Texto: por padrão vai para a camada de efeitos (estoura na tela); scene=True fica no cenário/personagem."""
+        target = self.img if scene else self.layers["fx"]
         f = ImageFont.truetype(FONT, s(size))
         lay = Image.new("RGBA", self.img.size, (0, 0, 0, 0))
         d = ImageDraw.Draw(lay)
         d.text((s(x), s(y)), t, font=f, fill=fill, stroke_width=s(stroke if stroke is not None else size / 9), stroke_fill=INK, anchor="mm")
         if angle: lay = lay.rotate(angle, center=(s(x), s(y)), resample=Image.BICUBIC)
-        self.img.alpha_composite(lay)
+        target.alpha_composite(lay)
 
 def limb(p0, p1, w0, w1=None):
     """Parte cilíndrica (braço/perna) afinando de w0 para w1, com pontas redondas."""
@@ -160,11 +168,20 @@ def paper(img, strength=10):
     img.alpha_composite(dark)
 
 def finish(cv, path):
-    paper(cv.img)
-    d = ImageDraw.Draw(cv.img)
+    """Salva o quadro pronto (fallback e testes) e as 3 camadas para a cutscene animada."""
+    bg, fg, fx = cv.layers["bg"], cv.layers["fg"], cv.layers["fx"]
+    paper(bg)
+    base = path[:-4]
+    bg.convert("RGB").resize((W, H), Image.LANCZOS).save(base + "_bg.png", optimize=True)
+    fg.resize((W, H), Image.LANCZOS).save(base + "_fg.png", optimize=True)
+    fx.resize((W, H), Image.LANCZOS).save(base + "_fx.png", optimize=True)
+    full = bg.copy()
+    full.alpha_composite(fg)
+    full.alpha_composite(fx)
+    d = ImageDraw.Draw(full)
     d.rectangle([0, 0, SW - 1, SH - 1], outline=(250, 246, 235), width=s(16))
     d.rectangle([s(16), s(16), SW - s(16), SH - s(16)], outline=INK, width=s(5))
-    cv.img.convert("RGB").resize((W, H), Image.LANCZOS).save(path, optimize=True)
+    full.convert("RGB").resize((W, H), Image.LANCZOS).save(path, optimize=True)
 
 def mountains(cv, base, layers, seed=3):
     r = random.Random(seed)
@@ -708,6 +725,7 @@ def bram1():
     cv.light = (-0.6, -0.8); cv.rim = (150, 220, 255)
     cathedral_bg(cv)
     ancient_gate(cv, 860, 800, 420, 560, open_=0.55)
+    cv.layer("fg")
     smith(cv, 1270, 900, 2.0, "angry", facing=-1, point=True, hammer=False, bandana=True, shirt=(50, 50, 58), beard=(25, 22, 26), look=(-0.8, 0.1))
     hero(cv, 640, 900, 1.45, "scared", facing=1, armL=(-25, 0.9), armR=(40, 0.95), shirt=(120, 110, 95), hair=(40, 30, 24), lantern=True, look=(0.6, -0.2))
     cv.text("ENTRA, BRAM!", 1250, 140, 60, (255, 225, 90), 6)
@@ -720,6 +738,7 @@ def bram2():
         r_ = random.Random(i)
         a = r_.uniform(0, math.tau)
         cv.line([(520 + math.cos(a) * 180, 430 + math.sin(a) * 180), (520 + math.cos(a) * 1300, 430 + math.sin(a) * 1300)], w=r_.uniform(1, 3), col=(90, 40, 110))
+    cv.layer("fg")
     beast(cv, 1300, 900, 2.0)
     for i in range(3):
         cv.shape([('poly', [(520 + i * 70, 180 + i * 40), (900 + i * 60, 560 + i * 40), (880 + i * 60, 575 + i * 40), (500 + i * 70, 195 + i * 40)])], (255, 255, 255), line=1.4, shadow=0.0, rim=False)
@@ -742,6 +761,7 @@ def bram3():
         cv.shape([('poly', [(tx - 18, 420), (tx, 360), (tx + 18, 420)])], (255, 180, 70), line=2, shadow=0.1, rim=False)
     for (vx, col) in ((420, (180, 70, 70)), (500, (70, 120, 170)), (1090, (110, 150, 90)), (1170, (200, 160, 80)), (1000, (150, 90, 150))):
         cv.shape([('rect', vx - 22, 520, vx + 22, 620, 10), ('ell', vx, 500, 20, 20)], col, line=2.4, shadow=0.45, rim=True)
+    cv.layer("fg")
     guildmaster(cv, 820, 860, 1.5, "n", facing=1)
     cv.shape(limb((910, 560), (1040, 500), 30), (110, 50, 130), line=3, shadow=0.4)
     hand(cv, 1050, 495, 18, SKIN)
@@ -768,6 +788,7 @@ def bram4():
         cv.shape(limb((wx + flip * 20, 670), (wx + flip * 80, 600), 16), (90, 80, 70), line=2.4, shadow=0.4)
         cv.shape([('rect', wx + flip * 80 - 20, 575, wx + flip * 80 + 20, 600, 3)], (120, 120, 135), line=2, shadow=0.3, rim=False)
     cv.text("CLANG!", 470, 520, 36, (255, 220, 120), -8)
+    cv.layer("fg")
     # a silhueta do Corvo descendo pela fresta, olhos vermelhos
     cv.flat([('poly', [(1180, 900), (1600, 900), (1600, 300), (1360, 260)])], (8, 4, 10), alpha=235)
     cv.shape([('ell', 1400, 520, 140, 170), ('rect', 1260, 560, 1540, 900, 30)], (14, 10, 16), line=3, shadow=0.0, hi=0.0, rim=True)
@@ -828,6 +849,7 @@ def end1():
     # bigorna partida e o martelo largado
     cv.shape([('rect', 1180, 700, 1420, 790, 6)], (60, 58, 66), line=3.4, shadow=0.4)
     cv.shape([('poly', [(1300, 700), (1320, 760), (1290, 790)])], (255, 120, 80), line=1.6, shadow=0.1, rim=False)
+    cv.layer("fg")
     corvo(cv, 1150, 940, 1.7, "sad", facing=-1, look=(-0.6, 0.6), hammer=False)
     hs = hero(cv, 470, 900, 1.6, "determined", facing=1, armR=(160, 1.0), armL=(-20, 0.9), helmet=True, dirty=True, look=(0.2, -0.8))
     hx_, hy_, _ = hs[1]
@@ -850,6 +872,7 @@ def end2():
     cv.shape([('rect', 730, 640, 870, 700, 8)], (150, 145, 140), line=3, shadow=0.3)
     crystal(cv, 800, 640, 170, (150, 235, 255))
     seed(cv, 800, 600, 30)
+    cv.layer("fg")
     # moradores olhando e o Velho Bram
     for (vx, col) in ((300, (180, 70, 70)), (380, (70, 120, 170)), (1150, (110, 150, 90)), (1240, (200, 160, 80)), (1090, (150, 90, 150))):
         cv.shape([('rect', vx - 22, 600, vx + 22, 700, 10), ('ell', vx, 580, 20, 20)], col, line=2.4, shadow=0.45, rim=True)
@@ -865,6 +888,7 @@ def end3():
         a = r_.uniform(0, math.tau)
         cv.line([(800 + math.cos(a) * 160, 460 + math.sin(a) * 160), (800 + math.cos(a) * 1300, 460 + math.sin(a) * 1300)], w=r_.uniform(1, 4), col=(255, 240, 190))
     cv.glow(800, 460, 300, (255, 245, 200), 230)
+    cv.layer("fg")
     # escravos com correntes se partindo
     for (sx, sc_, f) in ((260, 0.95, 1), (520, 0.8, 1), (1080, 0.8, -1), (1340, 0.95, -1)):
         slave(cv, sx, 880, sc_, 1, (130, 115, 100), f)
@@ -900,7 +924,8 @@ def end4():
         cv.shape([('ell', bx, by, r_, r_ * 0.8)], (170, 255, 170), line=2.6, shadow=0.35, hi=0.3)
     cv.glow(800, 330, 160, (255, 240, 170), 120)
     cv.shape([('rect', 1000, 470, 1230, 540, 6)], (200, 170, 120), line=3, shadow=0.25)
-    cv.text("MINA LIVRE", 1115, 505, 32, INK, 0, 0)
+    cv.text("MINA LIVRE", 1115, 505, 32, INK, 0, 0, scene=True)
+    cv.layer("fg")
     # comemoração: moradores, Bram e o herói
     for (vx, col) in ((330, (200, 80, 80)), (430, (80, 140, 200)), (1060, (120, 170, 90)), (1160, (220, 170, 80))):
         cv.shape([('rect', vx - 22, 600, vx + 22, 700, 10), ('ell', vx, 580, 20, 20)], col, line=2.4, shadow=0.4, rim=False)
@@ -941,6 +966,7 @@ def panel1():
     for i in range(30):
         cv.flat([('ell', 30 + i * 55, 725 + (i % 3) * 8, 18, 7)], (170, 135, 92))
     # herói com caixa de ferramentas e balão de pensamento (a oficina dos sonhos)
+    cv.layer("fg")
     contact(cv, 640, 880, 90)
     hs = hero(cv, 470, 890, 1.75, "happy", facing=1, armL=(-25, 0.9), armR=(10, 0.95), look=(0.6, -0.4))
     hx_, hy_, _ = hs[1]
@@ -953,7 +979,7 @@ def panel1():
     cv.shape([('ell', 900, 330, 240, 150)], (255, 255, 250), line=3.4, shadow=0.12, hi=0.0, rim=False)
     timber_house(cv, 780, 420, 230, 140, (240, 228, 200), (60, 120, 170), chimney=False, seed=9)
     cv.shape([('rect', 830, 230, 970, 262, 4)], (120, 80, 45), line=2.4, shadow=0.3)
-    cv.text("OFICINA", 900, 247, 24, (255, 230, 150), 0, 2)
+    cv.text("OFICINA", 900, 247, 24, (255, 230, 150), 0, 2, scene=True)
     for i in range(5):
         star(cv, 700 + i * 90, 215 + (i % 2) * 50, 14, (255, 225, 120))
     finish(cv, OUT + "/panel_1.png")
@@ -976,8 +1002,9 @@ def panel2():
     cv.shape([('ell', 800, 150, 120, 120)], (200, 150, 60), line=3.4, shadow=0.35, hi=0.2)
     cv.shape(limb((745, 210), (860, 95), 22), (130, 130, 145), line=2.6, shadow=0.3)
     cv.shape([('poly', [(815, 70), (905, 115), (885, 140), (795, 95)])], (110, 110, 125), line=2.6, shadow=0.35)
-    cv.text("GUILDA DOS FERREIROS", 800, 300, 34, (255, 220, 140), 0, 4)
+    cv.text("GUILDA DOS FERREIROS", 800, 300, 34, (255, 220, 140), 0, 4, scene=True)
     cv.glow(800, 560, 420, (255, 190, 110), 70)
+    cv.layer("fg")
     guildmaster(cv, 1100, 1010, 2.25, "happy", facing=-1)
     # mesa com tampo de madeira (na frente do mestre)
     cv.shape([('rect', 300, 600, 1300, 660, 8)], (120, 76, 44), line=3.4, shadow=0.35)
@@ -994,7 +1021,7 @@ def panel2():
     cv.shape([('ell', 1380, 250, 175, 70)], (255, 255, 250), line=3.2, shadow=0.1, hi=0.0, rim=False)
     cv.shape([('poly', [(1260, 290), (1205, 360), (1300, 300)])], (255, 255, 250), line=2.6, shadow=0.05, hi=0.0, rim=False)
     cv.flat([('ell', 1380, 250, 168, 63)], (255, 255, 250))
-    cv.text("Assine aqui, rapaz!", 1380, 250, 30, (40, 30, 40), 0, 0)
+    cv.text("Assine aqui, rapaz!", 1380, 250, 30, (40, 30, 40), 0, 0, scene=True)
     finish(cv, OUT + "/panel_2.png")
 
 def panel3():
@@ -1029,13 +1056,14 @@ def panel3():
     # contas de dívida espalhadas e a conta gigante
     for i, (px, py, a) in enumerate(((760, 590, -8), (880, 585, 5), (980, 592, -3))):
         cv.shape([('poly', [(px - 50, py - 30), (px + 50, py - 36), (px + 54, py + 4), (px - 46, py + 8)])], (240, 234, 214), line=2, shadow=0.2, rim=False)
-        cv.text("DÍVIDA", px, py - 12, 15, (190, 40, 50), a, 0)
+        cv.text("DÍVIDA", px, py - 12, 15, (190, 40, 50), a, 0, scene=True)
     cv.shape([('poly', [(1240, 380), (1520, 360), (1540, 880), (1250, 890)])], (248, 244, 228), line=3, shadow=0.15)
-    cv.text("DÍVIDA", 1390, 420, 40, (200, 30, 40), -2, 0)
+    cv.text("DÍVIDA", 1390, 420, 40, (200, 30, 40), -2, 0, scene=True)
     for i, v in enumerate(["500 Lúmens", "1.200 Lúmens", "3.800 Lúmens", "9.400 Lúmens", "27.000 Lúmens", "81.000 Lúmens"]):
-        cv.text(v, 1392, 485 + i * 58, 24, INK if i < 5 else (200, 30, 40), -2, 0)
+        cv.text(v, 1392, 485 + i * 58, 24, INK if i < 5 else (200, 30, 40), -2, 0, scene=True)
     cv.text("JUROS!", 1400, 840, 30, (200, 30, 40), -8, 2)
     # herói sentado, mãos na cabeça
+    cv.layer("fg")
     hero(cv, 860, 880, 1.6, "sad", facing=1, sit=True, armL=(160, 0.95), armR=(-160, 0.95), tears=True, look=(-0.2, 0.6))
     cv.shape([('rect', 760, 760, 1000, 790, 4)], (110, 74, 44), line=2.6, shadow=0.3)   # banquinho
     cv.text("SUSPIRO...", 560, 470, 30, (190, 200, 240), 4, 3)
@@ -1056,6 +1084,7 @@ def panel4():
     # sombras compridas dos ferreiros no chão
     cv.flat([('poly', [(900, 900), (1150, 900), (500, 660), (330, 660)])], (25, 10, 12), alpha=200)
     cv.flat([('poly', [(1200, 900), (1400, 900), (900, 660), (760, 660)])], (25, 10, 12), alpha=200)
+    cv.layer("fg")
     smith(cv, 1080, 900, 2.5, "angry", facing=-1, arm_up=True, look=(-0.7, 0.3))
     smith(cv, 1370, 920, 2.1, "angry", facing=-1, hammer=False, bandana=True, shirt=(60, 90, 140), beard=(40, 30, 26), look=(-0.7, 0.3))
     # herói encolhido no chão
@@ -1088,9 +1117,10 @@ def panel5():
         cv.shape([('rect', 690 + i * 12, yy - 6, 910 - i * 12, yy + 6, 2)], (110, 74, 44), line=2, shadow=0.3, rim=False)
     cv.line([(700, 900), (775, 650)], w=5, col=(160, 160, 175)); cv.line([(900, 900), (825, 650)], w=5, col=(160, 160, 175))
     cv.shape([('rect', 1260, 300, 1530, 430, 6)], (205, 172, 120), line=3.2, shadow=0.25)
-    cv.text("MINA DA", 1395, 342, 32, INK, 0, 0)
-    cv.text("GUILDA", 1395, 388, 32, INK, 0, 0)
+    cv.text("MINA DA", 1395, 342, 32, INK, 0, 0, scene=True)
+    cv.text("GUILDA", 1395, 388, 32, INK, 0, 0, scene=True)
     cv.shape(limb((1395, 430), (1395, 840), 22), (110, 74, 44), line=2.6, shadow=0.35)
+    cv.layer("fg")
     smith(cv, 1110, 900, 1.95, "angry", facing=-1, point=True, bandana=True, shirt=(60, 90, 140), beard=(40, 30, 26), look=(-0.8, 0.2), hammer=False)
     hero(cv, 470, 900, 1.5, "sad", facing=1, helmet=True, chain=True, pick=True, armR=(35, 0.95), armL=(-10, 0.9), look=(0.6, 0.2), dirty=True)
     cv.text("TRABALHE!", 1180, 120, 52, (255, 230, 90), 6)
@@ -1126,6 +1156,7 @@ def panel6():
     for k in range(4): cv.line([(735 + k * 3, 824 + k * 8), (840 + k * 3, 810 + k * 8)], w=1, col=(120, 100, 80))
     cv.glow(790, 830, 70, (255, 240, 200), 60)
     cv.text("?", 820, 760, 40, (255, 240, 200), 0, 3)
+    cv.layer("fg")
     hero(cv, 470, 900, 1.65, "determined", facing=1, helmet=True, pick=True, armR=(35, 0.95), armL=(-15, 0.9), look=(0.8, -0.3), lamp_on=True, dirty=True)
     cv.text("O CORAÇÃO...", 1180, 160, 46, (255, 170, 190), 6)
     finish(cv, OUT + "/panel_6.png")

@@ -493,14 +493,22 @@ public partial class ScreenshotTour : Node
             var ic = new CrystalExcavator.UI.IntroComic();
             AddChild(ic);
             await Wait(0.2f);
-            ic.Play();
-            for (int i = 0; i < CrystalExcavator.UI.IntroComic.Captions.Length; i++)
+            // as 3 HQs: abertura, flashback do Bram e final (com uma foto no meio de cada transição)
+            var seqs = new (string prefix, string[] caps)[] { ("panel_", CrystalExcavator.UI.IntroComic.Captions), ("bram_", StoryData.Flashback), ("end_", StoryData.Ending) };
+            foreach (var (prefix, caps) in seqs)
             {
-                await Wait(i == 0 ? 0.6f : 0.4f);
-                ic.Advance(); // completa a fala
-                await Wait(0.5f);
-                await Shot($"40_intro_{i + 1}");
-                ic.Advance();
+                ic.Play(prefix, caps);
+                for (int i = 0; i < caps.Length; i++)
+                {
+                    await Wait(0.3f);
+                    await Shot($"40_{prefix}{i + 1}_trans");
+                    await Wait(i == 0 ? 1.2f : 0.9f);
+                    ic.Advance(); // completa a fala
+                    await Wait(0.9f);
+                    await Shot($"40_{prefix}{i + 1}");
+                    ic.Advance();
+                }
+                await Wait(0.8f);
             }
             SaveSystem.Delete();
             GameState.Instance.QuitClean();

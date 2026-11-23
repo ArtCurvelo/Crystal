@@ -1768,9 +1768,21 @@ public partial class TestRunner : Node
         ic.Play();
         await Frames(2);
         Check(ic.IsPlaying && ic.Visible && ic.Index == 0, "HQ começa no primeiro quadro");
+        Check(ic.Layered, "quadro animado em camadas (cenário, personagens, efeitos)");
         ic.Advance(); // completa a frase
         ic.Advance(); // próximo quadro
         Check(ic.Index == 1, "avançar completa a fala e depois passa o quadro");
+        Check(ic.Transitioning, "o quadro novo entra com transição");
+        ic.Advance(); // termina a transição e a fala
+        Check(!ic.Transitioning, "avançar durante a transição termina a transição");
+        foreach (var (pre, n) in new[] { ("panel_", IntroComic.Captions.Length), ("bram_", StoryData.Flashback.Length), ("end_", StoryData.Ending.Length) })
+            for (int i = 1; i <= n; i++)
+                foreach (var layer in new[] { "_bg", "_fg", "_fx" })
+                    Check(ResourceLoader.Exists($"res://assets/story/{pre}{i}{layer}.png"), $"camada {pre}{i}{layer}");
+        var kinds = new System.Collections.Generic.HashSet<IntroComic.Transition>();
+        for (int i = 1; i <= 6; i++) kinds.Add(IntroComic.SceneOf($"panel_{i}").In);
+        Check(kinds.Count >= 4, $"transições variadas na abertura ({kinds.Count})");
+        Check(IntroComic.SceneOf("panel_3").Particles == IntroComic.Fx.Rain && IntroComic.SceneOf("panel_4").Shake > 0, "chuva no quadro 3, tremida na cobrança");
         for (int k = 0; k < 20 && ic.IsPlaying; k++) { ic.Advance(); ic.Advance(); await Frames(1); }
         await Frames(40);
         Check(done && !ic.IsPlaying && !ic.Visible, "HQ termina depois do último quadro");

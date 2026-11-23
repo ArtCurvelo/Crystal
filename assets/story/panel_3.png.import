@@ -15,9 +15,9 @@ dest_files=["res://.godot/imported/panel_3.png-3fd90f7d7b00ec4cd683d3133e3877a9.
 
 [params]
 
-compress/mode=0
+compress/mode=1
 compress/high_quality=false
-compress/lossy_quality=0.7
+compress/lossy_quality=0.85
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
