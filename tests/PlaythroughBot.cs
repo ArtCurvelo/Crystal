@@ -487,6 +487,22 @@ public partial class PlaythroughBot : Node
             if (fs.IsOpen || !P.InputEnabled) { _errors++; Log("ERRO: Esc não fechou a forja"); return; }
         }
 
+        // história: quando o Velho Bram chama, conversa, vê o flashback e recebe a missão do portão
+        if (GS.Story == StoryData.BramCalls && town.Bram != null && await UseStationNode(town.Bram))
+        {
+            var dlg = Main.GetChildren().OfType<DialogueScreen>().FirstOrDefault();
+            for (int k = 0; k < 400 && GS.Story == StoryData.BramCalls; k++)
+            {
+                var fb = Main.GetChildren().OfType<IntroComic>().FirstOrDefault(c => c.Name == "Flashback");
+                if (fb != null && fb.IsPlaying) fb.Advance();
+                else dlg?.Advance();
+                await Frames(4);
+            }
+            await Frames(10);
+            if (GS.Story != StoryData.FindGate || !P.InputEnabled) { _errors++; Log("ERRO: conversa com o Velho Bram não avançou a história"); return; }
+            Log("Ouviu a história do Velho Bram (missão: portão selado da Catedral)");
+        }
+
         // porta: entra em casa
         if (!await UseStationNode(town.DoorOutside)) { _errors++; Log("ERRO: porta da casa (lado de fora) não funcionou"); return; }
         await Frames(60);
