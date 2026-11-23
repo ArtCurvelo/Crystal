@@ -33,6 +33,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Vila viva** (`World/Humanoid.cs`, `World/TownLife.cs`, `World/TownVillage.cs`): moradores com rotina dia/noite, vigia, feirantes, galinhas, pássaros; casas enxaimel, feira, poço, árvores, bandeirolas.
 - **Diários de escravos** (`Data/DiaryData.cs`, `World/DiaryNote.cs`, `UI/DiaryScreen.cs`): 12 em câmaras secretas contando a história do Coração, do Povo Lúmen e da Guilda (gancho: "quebrar a Guilda").
 - **Ato 2 — A Chave Falsa** (`docs/STORY.md`, `Data/StoryData.cs`): Velho Bram (vila) → flashback em HQ → portão selado no fundo da Catedral (`World/SealedGate.cs`) → molde do selo → chave falsa forjada à noite → portão aberto (as Profundezas Proibidas ainda não existem).
+- **Ato 3 — Profundezas Proibidas** (fase 1): `RegionDef.Deep` (regiões depois das 6 da mina, sem túnel), Galerias Esquecidas com Rastejantes e Sentinelas (`World/Enemies.cs`), armas forjadas (`Data/WeaponData.cs`, tecla X). Faltam as áreas 2–6, o Mestre Corvo e a Semente do Povo Lúmen.
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
@@ -134,7 +135,7 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 - **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
 
 ## Próxima ação recomendada
-Etapa 3 do plano de conteúdo: níveis mais fundos com inimigos pelo elevador (a história já aponta para enfrentar a Guilda) (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.
+Ato 3, fase 2: áreas 2–5 das Profundezas (novos inimigos e minérios) e armadura; depois o chefão Mestre Corvo e a Semente do Povo Lúmen (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.
 
 ## Renderização (v0.4.0)
 - Forward+ (Vulkan) com fallback automático para OpenGL. `Settings.Advanced` = Forward+ ativo. Testes/capturas locais usam Mesa lavapipe (`/home/user/tools/vk`, variáveis em `env.sh`).

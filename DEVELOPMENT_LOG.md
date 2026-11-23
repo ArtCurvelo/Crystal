@@ -486,3 +486,11 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Arte: retratos do Bram e do herói e 4 quadros do flashback (Corvo obriga Bram a entrar; a criatura de Lúmen; a vila expulsa Corvo; a Guilda lacra o portão e Corvo desce) em `tools/comic2.py`.
 - Lanterna do capacete apaga sozinha de dia na vila (estourava quem estava perto).
 - Testes 939/939. Bot conversa com o Bram depois do Coração.
+
+## Ato 3, fase 1: combate e as Galerias Esquecidas (v0.27.0)
+- Decisões do diretor: armas forjadas (a ferramenta continua só para minerar); ao perder a vida desmaia e perde parte da mochila; as 6 áreas são cavernas grandes com minério protegido por inimigos; o objeto que o Corvo larga é a **Semente do Povo Lúmen**.
+- Profundezas como regiões com `RegionDef.Deep` depois das 6 da mina (`GameData.MineRegions`, `GameData.Mine/Deep`), longe no eixo Z (`DeepGap`), sem túnel nem portão de compra; a Catedral não muda de formato (`hasNorth` ignora regiões profundas). Culling separa mina e Profundezas.
+- 1ª área: Galerias Esquecidas (Lúmen Bruto, Vidro Ancestral, Pedra Rúnica, Coração de Lúmen). Entra-se pelo portão aberto da Catedral; portal de volta na entrada (`DeepPortal`).
+- Armas (`Data/WeaponData.cs`, `Player/WeaponView.cs`): espada (rápida, arco) e martelo (lento, forte, empurra) em 3 níveis, forjadas na vila depois que o portão abre. Tecla X / botão Y troca ferramenta e arma; dano usa luvas e Essência.
+- Inimigos (`Data/EnemyData.cs`, `World/Enemies.cs`): Rastejante de Cristal (rápido, bote) e Sentinela de Lúmen (golem, golpe em área com anel de aviso). Física de verdade, perseguição com linha de visão, coleira de volta para casa, barra de vida, números de dano, fragmentos ao morrer, renascem depois de 150 s longe do jogador.
+- Testes 986/986 (combate de ponta a ponta: perseguição, dano no jogador, espada mata, fragmentos, desmaio).

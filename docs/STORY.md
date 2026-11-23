@@ -1,5 +1,7 @@
 # Crystal Excavator — Bíblia da história
 
+> Decisões do diretor criativo (ato 3): armas forjadas; desmaio perde parte da mochila; as 6 áreas são cavernas grandes com minério e inimigos; o objeto final é a Semente do Povo Lúmen.
+>
 > Decisões do diretor criativo: o velho ex-escravo é o **Velho Bram** (autor dos diários do Núcleo, que sobreviveu); ele se abre **depois que o jogador quebra o Coração Ancestral**; a entrada das áreas com inimigos é um **portão selado no fundo da Catedral de Cristal**; para entrar, o jogador **forja uma chave falsa da Guilda**; o chefão final é o ferreiro **Mestre Corvo**, corrompido.
 
 ## Personagens
@@ -13,7 +15,7 @@
 1. **A dívida (já no jogo)** — HQ de abertura; mina; vila; forja; diários; quebrar o Coração Ancestral.
 2. **O segredo do Velho Bram (esta etapa)** — depois do Coração, Bram chama o jogador, conta (em HQ de flashback) o que aconteceu com ele e com Corvo e ensina a forjar a chave falsa.
 3. **As Profundezas Proibidas (próxima etapa)** — atrás do portão: 6 áreas novas, cada uma com inimigos mais fortes (criaturas de Lúmen bruto, ex-escravos corrompidos...).
-4. **Mestre Corvo** — chefão no fim da 6ª área. Ao ser derrotado, larga **um objeto ainda a definir** que serve para acabar com a soberania dos ferreiros (final do jogo).
+4. **Mestre Corvo** — chefão no fim da 6ª área. Ao ser derrotado, larga a **Semente do Povo Lúmen**: o coração verdadeiro da mina, que a Guilda escondia. Quem a tem controla o Lúmen — e a Guilda perde o poder (final do jogo).
 
 ## Missão "A Chave Falsa" (ato 2)
 | Etapa | O que o jogador faz | Onde |
