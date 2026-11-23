@@ -213,8 +213,8 @@ public partial class SettingsScreen : ModalScreen
                     Changed();
                     BuildContent();
                 });
-                AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v => { d.RenderScale = v; d.DynamicResolution = false; }, v => $"{v * 100:0}%");
-                AddCheck(grid, "Resolução dinâmica (segura 120 FPS)", d.DynamicResolution, v => d.DynamicResolution = v);
+                AddSlider(grid, "Escala de resolução 3D", 0.5f, 1f, 0.05f, d.RenderScale, v => d.RenderScale = v, v => $"{v * 100:0}%");
+                AddCheck(grid, "Resolução dinâmica (baixa a escala 3D quando o FPS cai)", d.DynamicResolution, v => d.DynamicResolution = v);
                 AddOption(grid, "Suavização de bordas", new[] { "Desligada", "FXAA (leve)", "SMAA (recomendado)", "Temporal FSR 2 (máxima)" }, d.AntiAliasing, i => { d.AntiAliasing = i; Changed(); }, false);
                 var sizes = new string[Settings.WindowSizes.Length];
                 for (int i = 0; i < sizes.Length; i++) sizes[i] = $"{Settings.WindowSizes[i].X} × {Settings.WindowSizes[i].Y}";

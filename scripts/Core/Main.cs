@@ -302,7 +302,7 @@ public partial class Main : Node
         _dynTimer = 0;
         double fps = Engine.GetFramesPerSecond();
         double target = DynamicTarget(Settings.Data.MaxFps, Settings.Data.VSync ? DisplayServer.ScreenGetRefreshRate() : -1);
-        _dynScale = NextDynamicScale(_dynScale, max, fps, target);
+        _dynScale = NextDynamicScale(_dynScale, max, fps, target, Settings.Quality == GraphicsQuality.Low ? 0.5f : 0.6f);
         if (!Mathf.IsEqualApprox(vp.Scaling3DScale, _dynScale)) vp.Scaling3DScale = _dynScale;
     }
 
@@ -316,10 +316,11 @@ public partial class Main : Node
         return System.Math.Min(120.0, cap - 3);
     }
 
-    /// <summary>Próxima escala 3D: baixa 5% quando o FPS fica abaixo do alvo, sobe quando sobra folga (mínimo 60%).</summary>
-    public static float NextDynamicScale(float scale, float max, double fps, double target)
+    /// <summary>Próxima escala 3D: baixa 5% quando o FPS fica abaixo do alvo (10% se estiver muito abaixo), sobe quando sobra folga.</summary>
+    public static float NextDynamicScale(float scale, float max, double fps, double target, float min = 0.6f)
     {
-        if (fps < target - 2 && scale > 0.6f) return Mathf.Max(0.6f, scale - 0.05f);
+        if (fps < target * 0.7 && scale > min) return Mathf.Max(min, scale - 0.1f);
+        if (fps < target - 2 && scale > min) return Mathf.Max(min, scale - 0.05f);
         if (fps > target * 1.12 && scale < max) return Mathf.Min(max, scale + 0.05f);
         return scale;
     }

@@ -52,3 +52,10 @@ gl_compatibility/driver.windows="opengl3_angle"
 gl_compatibility/fallback_to_native=true
 gl_compatibility/fallback_to_angle=true
 environment/defaults/default_clear_color=Color(0.02, 0.015, 0.04, 1)
+
+[shader_globals]
+
+cave_lite={
+"type": "float",
+"value": 0.0
+}

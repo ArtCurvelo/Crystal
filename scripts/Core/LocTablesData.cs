@@ -367,6 +367,7 @@ public static partial class LocTables
         list.Add(("Ainda é dia", "It\'s still daytime", "Todavía es de día"));
         list.Add(("Alguns textos só mudam depois de reiniciar o jogo.", "Some texts only change after restarting the game.", "Algunos textos solo cambian después de reiniciar el juego."));
         list.Add(("Alta", "High", "Alta"));
+        list.Add(("Baixa", "Low", "Baja"));
         list.Add(("Analógico esq.: mover · Analógico dir.: olhar\nRT: minerar · X: interagir · A: pular · B: agachar\nLB: correr · Start: pausa · B: voltar (menus)", "Left stick: move · Right stick: look\nRT: mine · X: interact · A: jump · B: crouch\nLB: sprint · Start: pause · B: back (menus)", "Stick izq.: moverse · Stick der.: mirar\nRT: minar · X: interactuar · A: saltar · B: agacharse\nLB: correr · Start: pausa · B: volver (menús)"));
         list.Add(("Analógicos esquerdo e direito", "Left and right sticks", "Sticks izquierdo y derecho"));
         list.Add(("Andar para a direita", "Move right", "Moverse a la derecha"));
@@ -791,7 +792,8 @@ public static partial class LocTables
         list.Add(("Libera o funil: ao lado de uma esteira, puxa fragmentos soltos e despeja nela.", "Unlocks the hopper: next to a belt, it pulls in loose shards and drops them on it.", "Desbloquea la tolva: junto a una cinta, atrae fragmentos sueltos y los echa en ella."));
         list.Add(("Libera o drone: recolhe fragmentos soltos dentro da área da base dele.", "Unlocks the drone: collects loose shards within its base's area.", "Desbloquea el dron: recoge fragmentos sueltos dentro del área de su base."));
         list.Add(("Libera o robô: minera sozinho dentro da área dele, mais devagar que um goblin.", "Unlocks the robot: mines on its own within its area, slower than a goblin.", "Desbloquea el robot: mina solo dentro de su área, más lento que un goblin."));
-        list.Add(("Resolução dinâmica (segura 120 FPS)", "Dynamic resolution (holds 120 FPS)", "Resolución dinámica (mantiene 120 FPS)"));
+        list.Add(("Resolução dinâmica (baixa a escala 3D quando o FPS cai)", "Dynamic resolution (lowers 3D scale when FPS drops)", "Resolución dinámica (baja la escala 3D cuando caen los FPS)"));
+        list.Add(("{0:0} FPS · 3D {1:0}%\n{2} · {3}\nCPU {4:0.0} ms · GPU {5:0.0} ms", "{0:0} FPS · 3D {1:0}%\n{2} · {3}\nCPU {4:0.0} ms · GPU {5:0.0} ms", "{0:0} FPS · 3D {1:0}%\n{2} · {3}\nCPU {4:0.0} ms · GPU {5:0.0} ms"));
         list.Add(("Suavização de bordas", "Anti-aliasing", "Suavizado de bordes"));
         list.Add(("Desligada", "Off", "Desactivado"));
         list.Add(("FXAA (leve)", "FXAA (light)", "FXAA (ligero)"));

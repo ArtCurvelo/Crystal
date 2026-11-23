@@ -137,7 +137,7 @@ public static class Settings
         if (FirstRun && DisplayServer.GetName() != "headless") Save();
     }
 
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>
     /// Configurações de versões antigas: o padrão era VSync + limite de 60 FPS (nunca passava de 60).
@@ -157,7 +157,21 @@ public static class Settings
             // antes não havia como saber se a qualidade foi escolhida à mão; "Baixa" quase sempre é escolha do jogador
             d.QualityManual = d.Quality == (int)GraphicsQuality.Low;
         }
+        if (d.Version < 4 && WeakGpu(gpu ?? AdapterName()))
+        {
+            // GPUs integradas: resolução dinâmica de volta (mexer na escala 3D desligava) e escala máxima de 75%
+            d.DynamicResolution = true;
+            if (d.RenderScale > 0.75f) d.RenderScale = 0.75f;
+        }
         d.Version = CurrentVersion;
+    }
+
+    /// <summary>Intel HD/UHD antigas e renderização por software: começam na Baixa, com escala 3D menor.</summary>
+    public static bool WeakGpu(string gpu)
+    {
+        string g = (gpu ?? "").ToLowerInvariant();
+        return g.Contains("intel") && (g.Contains("hd graphics") || g.Contains("uhd") || g.Contains("haswell") || g.Contains("ivybridge"))
+               || g.Contains("llvmpipe") || g.Contains("swiftshader");
     }
 
     static string AdapterName()
@@ -179,8 +193,7 @@ public static class Settings
         string gpu = "";
         try { gpu = RenderingServer.GetVideoAdapterName() ?? ""; } catch { }
         string g = gpu.ToLowerInvariant();
-        bool weak = g.Contains("intel") && (g.Contains("hd graphics") || g.Contains("uhd") || g.Contains("haswell") || g.Contains("ivybridge"))
-                    || g.Contains("llvmpipe") || g.Contains("swiftshader");
+        bool weak = WeakGpu(g);
         Data.Version = CurrentVersion;
         if (weak)
         {
@@ -232,6 +245,8 @@ public static class Settings
         if (tree?.Root != null)
         {
             tree.Root.Scaling3DScale = Data.RenderScale;
+            // rocha mais leve na Baixa (shaders/cave.gdshader)
+            RenderingServer.GlobalShaderParameterSet("cave_lite", Quality == GraphicsQuality.Low ? 1f : 0f);
             tree.Root.ContentScaleFactor = Data.UiScale;
             ApplyAntiAliasing(tree.Root);
         }

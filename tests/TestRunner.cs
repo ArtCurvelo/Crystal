@@ -1235,6 +1235,13 @@ public partial class TestRunner : Node
         var weak = System.Text.Json.JsonSerializer.Deserialize<SettingsData>("{\"VSync\":true,\"MaxFps\":60,\"Quality\":1}");
         Settings.Migrate(weak, "Intel(R) UHD Graphics 620");
         Check(weak.Quality == 1 && !weak.VSync, "integrada não sobe para Alta");
+        var hd = new SettingsData { Version = 3, Quality = 0, RenderScale = 1f, DynamicResolution = false };
+        Settings.Migrate(hd, "Intel(R) HD Graphics 4400");
+        Check(hd.DynamicResolution && hd.RenderScale <= 0.75f && hd.Quality == 0, "Intel HD: volta a resolução dinâmica e escala 3D até 75%");
+        var rtx = new SettingsData { Version = 3, Quality = 2, RenderScale = 1f, DynamicResolution = false };
+        Settings.Migrate(rtx, "NVIDIA GeForce RTX 3060");
+        Check(!rtx.DynamicResolution && rtx.RenderScale == 1f, "placa forte: escolhas de resolução mantidas");
+        Check(Settings.WeakGpu("Intel(R) HD Graphics 4400") && !Settings.WeakGpu("NVIDIA GeForce RTX 3060"), "detecção de placa fraca");
         var again = new SettingsData { Version = Settings.CurrentVersion, VSync = true, MaxFps = 60 };
         Settings.Migrate(again, "NVIDIA GeForce RTX 3060");
         Check(again.VSync && again.MaxFps == 60, "migração não roda de novo");
@@ -1252,6 +1259,10 @@ public partial class TestRunner : Node
         Check(sc > 0.6f, "com folga: sobe de novo");
         Check(Mathf.IsEqualApprox(Main.NextDynamicScale(0.8f, 1f, 125, 120), 0.8f), "perto do alvo: mantém (sem oscilar)");
         Check(Mathf.IsEqualApprox(Main.NextDynamicScale(1f, 1f, 200, 120), 1f), "não passa da escala escolhida");
+        Check(Mathf.IsEqualApprox(Main.NextDynamicScale(0.75f, 0.75f, 15, 27), 0.65f), "muito abaixo do alvo (15 de 30 FPS): baixa 10% de uma vez");
+        float lo = 0.75f;
+        for (int i = 0; i < 20; i++) lo = Main.NextDynamicScale(lo, 0.75f, 15, 27, 0.5f);
+        Check(Mathf.IsEqualApprox(lo, 0.5f), "na Baixa pode descer até 50%");
     }
 
     void TestSettings()

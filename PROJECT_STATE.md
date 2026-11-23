@@ -132,7 +132,7 @@ Draw calls: R1 ~290, R2 ~240, R3 ~180. Sem vazamento em cerca de 50 min de jogo 
 
 ## Problemas pendentes
 - **FPS na RTX 3060 do irmão do diretor (Alta)**: era 85; meta 120. Otimizações da v0.22 publicadas, aguardando a medição (F3).
-- **FPS real na HD 4400 ainda não medido** (o diretor recebeu builds; aguardando o resultado).
+- **HD 4400 (notebook do diretor)**: 12–19 FPS na Baixa (v0.27/0.28). Rocha leve + resolução dinâmica até 50% na v0.29; aguardando nova medição com o F3 (mostra ms de CPU e GPU).
 
 ## Próxima ação recomendada
 Desempenho em PCs fracos (aguardando dados do diretor sobre a máquina das capturas a 12–19 FPS na Baixa) e calibrar a duração total (meta 4–6 h) (as peças da forja já preparam o capacete como proteção). Depois: continuar a história (final ao quebrar o Coração = liberdade) e calibrar a duração para 4–6 h. Aguardar o FPS real da RTX 3060.

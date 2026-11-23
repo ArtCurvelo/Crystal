@@ -41,6 +41,25 @@ public partial class Hud : CanvasLayer
         tw.TweenProperty(_damageFlash, "color:a", 0f, 0.5f);
     }
 
+    bool _measuring;
+    float _fpsTimer;
+
+    /// <summary>Contador F3: FPS, escala 3D, renderizador, qualidade e quanto o processador e a placa de vídeo levam por quadro
+    /// (diz qual dos dois segura o jogo).</summary>
+    void UpdateFpsText(float dt)
+    {
+        var rid = GetViewport().GetViewportRid();
+        if (!_measuring) { RenderingServer.ViewportSetMeasureRenderTime(rid, true); _measuring = true; }
+        if ((_fpsTimer -= dt) > 0) return;
+        _fpsTimer = 0.5f;
+        double cpu = Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000.0 + RenderingServer.ViewportGetMeasuredRenderTimeCpu(rid)
+                     + RenderingServer.GetFrameSetupTimeCpu();
+        double gpu = RenderingServer.ViewportGetMeasuredRenderTimeGpu(rid);
+        string method = Core.Rendering.RenderMethods.Current switch { Core.Rendering.RenderMethods.Compatibility => "OpenGL", Core.Rendering.RenderMethods.Mobile => "Vulkan Mobile", _ => "Vulkan Forward+" };
+        string q = Loc.T(Settings.Quality switch { GraphicsQuality.Low => "Baixa", GraphicsQuality.Medium => "Média", _ => "Alta" });
+        _fps.Text = Loc.F("{0:0} FPS · 3D {1:0}%\n{2} · {3}\nCPU {4:0.0} ms · GPU {5:0.0} ms", Engine.GetFramesPerSecond(), GetViewport().Scaling3DScale * 100, method, q, cpu, gpu);
+    }
+
     void UpdateHp()
     {
         if (Player == null || !IsInstanceValid(Player)) return;
@@ -451,6 +470,8 @@ public partial class Hud : CanvasLayer
         _fps = UiTheme.Shadowed(UiTheme.Label("", 14, UiTheme.Success));
         UiTheme.Place(_fps, Control.LayoutPreset.BottomRight, new Vector2(-170, -164), new Vector2(150, 0));
         _fps.HorizontalAlignment = HorizontalAlignment.Right;
+        _fps.Position += new Vector2(-150, -40);
+        _fps.Size = new Vector2(300, 0);
         _root.AddChild(_fps);
     }
 
@@ -772,7 +793,8 @@ public partial class Hud : CanvasLayer
         UpdateClock();
         UpdateHp();
         _fps.Visible = Settings.Data.ShowFps;
-        if (_fps.Visible) _fps.Text = Loc.F("{0:0} FPS · 3D {1:0}%", Engine.GetFramesPerSecond(), GetViewport().Scaling3DScale * 100);
+        if (_fps.Visible) UpdateFpsText(dt);
+        else if (_measuring) { RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), false); _measuring = false; }
 
         if (Player == null || !IsInstanceValid(Player)) return;
         // ressonância (só com ferramenta a laser)

@@ -523,3 +523,17 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
   - a moldura de HQ fica parada enquanto o conteúdo treme.
 - Cenários e quadros prontos importados com compressão com perda (WebP 85%): as HQs ocupam ~5 MB no jogo.
 - Tour `--shots-intro` fotografa as 3 HQs, inclusive no meio de cada transição.
+
+## Desempenho no notebook do diretor (Intel HD 4400)
+- O diretor confirmou que as capturas a 12–19 FPS na Baixa são do notebook dele (Intel HD 4400, 1366×768). Uma captura antiga mostrava "3D 100%" a 23 FPS: mexer no controle de escala 3D desligava a resolução dinâmica sem avisar.
+- **Rocha leve na Baixa** (`shaders/cave.gdshader`, uniform global `cave_lite`):
+  - 15 leituras de textura por pixel em vez de 27;
+  - uma distorção em vez de três, sem poças e sem pontinhos de mineral.
+  - Comparação A/B no ambiente de testes (alternando 2x cada): média 11,1 → 13,2 FPS (+19%), mineração +22%.
+- **Resolução dinâmica:**
+  - o controle de escala 3D agora define o máximo e não desliga mais a resolução dinâmica;
+  - na Baixa ela pode descer até 50%;
+  - muito abaixo do alvo (menos de 70%), cai 10% de uma vez.
+- **Migração das configurações (versão 4):** em GPUs Intel HD/UHD, religa a resolução dinâmica e limita a escala 3D a 75%.
+- **Contador F3** agora mostra o renderizador (Vulkan/OpenGL), a qualidade e os ms de CPU e de GPU por quadro, para saber o que segura o jogo na máquina do jogador.
+- Benchmark: `--bench-shots=DIR` salva a imagem de cada vista; `--x-nolite` desliga a rocha leve.

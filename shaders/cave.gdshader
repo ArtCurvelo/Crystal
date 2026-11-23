@@ -15,6 +15,9 @@ uniform float vertex_shade = 0.0;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform sampler2D cell_tex : filter_linear_mipmap, repeat_enable;
 
+// qualidade Baixa (GPUs integradas): 15 leituras de textura por pixel em vez de 27, sem poças e sem pontinhos
+global uniform float cave_lite;
+
 varying vec3 wpos;
 varying vec3 wnorm;
 
@@ -31,7 +34,14 @@ void fragment() {
 	vec3 w = pow(abs(wnorm), vec3(4.0));
 	w /= (w.x + w.y + w.z);
 	// distorção de domínio: quebra a grade da textura
-	vec3 p = wpos + vec3(tri(noise_tex, wpos, w, 0.011) - 0.5, tri(noise_tex, wpos.zxy, w, 0.014) - 0.5, tri(noise_tex, wpos.yzx, w, 0.009) - 0.5) * 9.0;
+	bool lite = cave_lite > 0.5;
+	vec3 p;
+	if (lite) {
+		float d = tri(noise_tex, wpos, w, 0.011) - 0.5;
+		p = wpos + vec3(d, -d * 0.8, d * 0.6) * 9.0;
+	} else {
+		p = wpos + vec3(tri(noise_tex, wpos, w, 0.011) - 0.5, tri(noise_tex, wpos.zxy, w, 0.014) - 0.5, tri(noise_tex, wpos.yzx, w, 0.009) - 0.5) * 9.0;
+	}
 	float big = tri(noise_tex, p, w, 0.019);
 	float mid = tri(noise_tex, p, w, 0.083);
 	float fine = tri(noise_tex, p, w, 0.37);
@@ -57,7 +67,7 @@ void fragment() {
 	col *= 1.0 - crack * 0.6;
 	col *= 0.88 + 0.24 * fine;
 	// poças e rocha molhada no chão: escurece e fica lisa (reflete com o SSR)
-	float wet = smoothstep(0.62, 0.7, tri(noise_tex, p * 0.6 + vec3(13.0), w, 0.05)) * up * wetness;
+	float wet = lite ? 0.0 : smoothstep(0.62, 0.7, tri(noise_tex, p * 0.6 + vec3(13.0), w, 0.05)) * up * wetness;
 	float film = smoothstep(0.45, 0.6, big) * up * wetness * 0.6;
 	col = mix(col, col * 0.55, max(wet, film * 0.5));
 	ALBEDO = col * mix(vec3(1.0), COLOR.rgb, vertex_shade);
@@ -65,7 +75,7 @@ void fragment() {
 	SPECULAR = mix(0.35, 0.6, wet);
 
 	// minerais: pontinhos raros e veios finos só em algumas manchas
-	float sp = smoothstep(0.86, 0.9, tri(noise_tex, p, w, 1.17)) * (1.0 - up * 0.8);
+	float sp = lite ? 0.0 : smoothstep(0.86, 0.9, tri(noise_tex, p, w, 1.17)) * (1.0 - up * 0.8);
 	float vein = (1.0 - smoothstep(0.0, 0.006, abs(mid - 0.5))) * smoothstep(0.72, 0.82, big);
 	float pulse = 0.8 + 0.2 * sin(TIME * 1.1 + wpos.x * 0.05 + wpos.z * 0.04);
 	EMISSION = accent * (sp * 0.55 + vein * 0.7 * pulse) * speckle;
