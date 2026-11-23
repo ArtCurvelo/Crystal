@@ -786,6 +786,13 @@ public static class GameData
                 ("eyecrystal", "Cristal-Olho", OreArchetype.Geode, Rarity.Epico, 1280000, 7200000f, "Tem uma pupila. Ela se mexe.", new Color(0.2f, 0.05f, 0.2f), new Color(1f, 0.3f, 0.6f), 0.2f),
                 ("primelumen", "Lúmen Primordial", OreArchetype.Crystal, Rarity.Lendario, 4000000, 12800000f, "Lendário: o primeiro Lúmen, mais velho que o Coração.", new Color(1f, 1f, 1f), new Color(1f, 0.85f, 1f), 0f),
             });
+        Deep("throne", "Trono de Corvo", "Profundeza Proibida 6 · onde o Mestre Corvo forja sozinho há trinta anos.",
+            new Color(0.85f, 0.3f, 0.25f), new Color(0.1f, 0.01f, 0.02f), new Color(0.2f, 0.16f, 0.17f), new Color(1f, 0.25f, 0.2f), new Color(1f, 0.3f, 0.2f), new[]
+            {
+                ("crowsteel", "Aço do Corvo", OreArchetype.Vein, Rarity.Raro, 900000, 6000000f, "O metal que o Corvo forjou com o Lúmen bruto. Escuro e quente.", new Color(0.12f, 0.1f, 0.12f), new Color(1f, 0.25f, 0.2f), 0.55f),
+                ("bloodlumen", "Lúmen Rubro", OreArchetype.Crystal, Rarity.Epico, 1600000, 9000000f, "Lúmen que bebeu raiva demais.", new Color(0.6f, 0.05f, 0.08f), new Color(1f, 0.2f, 0.25f), 0.35f),
+                ("anvilstone", "Pedra-Bigorna", OreArchetype.Banded, Rarity.Lendario, 5000000, 16000000f, "Lendário: lascas da bigorna onde o Corvo batia sem parar.", new Color(0.4f, 0.38f, 0.42f), new Color(1f, 0.6f, 0.3f), 0f),
+            });
         foreach (var rg in Regions) rg.UnlockCost = (long)Math.Round(rg.UnlockCost * Economy.RegionCost / 100.0) * 100;
 
         // posições em Z: cada região começa onde a anterior termina + túnel (a entrada do acampamento fica em z = 90)

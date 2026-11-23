@@ -14,6 +14,9 @@ public static class ChunkedMulti
     public const float Cell = 32f;
     /// <summary>Distância de desenho padrão da decoração (a névoa da caverna já esconde o que passa disso).</summary>
     public const float DefaultRange = 85f;
+    public const string RangeMeta = "base_range";
+    /// <summary>Distância de desenho por qualidade (Baixa desenha bem mais perto: menos triângulos na GPU fraca).</summary>
+    public static float RangeScale(Core.GraphicsQuality q) => q switch { Core.GraphicsQuality.Low => 0.5f, Core.GraphicsQuality.Medium => 0.8f, _ => 1f };
 
     public static void Add(Node3D root, Mesh mesh, Material mat, List<Transform3D> xforms, float lowFraction, float range = DefaultRange)
     {
@@ -42,6 +45,7 @@ public static class ChunkedMulti
                 VisibilityRangeFadeMode = GeometryInstance3D.VisibilityRangeFadeModeEnum.Disabled,
             };
             mmi.SetMeta(WorldBuilder.LowFractionMeta, lowFraction);
+            mmi.SetMeta(RangeMeta, range);
             root.AddChild(mmi);
         }
     }

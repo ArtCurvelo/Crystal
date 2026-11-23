@@ -229,6 +229,7 @@ public partial class Main : Node
         UiBus.Gate += UseGate;
         UiBus.DeepExit += ExitDeep;
         UiBus.Descend += Descend;
+        UiBus.Plant += PlantSeed;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
@@ -264,6 +265,7 @@ public partial class Main : Node
             float frac = (float)mm.GetMeta(WorldBuilder.LowFractionMeta);
             int visible = on ? -1 : Mathf.Max(1, (int)(mm.Multimesh.InstanceCount * frac));
             if (mm.Multimesh.VisibleInstanceCount != visible) mm.Multimesh.VisibleInstanceCount = visible;
+            if (mm.HasMeta(ChunkedMulti.RangeMeta)) mm.VisibilityRangeEnd = (float)mm.GetMeta(ChunkedMulti.RangeMeta) * ChunkedMulti.RangeScale(Settings.Quality);
         }
         int amount = WorldBuilder.AmbientAmount();
         foreach (var n in GetTree().GetNodesInGroup(WorldBuilder.AmbientGroup))
@@ -417,6 +419,7 @@ public partial class Main : Node
         UiBus.Gate -= UseGate;
         UiBus.DeepExit -= ExitDeep;
         UiBus.Descend -= Descend;
+        UiBus.Plant -= PlantSeed;
         UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
@@ -502,6 +505,7 @@ public partial class Main : Node
                 if (e.Def.Guardian) GameState.Instance.DefeatGuardian(e.Def.Region);
             };
             World.Enemies.DamageTakenMultiplier = () => GameState.Instance.DamageTakenMultiplier;
+            World.Enemies.Killed += e => { if (e.Def.Boss) OnBossDefeated(); };
             _shards.GroundAt = World.GroundAt;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
@@ -836,6 +840,15 @@ public partial class Main : Node
             case StoryData.OpenGate:
                 Say(StoryData.KeyReady);
                 break;
+            case StoryData.SeedFound:
+                Say(StoryData.BramSeed, () => gs.SetStory(StoryData.PlantSeed));
+                break;
+            case StoryData.PlantSeed:
+                Say(StoryData.RemindPlant);
+                break;
+            case StoryData.Freed:
+                Say(StoryData.AfterEnding);
+                break;
             default:
                 Say(StoryData.AfterGate);
                 break;
@@ -862,6 +875,50 @@ public partial class Main : Node
     }
 
     DeepTravelScreen _deepTravel;
+
+    /// <summary>Chegada à arena do Mestre Corvo: conversa e depois a luta. Corvo já derrotado não volta.</summary>
+    void CheckBoss()
+    {
+        var boss = World.Enemies?.Boss;
+        if (boss == null || Player == null || CurrentMode != Mode.Playing) return;
+        var gs = GameState.Instance;
+        if (gs.Story >= StoryData.SeedFound) { if (boss.Alive) boss.Retire(); return; }
+        if (!boss.Dormant || StoryPlaying || AnyModal() || _fading) return;
+        if (Player.GlobalPosition.DistanceTo(World.BossArena) > World.BossArenaRadius + 3f) return;
+        Hud.ShowBigMessage(Loc.T("MESTRE CORVO"));
+        Say(StoryData.CorvoIntro, () => { boss.Dormant = false; if (gs.HasWeapon) Player.SetWeaponMode(true); });
+    }
+
+    void OnBossDefeated()
+    {
+        var gs = GameState.Instance;
+        gs.SetStory(StoryData.SeedFound);
+        Hud.ShowBigMessage(Loc.T("A SEMENTE DO POVO LÚMEN"));
+        gs.Notify("Mestre Corvo derrotado!", Loc.T("Você pegou a Semente do Povo Lúmen. Leve-a ao Velho Bram, na vila."), NotifyKind.Unlock);
+        GetTree().CreateTimer(1.6f).Timeout += () => { if (CurrentMode == Mode.Playing && !StoryPlaying) Say(StoryData.CorvoDefeated); };
+    }
+
+    /// <summary>Final: planta a Semente no monumento da praça (HQ final) e a Guilda perde o poder.</summary>
+    void PlantSeed()
+    {
+        var gs = GameState.Instance;
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading || StoryPlaying || gs.Story != StoryData.PlantSeed) return;
+        BeginStory();
+        if (_flashback == null)
+        {
+            _flashback = new IntroComic { Name = "Flashback" };
+            AddChild(_flashback);
+            _flashback.Finished += () => { var t = _flashbackThen; _flashbackThen = null; t?.Invoke(); EndStory(); };
+        }
+        _flashbackThen = () =>
+        {
+            gs.SetStory(StoryData.Freed);
+            World.Town?.SeedPlanted();
+            Hud.ShowBigMessage(Loc.T("LIVRE!"));
+            gs.Notify("Fim · A mina é de quem cava", Loc.T("A Guilda caiu. Sem a taxa dela, tudo vende 25% mais caro. O jogo continua: termine a Coleção, os diários e as Profundezas."), NotifyKind.Unlock);
+        };
+        _flashback.Play("end_", StoryData.Ending);
+    }
 
     /// <summary>Passagem no fundo de uma Profundeza: só com o Guardião derrotado; leva à próxima área.</summary>
     void Descend(string regionId)
@@ -916,7 +973,7 @@ public partial class Main : Node
                 Hud.ShowBigMessage(Loc.T("O PORTÃO SE ABRIU"));
                 gs.Notify("As Profundezas Proibidas", Loc.T("Um vento frio sobe da escuridão. Seis lugares, um pior que o outro... e o Mestre Corvo no último. Forje uma arma na vila antes de descer."), NotifyKind.Unlock);
                 break;
-            case StoryData.GateOpen:
+            case >= StoryData.GateOpen:
                 // com mais de uma Profundeza aberta, escolhe o destino
                 if (GameData.Deep.Count(r => gs.IsUnlocked(r.Id)) > 1)
                 {
@@ -1138,6 +1195,7 @@ public partial class Main : Node
             return;
         }
         UpdateRegion(false);
+        CheckBoss();
         UpdateDynamicResolution((float)delta);
         UpdateAccessibilityCues((float)delta);
         _cullTimer -= (float)delta;

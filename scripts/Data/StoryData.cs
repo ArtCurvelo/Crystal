@@ -13,6 +13,10 @@ public readonly record struct Line(string Speaker, string Text);
 public static class StoryData
 {
     public const int Locked = 0, BramCalls = 1, FindGate = 2, BringMold = 3, ForgeKey = 4, OpenGate = 5, GateOpen = 6;
+    /// <summary>Ato 3: o Corvo caiu e largou a Semente · Bram mandou plantar no monumento · final (a Guilda caiu).</summary>
+    public const int SeedFound = 7, PlantSeed = 8, Freed = 9;
+    /// <summary>Venda sem a taxa da Guilda depois do final.</summary>
+    public const float FreedValueBonus = 1.25f;
     public const string KeyOre1 = "meteorite", KeyOre2 = "diamond";
     public const int KeyOre1Amount = 30, KeyOre2Amount = 12;
     public static readonly long KeyFee = 250_000;
@@ -88,5 +92,50 @@ public static class StoryData
         new("bram", "Prepara as ferramentas, garoto. E que o Povo Lúmen te guarde."),
     };
 
-    public static string SpeakerName(string id) => Core.Loc.T(id == "bram" ? "Velho Bram" : "Você");
+    public static readonly Line[] CorvoIntro =
+    {
+        new("corvo", "Mais um escravo da Guilda. Trinta anos e eles ainda mandam crianças para o meu trono."),
+        new("hero", "Mestre Corvo... o Velho Bram mandou lembranças."),
+        new("corvo", "Bram! Aquele covarde ainda respira? Eu lhe dei a chance de ver a verdade e ele deixou um olho no caminho."),
+        new("corvo", "O Lúmen me mostrou tudo: a Guilda nunca liberta ninguém. Então eu fiquei com o poder deles. A Semente é minha!"),
+        new("hero", "A Semente não é de ninguém. Vim buscá-la."),
+        new("corvo", "Então venha. Vou te ensinar como um ferreiro de verdade bate."),
+    };
+
+    public static readonly Line[] CorvoDefeated =
+    {
+        new("corvo", "O Lúmen... me prometeu que eu seria livre..."),
+        new("corvo", "Leve a Semente, garoto. Ela não é poder. Ela é a vida da mina inteira. A Guilda vive dela como um parasita."),
+        new("corvo", "Faça o que eu não tive coragem de fazer... devolva ela para o povo. E diga ao Bram... que eu sinto muito."),
+    };
+
+    public static readonly Line[] BramSeed =
+    {
+        new("bram", "Essa luz... é a Semente do Povo Lúmen. Eu nunca achei que veria isso antes de morrer."),
+        new("hero", "O Corvo morreu. Antes, pediu desculpas para você."),
+        new("bram", "... Trinta anos esperando por isso, e agora não sei o que sentir."),
+        new("bram", "Escuta. Se a Semente voltar para onde o Povo Lúmen a plantou, o Lúmen volta a ser de todo mundo. A Guilda perde tudo."),
+        new("bram", "O monumento de cristal da praça foi construído em cima do lugar sagrado deles. Planta ela lá. Na frente de todo mundo."),
+    };
+
+    public static readonly Line[] RemindPlant =
+    {
+        new("bram", "O monumento de cristal, no meio da praça. Planta a Semente lá. O que você está esperando?"),
+    };
+
+    public static readonly Line[] AfterEnding =
+    {
+        new("bram", "Olha essa vila. Ninguém mais deve nada a ninguém. Até o ferreiro está cantando."),
+        new("bram", "Continua cavando se quiser, garoto. Mas agora cada Lúmen que você tirar é seu."),
+    };
+
+    public static readonly string[] Ending =
+    {
+        "O Mestre Corvo caiu. E com ele, a última coisa que prendia a Semente do Povo Lúmen às mãos de um homem.",
+        "Na praça da vila, na frente de todos, a Semente voltou para o lugar de onde nunca deveria ter saído.",
+        "A luz correu pelas raízes de cristal até cada canto da mina. As correntes se partiram. Os livros de dívida viraram pó.",
+        "A Guilda dos Ferreiros perdeu tudo o que nunca foi dela. A mina agora é de quem cava. E eu, pela primeira vez, sou livre.",
+    };
+
+    public static string SpeakerName(string id) => Core.Loc.T(id switch { "bram" => "Velho Bram", "corvo" => "Mestre Corvo", _ => "Você" });
 }

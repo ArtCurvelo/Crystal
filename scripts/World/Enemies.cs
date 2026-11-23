@@ -26,6 +26,13 @@ public partial class Enemy : CharacterBody3D
     public EnemyManager Manager;
     /// <summary>Filhote (divisão de um Lúmen Vivo): não renasce, some depois de morto.</summary>
     public bool Temporary;
+    /// <summary>Chefão parado até a conversa de chegada terminar.</summary>
+    public bool Dormant;
+    int _attack;
+    float _summonCd;
+    /// <summary>Fase do chefão: 1 (cheio), 2 (abaixo de 2/3), 3 (abaixo de 1/3, enfurecido).</summary>
+    public int Phase => Hp > Def.Hp * 0.66f ? 1 : Hp > Def.Hp * 0.33f ? 2 : 3;
+    float Fury => Def.Boss ? (Phase == 3 ? 1.35f : Phase == 2 ? 1.15f : 1f) : 1f;
 
     Node3D _body, _armL, _armR, _head;
     readonly List<Node3D> _legs = new();
@@ -46,8 +53,8 @@ public partial class Enemy : CharacterBody3D
         CollisionMask = PlayerController.WorldLayer;
         FloorMaxAngle = Mathf.DegToRad(50);
         bool low = def.Kind is EnemyKind.Crawler or EnemyKind.Blob;
-        float h = def.Kind switch { EnemyKind.Crawler => 0.9f, EnemyKind.Blob => 1.1f, EnemyKind.Ember or EnemyKind.Eye => 1.0f, EnemyKind.Root => 2.6f, EnemyKind.Spitter => 1.6f, EnemyKind.Chained or EnemyKind.Overseer => 1.8f, _ => 2.2f } * def.Scale;
-        float r = def.Kind switch { EnemyKind.Crawler => 0.45f, EnemyKind.Ember or EnemyKind.Eye => 0.45f, EnemyKind.Chained or EnemyKind.Overseer => 0.35f, _ => 0.6f } * (low ? def.Scale : def.Scale);
+        float h = def.Kind switch { EnemyKind.Crawler => 0.9f, EnemyKind.Blob => 1.1f, EnemyKind.Ember or EnemyKind.Eye => 1.0f, EnemyKind.Root => 2.6f, EnemyKind.Spitter => 1.6f, EnemyKind.Chained or EnemyKind.Overseer or EnemyKind.Corvo => 1.8f, _ => 2.2f } * def.Scale;
+        float r = def.Kind switch { EnemyKind.Crawler => 0.45f, EnemyKind.Ember or EnemyKind.Eye => 0.45f, EnemyKind.Chained or EnemyKind.Overseer or EnemyKind.Corvo => 0.35f, _ => 0.6f } * (low ? def.Scale : def.Scale);
         var shape = low && def.Kind == EnemyKind.Crawler ? (Shape3D)new CapsuleShape3D { Radius = 0.45f * def.Scale, Height = 0.9f * def.Scale } : new CapsuleShape3D { Radius = r, Height = Mathf.Max(h, r * 2.1f) };
         AddChild(new CollisionShape3D { Shape = shape, Position = new Vector3(0, def.Flying ? 0f : (def.Kind == EnemyKind.Crawler ? 0.45f * def.Scale : Mathf.Max(h, r * 2.1f) / 2f), 0), Rotation = def.Kind == EnemyKind.Crawler ? new Vector3(0, 0, Mathf.Pi / 2) : Vector3.Zero });
         if (def.Flying) MotionMode = MotionModeEnum.Floating;
@@ -169,7 +176,7 @@ public partial class Enemy : CharacterBody3D
     float CrownHeight() => (Def.Kind switch
     {
         EnemyKind.Crawler => 1.0f, EnemyKind.Blob => 1.2f, EnemyKind.Ember => 0.6f, EnemyKind.Eye => 0.8f, EnemyKind.Root => 2.9f, EnemyKind.Spitter => 1.8f,
-        EnemyKind.Chained => 2.0f, EnemyKind.Overseer => 2.1f, _ => 2.6f,
+        EnemyKind.Chained => 2.0f, EnemyKind.Overseer or EnemyKind.Corvo => 2.1f, _ => 2.6f,
     }) * Def.Scale;
 
     Humanoid _human;
@@ -268,6 +275,32 @@ public partial class Enemy : CharacterBody3D
                 }
                 break;
             }
+            case EnemyKind.Corvo:
+            {
+                // o ferreiro corrompido: pele cinza-avermelhada rachada de brasa, barba preta, cristais nas costas, martelo enorme
+                var look = new Look
+                {
+                    Skin = new Color(0.45f, 0.32f, 0.3f), Shirt = new Color(0.12f, 0.1f, 0.12f), Pants = new Color(0.1f, 0.08f, 0.09f), Shoes = new Color(0.06f, 0.05f, 0.05f),
+                    Hair = new Color(0.05f, 0.04f, 0.05f), Accent = new Color(0.08f, 0.06f, 0.07f), HairStyle = 3, Beard = true, Apron = true, Hat = 3, Width = 1.25f,
+                };
+                _human = new Humanoid(look, 666) { Mode = Humanoid.Pose.Idle };
+                _body.AddChild(_human);
+                foreach (int sx in new[] { -1, 1 })
+                    Part(_body, new SphereMesh { Radius = 0.03f, Height = 0.06f }, eyeMat, new Vector3(sx * 0.05f, 1.72f, 0.13f));
+                for (int i = 0; i < 9; i++)
+                    Part(_body, new BoxMesh { Size = new Vector3(0.015f, 0.18f + (i % 3) * 0.06f, 0.01f) }, _glowMat, new Vector3(-0.16f + i * 0.04f, 1.15f + (i % 2) * 0.12f, 0.17f), new Vector3(0, 0, (i % 3 - 1) * 0.6f));
+                for (int i = 0; i < 7; i++)
+                    Part(_body, MeshFactory.CrystalPrism(5, 1, 1, 0.25f), _glowMat, new Vector3(-0.18f + i * 0.06f, 1.3f + (i % 2) * 0.1f, -0.15f), new Vector3(-0.7f, 0, (i - 3) * 0.2f), new Vector3(0.04f, 0.2f + (i % 3) * 0.08f, 0.04f));
+                // martelo: cabo comprido e cabeça de Pedra-Bigorna em brasa
+                var hammer = new Node3D();
+                _human.Hold(hammer);
+                var dark = new StandardMaterial3D { AlbedoColor = new Color(0.15f, 0.12f, 0.12f), Roughness = 0.5f, Metallic = 0.4f };
+                hammer.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.02f, BottomRadius = 0.025f, Height = 0.8f, RadialSegments = 6 }, MaterialOverride = dark, Position = new Vector3(0, -0.1f, 0.3f), Rotation = new Vector3(Mathf.Pi / 2, 0, 0) });
+                hammer.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.32f, 0.2f, 0.2f) }, MaterialOverride = dark, Position = new Vector3(0, -0.1f, 0.72f) });
+                hammer.AddChild(new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(0.34f, 0.04f, 0.22f) }, MaterialOverride = _glowMat, Position = new Vector3(0, -0.1f, 0.72f) });
+                _body.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.3f, 0.2f), LightEnergy = 0.7f, OmniRange = 4f, Position = new Vector3(0, 2.3f, -0.5f) });
+                break;
+            }
             case EnemyKind.Blob:
             {
                 // gota de Lúmen gelatinosa com núcleo e bolhas
@@ -327,7 +360,7 @@ public partial class Enemy : CharacterBody3D
         Hp = 0;
         Visible = false;
         CollisionLayer = 0;
-        _respawn = 150f;
+        _respawn = Def.Boss ? float.MaxValue : 150f;
         Effects.Instance?.Burst(GlobalPosition + Vector3.Up * 0.6f * Def.Scale, _glowMat.AlbedoColor, 1.4f * Def.Scale);
         Audio.AudioManager.Instance?.Play("break", -2f, 0.8f, 0.1f);
         var drop = GameData.Mat(Def.Drop);
@@ -342,6 +375,16 @@ public partial class Enemy : CharacterBody3D
             }
         Manager?.OnKilled(this);
         if (Temporary) QueueFree();
+    }
+
+    /// <summary>Chefão já derrotado em outra sessão: some sem largar nada.</summary>
+    public void Retire()
+    {
+        Mode = State.Dead;
+        Hp = 0;
+        Visible = false;
+        CollisionLayer = 0;
+        _respawn = float.MaxValue;
     }
 
     void Respawn()
@@ -386,8 +429,10 @@ public partial class Enemy : CharacterBody3D
         Vector3 want = Vector3.Zero;
         var toP = player != null ? player.GlobalPosition - GlobalPosition : Vector3.Zero;
         toP.Y = 0;
-        bool sees = player != null && player.Hp > 0 && pd < Def.Aggro && Manager.CanSee(this, player);
+        bool sees = player != null && player.Hp > 0 && pd < Def.Aggro && Manager.CanSee(this, player) && !Dormant;
         float home = GlobalPosition.DistanceTo(Home);
+        if (Def.Boss) home = Mathf.Min(home, 20f); // o chefão não desiste da arena (só se o jogador sair dela)
+        if (_summonCd > 0) _summonCd -= dt;
         switch (Mode)
         {
             case State.Idle:
@@ -400,12 +445,13 @@ public partial class Enemy : CharacterBody3D
                 break;
             case State.Chase:
                 if (home > 30f || !sees && pd > Def.Aggro * 1.6f) { Mode = State.Idle; _wander = Home; Hp = Mathf.Min(Def.Hp, Hp + Def.Hp * 0.5f); break; }
-                if (toP.Length() <= Def.Range && (Def.Projectile <= 0 || sees)) { Mode = State.Windup; _timer = Def.Windup; break; }
-                if (!Def.Stationary) want = toP.Normalized() * Def.Speed;
+                if (Def.Boss && sees && BossRanged(toP.Length())) { Mode = State.Windup; _timer = Def.Windup / Fury; break; }
+                if (toP.Length() <= Def.Range && (Def.Projectile <= 0 || sees)) { Mode = State.Windup; _timer = Def.Windup / Fury; break; }
+                if (!Def.Stationary) want = toP.Normalized() * Def.Speed * Fury;
                 break;
             case State.Windup:
                 _timer -= dt;
-                if (_timer <= 0) { Strike(player); if (Mode == State.Dead) return; Mode = State.Recover; _timer = Def.Cooldown; }
+                if (_timer <= 0) { Strike(player); if (Mode == State.Dead) return; Mode = State.Recover; _timer = Def.Cooldown / Fury; }
                 break;
             case State.Recover:
                 _timer -= dt;
@@ -436,9 +482,48 @@ public partial class Enemy : CharacterBody3D
         Animate(dt, new Vector2(vel.X, vel.Z).Length());
     }
 
+    /// <summary>Ataque à distância do chefão: rajada em leque (todas as fases) e crias (fase 2+), alternando.</summary>
+    bool BossRanged(float dist)
+    {
+        if (dist <= Def.Range) { _attack = 0; return false; }
+        if (dist > 22f) return false;
+        _attack = Phase >= 2 && _summonCd <= 0 ? 2 : 1;
+        return true;
+    }
+
     void Strike(PlayerController player)
     {
         if (player == null || player.Hp <= 0) return;
+        if (Def.Boss && _attack == 1)
+        {
+            // rajada: 5 raios em leque (7 enfurecido)
+            int n = Phase == 3 ? 7 : 5;
+            var from = GlobalPosition + Vector3.Up * 2.6f;
+            var dir = (player.GlobalPosition + Vector3.Up * 1.1f - from).Normalized();
+            for (int i = 0; i < n; i++)
+            {
+                float a = (i - (n - 1) / 2f) * 0.16f;
+                var fd = dir.Rotated(Vector3.Up, a);
+                Manager?.Fire(from, from + fd * 20f, 15f, Def.Damage * 0.5f * (Manager?.DamageTakenMultiplier?.Invoke() ?? 1f), new Color(1f, 0.25f, 0.2f));
+            }
+            Audio.AudioManager.Instance?.Play("swing", -2f, 0.6f, 0.05f);
+            _attack = 0;
+            return;
+        }
+        if (Def.Boss && _attack == 2)
+        {
+            // chama crias de Lúmen em volta
+            if (EnemyData.Of("crowling") is { } cr)
+                for (int i = 0; i < 3; i++)
+                {
+                    float a = Rotation.Y + (i - 1) * 1.2f;
+                    Manager?.SpawnTemporary(cr, GlobalPosition + new Vector3(Mathf.Sin(a), 0.4f, Mathf.Cos(a)) * 3f);
+                }
+            Effects.Instance?.Burst(GlobalPosition + Vector3.Up * 2f, new Color(1f, 0.3f, 0.25f), 3f);
+            _summonCd = 14f;
+            _attack = 0;
+            return;
+        }
         if (Def.Projectile > 0)
         {
             // farpa / raio: vai até onde o jogador estava (dá para desviar andando de lado)
@@ -500,6 +585,7 @@ public partial class Enemy : CharacterBody3D
                 _head.Scale = Vector3.One * (1f + (windup ? k * 0.4f : 0f));
                 _body.Position = new Vector3(0, windup ? -0.1f * k : 0f, 0);
                 return;
+            case EnemyKind.Corvo:
             case EnemyKind.Chained:
             case EnemyKind.Overseer:
                 _human.WalkSpeed = Mathf.Max(0.6f, speed * 0.8f);
@@ -533,6 +619,10 @@ public partial class Enemy : CharacterBody3D
 public partial class EnemyManager : Node3D
 {
     public readonly List<Enemy> Enemies = new();
+    /// <summary>O Mestre Corvo (null se a área ainda não existe).</summary>
+    public Enemy Boss => Enemies.Find(e => e.Def.Boss);
+    /// <summary>Luta em andamento: barra do chefão no topo da tela.</summary>
+    public bool BossEngaged => Boss is { } b && b.Alive && !b.Dormant && b.Mode != Enemy.State.Idle && b.Visible && b.IsVisibleInTree();
     public PlayerController Player;
     public Action<MaterialDef, Vector3, int> SpawnShards;
     public Func<float> DamageTakenMultiplier;

@@ -306,6 +306,8 @@ public partial class WorldBuilder : Node3D
     /// perto da entrada ficam livres (o jogador chega com calma). Posições só pela geometria (sem gerador).
     /// </summary>
     public readonly List<DeepDescent> DeepDescents = new();
+    public Vector3 BossArena;
+    public float BossArenaRadius;
 
     void SpawnEnemies(RegionDef r, CaveLayout L)
     {
@@ -341,7 +343,17 @@ public partial class WorldBuilder : Node3D
                 Enemies.Spawn(heavy, L.OnGround(p.X, p.Y, 0.3f), 7000 + seed);
             seed++;
         }
-        if (deepest != null)
+        var boss = EnemyData.All.FirstOrDefault(e => e.Boss && e.Region == r.Id);
+        if (deepest != null && boss != null)
+        {
+            // Trono de Corvo: o chefão espera no salão mais fundo (dorme até a conversa de chegada)
+            var bc = deepest.Center;
+            var b = Enemies.Spawn(boss, L.OnGround(bc.X, bc.Y, 0.3f), 666);
+            b.Dormant = true;
+            BossArena = L.OnGround(bc.X, bc.Y);
+            BossArenaRadius = deepest.Radius;
+        }
+        else if (deepest != null)
         {
             var g = EnemyData.GuardianOf(r.Id);
             var gc = deepest.Center;

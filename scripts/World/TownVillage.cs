@@ -43,6 +43,9 @@ public partial class Town
         foreach (var (x, z) in new[] { (-9.5f, 18f), (2.0f, 21.5f), (13.5f, 16f), (-20f, 2f), (-21f, -6f), (20.5f, 6.5f), (21f, -4f), (-10.5f, -21f), (6.5f, -19.5f), (-19.5f, 13.5f), (0.5f, -22.5f) })
             Tree(c + new Vector3(x, 0, z), rng);
         BramShack(c + new Vector3(-6.2f, 0, -18.6f));
+        Altar = new SeedAltar { Name = "SeedAltar", Position = c };
+        AddChild(Altar);
+        BuildSeedGlow(c);
         Bunting(c);
         Flowers(c, rng);
         Grass(c, rng);
@@ -182,6 +185,36 @@ public partial class Town
     }
 
     public BramNpc Bram;
+    public SeedAltar Altar;
+    Node3D _seedGlow;
+
+    /// <summary>Depois do final: a Semente brota no monumento (raiz dourada, feixe de luz e vagalumes de Lúmen).</summary>
+    void BuildSeedGlow(Vector3 c)
+    {
+        _seedGlow = new Node3D { Name = "SeedGlow", Visible = (GameState.Instance?.Data.StoryStage ?? 0) >= StoryData.Freed };
+        AddChild(_seedGlow);
+        var gold = Glow(new Color(1f, 0.85f, 0.45f), 2.2f);
+        var green = Glow(new Color(0.6f, 1f, 0.6f), 1.8f);
+        _seedGlow.AddChild(new MeshInstance3D { Mesh = new SphereMesh { Radius = 0.45f, Height = 0.9f }, MaterialOverride = gold, Position = c + new Vector3(0, 3.4f, 0) });
+        for (int i = 0; i < 6; i++)
+        {
+            float a = Mathf.Tau * i / 6f;
+            _seedGlow.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.09f, Height = 4.5f, RadialSegments = 6 }, MaterialOverride = green,
+                Position = c + new Vector3(Mathf.Cos(a) * 3f, 0.1f, Mathf.Sin(a) * 3f), Rotation = new Vector3(Mathf.Sin(a) * 1.5f, 0, -Mathf.Cos(a) * 1.5f) });
+        }
+        var beam = new StandardMaterial3D { AlbedoColor = new Color(1f, 0.9f, 0.6f, 0.18f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        _seedGlow.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 1.4f, BottomRadius = 0.6f, Height = 40f, RadialSegments = 16 }, MaterialOverride = beam, Position = c + new Vector3(0, 22f, 0) });
+        _seedGlow.AddChild(new OmniLight3D { LightColor = new Color(1f, 0.9f, 0.6f), LightEnergy = 2.2f, OmniRange = 16f, Position = c + new Vector3(0, 4f, 0) });
+        var fade = new Gradient(); fade.SetColor(0, new Color(1f, 0.95f, 0.6f, 1f)); fade.SetColor(1, new Color(0.6f, 1f, 0.6f, 0f));
+        _seedGlow.AddChild(new CpuParticles3D
+        {
+            Amount = 40, Lifetime = 5f, Mesh = new SphereMesh { Radius = 0.05f, Height = 0.1f, RadialSegments = 6, Rings = 3 }, Direction = Vector3.Up, Spread = 60, Gravity = new Vector3(0, 0.25f, 0),
+            InitialVelocityMin = 0.3f, InitialVelocityMax = 0.9f, ColorRamp = fade, Position = c + new Vector3(0, 1.5f, 0), EmissionShape = CpuParticles3D.EmissionShapeEnum.Sphere, EmissionSphereRadius = 6f,
+            MaterialOverride = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, Transparency = BaseMaterial3D.TransparencyEnum.Alpha },
+        });
+    }
+
+    public void SeedPlanted() { if (_seedGlow != null) _seedGlow.Visible = true; }
 
     /// <summary>Barraco torto do Velho Bram atrás da oficina do ferreiro (frente para o sul).</summary>
     void BramShack(Vector3 p)
@@ -515,10 +548,24 @@ public partial class BramNpc : StationBase
         return st switch
         {
             StoryData.Locked => Loc.F("{0} Falar com o velho", InputHints.Interact),
-            StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate => Loc.F("{0} Velho Bram (quer falar com você!)", InputHints.Interact),
+            StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate or StoryData.SeedFound => Loc.F("{0} Velho Bram (quer falar com você!)", InputHints.Interact),
             _ => Loc.F("{0} Falar com o Velho Bram", InputHints.Interact),
         };
     }
 
     public override void Interact(PlayerController player) => UiBus.RequestTalk("bram");
+}
+
+/// <summary>Monumento de cristal da praça: no final, é onde a Semente do Povo Lúmen volta para a terra.</summary>
+public partial class SeedAltar : StationBase
+{
+    public override void _Ready() => SetupBody(new Vector3(2.6f, 2.6f, 2.6f));
+
+    public override string GetPrompt()
+    {
+        int st = GameState.Instance?.Story ?? 0;
+        return st == StoryData.PlantSeed ? Loc.F("{0} Plantar a Semente do Povo Lúmen", InputHints.Interact) : "";
+    }
+
+    public override void Interact(PlayerController player) => UiBus.RequestPlant();
 }

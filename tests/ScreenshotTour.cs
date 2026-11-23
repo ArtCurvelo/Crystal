@@ -307,6 +307,63 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-boss"))
+        {
+            foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
+            gs.Data.Discovered.Add("heart"); gs.Data.GameCompleted = true;
+            gs.Data.StoryStage = CrystalExcavator.Data.StoryData.GateOpen;
+            gs.Data.WeaponKind = 1; gs.Data.WeaponOres = new() { "primelumen", "eyecrystal", "freedomstone" };
+            gs.Data.ArmorOres = new() { "primelumen", "eyecrystal", "freedomstone", "seedglass", "phoenixite" };
+            gs.RaiseAll();
+            await Wait(0.5f);
+            Main.CloseAllForTour();
+            var arena = Main.World.BossArena;
+            var boss = Main.World.Enemies.Boss;
+            var L = Main.World.LayoutAt(arena);
+            Vector3 stand = arena;
+            for (int k = 0; k < 16; k++)
+            {
+                float a2 = k * Mathf.Tau / 16f;
+                var q = arena + new Vector3(Mathf.Cos(a2), 0, Mathf.Sin(a2)) * (Main.World.BossArenaRadius * 0.55f);
+                if (L.WallDist(q.X, q.Z) < -2f && L.Reachable(q.X, q.Z)) { stand = L.OnGround(q.X, q.Z, 0.1f); break; }
+            }
+            LookAtPoint(p, stand, boss.GlobalPosition + Vector3.Up * 3.5f);
+            await Wait(2.5f);
+            await Shot("45_boss_intro");
+            var dlg = Main.GetChildren().OfType<CrystalExcavator.UI.DialogueScreen>().FirstOrDefault();
+            for (int k = 0; k < 20 && dlg != null && dlg.IsPlaying; k++) { dlg.Advance(); await Wait(0.1f); }
+            await Wait(2.5f);
+            LookAtPoint(p, p.GlobalPosition, boss.GlobalPosition + Vector3.Up * 3.5f);
+            p.InputEnabled = false;
+            await Wait(0.3f);
+            await Shot("45_boss_fight");
+            boss.TakeHit(boss.Def.Hp * 0.75f, p.GlobalPosition, 0);
+            await Wait(1.8f);
+            LookAtPoint(p, p.GlobalPosition, boss.GlobalPosition + Vector3.Up * 3.5f);
+            await Wait(0.3f);
+            await Shot("45_boss_enraged");
+            boss.TakeHit(1e12f, p.GlobalPosition, 0);
+            await Wait(2.5f);
+            await Shot("45_boss_defeated");
+            for (int k = 0; k < 20 && dlg != null && dlg.IsPlaying; k++) { dlg.Advance(); await Wait(0.1f); }
+            gs.SetStory(CrystalExcavator.Data.StoryData.PlantSeed);
+            p.GlobalPosition = Main.World.Town.ArrivePoint;
+            await Wait(1f);
+            UiBus.RequestPlant();
+            await Wait(1.2f);
+            var fb = Main.GetChildren().OfType<CrystalExcavator.UI.IntroComic>().FirstOrDefault(c => c.Name == "Flashback");
+            fb?.Advance();
+            await Wait(0.4f);
+            await Shot("45_ending_comic");
+            fb?.Skip();
+            await Wait(1.5f);
+            LookAtPoint(p, CrystalExcavator.World.Town.PlazaCenter + new Vector3(9f, 0.1f, 6f), CrystalExcavator.World.Town.PlazaCenter + Vector3.Up * 6f);
+            await Wait(1.5f);
+            await Shot("45_seed_planted");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-deep"))
         {
             foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);

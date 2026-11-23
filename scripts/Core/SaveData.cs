@@ -100,7 +100,7 @@ public sealed class SaveData
         Contracts.RemoveAll(c => c == null || GameData.Mat(c.Mat) == null || c.Amount <= 0 || c.Reward < 0);
         if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
         Gear ??= new();
-        StoryStage = System.Math.Clamp(StoryStage, 0, StoryData.GateOpen);
+        StoryStage = System.Math.Clamp(StoryStage, 0, StoryData.Freed);
         WeaponOres ??= new();
         ArmorOres ??= new();
         if (Weapon >= 0 && Weapon < WeaponData.LegacyRecipes.Length && WeaponOres.Count == 0)

@@ -124,7 +124,7 @@ public partial class TestRunner : Node
                 Check(!GS.TryForgeKey(), "não forja duas chaves");
                 var j = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
                 j.StoryStage = 99; j.Sanitize();
-                Check(j.StoryStage == StoryData.GateOpen, "etapa da história fica no save (saneada)");
+                Check(j.StoryStage == StoryData.Freed, "etapa da história fica no save (saneada)");
                 GS.Data.GameCompleted = true; GS.Data.RunEarned = 50_000_000;
                 if (GS.CanPrestige) GS.Prestige();
                 Check(GS.Data.StoryStage == StoryData.OpenGate, "a história continua depois do renascimento");
@@ -175,7 +175,8 @@ public partial class TestRunner : Node
                 Check(GS.TryForgeArmor(a) && GS.DamageTakenMultiplier < 1f && PlayerController.MaxHp > 100f, "armadura diminui o dano e aumenta a vida");
                 Check(GameData.Regions.Count == GameData.MineRegions + GameData.Deep.Count() && GameData.Deep.All(r => r.Deep && r.Spawns.All(sp => GameData.Mat(sp.MaterialId) != null)), "Profundezas com minérios válidos");
                 Check(EnemyData.All.All(e => GameData.Mat(e.Drop) != null && GameData.Regions.Any(r => r.Id == e.Region && r.Deep)), "inimigos largam minérios existentes e moram nas Profundezas");
-                Check(GameData.Deep.All(r => EnemyData.GuardianOf(r.Id) != null), "cada Profundeza tem Guardião");
+                Check(GameData.Deep.Where(r => r.Id != "throne").All(r => EnemyData.GuardianOf(r.Id) != null), "cada Profundeza tem Guardião (menos o Trono)");
+                Check(EnemyData.All.Count(e => e.Boss) == 1 && EnemyData.Of("corvo").Region == "throne", "o Mestre Corvo é o único chefão e mora no Trono");
                 Check(GS.NextLockedRegion() == null || !GS.NextLockedRegion().Deep, "Profundezas não aparecem como próxima região a comprar");
                 // save: combinação guardada; save antigo (receita fixa) é convertido
                 var j = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
@@ -189,6 +190,32 @@ public partial class TestRunner : Node
                 GS.Data.GameCompleted = true; GS.Data.RunEarned = 50_000_000; GS.Data.Discovered.Add("heart");
                 if (GS.CanPrestige) GS.Prestige();
                 Check(!GS.HasWeapon && GS.CurrentArmor == null && GS.GuardianDefeated("forgotten"), "ao renascer arma e armadura ficam para trás; passagens continuam abertas");
+                Fresh();
+            });
+            Run("História: o final com a Semente do Povo Lúmen", () =>
+            {
+                Fresh(); GS.NewGame();
+                GS.Data.StoryStage = StoryData.GateOpen;
+                float v = GS.ValueMultiplier;
+                GS.SetStory(StoryData.SeedFound);
+                Check(GS.Story == StoryData.SeedFound, "derrotar o Corvo leva à etapa da Semente");
+                GS.SetStory(StoryData.PlantSeed);
+                var altar = new SeedAltar();
+                Check(altar.GetPrompt().Contains("Semente"), "monumento da praça oferece plantar a Semente");
+                GS.SetStory(StoryData.Freed);
+                Check(altar.GetPrompt() == "", "depois do final o monumento não pede mais nada");
+                Check(Math.Abs(GS.ValueMultiplier - v * StoryData.FreedValueBonus) < 0.001f, "livre da Guilda: venda +25%");
+                altar.Free();
+                bool ok = true;
+                foreach (var set in new[] { StoryData.CorvoIntro, StoryData.CorvoDefeated, StoryData.BramSeed, StoryData.RemindPlant, StoryData.AfterEnding })
+                    foreach (var l in set)
+                        if (!LocTables.En.ContainsKey(l.Text) || !ResourceLoader.Exists($"res://assets/story/portrait_{l.Speaker}.png")) { ok = false; GD.Print($"      fala sem tradução/retrato: {l.Text}"); }
+                foreach (var t in StoryData.Ending) if (!LocTables.En.ContainsKey(t)) ok = false;
+                for (int i = 1; i <= StoryData.Ending.Length; i++) if (!ResourceLoader.Exists($"res://assets/story/end_{i}.png")) ok = false;
+                Check(ok, "falas do Corvo e do final traduzidas, com retratos e HQ final");
+                var j = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
+                j.Sanitize();
+                Check(j.StoryStage == StoryData.Freed, "final fica no save");
                 Fresh();
             });
             Run("Forja: equipamentos e conserto", () =>
@@ -1671,12 +1698,27 @@ public partial class TestRunner : Node
         Check(shards.GetChildCount() > before || GS.InventoryCount > 0, "inimigo morto larga fragmentos");
         Check(!world.Enemies.Enemies.Where(e => e != crawler).Any(e => e.Hp < e.Def.Hp && e.GlobalPosition.DistanceTo(player.GlobalPosition) > 8f), "golpe não acerta inimigos longe");
         // todas as Profundezas: inimigos, Guardião no salão mais fundo e passagem
-        Check(world.DeepDescents.Count == GameData.Deep.Count(), "cada Profundeza tem uma passagem no fundo");
+        Check(world.DeepDescents.Count == GameData.Deep.Count() - 1, "cada Profundeza (menos o Trono) tem uma passagem no fundo");
         foreach (var r in GameData.Deep)
         {
             var mine = world.Enemies.Enemies.Where(e => WorldBuilder.RegionAt(e.Home) == r).ToList();
-            Check(mine.Count >= 8 && mine.Count(e => e.Def.Guardian) == 1, $"{r.NamePt}: {mine.Count} inimigos e 1 Guardião");
+            if (r.Id == "throne") Check(mine.Count >= 6 && mine.Count(e => e.Def.Boss) == 1 && mine.First(e => e.Def.Boss).Dormant, $"Trono de Corvo: {mine.Count} inimigos e o Mestre Corvo dormindo na arena");
+            else Check(mine.Count >= 8 && mine.Count(e => e.Def.Guardian) == 1, $"{r.NamePt}: {mine.Count} inimigos e 1 Guardião");
         }
+        // o chefão: acorda, troca de fase com a vida, chama crias e não renasce
+        var boss = world.Enemies.Boss;
+        Check(boss != null && !world.Enemies.BossEngaged, "Mestre Corvo começa fora de luta");
+        Check(world.BossArena.DistanceTo(boss.Home) < 1f && world.BossArenaRadius > 6f, "arena do chefão marcada no salão mais fundo");
+        boss.TakeHit(boss.Def.Hp * 0.4f, boss.GlobalPosition + Vector3.Forward * 3f, 0);
+        Check(boss.Phase == 2, "abaixo de 2/3 da vida: fase 2");
+        boss.TakeHit(boss.Def.Hp * 0.3f, boss.GlobalPosition + Vector3.Forward * 3f, 0);
+        Check(boss.Phase == 3, "abaixo de 1/3: enfurecido (fase 3)");
+        bool bossKilled = false; void OnBossKill(Enemy e) { if (e.Def.Boss) bossKilled = true; }
+        world.Enemies.Killed += OnBossKill;
+        boss.TakeHit(1e12f, boss.GlobalPosition + Vector3.Forward * 3f, 0);
+        world.Enemies.Killed -= OnBossKill;
+        await Frames(3);
+        Check(bossKilled && !boss.Alive, "derrotar o Mestre Corvo avisa o jogo (Semente)");
         // comportamentos especiais (perto do jogador)
         var near = player.GlobalPosition + player.GlobalTransform.Basis.Z * -3f;
         var blob = world.Enemies.Spawn(EnemyData.Of("blob"), near, 1);

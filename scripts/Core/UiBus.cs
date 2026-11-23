@@ -29,6 +29,8 @@ public static class UiBus
     public static void RequestMissions() => OpenMissions?.Invoke();
     public static event Action<string> Talk;
     public static void RequestTalk(string who) => Talk?.Invoke(who);
+    public static event Action Plant;
+    public static void RequestPlant() => Plant?.Invoke();
     public static event Action<string> Descend;
     public static void RequestDescend(string region) => Descend?.Invoke(region);
     public static event Action DeepTravel;

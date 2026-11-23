@@ -122,7 +122,7 @@ public partial class GameState : Node
     public int Capacity => (int)(StatValue(UpgradeIds.Capacity) * HouseMul(HouseIds.Wardrobe) * HouseMul(HouseIds.Chest) * (HasSkill(SkillIds.Compactor) ? 1.25f : 1f) * (1f + GearBonus(GearSlot.Bag)));
     public float MoveSpeed => StatValue(UpgradeIds.Move) * HouseMul(HouseIds.Kitchen) * (HasSkill(SkillIds.LightBoots) ? 1.08f : 1f) * (1f + GearBonus(GearSlot.Boots));
     public float ValueMultiplier => StatValue(UpgradeIds.Value) * EssenceMultiplier
-                                    * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f) * (HasSkill(SkillIds.LoyalBuyer) ? 1.10f : 1f);
+                                    * HouseMul(HouseIds.Trophies) * (HasSkill(SkillIds.Haggle) ? 1.10f : 1f) * (HasSkill(SkillIds.LoyalBuyer) ? 1.10f : 1f) * (Data.StoryStage >= StoryData.Freed ? StoryData.FreedValueBonus : 1f);
     public float MagnetRadius => StatValue(UpgradeIds.Reach) * (HasSkill(SkillIds.Magnet) ? 1.3f : 1f);
     public float CritChance => HasSkill(SkillIds.Critical) ? 0.12f : 0f;
     public float CritMultiplier => HasSkill(SkillIds.Piercing) ? 4f : 3f;

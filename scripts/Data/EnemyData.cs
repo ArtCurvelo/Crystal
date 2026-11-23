@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace CrystalExcavator.Data;
 
 /// <summary>Aparência (e o jeito de andar) do inimigo.</summary>
-public enum EnemyKind { Crawler, Sentinel, Slag, Ember, Root, Spitter, Chained, Overseer, Blob, Eye }
+public enum EnemyKind { Crawler, Sentinel, Slag, Ember, Root, Spitter, Chained, Overseer, Blob, Eye, Corvo }
 
 /// <summary>Inimigo das Profundezas Proibidas.</summary>
 public sealed class EnemyDef
@@ -33,6 +33,8 @@ public sealed class EnemyDef
     public int SplitCount;
     /// <summary>Guardião da área: muito mais forte; derrotá-lo abre a passagem para a próxima Profundeza.</summary>
     public bool Guardian;
+    /// <summary>Chefão final (Mestre Corvo): fases, rajadas e crias; não renasce depois de derrotado.</summary>
+    public bool Boss;
     /// <summary>Fragmentos que larga ao morrer.</summary>
     public string Drop;
     public int DropMin, DropMax;
@@ -158,6 +160,26 @@ public static class EnemyData
         };
         E(eye);
         Guardian("guardian_nest", "Mãe do Ninho", blob, 5f, "eyecrystal", "primelumen");
+
+        // 6 · Trono de Corvo
+        E(new EnemyDef
+        {
+            Id = "servant", Name = "Servo do Corvo", Kind = EnemyKind.Chained, Region = "throne",
+            Hp = 160000, Damage = 50, Speed = 3.6f, Range = 2.0f, Windup = 0.4f, Cooldown = 1.1f, Aggro = 13f, Scale = 1.15f,
+            Drop = "crowsteel", DropMin = 2, DropMax = 4, RareDrop = "bloodlumen", RareChance = 0.12f,
+        });
+        E(new EnemyDef
+        {
+            Id = "crowling", Name = "Cria de Lúmen", Kind = EnemyKind.Crawler, Region = "throne",
+            Hp = 70000, Damage = 34, Speed = 5.0f, Range = 1.6f, Windup = 0.3f, Cooldown = 1.0f, Aggro = 14f, Scale = 1.1f,
+            Drop = "crowsteel", DropMin = 1, DropMax = 2,
+        });
+        E(new EnemyDef
+        {
+            Id = "corvo", Name = "Mestre Corvo", Kind = EnemyKind.Corvo, Region = "throne", Boss = true,
+            Hp = 4_500_000, Damage = 70, Speed = 2.6f, Range = 3.4f, Windup = 0.9f, Cooldown = 1.6f, Area = 4.5f, Aggro = 30f, Scale = 2.4f,
+            Projectile = 0f, Drop = "anvilstone", DropMin = 6, DropMax = 8,
+        });
     }
 
     public static EnemyDef Of(string id) => All.Find(e => e.Id == id);

@@ -45,8 +45,8 @@ public partial class WeaponView : Node3D
         _pivot.AddChild(_model);
         var c = WeaponData.BladeColor(w);
         var g = WeaponData.GlowColor(w);
-        var blade = new StandardMaterial3D { AlbedoColor = c.Lightened(0.15f), Roughness = 0.25f, Metallic = 0.35f, EmissionEnabled = true, Emission = g, EmissionEnergyMultiplier = 0.25f };
-        var edge = new StandardMaterial3D { AlbedoColor = g, EmissionEnabled = true, Emission = g, EmissionEnergyMultiplier = 1.8f };
+        var blade = new StandardMaterial3D { AlbedoColor = c.Lightened(0.1f), Roughness = 0.35f, Metallic = 0.3f, EmissionEnabled = true, Emission = g, EmissionEnergyMultiplier = 0.08f };
+        var edge = new StandardMaterial3D { AlbedoColor = g, EmissionEnabled = true, Emission = g, EmissionEnergyMultiplier = 0.8f };
         var grip = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.15f, 0.1f), Roughness = 0.9f };
         var metal = new StandardMaterial3D { AlbedoColor = new Color(0.55f, 0.5f, 0.42f), Roughness = 0.35f, Metallic = 0.5f };
         _trailMat.AlbedoColor = new Color(g, 0f);

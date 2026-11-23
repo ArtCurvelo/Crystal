@@ -779,7 +779,7 @@ def bram4():
 
 def portraits():
     """Retratos para as conversas (cabeça e ombros, fundo de cor lisa)."""
-    for name, bg, draw in (("bram", ((120, 80, 50), (200, 140, 90)), lambda cv: oldbram(cv, 800, 1170, 2.2, "talk", facing=1, look=(0.6, 0))),
+    for name, bg, draw in (("corvo", ((60, 10, 14), (140, 30, 30)), lambda cv: corvo(cv, 800, 1120, 2.0, "angry", facing=1, look=(0.6, 0), hammer=False)),("bram", ((120, 80, 50), (200, 140, 90)), lambda cv: oldbram(cv, 800, 1170, 2.2, "talk", facing=1, look=(0.6, 0))),
                            ("hero", ((50, 80, 140), (110, 160, 220)), lambda cv: hero(cv, 800, 1230, 2.2, "happy", facing=-1, look=(-0.6, 0)))):
         cv = Canvas(gradient(bg[0], bg[1]))
         cv.light = (-0.6, -0.8); cv.rim = (255, 230, 190)
@@ -787,6 +787,129 @@ def portraits():
         paper(cv.img, 8)
         img = cv.img.crop((s(800 - 300), s(300), s(800 + 300), s(900))).convert("RGB").resize((512, 512), Image.LANCZOS)
         img.save(OUT + f"/portrait_{name}.png", optimize=True)
+
+def corvo(cv, x, y, sc=1.0, mood="angry", facing=-1, look=(-0.4, 0), hammer=True, arm_up=False):
+    """Mestre Corvo corrompido: o ferreiro de barba preta com rachaduras de Lúmen rubro e cristais nos ombros."""
+    hands = smith(cv, x, y, sc, mood, facing=facing, hammer=hammer, arm_up=arm_up, bandana=True, shirt=(40, 34, 40), beard=(18, 14, 18), look=look)
+    u = 100 * sc
+    hr = u * 0.6
+    shy = y - u * 1.15 - u * 1.15
+    hx, hy = x + facing * u * 0.03, shy - hr * 0.72
+    r = random.Random(7)
+    # rachaduras de brasa no rosto, no peito e nos braços
+    for (cx, cy, ln) in ((hx - hr * 0.5, hy - hr * 0.1, hr * 0.5), (hx + hr * 0.45, hy + hr * 0.05, hr * 0.4), (x - u * 0.3, shy + u * 0.3, u * 0.5), (x + u * 0.25, shy + u * 0.6, u * 0.45), (x - u * 0.85, shy + u * 0.5, u * 0.4)):
+        pts = [(cx, cy)]
+        for k in range(4):
+            pts.append((pts[-1][0] + r.uniform(-0.3, 0.3) * ln, pts[-1][1] + ln * 0.3))
+        cv.line(pts, w=3.2, col=(255, 90, 60))
+        cv.glow(cx, cy + ln * 0.5, ln * 0.6, (255, 60, 40), 70)
+    for side in (-1, 1):
+        for k in range(3):
+            crystal(cv, x + side * (u * 0.6 + k * u * 0.13), shy + u * 0.05, u * (0.35 + k * 0.1), (255, 70, 80), lean=side * u * 0.12)
+    return hands
+
+def seed(cv, x, y, r):
+    """A Semente do Povo Lúmen: esfera dourada com folhas de cristal verde e luz."""
+    cv.glow(x, y, r * 3.5, (255, 230, 150), 200)
+    for k in range(5):
+        a = -math.pi / 2 + (k - 2) * 0.5
+        cv.shape([('poly', [(x, y - r * 0.2), (x + math.cos(a) * r * 1.6 - r * 0.25, y + math.sin(a) * r * 1.6), (x + math.cos(a) * r * 2.0, y + math.sin(a) * r * 2.0), (x + math.cos(a) * r * 1.6 + r * 0.25, y + math.sin(a) * r * 1.6)])], (150, 255, 150), line=2.2, shadow=0.3)
+    cv.shape([('ell', x, y, r, r * 1.1)], (255, 215, 110), line=3, shadow=0.35, hi=0.35)
+    cv.flat([('ell', x - r * 0.3, y - r * 0.35, r * 0.3, r * 0.22)], (255, 250, 220))
+
+def end1():
+    cv = Canvas(gradient((30, 6, 10), (70, 14, 18)))
+    cv.light = (-0.4, -0.9); cv.rim = (255, 220, 150)
+    for i in range(14):
+        x = 30 + i * 118
+        hh = 90 + (i * 53) % 150
+        cv.shape([('poly', [(x - 44, -10), (x + 44, -10), (x + 6, hh)])], (50, 22, 28), line=2.6, shadow=0.3, rim=False)
+    cv.shape([('rect', -20, 780, W + 20, H + 20, 0)], (40, 18, 22), line=3, shadow=0.0, rim=False)
+    # bigorna partida e o martelo largado
+    cv.shape([('rect', 1180, 700, 1420, 790, 6)], (60, 58, 66), line=3.4, shadow=0.4)
+    cv.shape([('poly', [(1300, 700), (1320, 760), (1290, 790)])], (255, 120, 80), line=1.6, shadow=0.1, rim=False)
+    corvo(cv, 1150, 940, 1.7, "sad", facing=-1, look=(-0.6, 0.6), hammer=False)
+    hs = hero(cv, 470, 900, 1.6, "determined", facing=1, armR=(160, 1.0), armL=(-20, 0.9), helmet=True, dirty=True, look=(0.2, -0.8))
+    hx_, hy_, _ = hs[1]
+    seed(cv, hx_ + 10, hy_ - 70, 38)
+    cv.text("A SEMENTE...", 800, 130, 54, (255, 225, 140), -4)
+    finish(cv, OUT + "/end_1.png")
+
+def end2():
+    cv = Canvas(gradient((12, 14, 38), (40, 34, 64)))
+    cv.light = (0.0, -1.0); cv.rim = (255, 225, 150)
+    mountains(cv, 520, [((40, 38, 70), 160, 300), ((30, 28, 56), 100, 220)])
+    timber_house(cv, 40, 640, 220, 150, (200, 190, 170), (120, 50, 40), seed=4)
+    timber_house(cv, 1330, 630, 230, 150, (210, 196, 176), (70, 72, 90), seed=6)
+    cv.shape([('rect', -20, 600, W + 20, H + 20, 0)], (60, 66, 60), line=2, shadow=0.05, rim=False)
+    cv.shape([('ell', 800, 760, 420, 90)], (110, 106, 102), line=3, shadow=0.1, rim=False)
+    # feixe de luz subindo do monumento
+    lay = Image.new("RGBA", cv.img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(lay).polygon([(s(740), s(680)), (s(860), s(680)), (s(960), 0), (s(640), 0)], fill=(255, 235, 160, 110))
+    cv.img.alpha_composite(lay.filter(ImageFilter.GaussianBlur(s(18))))
+    cv.shape([('rect', 730, 640, 870, 700, 8)], (150, 145, 140), line=3, shadow=0.3)
+    crystal(cv, 800, 640, 170, (150, 235, 255))
+    seed(cv, 800, 600, 30)
+    # moradores olhando e o Velho Bram
+    for (vx, col) in ((300, (180, 70, 70)), (380, (70, 120, 170)), (1150, (110, 150, 90)), (1240, (200, 160, 80)), (1090, (150, 90, 150))):
+        cv.shape([('rect', vx - 22, 600, vx + 22, 700, 10), ('ell', vx, 580, 20, 20)], col, line=2.4, shadow=0.45, rim=True)
+    oldbram(cv, 1310, 900, 1.25, "talk", facing=-1, look=(-0.6, -0.3))
+    hero(cv, 560, 910, 1.4, "happy", facing=1, armR=(150, 1.0), armL=(120, 1.0), look=(0.6, -0.6))
+    finish(cv, OUT + "/end_2.png")
+
+def end3():
+    cv = Canvas(gradient((60, 40, 20), (255, 210, 120)))
+    cv.light = (0.0, 1.0); cv.rim = (255, 240, 190)
+    for i in range(70):
+        r_ = random.Random(i)
+        a = r_.uniform(0, math.tau)
+        cv.line([(800 + math.cos(a) * 160, 460 + math.sin(a) * 160), (800 + math.cos(a) * 1300, 460 + math.sin(a) * 1300)], w=r_.uniform(1, 4), col=(255, 240, 190))
+    cv.glow(800, 460, 300, (255, 245, 200), 230)
+    # escravos com correntes se partindo
+    for (sx, sc_, f) in ((260, 0.95, 1), (520, 0.8, 1), (1080, 0.8, -1), (1340, 0.95, -1)):
+        slave(cv, sx, 880, sc_, 1, (130, 115, 100), f)
+        for k in range(5):
+            r_ = random.Random(int(sx) + k)
+            cx, cy = sx + r_.uniform(-80, 80), 760 + r_.uniform(-60, 60)
+            cv.shape([('ell', cx, cy, 14, 9)], (190, 190, 200), line=2, shadow=0.3, rim=False)
+        cv.text("CRACK!", sx, 520, 30, (255, 255, 255), r_.uniform(-12, 12), 3)
+    # o livro de dívidas virando pó nas mãos do mestre da guilda
+    guildmaster(cv, 800, 1060, 1.5, "n", facing=1)
+    scroll(cv, 900, 790, 200, 70, 4, seal=False)
+    for k in range(40):
+        r_ = random.Random(100 + k)
+        cv.flat([('ell', 1100 + r_.uniform(0, 220), 760 + r_.uniform(-140, 40), r_.uniform(2, 6), r_.uniform(2, 6))], (120, 100, 80))
+    cv.text("AS DÍVIDAS...", 800, 120, 56, (90, 40, 20), 0, 4)
+    finish(cv, OUT + "/end_3.png")
+
+def end4():
+    cv = Canvas(gradient((255, 170, 120), (255, 235, 190), (255, 205, 150), 0.5))
+    cv.light = (0.7, -0.7); cv.rim = (255, 230, 170)
+    cv.glow(1250, 300, 260, (255, 250, 210), 220)
+    mountains(cv, 520, [((210, 140, 150), 180, 320), ((170, 110, 130), 120, 250)])
+    cv.shape([('rect', -30, 520, W + 30, H + 30, 0)], (120, 175, 95), line=2, shadow=0.05, hi=0.0, rim=False)
+    grass(cv, 560, 890, (120, 175, 95), 500)
+    timber_house(cv, 40, 640, 220, 150, (240, 226, 196), (170, 62, 48), seed=1)
+    timber_house(cv, 1320, 620, 220, 150, (240, 220, 200), (150, 110, 60), seed=3)
+    bunting(cv, 260, 420, 790, 380, 40)
+    bunting(cv, 810, 380, 1330, 430, 40)
+    # monumento com a árvore de cristal dourada
+    cv.shape([('rect', 740, 560, 860, 600, 6)], (150, 145, 140), line=2.6)
+    cv.shape(limb((800, 560), (800, 360), 26, 14), (200, 170, 90), line=2.6, shadow=0.35)
+    for (bx, by, r_) in ((800, 330, 70), (740, 370, 50), (860, 370, 50), (800, 280, 45)):
+        cv.shape([('ell', bx, by, r_, r_ * 0.8)], (170, 255, 170), line=2.6, shadow=0.35, hi=0.3)
+    cv.glow(800, 330, 160, (255, 240, 170), 120)
+    cv.shape([('rect', 1000, 470, 1230, 540, 6)], (200, 170, 120), line=3, shadow=0.25)
+    cv.text("MINA LIVRE", 1115, 505, 32, INK, 0, 0)
+    # comemoração: moradores, Bram e o herói
+    for (vx, col) in ((330, (200, 80, 80)), (430, (80, 140, 200)), (1060, (120, 170, 90)), (1160, (220, 170, 80))):
+        cv.shape([('rect', vx - 22, 600, vx + 22, 700, 10), ('ell', vx, 580, 20, 20)], col, line=2.4, shadow=0.4, rim=False)
+        cv.shape(limb((vx - 18, 615), (vx - 40, 560), 10), col, line=2, shadow=0.3, rim=False)
+        cv.shape(limb((vx + 18, 615), (vx + 40, 560), 10), col, line=2, shadow=0.3, rim=False)
+    oldbram(cv, 1260, 900, 1.3, "talk", facing=-1, look=(-0.6, -0.3))
+    hero(cv, 560, 900, 1.6, "happy", facing=1, armL=(-160, 0.95), armR=(160, 0.95), look=(0.4, -0.6))
+    cv.text("FIM", 800, 130, 96, (255, 245, 210), 0, 8)
+    finish(cv, OUT + "/end_4.png")
 
 # ------------------------------------------------------------------ quadros
 def panel1():
@@ -1011,7 +1134,7 @@ if __name__ == "__main__":
     OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "story")
     os.makedirs(OUT, exist_ok=True)
     only = sys.argv[2] if len(sys.argv) > 2 else None
-    jobs = [("1", panel1), ("2", panel2), ("3", panel3), ("4", panel4), ("5", panel5), ("6", panel6), ("a", bram1), ("b", bram2), ("c", bram3), ("d", bram4), ("p", portraits)]
+    jobs = [("1", panel1), ("2", panel2), ("3", panel3), ("4", panel4), ("5", panel5), ("6", panel6), ("a", bram1), ("b", bram2), ("c", bram3), ("d", bram4), ("p", portraits), ("e", end1), ("f", end2), ("g", end3), ("h", end4)]
     for key, f in jobs:
         if only and key not in only: continue
         f()

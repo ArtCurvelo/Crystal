@@ -20,7 +20,9 @@ public partial class Hud : CanvasLayer
     public World.RegionEvents Events;
 
     Control _root;
-    PanelContainer _clockPanel, _hpPanel;
+    PanelContainer _clockPanel, _hpPanel, _bossPanel;
+    Label _bossName;
+    ProgressBar _bossBar;
     Label _hpLabel;
     ProgressBar _hpBar;
     ColorRect _damageFlash;
@@ -261,6 +263,19 @@ public partial class Hud : CanvasLayer
         _clockBar = UiTheme.Bar(UiTheme.Gold, 150, 4);
         kv.AddChild(_clockBar);
         col.AddChild(_moneyGain);
+
+        // barra do chefão (Mestre Corvo), no alto e no centro
+        _bossPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        _bossPanel.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(new Color(0.08f, 0.02f, 0.03f, 0.88f), new Color(1f, 0.25f, 0.2f, 0.9f), 12, 2, 18, 8));
+        UiTheme.Place(_bossPanel, Control.LayoutPreset.CenterTop, new Vector2(-330, 96), new Vector2(660, 0));
+        _root.AddChild(_bossPanel);
+        var bv = new VBoxContainer();
+        bv.AddThemeConstantOverride("separation", 4);
+        _bossPanel.AddChild(bv);
+        _bossName = UiTheme.Label("", 20, new Color(1f, 0.55f, 0.45f), true, HorizontalAlignment.Center);
+        bv.AddChild(_bossName);
+        _bossBar = UiTheme.Bar(new Color(1f, 0.25f, 0.2f), 620, 14);
+        bv.AddChild(_bossBar);
 
         // vida (aparece quando há perigo ou dano)
         _hpPanel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
@@ -544,6 +559,8 @@ public partial class Hud : CanvasLayer
                 Math.Min(gs.InventoryOf(StoryData.KeyOre1), StoryData.KeyOre1Amount), StoryData.KeyOre1Amount, Math.Min(gs.InventoryOf(StoryData.KeyOre2), StoryData.KeyOre2Amount), StoryData.KeyOre2Amount,
                 StoryData.AldricDiaries.Count(x => gs.Data.Diaries.Contains(x))),
         StoryData.OpenGate => Loc.T("HISTÓRIA\nUse a chave falsa no PORTÃO SELADO, no fundo da Catedral de Cristal."),
+        StoryData.SeedFound => Loc.T("HISTÓRIA\nLeve a Semente do Povo Lúmen ao VELHO BRAM, na vila."),
+        StoryData.PlantSeed => Loc.T("HISTÓRIA\nPlante a Semente no MONUMENTO DE CRISTAL, no meio da praça da vila."),
         _ => null,
     };
 
@@ -555,7 +572,7 @@ public partial class Hud : CanvasLayer
         bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
         bool inTown = !inHouse && Player != null && IsInstanceValid(Player) && World.Town.Contains(Player.GlobalPosition);
         string story = StoryObjective(gs);
-        bool talkNow = gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate;
+        bool talkNow = gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate or StoryData.SeedFound or StoryData.PlantSeed;
         if (inTown && story != null && (talkNow || gs.CanForgeKey))
             text = story;
         else if (inHouse)
@@ -576,7 +593,7 @@ public partial class Hud : CanvasLayer
         else if (d.Upgrades.Count == 0) text = Loc.T("OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).");
         else if (gs.IsUnlocked("core") && !d.Discovered.Contains("heart") && gs.Damage * gs.SwingsPerSecond * 120 > GameData.Mat("heart").Hp)
             text = Loc.T("META\nDestrua o Coração Ancestral no centro do Núcleo.");
-        else if (story != null && d.Discovered.Contains("heart") && (gs.IsUnlocked("cathedral") || gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate))
+        else if (story != null && d.Discovered.Contains("heart") && (gs.IsUnlocked("cathedral") || gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate or StoryData.SeedFound or StoryData.PlantSeed))
             text = story;
         else
         {
@@ -723,6 +740,15 @@ public partial class Hud : CanvasLayer
     {
         float dt = (float)delta;
         var gs = GameState.Instance;
+        // chefão em luta: barra no topo com a fase
+        var boss = Player != null && IsInstanceValid(Player) ? Player.Enemies?.Boss : null;
+        bool showBoss = Player != null && IsInstanceValid(Player) && (Player.Enemies?.BossEngaged ?? false);
+        if (_bossPanel.Visible != showBoss) _bossPanel.Visible = showBoss;
+        if (showBoss)
+        {
+            _bossBar.Value = boss.Hp / boss.Def.Hp;
+            _bossName.Text = boss.Def.Name.ToUpper() + (boss.Phase == 3 ? "  ·  " + Loc.T("ENFURECIDO") : boss.Phase == 2 ? "  ·  " + Loc.T("FASE 2") : "");
+        }
         long target = gs.Data.Money;
         if (_displayMoney != target)
         {

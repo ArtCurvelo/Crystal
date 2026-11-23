@@ -48,7 +48,7 @@ public sealed record RenderFeatures(
                     Ssao: !low, Ssr: !low, SsrSteps: high ? 56 : 40, Ssil: high, VolumetricFog: high,
                     LampShadows: high, Glow: true, GlowIntensity: glow,
                     Smaa: true, Fxaa: false, Msaa: Viewport.Msaa.Disabled, Fsr1: true, Fsr2: true, Debanding: true,
-                    AmbientBoost: low ? 1.5f : 1.0f);
+                    AmbientBoost: low ? 2.3f : 1.0f);
             case RenderMethods.Mobile:
                 // sem SSAO/SSR/SSIL/névoa volumétrica: compensa com um pouco mais de luz ambiente;
                 // sombras da lanterna só na Alta (custo alto em GPU integrada)
@@ -56,13 +56,13 @@ public sealed record RenderFeatures(
                     Ssao: false, Ssr: false, SsrSteps: 0, Ssil: false, VolumetricFog: false,
                     LampShadows: high, Glow: true, GlowIntensity: glow,
                     Smaa: true, Fxaa: false, Msaa: Viewport.Msaa.Disabled, Fsr1: true, Fsr2: false, Debanding: true,
-                    AmbientBoost: low ? 1.5f : 1.1f);
+                    AmbientBoost: low ? 2.3f : 1.1f);
             default: // Compatibility (OpenGL)
                 return new RenderFeatures(RenderMethods.Compatibility, q,
                     Ssao: false, Ssr: false, SsrSteps: 0, Ssil: false, VolumetricFog: false,
                     LampShadows: high, Glow: true, GlowIntensity: glow,
                     Smaa: false, Fxaa: false, Msaa: low ? Viewport.Msaa.Disabled : Viewport.Msaa.Msaa2X, Fsr1: false, Fsr2: false, Debanding: false,
-                    AmbientBoost: low ? 1.5f : 1.1f);
+                    AmbientBoost: low ? 2.3f : 1.1f);
         }
     }
 
