@@ -494,3 +494,12 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - Armas (`Data/WeaponData.cs`, `Player/WeaponView.cs`): espada (rápida, arco) e martelo (lento, forte, empurra) em 3 níveis, forjadas na vila depois que o portão abre. Tecla X / botão Y troca ferramenta e arma; dano usa luvas e Essência.
 - Inimigos (`Data/EnemyData.cs`, `World/Enemies.cs`): Rastejante de Cristal (rápido, bote) e Sentinela de Lúmen (golem, golpe em área com anel de aviso). Física de verdade, perseguição com linha de visão, coleira de volta para casa, barra de vida, números de dano, fragmentos ao morrer, renascem depois de 150 s longe do jogador.
 - Testes 986/986 (combate de ponta a ponta: perseguição, dano no jogador, espada mata, fragmentos, desmaio).
+
+## Ato 3, fase 2: Profundezas 2 a 5, Guardiões e forja por combinação (v0.28.0)
+- Áreas novas (regiões `Deep`): Fornalha Abandonada, Raízes do Coração, Poço dos Acorrentados e Ninho de Lúmen Bruto, cada uma com 4 minérios (valor ~2x por área).
+- Inimigos novos (`Data/EnemyData.cs`, `World/Enemies.cs`): Golem de Escória (área), Brasa Viva (voa e explode), Raiz Viva (parada, chicoteia em volta), Espinhador (atira farpas), Acorrentado e Capataz Corrompido (corpo dos moradores, correntes, chicote), Lúmen Vivo (divide-se em duas Gotas ao morrer) e Vigia do Ninho (olho voador que atira). Projéteis (`EnemyProjectile`) batem na rocha e dá para desviar.
+- Guardião por área (elite com coroa de cristais e nome) no salão mais fundo; derrotá-lo abre a `DeepDescent` (passagem) para a próxima área. No portão da Catedral, `DeepTravelScreen` escolhe a área já aberta. Guardiões derrotados valem entre renascimentos (`SaveData.Guardians`).
+- Pedido do diretor: forja por combinação. Arma = 2 a 3 minérios quaisquer (20 de cada); armadura = 3 a 5 (15 de cada). Força do minério = valor^0,65 × bônus de raridade; dano da arma = soma × 3 (martelo × 2,6); armadura reduz até 75% do dano e dá vida extra. Nome e cores vêm dos minérios. Saves da v0.27 viram a combinação equivalente.
+- Vida máxima = 100 + armadura. Inimigos agrupados por área (só a área atual processa/desenha).
+- Bug achado pelo teste: a Brasa explodia mas o estado "recuperando" sobrescrevia a morte (ficava viva invisível).
+- Testes 1099/1099 (o script de testes passou a ter 15 min de limite: o mundo ficou maior).
