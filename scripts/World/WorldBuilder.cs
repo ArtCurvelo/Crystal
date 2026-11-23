@@ -208,6 +208,7 @@ public partial class WorldBuilder : Node3D
             PitRopes.Add(rope);
         }
         BuildDiaries(root, L, index, reserved);
+        if (r.Id == "cathedral") BuildSealedGate(root, L, reserved);
         BeginSolids(root, L, reserved);
         BuildDecoration(root, r, L, rng);
         BuildLights(root, r, L);
@@ -279,6 +280,47 @@ public partial class WorldBuilder : Node3D
 
     public readonly List<GoblinCamp> GoblinCamps = new();
     public readonly List<DiaryNote> Diaries = new();
+    public SealedGate SealedGate;
+
+    /// <summary>Portão selado (ato 2) na câmara mais funda da Catedral, de frente para quem chega.</summary>
+    void BuildSealedGate(Node3D root, CaveLayout L, List<Vector3> reserved)
+    {
+        CaveFeature best = null;
+        float bestDepth = -1f;
+        foreach (var c in L.Chambers)
+        {
+            if (c == L.Camp || c == L.Heart || c == L.Lake || c == L.Giant || c.Kind != CaveKind.Chamber || c.Radius < 8f || Mathf.Min(c.HA, c.HB) < 10f) continue;
+            float d = L.Depth(c.Center.X, c.Center.Y);
+            if (d > bestDepth) { bestDepth = d; best = c; }
+        }
+        if (best == null) return;
+        var center = best.Center;
+        // de frente para o lado mais raso (por onde o jogador chega)
+        var face = Vector2.Up;
+        float minD = float.MaxValue;
+        for (int i = 0; i < 16; i++)
+        {
+            float a = Mathf.Tau * i / 16f;
+            var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+            var q = center + dir * 6f;
+            if (L.WallDist(q.X, q.Y) > -1f) continue;
+            float d = L.Depth(q.X, q.Y);
+            if (d < minD) { minD = d; face = dir; }
+        }
+        var pos = center - face * 2.5f;
+        SealedGate = new SealedGate { Name = "SealedGate" };
+        root.AddChild(SealedGate);
+        SealedGate.Position = L.OnGround(pos.X, pos.Y, -0.1f);
+        SealedGate.Rotation = new Vector3(0, Mathf.Atan2(face.X, face.Y), 0);
+        var side = new Vector2(face.Y, -face.X);
+        foreach (var k in new[] { 0f, -2.8f, 2.8f })
+        {
+            var q = pos + side * k;
+            reserved.Add(L.OnGround(q.X, q.Y));
+            var f = pos + side * k + face * 2.5f;
+            reserved.Add(L.OnGround(f.X, f.Y));
+        }
+    }
 
     /// <summary>
     /// Dois diários por região, no fundo de câmaras secretas (não a do goblin), virados para a entrada do túnel.

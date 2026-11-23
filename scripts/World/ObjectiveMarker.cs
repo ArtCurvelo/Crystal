@@ -101,10 +101,19 @@ public partial class ObjectiveMarker : Node3D
         if (Town.Contains(PlayerPos()) && World.Town != null)
         {
             // na vila: de noite, encomendas prontas ou a casa; de dia, o elevador
+            // história: o Velho Bram chamando, ou a chave pronta para forjar
+            if (World.Town.Bram != null && gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate) { _target = World.Town.Bram; _targetHeight = 2.4f; return; }
+            if (gs.CanForgeKey && World.Town.Anvil != null) { _target = World.Town.Anvil; _targetHeight = 2.2f; return; }
             bool deliver = false;
             for (int i = 0; i < gs.Data.Contracts.Count; i++) deliver |= gs.CanDeliver(i);
             _target = gs.DayOver ? (deliver ? World.Town.Board : World.Town.DoorOutside) : World.Town.Elevator;
             _targetHeight = gs.DayOver ? 2.8f : 6.5f;
+            return;
+        }
+        if (!gs.DayOver && World.SealedGate != null && region.Id == "cathedral" && gs.Story is StoryData.FindGate or StoryData.OpenGate)
+        {
+            _target = World.SealedGate;
+            _targetHeight = 10f;
             return;
         }
         if (gs.DayOver)

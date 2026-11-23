@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using CrystalExcavator.Core;
+using CrystalExcavator.Data;
+using CrystalExcavator.Player;
 using Godot;
 
 namespace CrystalExcavator.World;
@@ -37,8 +40,9 @@ public partial class Town
         Bench(c, 58.6f);
         // árvores de folha (as de copa colorida dão vida à praça)
         var rng = new Random(321);
-        foreach (var (x, z) in new[] { (-9.5f, 18f), (2.0f, 21.5f), (13.5f, 16f), (-20f, 2f), (-21f, -6f), (20.5f, 6.5f), (21f, -4f), (-6f, -19.5f), (6.5f, -19.5f), (-19.5f, 13.5f), (0.5f, -22.5f) })
+        foreach (var (x, z) in new[] { (-9.5f, 18f), (2.0f, 21.5f), (13.5f, 16f), (-20f, 2f), (-21f, -6f), (20.5f, 6.5f), (21f, -4f), (-10.5f, -21f), (6.5f, -19.5f), (-19.5f, 13.5f), (0.5f, -22.5f) })
             Tree(c + new Vector3(x, 0, z), rng);
+        BramShack(c + new Vector3(-6.2f, 0, -18.6f));
         Bunting(c);
         Flowers(c, rng);
         Grass(c, rng);
@@ -175,6 +179,39 @@ public partial class Town
             ColorRamp = fade, Position = pos,
             MaterialOverride = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, VertexColorUseAsAlbedo = true },
         });
+    }
+
+    public BramNpc Bram;
+
+    /// <summary>Barraco torto do Velho Bram atrás da oficina do ferreiro (frente para o sul).</summary>
+    void BramShack(Vector3 p)
+    {
+        var n = new Node3D { Position = p, Name = "BramShack" };
+        AddChild(n);
+        var plank = Mat(new Color(0.38f, 0.27f, 0.19f));
+        var plankD = Mat(new Color(0.27f, 0.19f, 0.13f));
+        var tin = Mat(new Color(0.45f, 0.42f, 0.4f), 0.6f, 0.3f);
+        // paredes de tábuas desencontradas, telhado de zinco torto, porta de pano
+        for (int i = 0; i < 9; i++)
+            L(n, new BoxMesh { Size = new Vector3(0.36f, 2.2f + (i % 3) * 0.12f, 0.08f) }, i % 2 == 0 ? plank : plankD, new Vector3(-1.45f + i * 0.36f, 1.1f, -1.0f), new Vector3(0, 0, (i % 3 - 1) * 0.03f));
+        foreach (int s in new[] { -1, 1 })
+            L(n, new BoxMesh { Size = new Vector3(0.08f, 2.1f, 2.0f) }, plankD, new Vector3(s * 1.6f, 1.05f, 0f));
+        L(n, new BoxMesh { Size = new Vector3(3.6f, 0.05f, 2.6f) }, tin, new Vector3(0, 2.35f, 0.1f), new Vector3(0.18f, 0, 0.04f));
+        L(n, new BoxMesh { Size = new Vector3(0.9f, 1.7f, 0.04f) }, Mat(new Color(0.45f, 0.3f, 0.3f)), new Vector3(0.8f, 0.85f, -0.92f));
+        L(n, new BoxMesh { Size = new Vector3(0.08f, 2.3f, 0.08f) }, plankD, new Vector3(-1.55f, 1.15f, 1.0f));
+        L(n, new BoxMesh { Size = new Vector3(0.08f, 2.3f, 0.08f) }, plankD, new Vector3(1.55f, 1.15f, 1.0f));
+        SolidLocal(n, new Vector3(0, 1.1f, -1.0f), new Vector3(3.3f, 2.2f, 0.2f));
+        SolidLocal(n, new Vector3(-1.6f, 1.05f, 0), new Vector3(0.15f, 2.1f, 2.0f));
+        SolidLocal(n, new Vector3(1.6f, 1.05f, 0), new Vector3(0.15f, 2.1f, 2.0f));
+        // lampião fraco e caixotes
+        var lampPos = n.Position + new Vector3(-1.5f, 2.0f, -0.75f);
+        M(this, new BoxMesh { Size = new Vector3(0.14f, 0.2f, 0.14f) }, Glow(new Color(1f, 0.7f, 0.35f), 1.8f), lampPos);
+        var l = new OmniLight3D { LightColor = new Color(1f, 0.68f, 0.38f), LightEnergy = 0.7f, OmniRange = 5f, Position = lampPos + new Vector3(0.2f, -0.2f, 0.4f) };
+        AddChild(l);
+        _nightLights.Add(l);
+        Decor.Crate(this, n.Position + new Vector3(-1.0f, 0, 0.1f), 0.2f, 0.7f, true);
+        Bram = new BramNpc { Name = "BramNpc", Position = n.Position + new Vector3(0.2f, 0, 1.6f) };
+        AddChild(Bram);
     }
 
     // ------------------------------------------------------------------ feira
@@ -428,4 +465,60 @@ public partial class Town
         if (_windowGlass != null) _windowGlass.EmissionEnergyMultiplier = night ? 2.4f : 0.6f;
         foreach (var l in _nightLights) l.Visible = night;
     }
+}
+
+/// <summary>
+/// Velho Bram: ex-escravo caolho e perneta, sentado num banquinho na frente do barraco atrás da oficina do
+/// ferreiro. Antes do Coração só resmunga; depois conta a história do portão e do Mestre Corvo (ato 2).
+/// </summary>
+public partial class BramNpc : StationBase
+{
+    Humanoid _body;
+    float _t;
+    public override void _Ready()
+    {
+        SetupBody(new Vector3(1.0f, 1.5f, 1.0f));
+        var look = new Look
+        {
+            Skin = new Color(0.82f, 0.62f, 0.5f), Shirt = new Color(0.45f, 0.42f, 0.38f), Pants = new Color(0.32f, 0.27f, 0.22f), Shoes = new Color(0.2f, 0.13f, 0.08f),
+            Hair = new Color(0.85f, 0.85f, 0.86f), Accent = new Color(0.35f, 0.3f, 0.25f), HairStyle = 3, Beard = true, Vest = true, EyePatch = true, PegLeg = true,
+            Height = 0.95f, Width = 0.95f,
+        };
+        _body = new Humanoid(look, 777) { Mode = Humanoid.Pose.Sit, Seated = true };
+        AddChild(_body);
+        var wood = new StandardMaterial3D { AlbedoColor = new Color(0.42f, 0.28f, 0.17f), Roughness = 0.9f };
+        var dark = new StandardMaterial3D { AlbedoColor = new Color(0.26f, 0.17f, 0.11f), Roughness = 0.9f };
+        // banquinho, muleta encostada, caneca e garrafa
+        AddMesh(new CylinderMesh { TopRadius = 0.22f, BottomRadius = 0.22f, Height = 0.06f, RadialSegments = 12 }, wood, new Vector3(0, 0.47f, -0.05f));
+        foreach (var (x, z) in new[] { (-0.14f, -0.15f), (0.14f, -0.15f), (0f, 0.1f) })
+            AddMesh(new CylinderMesh { TopRadius = 0.025f, BottomRadius = 0.03f, Height = 0.46f, RadialSegments = 6 }, dark, new Vector3(x, 0.23f, z - 0.05f));
+        var crutch = new Node3D { Position = new Vector3(0.45f, 0, 0.05f), Rotation = new Vector3(0, 0, 0.22f) };
+        AddChild(crutch);
+        crutch.AddChild(new MeshInstance3D { Mesh = new CylinderMesh { TopRadius = 0.025f, BottomRadius = 0.025f, Height = 1.35f, RadialSegments = 6 }, MaterialOverride = wood, Position = new Vector3(0, 0.68f, 0) });
+        crutch.AddChild(new MeshInstance3D { Mesh = new CapsuleMesh { Radius = 0.04f, Height = 0.3f }, MaterialOverride = dark, Position = new Vector3(0, 1.36f, 0), Rotation = new Vector3(0, 0, Mathf.Pi / 2) });
+        AddMesh(new CylinderMesh { TopRadius = 0.05f, BottomRadius = 0.045f, Height = 0.1f, RadialSegments = 8 }, new StandardMaterial3D { AlbedoColor = new Color(0.6f, 0.6f, 0.62f), Metallic = 0.4f, Roughness = 0.4f }, new Vector3(-0.45f, 0.05f, 0.2f));
+        AddMesh(new CylinderMesh { TopRadius = 0.03f, BottomRadius = 0.06f, Height = 0.28f, RadialSegments = 8 }, new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.4f, 0.25f), Roughness = 0.2f }, new Vector3(-0.6f, 0.14f, -0.1f));
+        Label = MakeLabel("VELHO BRAM", new Color(0.95f, 0.8f, 0.6f), 1.85f, 44);
+    }
+
+    public override void _Process(double delta)
+    {
+        base._Process(delta);
+        _t += (float)delta;
+        // gesticula de vez em quando (resmungando sozinho)
+        if (_body != null) _body.Mode = ((int)(_t / 5f) % 4 == 1) ? Humanoid.Pose.Talk : Humanoid.Pose.Sit;
+    }
+
+    public override string GetPrompt()
+    {
+        int st = GameState.Instance?.Story ?? 0;
+        return st switch
+        {
+            StoryData.Locked => Loc.F("{0} Falar com o velho", InputHints.Interact),
+            StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate => Loc.F("{0} Velho Bram (quer falar com você!)", InputHints.Interact),
+            _ => Loc.F("{0} Falar com o Velho Bram", InputHints.Interact),
+        };
+    }
+
+    public override void Interact(PlayerController player) => UiBus.RequestTalk("bram");
 }

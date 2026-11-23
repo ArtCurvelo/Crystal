@@ -32,6 +32,8 @@ public sealed class SaveData
     public Dictionary<string, int> Gear { get; set; } = new();
     /// <summary>Diários de outros escravos já encontrados na mina (ficam ao renascer).</summary>
     public List<string> Diaries { get; set; } = new();
+    /// <summary>Etapa do ato 2 ("A Chave Falsa", ver StoryData). Fica ao renascer.</summary>
+    public int StoryStage { get; set; }
     public long CrystalsMined { get; set; }
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
@@ -87,6 +89,7 @@ public sealed class SaveData
         Contracts.RemoveAll(c => c == null || GameData.Mat(c.Mat) == null || c.Amount <= 0 || c.Reward < 0);
         if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
         Gear ??= new();
+        StoryStage = System.Math.Clamp(StoryStage, 0, StoryData.GateOpen);
         Diaries = (Diaries ?? new()).Where(d => DiaryData.Of(d) != null).Distinct().ToList();
         foreach (var key in Gear.Keys.ToList())
         {

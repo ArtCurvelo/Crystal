@@ -287,6 +287,11 @@ public partial class GameState : Node
         if (Data.Discovered.Contains(def.Id)) return;
         Data.Discovered.Add(def.Id);
         MaterialDiscovered?.Invoke(def);
+        if (def.Id == "heart" && Data.StoryStage == StoryData.Locked)
+        {
+            Notify("Um recado da vila", Loc.T("O Velho Bram, atrás da oficina do ferreiro, ouviu o Coração se partir e quer falar com você."), NotifyKind.Unlock);
+            StoryChanged?.Invoke();
+        }
         Notify(def.Rarity >= Rarity.Epico ? Loc.F("Material {0} descoberto!", RarityInfo.Name(def.Rarity)) : Loc.T("Novo material descoberto"),
             Loc.F("{0} — {1} por fragmento", def.Name, FormatMoney(SellPrice(def))),
             def.Rare || def.Special ? NotifyKind.Rare : NotifyKind.Info);
@@ -575,6 +580,39 @@ public partial class GameState : Node
         InventoryChanged?.Invoke();
         ContractsChanged?.Invoke();
         Notify("Encomenda entregue!", Loc.F("+{0} pela entrega de {1}x {2}.", FormatMoney(c.Reward), c.Amount, GameData.Mat(c.Mat)?.Name ?? c.Mat), NotifyKind.Success);
+        return true;
+    }
+
+    // ================= História (ato 2: A Chave Falsa) =================
+    public event Action StoryChanged;
+    /// <summary>Etapa atual: o Coração quebrado já libera o chamado do Velho Bram.</summary>
+    public int Story => Math.Max(Data.StoryStage, Data.Discovered.Contains("heart") ? StoryData.BramCalls : StoryData.Locked);
+
+    public void SetStory(int stage)
+    {
+        if (stage <= Data.StoryStage) return;
+        Data.StoryStage = stage;
+        StoryChanged?.Invoke();
+        SaveGame(true);
+    }
+
+    public bool AldricRead => StoryData.AldricDiaries.All(d => Data.Diaries.Contains(d));
+    public bool HasKeyOres => InventoryOf(StoryData.KeyOre1) >= StoryData.KeyOre1Amount && InventoryOf(StoryData.KeyOre2) >= StoryData.KeyOre2Amount;
+    public long KeyFee => (long)Math.Round(StoryData.KeyFee * Economy.UpgradeCost);
+    /// <summary>A chave falsa só sai de noite (o ferreiro dorme), com os minérios, os cadernos do Aldric e a taxa.</summary>
+    public bool CanForgeKey => Story == StoryData.ForgeKey && DayOver && AldricRead && HasKeyOres && CanAfford(KeyFee);
+
+    public bool TryForgeKey()
+    {
+        if (!CanForgeKey) return false;
+        Data.Money -= KeyFee;
+        PayForgeCosts(new[] { new ForgeCost(StoryData.KeyOre1, StoryData.KeyOre1Amount), new ForgeCost(StoryData.KeyOre2, StoryData.KeyOre2Amount) });
+        MoneyChanged?.Invoke();
+        InventoryChanged?.Invoke();
+        GearChanged?.Invoke();
+        Notify("Chave falsa da Guilda", Loc.T("Forjada em segredo. Mostre ao Velho Bram e depois use no portão selado."), NotifyKind.Unlock);
+        BigMessage?.Invoke(Loc.T("CHAVE FALSA FORJADA"));
+        SetStory(StoryData.OpenGate);
         return true;
     }
 

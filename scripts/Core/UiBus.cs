@@ -27,6 +27,10 @@ public static class UiBus
     public static void RequestDoor(bool toInside) => Door?.Invoke(toInside);
     public static event Action OpenMissions;
     public static void RequestMissions() => OpenMissions?.Invoke();
+    public static event Action<string> Talk;
+    public static void RequestTalk(string who) => Talk?.Invoke(who);
+    public static event Action Gate;
+    public static void RequestGate() => Gate?.Invoke();
     public static event Action<string> OpenDiary;
     public static void RequestDiary(string id) => OpenDiary?.Invoke(id);
     public static event Action OpenForge;

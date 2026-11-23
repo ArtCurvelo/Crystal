@@ -311,7 +311,7 @@ def hand(cv, x, y, r, col=SKIN, ang=0.0):
     cv.shape([('ell', tx, ty, r * 0.42, r * 0.42)], col, line=2.2, shadow=0.3)
 
 def hero(cv, x, y, sc=1.0, mood="happy", facing=1, helmet=False, armL=(-20, 0.9), armR=(20, 0.9), shirt=(70, 125, 205),
-         chain=False, pick=False, sit=False, look=(0.3, 0), tears=False, quill=False, lamp_on=False, dirty=False):
+         chain=False, pick=False, sit=False, look=(0.3, 0), tears=False, quill=False, lamp_on=False, dirty=False, hair=(112, 66, 34), lantern=False):
     """Escavador (pés em x,y). Braços: (ângulo em graus a partir de 'para baixo', positivo = para a frente; comprimento)."""
     u = 100 * sc
     f = facing
@@ -372,6 +372,11 @@ def hero(cv, x, y, sc=1.0, mood="happy", facing=1, helmet=False, armL=(-20, 0.9)
     if quill:
         hx, hy, _ = hands[1]
         cv.shape([('poly', [(hx, hy), (hx + f * u * 0.55, hy - u * 0.6), (hx + f * u * 0.62, hy - u * 0.55), (hx + f * u * 0.06, hy + u * 0.03)])], (250, 250, 244), line=2, shadow=0.25)
+    if lantern:
+        lx_, ly_, _ = hands[1]
+        cv.line([(lx_, ly_), (lx_, ly_ + u * 0.2)], w=2, col=(60, 60, 70))
+        cv.glow(lx_, ly_ + u * 0.38, u * 0.5, (255, 220, 140), 150)
+        cv.shape([('rect', lx_ - u * 0.12, ly_ + u * 0.2, lx_ + u * 0.12, ly_ + u * 0.52, 4)], (255, 220, 130), line=2.6, shadow=0.2, rim=False)
     for hx, hy, a in hands:
         hand(cv, hx, hy, u * 0.12, SKIN, ang=-math.pi / 2 if f > 0 else -math.pi / 2)
     # pescoço e cabeça (cabeça grande, estilo HQ)
@@ -399,7 +404,6 @@ def hero(cv, x, y, sc=1.0, mood="happy", facing=1, helmet=False, armL=(-20, 0.9)
     if dirty:
         cv.flat([('ell', hx - f * hr * 0.4, hy + hr * 0.62, hr * 0.15, hr * 0.08)], (120, 100, 90), alpha=150)
     # cabelo em mechas ou capacete
-    hair = (112, 66, 34)
     if helmet:
         cv.shape([('pie', hx, hy - hr * 0.08, hr * 1.12, hr * 1.12, 180, 360)], (246, 196, 40), line=3.4, shadow=0.42, hi=0.25)
         cv.shape([('rect', hx - hr * 1.25, hy - hr * 0.16, hx + hr * 1.25, hy + hr * 0.02, 4)], (220, 170, 30), line=2.8, shadow=0.3)
@@ -416,13 +420,13 @@ def hero(cv, x, y, sc=1.0, mood="happy", facing=1, helmet=False, armL=(-20, 0.9)
         for i in range(n + 1):
             a = math.pi * (1.0 + i / n)
             rr = hr * (1.32 if i % 2 else 1.02)
-            pts.append((hx + math.cos(a) * rr + (f * hr * 0.1 if i % 2 else 0), hy - hr * 0.08 + math.sin(a) * rr * 0.98))
+            pts.append((hx + math.cos(a) * rr + (hr * 0.1 if i % 2 else 0), hy - hr * 0.08 + math.sin(a) * rr * 0.98))
         # lateral direita descendo até a orelha, franja em zigue-zague voltando pela testa
         pts.append((hx + hr * 0.98, hy + hr * 0.05))
         fr = [(0.82, -0.18), (0.62, -0.42), (0.45, -0.22), (0.22, -0.48), (0.02, -0.26), (-0.22, -0.5), (-0.42, -0.24), (-0.62, -0.46), (-0.85, -0.15)]
         for fx_, fy_ in fr:
-            pts.append((hx + fx_ * hr * f, hy + fy_ * hr))
-        pts.append((hx - hr * 0.98 * f if f > 0 else hx + hr * 0.98, hy + hr * 0.05))
+            pts.append((hx + fx_ * hr, hy + fy_ * hr))
+        pts.append((hx - hr * 0.98, hy + hr * 0.05))
         if f < 0:
             pts = [(2 * hx - px, py) for px, py in pts]
         locks = [('poly', pts)]
@@ -576,6 +580,213 @@ def slave(cv, x, y, sc, pose=0, shirt=(140, 120, 100), facing=1):
     cv.shape([('pie', x, shy - u * 0.45, u * 0.4, u * 0.38, 180, 360)], (230, 180, 50), line=2.4, shadow=0.4)
     cv.shape([('ell', x + facing * u * 0.1, shy - u * 0.78, u * 0.08, u * 0.08)], (255, 245, 200), line=1.6, shadow=0.1, rim=False)
     cv.glow(x + facing * u * 0.1, shy - u * 0.78, u * 0.35, (255, 240, 180), 110)
+
+def oldbram(cv, x, y, sc=1.0, mood="n", facing=1, look=(0.3, 0), sit=False):
+    """Velho Bram: careca com tufos brancos, barba longa, tapa-olho, rugas, colete remendado, perna de pau e muleta."""
+    u = 100 * sc
+    f = facing
+    contact(cv, x, y + u * 0.02, u * 0.8)
+    pants, shirt, vest = (84, 72, 60), (150, 140, 120), (92, 82, 70)
+    hipy = y - (u * 0.78 if sit else u * 1.2)
+    shy = hipy - u * 1.0
+    if sit:
+        cv.shape([('rect', x - u * 0.45, hipy + u * 0.05, x + u * 0.45, hipy + u * 0.16, 4)], (110, 74, 44), line=2.6, shadow=0.35)
+        for lx in (-0.35, 0.35):
+            cv.shape(limb((x + lx * u, hipy + u * 0.14), (x + lx * u * 1.1, y), u * 0.07), (90, 60, 36), line=2, shadow=0.3, rim=False)
+    # perna boa e perna de pau
+    kx, ky = (x - u * 0.2 + f * u * 0.55, hipy + u * 0.05) if sit else (x - u * 0.2, hipy + u * 0.6)
+    cv.shape(limb((x - u * 0.2, hipy), (kx, ky), u * 0.32, u * 0.28), pants, line=3, shadow=0.45, dots=True)
+    cv.shape(limb((kx, ky), (kx, y - u * 0.1), u * 0.28, u * 0.24), pants, line=3, shadow=0.45, dots=True)
+    cv.shape([('rect', kx - u * 0.16 + f * u * 0.03, y - u * 0.18, kx + u * 0.2 + f * u * 0.08, y + u * 0.02, 8 * sc)], (70, 46, 30), line=3, shadow=0.4)
+    k2x, k2y = (x + u * 0.2 + f * u * 0.55, hipy + u * 0.05) if sit else (x + u * 0.2, hipy + u * 0.55)
+    cv.shape(limb((x + u * 0.2, hipy), (k2x, k2y), u * 0.32, u * 0.3), pants, line=3, shadow=0.45, dots=True)
+    cv.shape([('ell', k2x, k2y + u * 0.04, u * 0.17, u * 0.12)], shade(pants, 0.8), line=2.4, shadow=0.3)   # amarra da calça
+    cv.shape(limb((k2x, k2y + u * 0.1), (k2x + f * u * 0.04, y - u * 0.02), u * 0.11, u * 0.08), (150, 105, 60), line=2.6, shadow=0.4, hi=0.25)
+    # tronco com camisa e colete remendado
+    cv.shape([('poly', [(x - u * 0.44, shy), (x + u * 0.44, shy), (x + u * 0.42, hipy + u * 0.05), (x - u * 0.42, hipy + u * 0.05)]),
+              ('ell', x - u * 0.38, shy + u * 0.1, u * 0.14, u * 0.12), ('ell', x + u * 0.38, shy + u * 0.1, u * 0.14, u * 0.12)], shirt, line=3.2, shadow=0.45, dots=True)
+    for side in (-1, 1):
+        cv.shape([('poly', [(x + side * u * 0.44, shy + u * 0.02), (x + side * u * 0.08, shy + u * 0.05), (x + side * u * 0.1, hipy), (x + side * u * 0.42, hipy)])], vest, line=2.6, shadow=0.4)
+    cv.shape([('rect', x - u * 0.34, shy + u * 0.5, x - u * 0.14, shy + u * 0.68, 2)], (130, 60, 50), line=1.8, shadow=0.2, rim=False)
+    # braços: um apoiado na muleta
+    cx_ = x + f * u * 0.85
+    cv.shape(limb((cx_, shy - u * 0.05), (cx_ + f * u * 0.08, y), u * 0.07), (130, 90, 52), line=2.4, shadow=0.35)
+    cv.shape([('rect', cx_ - u * 0.18, shy - u * 0.12, cx_ + u * 0.18, shy, 4)], (100, 66, 40), line=2.4, shadow=0.3)
+    for side in (-1, 1):
+        sx_, sy_ = x + side * u * 0.42, shy + u * 0.12
+        if side == f:
+            ex, ey, hx, hy = sx_ + side * u * 0.3, sy_ + u * 0.3, cx_, shy + u * 0.18
+        else:
+            ex, ey, hx, hy = sx_ - side * u * 0.02, sy_ + u * 0.5, sx_ + side * u * 0.05 + (f * u * 0.3 if sit else 0), sy_ + u * 0.95
+        cv.shape(limb((sx_, sy_), (ex, ey), u * 0.25, u * 0.22), shirt, line=3, shadow=0.45, dots=True)
+        cv.shape(limb((ex, ey), (hx, hy), u * 0.17, u * 0.15), SKIN_D, line=2.8, shadow=0.4)
+        hand(cv, hx, hy, u * 0.12, SKIN_D)
+    # cabeça: careca, tufos brancos, rugas, tapa-olho, barba longa
+    hr = u * 0.6
+    hx, hy = x + f * u * 0.03, shy - hr * 0.85
+    for side in (-1, 1):
+        cv.shape([('ell', hx + side * hr * 0.92, hy - hr * 0.1, hr * 0.22, hr * 0.34)], (236, 236, 240), line=2.4, shadow=0.3)
+    cv.shape([('ell', hx, hy, hr, hr * 1.04)], SKIN_D, line=3.4, shadow=0.4, hi=0.1)
+    cv.flat([('ell', hx - hr * 0.35, hy - hr * 0.65, hr * 0.26, hr * 0.1)], light(SKIN_D, 0.5))
+    for k in range(3):
+        cv.line([(hx - hr * 0.4, hy - hr * (0.42 - k * 0.1)), (hx + hr * 0.4, hy - hr * (0.45 - k * 0.1))], w=1.4, col=shade(SKIN_D, 0.6))
+    ex_ = hx + f * hr * 0.12
+    good, bad = ex_ + f * hr * 0.34, ex_ - f * hr * 0.34
+    eye(cv, good, hy + hr * 0.02, hr * 0.17, (110, 100, 80), look=look, mood="angry" if mood == "angry" else "n", side=f)
+    brow(cv, good, hy - hr * 0.28, hr * 0.24, "angry" if mood in ("angry", "n") else mood, f, col=(220, 220, 225), thick=7)
+    cv.shape([('ell', bad, hy + hr * 0.03, hr * 0.22, hr * 0.2)], (30, 24, 26), line=2.4, shadow=0.2, hi=0.15, rim=False)
+    cv.line([(hx - hr * 0.98, hy - hr * 0.35), (bad, hy + hr * 0.0), (hx + hr * 0.98, hy - hr * 0.42)], w=3, col=(30, 24, 26))
+    cv.line([(bad - hr * 0.05, hy - hr * 0.35), (bad + hr * 0.05, hy + hr * 0.3)], w=1.6, col=(170, 100, 90))   # cicatriz
+    cv.shape([('ell', ex_ + f * hr * 0.08, hy + hr * 0.3, hr * 0.15, hr * 0.13)], shade(SKIN_D, 0.85), line=2, shadow=0.3, rim=False)
+    bpts = [(hx - hr * 0.85, hy + hr * 0.3), (hx - hr * 0.7, hy + hr * 1.2), (hx - hr * 0.3, hy + hr * 1.9), (hx, hy + hr * 2.2), (hx + hr * 0.3, hy + hr * 1.9), (hx + hr * 0.7, hy + hr * 1.2), (hx + hr * 0.85, hy + hr * 0.3), (hx, hy + hr * 0.62)]
+    cv.shape([('poly', bpts)], (236, 236, 240), line=3, shadow=0.4, hi=0.15)
+    for i in range(5):
+        t = -0.5 + i * 0.25
+        cv.line([(hx + t * hr, hy + hr * 0.8), (hx + t * hr * 0.6, hy + hr * 1.7)], w=1.3, col=(170, 170, 180))
+    cv.shape([('poly', [(hx - hr * 0.55, hy + hr * 0.55), (hx, hy + hr * 0.42), (hx + hr * 0.55, hy + hr * 0.55), (hx + hr * 0.3, hy + hr * 0.65), (hx - hr * 0.3, hy + hr * 0.65)])], (210, 210, 218), line=2.4, shadow=0.3)
+    if mood == "talk":
+        cv.shape([('ell', ex_ + f * hr * 0.05, hy + hr * 0.75, hr * 0.15, hr * 0.1)], (90, 30, 40), line=2, shadow=0.1, rim=False)
+
+def beast(cv, x, y, sc=1.0):
+    """Criatura de Lúmen bruto: corpo curvado, cabeça com mandíbula, espinhos de cristal, olhos vermelhos e garras."""
+    u = 100 * sc
+    dark = (46, 30, 66)
+    cv.glow(x - u * 0.5, y - u * 1.6, u * 2.4, (120, 40, 160), 110)
+    for lx in (-0.9, 0.2, 0.9):   # patas
+        cv.shape(limb((x + lx * u, y - u * 1.0), (x + lx * u - u * 0.15, y - u * 0.05), u * 0.45, u * 0.3), shade(dark, 0.85), line=3.2, shadow=0.4)
+        for c in range(3):
+            cv.shape([('poly', [(x + lx * u - u * 0.35 + c * u * 0.18, y - u * 0.1), (x + lx * u - u * 0.42 + c * u * 0.18, y + u * 0.05), (x + lx * u - u * 0.25 + c * u * 0.18, y - u * 0.02)])], (200, 240, 255), line=1.8, shadow=0.2, rim=False)
+    cv.shape([('poly', blob(x, y - u * 1.45, u * 1.5, u * 0.9, 16, 0.08, 7))], dark, line=4, shadow=0.4, hi=0.12, dots=True)
+    for i in range(6):   # espinhos de cristal nas costas
+        t = i / 5
+        bx, by = x - u * 0.9 + t * u * 2.0, y - u * 2.15 + math.sin(t * math.pi) * -u * 0.25
+        crystal(cv, bx, by + u * 0.25, u * (0.6 + (i % 3) * 0.3), (120, 230, 255) if i % 2 else (190, 120, 255), lean=(t - 0.5) * u * 0.4)
+    hx, hy = x - u * 1.55, y - u * 1.75   # cabeça
+    cv.shape([('poly', blob(hx, hy, u * 0.75, u * 0.6, 12, 0.06, 3))], dark, line=4, shadow=0.4, hi=0.12)
+    cv.shape([('poly', [(hx - u * 0.75, hy + u * 0.1), (hx + u * 0.2, hy + u * 0.25), (hx - u * 0.1, hy + u * 0.7), (hx - u * 0.85, hy + u * 0.45)])], shade(dark, 0.8), line=3.4, shadow=0.35)
+    for k in range(5):   # dentes
+        tx = hx - u * 0.7 + k * u * 0.18
+        cv.shape([('poly', [(tx, hy + u * 0.18), (tx + u * 0.12, hy + u * 0.2), (tx + u * 0.06, hy + u * 0.4)])], (240, 240, 250), line=1.6, shadow=0.15, rim=False)
+    for k in (-1, 1):
+        ex, ey = hx - u * 0.25 + k * u * 0.25, hy - u * 0.2
+        cv.glow(ex, ey, u * 0.35, (255, 40, 60), 220)
+        cv.shape([('poly', [(ex - u * 0.13, ey - u * 0.04), (ex + u * 0.13, ey - u * 0.08), (ex, ey + u * 0.08)])], (255, 80, 90), line=2, shadow=0.1, rim=False)
+
+def cathedral_bg(cv, warm=False):
+    for i, (x, h, col) in enumerate(((120, 700, (90, 70, 140)), (380, 760, (70, 60, 120)), (1220, 740, (80, 66, 130)), (1480, 700, (90, 70, 140)))):
+        cv.shape([('rect', x - 70, 900 - h, x + 70, 900, 8)], col, line=3, shadow=0.3, rim=False, dots=True)
+        crystal(cv, x, 900 - h + 40, 120, (150, 230, 255), 0)
+    cv.shape([('rect', -20, 780, W + 20, H + 20, 0)], (44, 36, 70), line=3, shadow=0.0, rim=False)
+
+def ancient_gate(cv, x, y, w, h, open_=0.0, sealed=False):
+    stone = (120, 112, 140)
+    cv.shape([('rect', x - w / 2 - 70, y - h, x - w / 2, y, 6), ('rect', x + w / 2, y - h, x + w / 2 + 70, y, 6), ('rect', x - w / 2 - 90, y - h - 80, x + w / 2 + 90, y - h + 10, 6)], stone, line=3.4, shadow=0.35, dots=True)
+    for k in range(4):
+        for sx in (-1, 1):
+            cv.shape([('poly', [(x + sx * (w / 2 + 35), y - h + 60 + k * 110), (x + sx * (w / 2 + 50), y - h + 75 + k * 110), (x + sx * (w / 2 + 35), y - h + 90 + k * 110), (x + sx * (w / 2 + 20), y - h + 75 + k * 110)])], (130, 230, 255), line=1.6, shadow=0.1, rim=False)
+    cv.shape([('rect', x - w / 2, y - h, x + w / 2, y, 2)], (12, 6, 18), line=2, shadow=0.0, hi=0.0, rim=False)
+    cv.glow(x, y - h * 0.4, w * 0.5, (200, 40, 70), 120)
+    dw = w / 2 * (1 - open_)
+    for sx in (-1, 1):
+        if dw > 4:
+            x0 = x - w / 2 if sx < 0 else x + w / 2 - dw
+            cv.shape([('rect', x0, y - h, x0 + dw, y, 2)], (80, 78, 86), line=3, shadow=0.35, hi=0.2)
+            for r_ in range(4):
+                cv.shape([('rect', x0, y - h + 40 + r_ * (h - 60) / 3, x0 + dw, y - h + 56 + r_ * (h - 60) / 3, 1)], (110, 80, 60), line=1.6, shadow=0.3, rim=False)
+    if sealed:
+        for sx in (-1, 1):
+            for i in range(14):
+                t = i / 13
+                cv.shape([('ell', x + sx * (-w / 2 + w * t), y - h + 40 + (h - 80) * t, 13, 8)], (170, 170, 180), line=1.8, shadow=0.3, rim=False)
+        cv.glow(x, y - h * 0.5, 90, (255, 170, 70), 200)
+        cv.shape([('ell', x, y - h * 0.5, 55, 55)], (255, 190, 80), line=3, shadow=0.3, hi=0.3)
+        cv.shape(limb((x - 20, y - h * 0.5 + 25), (x + 18, y - h * 0.5 - 20), 9), (120, 80, 50), line=1.8, shadow=0.2, rim=False)
+        cv.shape([('poly', [(x + 5, y - h * 0.5 - 32), (x + 38, y - h * 0.5 - 12), (x + 30, y - h * 0.5), (x - 3, y - h * 0.5 - 20)])], (120, 120, 135), line=1.8, shadow=0.3, rim=False)
+
+def bram1():
+    cv = Canvas(gradient((26, 20, 50), (60, 44, 90)))
+    cv.light = (-0.6, -0.8); cv.rim = (150, 220, 255)
+    cathedral_bg(cv)
+    ancient_gate(cv, 860, 800, 420, 560, open_=0.55)
+    smith(cv, 1270, 900, 2.0, "angry", facing=-1, point=True, hammer=False, bandana=True, shirt=(50, 50, 58), beard=(25, 22, 26), look=(-0.8, 0.1))
+    hero(cv, 640, 900, 1.45, "scared", facing=1, armL=(-25, 0.9), armR=(40, 0.95), shirt=(120, 110, 95), hair=(40, 30, 24), lantern=True, look=(0.6, -0.2))
+    cv.text("ENTRA, BRAM!", 1250, 140, 60, (255, 225, 90), 6)
+    finish(cv, OUT + "/bram_1.png")
+
+def bram2():
+    cv = Canvas(gradient((10, 6, 18), (34, 14, 40)))
+    cv.light = (0.7, -0.7); cv.rim = (255, 80, 110)
+    for i in range(60):
+        r_ = random.Random(i)
+        a = r_.uniform(0, math.tau)
+        cv.line([(520 + math.cos(a) * 180, 430 + math.sin(a) * 180), (520 + math.cos(a) * 1300, 430 + math.sin(a) * 1300)], w=r_.uniform(1, 3), col=(90, 40, 110))
+    beast(cv, 1300, 900, 2.0)
+    for i in range(3):
+        cv.shape([('poly', [(520 + i * 70, 180 + i * 40), (900 + i * 60, 560 + i * 40), (880 + i * 60, 575 + i * 40), (500 + i * 70, 195 + i * 40)])], (255, 255, 255), line=1.4, shadow=0.0, rim=False)
+    hero(cv, 470, 900, 1.5, "scared", facing=1, armL=(-160, 0.9), armR=(150, 0.95), shirt=(120, 110, 95), hair=(40, 30, 24), look=(0.8, -0.3))
+    cv.shape([('rect', 250, 860, 300, 890, 4)], (255, 220, 130), line=2.4, shadow=0.2, rim=False)   # lanterna caída
+    cv.glow(275, 870, 60, (255, 220, 140), 110)
+    cv.text("AAAAH!", 330, 130, 84, (255, 110, 110), -10)
+    finish(cv, OUT + "/bram_2.png")
+
+def bram3():
+    cv = Canvas(gradient((18, 22, 50), (60, 48, 70)))
+    cv.light = (0.8, -0.5); cv.rim = (255, 170, 90)
+    mountains(cv, 520, [((50, 46, 80), 160, 300), ((38, 34, 62), 100, 220)])
+    timber_house(cv, 40, 640, 220, 150, (200, 190, 170), (120, 50, 40), seed=4)
+    timber_house(cv, 1320, 630, 230, 150, (210, 196, 176), (70, 72, 90), seed=6)
+    cv.shape([('rect', -20, 600, W + 20, H + 20, 0)], (60, 70, 52), line=2, shadow=0.05, rim=False)
+    for tx in (300, 1240):
+        cv.shape(limb((tx, 600), (tx, 420), 14), (90, 60, 36), line=2.4, shadow=0.3)
+        cv.glow(tx, 400, 90, (255, 170, 80), 170)
+        cv.shape([('poly', [(tx - 18, 420), (tx, 360), (tx + 18, 420)])], (255, 180, 70), line=2, shadow=0.1, rim=False)
+    for (vx, col) in ((420, (180, 70, 70)), (500, (70, 120, 170)), (1090, (110, 150, 90)), (1170, (200, 160, 80)), (1000, (150, 90, 150))):
+        cv.shape([('rect', vx - 22, 520, vx + 22, 620, 10), ('ell', vx, 500, 20, 20)], col, line=2.4, shadow=0.45, rim=True)
+    guildmaster(cv, 820, 860, 1.5, "n", facing=1)
+    cv.shape(limb((910, 560), (1040, 500), 30), (110, 50, 130), line=3, shadow=0.4)
+    hand(cv, 1050, 495, 18, SKIN)
+    smith(cv, 1330, 920, 1.7, "angry", facing=-1, hammer=True, bandana=True, shirt=(50, 50, 58), beard=(25, 22, 26), look=(-0.9, 0.1))
+    # Bram ferido na maca, carregado por dois moradores
+    cv.shape([('rect', 120, 760, 520, 800, 6)], (150, 120, 80), line=3, shadow=0.35)
+    cv.shape([('rect', 170, 720, 470, 770, 14)], (200, 195, 185), line=3, shadow=0.35, dots=True)
+    cv.shape([('ell', 160, 720, 48, 44)], SKIN, line=3, shadow=0.4)
+    cv.shape([('rect', 120, 700, 200, 722, 6)], (240, 240, 235), line=2.4, shadow=0.2, rim=False)   # atadura no olho
+    cv.shape([('ell', 470, 742, 30, 22)], (240, 240, 235), line=2.4, shadow=0.2, rim=False)        # perna enfaixada
+    for px in (110, 530):
+        cv.shape([('rect', px - 22, 660, px + 22, 900, 10), ('ell', px, 640, 22, 22)], (70, 60, 70), line=2.6, shadow=0.4)
+    cv.text("FORA DA VILA, CORVO!", 820, 150, 56, (255, 225, 90), -4)
+    finish(cv, OUT + "/bram_3.png")
+
+def bram4():
+    cv = Canvas(gradient((22, 16, 40), (50, 36, 76)))
+    cv.light = (-0.5, -0.85); cv.rim = (255, 80, 90)
+    cathedral_bg(cv)
+    ancient_gate(cv, 640, 800, 440, 580, open_=0.12, sealed=True)
+    # trabalhadores da Guilda pregando as correntes
+    for (wx, flip) in ((330, 1), (960, -1)):
+        cv.shape([('rect', wx - 30, 640, wx + 30, 790, 12), ('ell', wx, 618, 26, 26)], (90, 80, 70), line=2.6, shadow=0.45)
+        cv.shape(limb((wx + flip * 20, 670), (wx + flip * 80, 600), 16), (90, 80, 70), line=2.4, shadow=0.4)
+        cv.shape([('rect', wx + flip * 80 - 20, 575, wx + flip * 80 + 20, 600, 3)], (120, 120, 135), line=2, shadow=0.3, rim=False)
+    cv.text("CLANG!", 470, 520, 36, (255, 220, 120), -8)
+    # a silhueta do Corvo descendo pela fresta, olhos vermelhos
+    cv.flat([('poly', [(1180, 900), (1600, 900), (1600, 300), (1360, 260)])], (8, 4, 10), alpha=235)
+    cv.shape([('ell', 1400, 520, 140, 170), ('rect', 1260, 560, 1540, 900, 30)], (14, 10, 16), line=3, shadow=0.0, hi=0.0, rim=True)
+    for k in (-1, 1):
+        cv.glow(1395 + k * 42, 500, 40, (255, 40, 60), 230)
+        cv.shape([('poly', [(1375 + k * 42, 495), (1415 + k * 42, 492), (1395 + k * 42, 508)])], (255, 90, 90), line=1.6, shadow=0.0, rim=False)
+    cv.text("...", 1400, 200, 70, (255, 120, 120), 0)
+    finish(cv, OUT + "/bram_4.png")
+
+def portraits():
+    """Retratos para as conversas (cabeça e ombros, fundo de cor lisa)."""
+    for name, bg, draw in (("bram", ((120, 80, 50), (200, 140, 90)), lambda cv: oldbram(cv, 800, 1170, 2.2, "talk", facing=1, look=(0.6, 0))),
+                           ("hero", ((50, 80, 140), (110, 160, 220)), lambda cv: hero(cv, 800, 1230, 2.2, "happy", facing=-1, look=(-0.6, 0)))):
+        cv = Canvas(gradient(bg[0], bg[1]))
+        cv.light = (-0.6, -0.8); cv.rim = (255, 230, 190)
+        draw(cv)
+        paper(cv.img, 8)
+        img = cv.img.crop((s(800 - 300), s(300), s(800 + 300), s(900))).convert("RGB").resize((512, 512), Image.LANCZOS)
+        img.save(OUT + f"/portrait_{name}.png", optimize=True)
 
 # ------------------------------------------------------------------ quadros
 def panel1():
@@ -800,7 +1011,8 @@ if __name__ == "__main__":
     OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "story")
     os.makedirs(OUT, exist_ok=True)
     only = sys.argv[2] if len(sys.argv) > 2 else None
-    for i, f in enumerate((panel1, panel2, panel3, panel4, panel5, panel6), 1):
-        if only and str(i) not in only: continue
+    jobs = [("1", panel1), ("2", panel2), ("3", panel3), ("4", panel4), ("5", panel5), ("6", panel6), ("a", bram1), ("b", bram2), ("c", bram3), ("d", bram4), ("p", portraits)]
+    for key, f in jobs:
+        if only and key not in only: continue
         f()
-        print("quadro", i)
+        print("quadro", key)

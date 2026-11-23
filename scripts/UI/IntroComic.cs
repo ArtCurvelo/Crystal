@@ -21,6 +21,8 @@ public partial class IntroComic : CanvasLayer
     };
 
     public event Action Finished;
+    string[] _caps = Captions;
+    string _prefix = "panel_";
     public bool IsPlaying { get; private set; }
     public int Index { get; private set; }
 
@@ -78,7 +80,17 @@ public partial class IntroComic : CanvasLayer
         _root.AddChild(skip);
     }
 
-    public void Play()
+    /// <summary>Toca outra sequência de quadros (ex.: o flashback do Velho Bram): assets/story/{prefix}N.png.</summary>
+    public void Play(string prefix, string[] captions)
+    {
+        _prefix = prefix;
+        _caps = captions;
+        Play(false);
+    }
+
+    public void Play() { _prefix = "panel_"; _caps = Captions; Play(false); }
+
+    void Play(bool _)
     {
         IsPlaying = true;
         _ending = false;
@@ -92,7 +104,7 @@ public partial class IntroComic : CanvasLayer
     void Show(int i)
     {
         Index = i;
-        _art.Texture = GD.Load<Texture2D>($"res://assets/story/panel_{i + 1}.png");
+        _art.Texture = GD.Load<Texture2D>($"res://assets/story/{_prefix}{i + 1}.png");
         // leve aproximação (efeito de câmera sobre o quadro)
         _art.PivotOffset = _art.Size / 2;
         _art.Scale = Vector2.One;
@@ -102,7 +114,7 @@ public partial class IntroComic : CanvasLayer
         _art.Modulate = new Color(1, 1, 1, 0);
         CreateTween().TweenProperty(_art, "modulate:a", 1f, 0.35f);
 
-        string line = Loc.T(Captions[i]);
+        string line = Loc.T(_caps[i]);
         _text.Text = line;
         _text.VisibleRatio = 0f;
         _typing = true;
@@ -110,8 +122,8 @@ public partial class IntroComic : CanvasLayer
         _typeTween = CreateTween();
         _typeTween.TweenProperty(_text, "visible_ratio", 1f, Math.Clamp(line.Length * 0.028f, 0.8f, 4f));
         _typeTween.TweenCallback(Callable.From(() => _typing = false));
-        _counter.Text = $"{i + 1} / {Captions.Length}";
-        _hint.Text = i == Captions.Length - 1 ? Loc.T("Clique ou Espaço para começar") : Loc.T("Clique ou Espaço para continuar");
+        _counter.Text = $"{i + 1} / {_caps.Length}";
+        _hint.Text = i == _caps.Length - 1 ? Loc.T("Clique ou Espaço para começar") : Loc.T("Clique ou Espaço para continuar");
         Accessibility.Speak(line, true);
         Audio.AudioManager.Instance?.Play("click", -10f);
     }
@@ -127,7 +139,7 @@ public partial class IntroComic : CanvasLayer
             _typing = false;
             return;
         }
-        if (Index + 1 < Captions.Length) Show(Index + 1);
+        if (Index + 1 < _caps.Length) Show(Index + 1);
         else End();
     }
 

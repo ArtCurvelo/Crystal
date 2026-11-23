@@ -307,6 +307,47 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-story"))
+        {
+            foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
+            gs.Data.Discovered.Add("heart");
+            gs.Data.GameCompleted = true;
+            gs.RaiseAll();
+            await Wait(0.5f);
+            Main.CloseAllForTour();
+            var bram = Main.World.Town.Bram;
+            LookAtPoint(p, bram.GlobalPosition + new Vector3(-1.2f, 0.1f, 1.7f), bram.GlobalPosition + Vector3.Up * 0.8f);
+            await Wait(1.5f);
+            await Shot("42_bram");
+            UiBus.RequestTalk("bram");
+            await Wait(1.2f);
+            await Shot("42_dialogue_bram");
+            var dlg = Main.GetChildren().OfType<CrystalExcavator.UI.DialogueScreen>().FirstOrDefault();
+            for (int k = 0; k < 3 && dlg != null; k++) { dlg.Advance(); await Wait(0.2f); dlg.Advance(); await Wait(0.3f); }
+            await Wait(0.8f);
+            await Shot("42_dialogue_hero");
+            for (int k = 0; k < 12 && dlg != null && dlg.IsPlaying; k++) { dlg.Advance(); await Wait(0.15f); }
+            await Wait(1.0f);
+            await Shot("42_flashback");
+            var fb = Main.GetChildren().OfType<CrystalExcavator.UI.IntroComic>().FirstOrDefault(c => c.Name == "Flashback");
+            fb?.Skip();
+            await Wait(1.0f);
+            for (int k = 0; k < 12 && dlg != null && dlg.IsPlaying; k++) { dlg.Advance(); await Wait(0.15f); }
+            await Wait(0.8f);
+            GD.Print($"[Tour] etapa da história: {gs.Story}");
+            var gate = Main.World.SealedGate;
+            var fwd = gate.GlobalTransform.Basis.Z;
+            LookAtPoint(p, gate.GlobalPosition + fwd * 11f + Vector3.Up * 0.2f, gate.GlobalPosition + Vector3.Up * 3.5f);
+            await Wait(1.5f);
+            await Shot("42_gate_sealed");
+            gs.SetStory(CrystalExcavator.Data.StoryData.OpenGate);
+            UiBus.RequestGate();
+            await Wait(3.5f);
+            await Shot("42_gate_open");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-diary"))
         {
             foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);

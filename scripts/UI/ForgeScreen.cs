@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using CrystalExcavator.Core;
 using CrystalExcavator.Data;
 using Godot;
@@ -74,6 +75,26 @@ public partial class ForgeScreen : ModalScreen
         var gs = GameState.Instance;
         UiTheme.ClearChildren(_list);
         Button first = null;
+        // receita escondida do Velho Bram (ato 2): a chave falsa da Guilda
+        if (gs.Story == StoryData.ForgeKey)
+        {
+            Card(new Color(1f, 0.4f, 0.3f), out var kh);
+            kh.AddChild(HudIcon.MakeOre(GameData.Mat(StoryData.KeyOre2), 48));
+            var kv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+            kh.AddChild(kv);
+            kv.AddChild(UiTheme.Label("Chave falsa da Guilda (receita do Velho Bram)", 18, new Color(1f, 0.7f, 0.55f), true));
+            int diaries = StoryData.AldricDiaries.Count(d => gs.Data.Diaries.Contains(d));
+            kv.AddChild(UiTheme.Label(Loc.F("Cadernos do Aldric lidos: {0}/2  ·  {1}", diaries, gs.DayOver ? Loc.T("o ferreiro está dormindo") : Loc.T("só de noite, quando o ferreiro dorme")), 14, diaries == 2 && gs.DayOver ? UiTheme.Success : UiTheme.Muted));
+            var kline = UiTheme.Label(CostLine(new[] { new ForgeCost(StoryData.KeyOre1, StoryData.KeyOre1Amount), new ForgeCost(StoryData.KeyOre2, StoryData.KeyOre2Amount) }, gs.KeyFee, out bool kok), 14, kok ? UiTheme.Success : UiTheme.Muted);
+            kline.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            kv.AddChild(kline);
+            var kb = UiTheme.Button("Forjar escondido", () => { if (GameState.Instance.TryForgeKey()) Audio.AudioManager.Instance?.Play("unlock", -4f); }, 170, 18);
+            kb.Disabled = !gs.CanForgeKey;
+            kb.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+            kb.SetMeta("key", 1);
+            kh.AddChild(kb);
+            if (!kb.Disabled) first = kb;
+        }
         foreach (var slot in GearData.Slots)
         {
             var cur = GearData.Of(slot, gs.GearTier(slot));

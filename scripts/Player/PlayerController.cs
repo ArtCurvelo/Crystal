@@ -261,6 +261,9 @@ public partial class PlayerController : CharacterBody3D
     OmniLight3D _lampFill;
     public bool LampOn = true;
     public void SetLamp(bool on) { LampOn = on; ApplySettings(); }
+    /// <summary>Ao ar livre de dia (vila) a lanterna do capacete apaga sozinha: estourava quem estivesse perto.</summary>
+    public bool Daylight { get; private set; }
+    public void SetDaylight(bool on) { if (on == Daylight) return; Daylight = on; ApplySettings(); }
 
     void ApplySettings()
     {
@@ -268,8 +271,8 @@ public partial class PlayerController : CharacterBody3D
         if (Lamp != null)
         {
             Lamp.ShadowEnabled = Core.Rendering.RenderFeatures.Current.LampShadows;
-            Lamp.Visible = LampOn;
-            _lampFill.Visible = LampOn && Settings.Quality != GraphicsQuality.Low;
+            Lamp.Visible = LampOn && !Daylight;
+            _lampFill.Visible = LampOn && !Daylight && Settings.Quality != GraphicsQuality.Low;
         }
         Camera.Fov = Settings.Data.Fov;
         Camera.Far = Settings.Quality switch { GraphicsQuality.Low => 80f, GraphicsQuality.Medium => 140f, _ => 240f };

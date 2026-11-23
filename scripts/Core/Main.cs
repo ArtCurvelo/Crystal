@@ -225,6 +225,8 @@ public partial class Main : Node
         UiBus.OpenMissions += OpenMissions;
         UiBus.OpenForge += OpenForge;
         UiBus.OpenDiary += OpenDiary;
+        UiBus.Talk += Talk;
+        UiBus.Gate += UseGate;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
@@ -409,6 +411,8 @@ public partial class Main : Node
         UiBus.OpenMissions -= OpenMissions;
         UiBus.OpenForge -= OpenForge;
         UiBus.OpenDiary -= OpenDiary;
+        UiBus.Talk -= Talk;
+        UiBus.Gate -= UseGate;
         UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
@@ -749,6 +753,111 @@ public partial class Main : Node
     MissionScreen _missions;
     ForgeScreen _forge;
     DiaryScreen _diary;
+    DialogueScreen _dialogue;
+    IntroComic _flashback;
+    public bool StoryPlaying => (_dialogue?.IsPlaying ?? false) || (_flashback?.IsPlaying ?? false);
+
+    void BeginStory()
+    {
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        Player.InputEnabled = false;
+        AudioManager.Instance?.SetBeam(false);
+    }
+
+    void EndStory()
+    {
+        if (StoryPlaying) return;
+        ReturnToGameplay();
+    }
+
+    void Say(System.Collections.Generic.IReadOnlyList<Line> lines, System.Action then = null)
+    {
+        if (_dialogue == null)
+        {
+            _dialogue = new DialogueScreen { Name = "Dialogue" };
+            AddChild(_dialogue);
+        }
+        BeginStory();
+        _dialogue.Play(lines, () => { then?.Invoke(); EndStory(); });
+    }
+
+    void Flashback(System.Action then)
+    {
+        if (_flashback == null)
+        {
+            _flashback = new IntroComic { Name = "Flashback" };
+            AddChild(_flashback);
+            _flashback.Finished += () => { var t = _flashbackThen; _flashbackThen = null; t?.Invoke(); EndStory(); };
+        }
+        BeginStory();
+        _flashbackThen = then;
+        _flashback.Play("bram_", StoryData.Flashback);
+    }
+    System.Action _flashbackThen;
+
+    /// <summary>Conversa com o Velho Bram conforme a etapa do ato 2.</summary>
+    void Talk(string who)
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading || StoryPlaying) return;
+        var gs = GameState.Instance;
+        bool cathedral = gs.IsUnlocked("cathedral");
+        switch (gs.Story)
+        {
+            case StoryData.Locked:
+                Say(new[] { new Line("bram", StoryData.Grumbles[gs.Data.Day % StoryData.Grumbles.Length]) });
+                break;
+            case StoryData.BramCalls:
+                Say(StoryData.Intro1, () => Flashback(() => Say(cathedral ? StoryData.Intro2 : StoryData.Intro2.Concat(StoryData.NeedCathedral).ToArray(), () => gs.SetStory(StoryData.FindGate))));
+                break;
+            case StoryData.FindGate:
+                Say(cathedral ? StoryData.RemindGate : StoryData.NeedCathedral);
+                break;
+            case StoryData.BringMold:
+                Say(StoryData.Mold, () => gs.SetStory(StoryData.ForgeKey));
+                break;
+            case StoryData.ForgeKey:
+                Say(StoryData.RemindKey);
+                break;
+            case StoryData.OpenGate:
+                Say(StoryData.KeyReady);
+                break;
+            default:
+                Say(StoryData.AfterGate);
+                break;
+        }
+    }
+
+    /// <summary>Portão selado da Catedral: molde do selo (etapa 2) e abertura com a chave falsa (etapa 5).</summary>
+    void UseGate()
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading || StoryPlaying) return;
+        var gs = GameState.Instance;
+        switch (gs.Story)
+        {
+            case StoryData.FindGate:
+                gs.SetStory(StoryData.BringMold);
+                Hud.ShowBigMessage(Loc.T("MOLDE DO SELO"));
+                gs.Notify("Molde do selo", Loc.T("Você apertou a cera no selo do Mestre. Leve o molde ao Velho Bram, na vila."), NotifyKind.Unlock);
+                break;
+            case StoryData.OpenGate:
+                gs.SetStory(StoryData.GateOpen);
+                World.SealedGate?.Open();
+                AudioManager.Instance?.Play("unlock", -2f);
+                Hud.ShowBigMessage(Loc.T("O PORTÃO SE ABRIU"));
+                gs.Notify("As Profundezas Proibidas", Loc.T("Um vento frio sobe da escuridão. Seis lugares, um pior que o outro... e o Mestre Corvo no último."), NotifyKind.Unlock);
+                break;
+            case StoryData.GateOpen:
+                gs.Notify("As Profundezas Proibidas", Loc.T("A escuridão ainda é funda demais para descer. (As Profundezas Proibidas chegam numa próxima atualização.)"), NotifyKind.Info);
+                break;
+            case StoryData.BringMold:
+            case StoryData.ForgeKey:
+                gs.Notify("Portão selado", Loc.T("O selo do Mestre não cede. Você precisa da chave falsa que o Velho Bram ensinou a forjar."), NotifyKind.Info);
+                break;
+            default:
+                gs.Notify("Portão selado", Loc.T("Um portão antigo, mais velho que a Guilda, lacrado com correntes e o selo do Mestre."), NotifyKind.Info);
+                break;
+        }
+    }
 
     void OpenDiary(string id)
     {
@@ -821,7 +930,7 @@ public partial class Main : Node
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
+    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || StoryPlaying || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -1030,6 +1139,7 @@ public partial class Main : Node
         int place = inHouse ? 2 : inTown ? 1 : 0;
         GameState.Instance.InTown = inTown;
         bool night = World.Town?.Night ?? true;
+        Player.SetDaylight(inTown && !inHouse && !night);
         // céu da vila acompanha o fim do turno e o novo dia mesmo sem sair do lugar
         if (inTown && night != _townNightShown && r == _currentRegion && place == _bannerPlace) { _townNightShown = night; _env.SetTown(true, night); }
         if (r == _currentRegion && place == _bannerPlace) return;

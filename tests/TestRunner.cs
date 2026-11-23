@@ -101,6 +101,43 @@ public partial class TestRunner : Node
                 GS.InTown = false;
                 Fresh();
             });
+            Run("História: a chave falsa do Velho Bram", () =>
+            {
+                Fresh(); GS.NewGame();
+                Check(GS.Story == StoryData.Locked, "antes do Coração a história não começa");
+                GS.Data.Discovered.Add("heart");
+                Check(GS.Story == StoryData.BramCalls, "quebrar o Coração faz o Velho Bram chamar");
+                GS.SetStory(StoryData.FindGate);
+                GS.SetStory(StoryData.Locked);
+                Check(GS.Story == StoryData.FindGate, "a história só anda para a frente");
+                GS.SetStory(StoryData.ForgeKey);
+                GS.Data.Inventory[StoryData.KeyOre1] = StoryData.KeyOre1Amount + 2;
+                GS.Data.Inventory[StoryData.KeyOre2] = StoryData.KeyOre2Amount;
+                GS.Data.Money = GS.KeyFee;
+                GS.Data.DayOver = false;
+                Check(!GS.CanForgeKey, "de dia (ferreiro acordado) não forja a chave");
+                GS.Data.DayOver = true;
+                Check(!GS.CanForgeKey, "sem ler os cadernos do Aldric não forja");
+                foreach (var d in StoryData.AldricDiaries) GS.Data.Diaries.Add(d);
+                Check(GS.CanForgeKey && GS.TryForgeKey(), "à noite, com tudo, forja a chave falsa");
+                Check(GS.Story == StoryData.OpenGate && GS.Data.Money == 0 && GS.InventoryOf(StoryData.KeyOre1) == 2 && GS.InventoryOf(StoryData.KeyOre2) == 0, "a chave cobra a taxa e os minérios e avança a história");
+                Check(!GS.TryForgeKey(), "não forja duas chaves");
+                var j = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
+                j.StoryStage = 99; j.Sanitize();
+                Check(j.StoryStage == StoryData.GateOpen, "etapa da história fica no save (saneada)");
+                GS.Data.GameCompleted = true; GS.Data.RunEarned = 50_000_000;
+                if (GS.CanPrestige) GS.Prestige();
+                Check(GS.Data.StoryStage == StoryData.OpenGate, "a história continua depois do renascimento");
+                // todas as falas têm tradução e retrato
+                bool linesOk = true;
+                foreach (var set in new[] { StoryData.Intro1, StoryData.Intro2, StoryData.NeedCathedral, StoryData.RemindGate, StoryData.Mold, StoryData.RemindKey, StoryData.KeyReady, StoryData.AfterGate })
+                    foreach (var l in set)
+                        if (!LocTables.En.ContainsKey(l.Text) || !ResourceLoader.Exists($"res://assets/story/portrait_{l.Speaker}.png")) { linesOk = false; GD.Print($"      fala sem tradução/retrato: {l.Text}"); }
+                foreach (var t in StoryData.Flashback.Concat(StoryData.Grumbles)) if (!LocTables.En.ContainsKey(t)) linesOk = false;
+                for (int i = 1; i <= StoryData.Flashback.Length; i++) if (!ResourceLoader.Exists($"res://assets/story/bram_{i}.png")) linesOk = false;
+                Check(linesOk, "falas traduzidas, retratos e quadros do flashback existem");
+                Fresh();
+            });
             Run("Forja: equipamentos e conserto", () =>
             {
                 Fresh(); GS.NewGame();
@@ -1317,6 +1354,19 @@ public partial class TestRunner : Node
         }
         Check(diariesOk, "cada diário está numa câmara secreta própria, em chão firme");
         Check(DiaryData.All.Select(d => d.Region).Distinct().Count() == GameData.Regions.Count, "dois diários por região");
+        // portão selado no fundo da Catedral
+        Check(world.SealedGate != null && WorldBuilder.RegionAt(world.SealedGate.GlobalPosition).Id == "cathedral", "portão selado fica na Catedral");
+        if (world.SealedGate != null)
+        {
+            var gp = world.SealedGate.GlobalPosition;
+            var gl = world.Layouts[5];
+            Check(gl.Depth(gp.X, gp.Z) > 0.6f, $"portão fica no fundo da Catedral (profundidade {gl.Depth(gp.X, gp.Z):0.00})");
+            var gfloor = dspace.IntersectRay(PhysicsRayQueryParameters3D.Create(gp + new Vector3(0, 0.5f, 0) + world.SealedGate.GlobalTransform.Basis.Z * 2.5f, gp + Vector3.Down * 2f + world.SealedGate.GlobalTransform.Basis.Z * 2.5f, PlayerController.WorldLayer));
+            Check(gfloor.Count > 0, "há chão na frente do portão");
+            bool gate = false; void OnGate() => gate = true;
+            UiBus.Gate += OnGate; world.SealedGate.Interact(null); UiBus.Gate -= OnGate;
+            Check(gate, "interagir com o portão chama a lógica da história");
+        }
         string readId = null; void OnDiary(string id) => readId = id;
         UiBus.OpenDiary += OnDiary; world.Diaries[0].Interact(null); UiBus.OpenDiary -= OnDiary;
         Check(readId == world.Diaries[0].DiaryId, "interagir com o diário abre a leitura");
@@ -1455,6 +1505,20 @@ public partial class TestRunner : Node
         Check(GS.Data.Contracts[0].Done, "entrega pela tela funciona");
         ms.CloseSilently();
         ms.QueueFree();
+        // Velho Bram: está atrás da oficina, interagir pede a conversa; a conversa avança e termina
+        Check(town.Bram != null && Town.Contains(town.Bram.GlobalPosition), "Velho Bram mora na vila");
+        string talked = null; void OnTalk(string w) => talked = w;
+        UiBus.Talk += OnTalk; town.Bram.Interact(null); UiBus.Talk -= OnTalk;
+        Check(talked == "bram", "falar com o Velho Bram abre a conversa");
+        var dlg = new DialogueScreen();
+        AddChild(dlg);
+        await Frames(1);
+        bool said = false;
+        dlg.Play(StoryData.Intro1, () => said = true);
+        await Frames(2);
+        for (int k = 0; k < 30 && dlg.IsPlaying; k++) { dlg.Advance(); await Frames(1); }
+        Check(said && !dlg.IsPlaying, "a conversa avança fala por fala e termina");
+        dlg.QueueFree();
         // forja: a bigorna abre a tela, forjar e consertar pela interface
         bool forge = false; void OnF() => forge = true;
         UiBus.OpenForge += OnF; town.Anvil.Interact(null); UiBus.OpenForge -= OnF;

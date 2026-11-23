@@ -764,12 +764,15 @@ public partial class PlaythroughBot : Node
         long before = GS.Data.Money;
         // como um jogador que guarda minério para a forja: separa o que as próximas peças pedem antes de vender
         var keep = new Dictionary<string, int>();
+        // só guarda quando já dá para pagar a taxa e sem passar de 40% da mochila (senão não sobra o que vender)
         foreach (var s in GearData.Slots)
-            if (GS.NextGear(s) is { } nd && GS.GearTierAvailable(nd))
+            if (GS.NextGear(s) is { } nd && GS.GearTierAvailable(nd) && GS.Data.Money >= nd.Fee)
                 foreach (var c in nd.Costs) keep[c.Mat] = Math.Max(keep.GetValueOrDefault(c.Mat), c.Amount);
+        int budget = (int)(GS.Capacity * 0.4f);
         foreach (var k in keep.Keys.ToList())
         {
-            int have = GS.InventoryOf(k), held = Math.Min(have, keep[k]);
+            int have = GS.InventoryOf(k), held = Math.Min(Math.Min(have, keep[k]), budget);
+            budget -= held;
             keep[k] = held;
             if (held > 0) { GS.Data.Inventory[k] = have - held; if (GS.Data.Inventory[k] == 0) GS.Data.Inventory.Remove(k); }
         }

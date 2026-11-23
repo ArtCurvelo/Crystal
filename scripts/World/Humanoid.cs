@@ -11,6 +11,8 @@ public sealed class Look
     public int HairStyle;   // 0 curto, 1 comprido, 2 coque, 3 careca, 4 rabo de cavalo
     public int Hat;         // 0 nenhum, 1 chapéu de palha, 2 gorro de lã, 3 boné de ferreiro
     public bool Skirt, Apron, Beard, Vest;
+    /// <summary>Velho Bram: tapa-olho (olho esquerdo) e perna de pau (direita).</summary>
+    public bool EyePatch, PegLeg;
     public float Height = 1f, Width = 1f;
 
     static readonly Color[] Skins = { new(0.96f, 0.8f, 0.66f), new(0.9f, 0.7f, 0.55f), new(0.78f, 0.56f, 0.4f), new(0.6f, 0.4f, 0.28f), new(0.45f, 0.3f, 0.2f), new(0.98f, 0.86f, 0.75f) };
@@ -47,6 +49,8 @@ public partial class Humanoid : Node3D
 {
     public enum Pose { Idle, Walk, Talk, Sit, Work }
     public Pose Mode = Pose.Idle;
+    /// <summary>Fica sentado mesmo quando gesticula (Velho Bram).</summary>
+    public bool Seated;
     public float WalkSpeed = 1.2f;
 
     Node3D _hips, _torso, _head, _legL, _legR, _kneeL, _kneeR, _armL, _armR, _elbowL, _elbowR;
@@ -92,7 +96,7 @@ public partial class Humanoid : Node3D
         AddChild(_hips);
         // pernas: coxa (do quadril ao joelho) e canela + sapato (do joelho ao pé)
         (_legL, _kneeL) = Leg(-0.1f, l);
-        (_legR, _kneeR) = Leg(0.1f, l);
+        (_legR, _kneeR) = Leg(0.1f, l, l.PegLeg);
         Part(_hips, Cap(0.15f, 0.36f), l.Pants, new Vector3(0, 0.02f, 0), new Vector3(0, 0, Mathf.Pi / 2), new Vector3(1, 1, 0.9f));
         if (l.Skirt)
             Part(_hips, new CylinderMesh { TopRadius = 0.19f, BottomRadius = 0.33f, Height = 0.62f, RadialSegments = 14 }, l.Accent, new Vector3(0, -0.24f, 0));
@@ -123,13 +127,21 @@ public partial class Humanoid : Node3D
         AlbedoColor = new Color(0, 0, 0, 0.32f), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
     };
 
-    (Node3D, Node3D) Leg(float x, Look l)
+    (Node3D, Node3D) Leg(float x, Look l, bool peg = false)
     {
         var hip = new Node3D { Position = new Vector3(x, 0, 0) };
         _hips.AddChild(hip);
         Part(hip, Cap(0.075f, 0.5f), l.Pants, new Vector3(0, -0.22f, 0));
         var knee = new Node3D { Position = new Vector3(0, -0.45f, 0) };
         hip.AddChild(knee);
+        if (peg)
+        {
+            // perna de pau: calça amarrada no joelho e um toco de madeira com ponteira
+            Part(knee, Sph(0.08f), l.Pants.Darkened(0.2f), new Vector3(0, -0.02f, 0));
+            Part(knee, new CylinderMesh { TopRadius = 0.045f, BottomRadius = 0.03f, Height = 0.42f, RadialSegments = 8 }, new Color(0.5f, 0.35f, 0.2f), new Vector3(0, -0.22f, 0));
+            Part(knee, new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.035f, Height = 0.04f, RadialSegments = 8 }, new Color(0.3f, 0.3f, 0.32f), new Vector3(0, -0.43f, 0));
+            return (hip, knee);
+        }
         Part(knee, Cap(0.065f, 0.46f), l.Pants, new Vector3(0, -0.2f, 0));
         Part(knee, new BoxMesh { Size = new Vector3(0.11f, 0.08f, 0.22f) }, l.Shoes, new Vector3(0, -0.41f, 0.04f));
         return (hip, knee);
@@ -183,7 +195,12 @@ public partial class Humanoid : Node3D
                 break;
         }
         if (l.Beard)
-            Part(h, Sph(0.1f), hair, new Vector3(0, -0.085f, 0.07f), null, new Vector3(1.1f, 0.9f, 0.7f));
+            Part(h, Sph(0.1f), hair, new Vector3(0, -0.085f, 0.07f), null, new Vector3(1.1f, l.EyePatch ? 1.4f : 0.9f, 0.7f));
+        if (l.EyePatch)
+        {
+            Part(h, new CylinderMesh { TopRadius = 0.04f, BottomRadius = 0.04f, Height = 0.012f, RadialSegments = 10 }, new Color(0.06f, 0.05f, 0.05f), new Vector3(-0.048f, 0.02f, 0.13f), new Vector3(Mathf.Pi / 2, 0, 0));
+            Part(h, new TorusMesh { InnerRadius = 0.138f, OuterRadius = 0.148f, Rings = 16, RingSegments = 4 }, new Color(0.06f, 0.05f, 0.05f), new Vector3(0, 0.04f, 0), new Vector3(0.3f, 0, 0.25f));
+        }
         switch (l.Hat)
         {
             case 1:
@@ -275,6 +292,7 @@ public partial class Humanoid : Node3D
                 break;
             }
         }
+        if (Seated && Mode != Pose.Walk) { hipY = 0.5f; legL = legR = 1.5f; kneeL = kneeR = 1.5f; }
         _hips.Position = new Vector3(0, hipY + bob, 0);
         _torso.Rotation = new Vector3(lean, 0, 0);
         _legL.Rotation = new Vector3(-legL, 0, 0);

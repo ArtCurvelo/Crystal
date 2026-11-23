@@ -519,6 +519,23 @@ public partial class Hud : CanvasLayer
     }
 
     /// <summary>Guia de objetivos para a experiência inicial e metas de longo prazo.</summary>
+    /// <summary>Texto da missão do ato 2 (null quando não há nada da história para fazer).</summary>
+    static string StoryObjective(GameState gs) => gs.Story switch
+    {
+        StoryData.BramCalls => Loc.T("HISTÓRIA\nO VELHO BRAM quer falar com você. Ele mora atrás da oficina do ferreiro, na vila."),
+        StoryData.FindGate => gs.IsUnlocked("cathedral")
+            ? Loc.T("HISTÓRIA\nAche o PORTÃO SELADO no ponto mais fundo da Catedral de Cristal e tire um molde do selo.")
+            : Loc.T("HISTÓRIA\nAbra caminho até a Catedral de Cristal: o portão selado fica lá no fundo."),
+        StoryData.BringMold => Loc.T("HISTÓRIA\nLeve o molde do selo ao VELHO BRAM, na vila."),
+        StoryData.ForgeKey => gs.CanForgeKey
+            ? Loc.T("HISTÓRIA\nForje a CHAVE FALSA na forja do ferreiro: ele está dormindo.")
+            : Loc.F("HISTÓRIA\nChave falsa: {0}/{1} Ferro Meteórico, {2}/{3} Diamantes, cadernos do Aldric {4}/2. Forje de noite, na vila.",
+                Math.Min(gs.InventoryOf(StoryData.KeyOre1), StoryData.KeyOre1Amount), StoryData.KeyOre1Amount, Math.Min(gs.InventoryOf(StoryData.KeyOre2), StoryData.KeyOre2Amount), StoryData.KeyOre2Amount,
+                StoryData.AldricDiaries.Count(x => gs.Data.Diaries.Contains(x))),
+        StoryData.OpenGate => Loc.T("HISTÓRIA\nUse a chave falsa no PORTÃO SELADO, no fundo da Catedral de Cristal."),
+        _ => null,
+    };
+
     void RefreshObjective()
     {
         var gs = GameState.Instance;
@@ -526,7 +543,11 @@ public partial class Hud : CanvasLayer
         var d = gs.Data;
         bool inHouse = Player != null && IsInstanceValid(Player) && World.PlayerHouse.Contains(Player.GlobalPosition);
         bool inTown = !inHouse && Player != null && IsInstanceValid(Player) && World.Town.Contains(Player.GlobalPosition);
-        if (inHouse)
+        string story = StoryObjective(gs);
+        bool talkNow = gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate;
+        if (inTown && story != null && (talkNow || gs.CanForgeKey))
+            text = story;
+        else if (inHouse)
             text = gs.DayOver
                 ? Loc.T("CASA\nUse o PAINEL para melhorias e habilidades. Durma na CAMA para começar o próximo dia.")
                 : Loc.T("NOVO DIA\nSaia de casa e pegue o ELEVADOR da vila para voltar à mina.");
@@ -544,6 +565,8 @@ public partial class Hud : CanvasLayer
         else if (d.Upgrades.Count == 0) text = Loc.T("OBJETIVO\nCompre uma melhoria no TERMINAL (dourado).");
         else if (gs.IsUnlocked("core") && !d.Discovered.Contains("heart") && gs.Damage * gs.SwingsPerSecond * 120 > GameData.Mat("heart").Hp)
             text = Loc.T("META\nDestrua o Coração Ancestral no centro do Núcleo.");
+        else if (story != null && d.Discovered.Contains("heart") && (gs.IsUnlocked("cathedral") || gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate))
+            text = story;
         else
         {
             var next = gs.NextLockedRegion();
@@ -555,6 +578,7 @@ public partial class Hud : CanvasLayer
                     : Loc.F("PRÓXIMA META\nVocê pode desbloquear {0}! Vá até o portão.", next.Name);
             }
             else if (!d.Discovered.Contains("heart")) text = Loc.T("META FINAL\nDestrua o Coração Ancestral no centro do Núcleo.");
+            else if (story != null) text = story;
             else text = Loc.T("MESTRE ESCAVADOR\nMaximize suas melhorias e encontre todos os materiais raros.");
         }
         _objective.Text = text;
