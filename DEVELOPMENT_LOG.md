@@ -479,3 +479,10 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - HQ 2.0 (`tools/comic2.py`): sombreamento em tons (cel shading automático por forma), luz de contorno colorida, traço mais grosso no lado da sombra, retícula, grão de papel e vinheta; personagens refeitos (olhos com brilho, franja em mechas, mãos com polegar), mestre da guilda, ferreiros em contraluz, outros escravos na mina e um diário velho no último quadro. Feedback do diretor corrigido: cabelo na frente do olho e balão de pensamento saindo da barriga.
 - Diários (`Data/DiaryData.cs`, `World/DiaryNote.cs`, `UI/DiaryScreen.cs`): 12 diários, 2 por região, no fundo de câmaras secretas (não a do goblin), com vela acesa. Contam a história: cristais que renascem, o pulso do Coração, o Povo Lúmen, a dívida que nunca acaba, o Coração como semente e a confissão de Aldric, fundador da Guilda (o Coração sempre renasce = o ciclo do renascimento; "não quebre o Coração, quebre a Guilda"). Coleção no códice; ficam ao renascer.
 - Testes 921/921.
+
+## Ato 2: o segredo do Velho Bram (v0.26.0)
+- Pedido do diretor: antes dos inimigos, desenvolver a história. Decisões: o velho ex-escravo é o Velho Bram (autor dos diários do Núcleo, vivo); aparece depois do Coração; o portão fica no fundo da Catedral; entra-se forjando uma chave falsa; o chefão final é o Mestre Corvo. Bíblia em `docs/STORY.md`.
+- `Data/StoryData.cs` (etapas e falas), `UI/DialogueScreen.cs` (conversa com retrato e fala letra por letra), `IntroComic.Play(prefixo, legendas)` (flashback em 4 quadros), `World/SealedGate.cs` (portão do Povo Lúmen com correntes e selo; abre com animação), `BramNpc` + barraco (`TownVillage.cs`), receita escondida da chave na forja, objetivo no HUD e marcador por etapa. `SaveData.StoryStage` fica ao renascer.
+- Arte: retratos do Bram e do herói e 4 quadros do flashback (Corvo obriga Bram a entrar; a criatura de Lúmen; a vila expulsa Corvo; a Guilda lacra o portão e Corvo desce) em `tools/comic2.py`.
+- Lanterna do capacete apaga sozinha de dia na vila (estourava quem estava perto).
+- Testes 939/939. Bot conversa com o Bram depois do Coração.

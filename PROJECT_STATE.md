@@ -32,6 +32,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **HQ de abertura** (`UI/IntroComic.cs`, `assets/story/panel_1..6.png` gerados por `tools/comic.py`): história da dívida com a Guilda dos Ferreiros, mostrada no novo jogo.
 - **Vila viva** (`World/Humanoid.cs`, `World/TownLife.cs`, `World/TownVillage.cs`): moradores com rotina dia/noite, vigia, feirantes, galinhas, pássaros; casas enxaimel, feira, poço, árvores, bandeirolas.
 - **Diários de escravos** (`Data/DiaryData.cs`, `World/DiaryNote.cs`, `UI/DiaryScreen.cs`): 12 em câmaras secretas contando a história do Coração, do Povo Lúmen e da Guilda (gancho: "quebrar a Guilda").
+- **Ato 2 — A Chave Falsa** (`docs/STORY.md`, `Data/StoryData.cs`): Velho Bram (vila) → flashback em HQ → portão selado no fundo da Catedral (`World/SealedGate.cs`) → molde do selo → chave falsa forjada à noite → portão aberto (as Profundezas Proibidas ainda não existem).
 - **Marcador de objetivo 3D** e guia de objetivos no HUD.
 - **Tela de conclusão** (Mestre Escavador): todas as regiões liberadas + Coração destruído.
 - **Idiomas:** português (texto-fonte), inglês e espanhol — `Core/Loc.cs` (`Loc.T`/`Loc.F`, chave = texto em português) e `Core/LocTablesData.cs` (gerado). Texto novo precisa de tradução nas duas tabelas; o teste confere os marcadores `{n}`.
