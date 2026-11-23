@@ -15,8 +15,9 @@ public partial class PlayerController : CharacterBody3D
     public const uint WorldLayer = 1, PlayerLayer = 2, CrystalLayer = 4, InteractLayer = 8, GoblinLayer = 16;
 
     // ---------- vida (só importa quando goblins se rebelam) ----------
-    public const float MaxHp = 100f;
-    public float Hp { get; private set; } = MaxHp;
+    /// <summary>Vida máxima: 100 + a armadura forjada.</summary>
+    public static float MaxHp => 100f + (GameState.Instance?.ArmorHp ?? 0f);
+    public float Hp { get; private set; } = 100f;
     float _sinceDamage = 99f;
     public event Action<float> Damaged;
     public event Action Fainted;

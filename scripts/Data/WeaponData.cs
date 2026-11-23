@@ -1,21 +1,18 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace CrystalExcavator.Data;
 
 public enum WeaponKind { Sword, Hammer }
 
-/// <summary>Arma forjada na vila para lutar nas Profundezas Proibidas (a ferramenta continua só para minerar).</summary>
+/// <summary>Arma forjada combinando minérios (a ferramenta continua só para minerar).</summary>
 public sealed class WeaponDef
 {
-    public int Index;
-    public string Id;
-    string _name, _desc;
-    public string Name { get => Core.Loc.T(_name); set => _name = value; }
-    public string NamePt => _name;
-    public string Description { get => Core.Loc.T(_desc); set => _desc = value; }
     public WeaponKind Kind;
-    public int Tier;
+    public List<string> Ores = new();
+    public string Name;
     public float Damage;
     /// <summary>Golpes por segundo.</summary>
     public float Speed;
@@ -24,46 +21,102 @@ public sealed class WeaponDef
     public float Knockback;
     public long Fee;
     public List<ForgeCost> Costs = new();
-    /// <summary>Minério da lâmina/cabeça (cor e brilho).</summary>
-    public string Ore;
-    /// <summary>Região (índice) que precisa estar liberada para forjar.</summary>
-    public int Region;
+    /// <summary>Minério principal (lâmina/cabeça) e o segundo (fio aceso).</summary>
+    public string Ore => Ores.Count > 0 ? Ores[0] : null;
+    public string Ore2 => Ores.Count > 1 ? Ores[1] : Ore;
     public float Dps => Damage * Speed;
+    public string Description => Core.Loc.F("{0} dano · {1:0.0} golpes/s · alcance {2:0.0} m", Core.GameState.FormatNumber(Damage), Speed, Reach);
+}
+
+/// <summary>Armadura forjada combinando 3 a 5 minérios: diminui o dano das criaturas e aumenta a vida.</summary>
+public sealed class ArmorDef
+{
+    public List<string> Ores = new();
+    public string Name;
+    public float Reduction;
+    public float BonusHp;
+    public long Fee;
+    public List<ForgeCost> Costs = new();
+    public string Ore => Ores.Count > 0 ? Ores[0] : null;
+    public string Description => Core.Loc.F("-{0}% de dano das criaturas · +{1} de vida", (int)Math.Round(Reduction * 100), (int)BonusHp);
 }
 
 /// <summary>
-/// Armas em 6 níveis: espada (rápida, arco largo) e martelo (lento, forte, empurra e acerta em volta).
-/// Os 3 primeiros níveis usam minérios da mina; os seguintes, das Profundezas.
+/// Forja por combinação (pedido do diretor): arma = 2 a 3 minérios quaisquer; armadura = 3 a 5. Cada minério
+/// tem uma força que vem do valor dele e da raridade; somar os melhores dá a melhor arma/armadura possível.
+/// O nome e as cores saem dos minérios usados.
 /// </summary>
 public static class WeaponData
 {
-    public static readonly List<WeaponDef> All = new();
+    public const int WeaponMinOres = 2, WeaponMaxOres = 3, ArmorMinOres = 3, ArmorMaxOres = 5;
+    /// <summary>Fragmentos de cada minério escolhido.</summary>
+    public const int WeaponOreAmount = 20, ArmorOreAmount = 15;
 
-    static void W(string id, string name, WeaponKind k, int tier, float dmg, string ore, string gem, int a1, int a2, long fee, int region, string desc)
+    public static float RarityMul(Rarity r) => r switch { Rarity.Comum => 1f, Rarity.Incomum => 1.05f, Rarity.Raro => 1.12f, Rarity.Epico => 1.22f, _ => 1.38f };
+
+    /// <summary>Força de um minério na forja (cresce devagar com o valor; raridade dá um extra).</summary>
+    public static float OrePower(MaterialDef m) => m == null ? 0f : Mathf.Pow(m.Value, 0.65f) * RarityMul(m.Rarity);
+
+    /// <summary>Minérios que servem na forja: os coletáveis (formações especiais e gigantes não).</summary>
+    public static bool Forgeable(MaterialDef m) => m != null && !m.Special;
+
+    static List<string> Clean(IEnumerable<string> ores, int max) =>
+        ores.Where(o => Forgeable(GameData.Mat(o))).Distinct().Take(max)
+            .OrderByDescending(o => OrePower(GameData.Mat(o))).ToList();
+
+    static string Joined(string piece, List<string> ores)
     {
-        bool sword = k == WeaponKind.Sword;
+        var names = ores.Take(2).Select(o => GameData.Mat(o)?.Name ?? o).ToList();
+        return names.Count >= 2 ? Core.Loc.F("{0} de {1} e {2}", Core.Loc.T(piece), names[0], names[1]) : Core.Loc.F("{0} de {1}", Core.Loc.T(piece), names.FirstOrDefault() ?? "?");
+    }
+
+    static long FeeFor(float power) => (long)Math.Round(400.0 * Math.Pow(power, 1.5) * Economy.UpgradeCost / 100.0) * 100;
+
+    /// <summary>Monta a arma de uma combinação (null se não tiver 2 a 3 minérios válidos).</summary>
+    public static WeaponDef Make(WeaponKind kind, IEnumerable<string> ores)
+    {
+        var list = Clean(ores ?? Array.Empty<string>(), WeaponMaxOres);
+        if (list.Count < WeaponMinOres) return null;
+        float power = list.Sum(o => OrePower(GameData.Mat(o)));
+        bool sword = kind == WeaponKind.Sword;
         var w = new WeaponDef
         {
-            Index = All.Count, Id = id, Name = name, Kind = k, Tier = tier, Description = desc, Ore = ore, Region = region,
-            Damage = sword ? dmg : dmg * 2.6f, Speed = sword ? 2.0f : 0.85f, Reach = sword ? 2.9f : 2.6f, Arc = sword ? 55f : 80f,
-            Knockback = sword ? 2.5f : 7f, Fee = (long)System.Math.Round(fee * Economy.UpgradeCost),
+            Kind = kind, Ores = list,
+            Damage = Mathf.Round(power * 3f * (sword ? 1f : 2.6f)),
+            Speed = sword ? 2.0f : 0.85f, Reach = sword ? 2.9f : 2.6f, Arc = sword ? 55f : 80f, Knockback = sword ? 2.5f : 7f,
+            Fee = FeeFor(power),
+            Name = Joined(sword ? "Espada" : "Martelo", list),
         };
-        w.Costs.Add(new ForgeCost(ore, a1));
-        w.Costs.Add(new ForgeCost(gem, a2));
-        All.Add(w);
+        foreach (var o in list) w.Costs.Add(new ForgeCost(o, WeaponOreAmount));
+        return w;
     }
 
-    static WeaponData()
+    /// <summary>Monta a armadura de uma combinação (null se não tiver 3 a 5 minérios válidos).</summary>
+    public static ArmorDef MakeArmor(IEnumerable<string> ores)
     {
-        W("sword_meteor", "Espada de Ferro Meteórico", WeaponKind.Sword, 0, 220, "meteorite", "obsidian", 25, 20, 400_000, 2, "Ferro que caiu do céu, batido na forja da vila. Leve e rápida.");
-        W("hammer_meteor", "Martelo de Ferro Meteórico", WeaponKind.Hammer, 0, 220, "meteorite", "gold", 30, 20, 450_000, 2, "Cabeça maciça de meteorito: lento, mas derruba qualquer coisa.");
-        W("sword_diamond", "Espada de Diamante", WeaponKind.Sword, 1, 600, "diamond", "tanzanite", 20, 25, 3_000_000, 5, "Fio de diamante: corta o Lúmen como se fosse cera.");
-        W("hammer_diamond", "Martelo de Diamante", WeaponKind.Hammer, 1, 600, "diamond", "alexandrite", 24, 20, 3_400_000, 5, "Diamante sobre alexandrita. Cada golpe faz a caverna tremer.");
-        W("sword_runic", "Espada Rúnica", WeaponKind.Sword, 2, 1600, "runestone", "lumenite", 25, 40, 12_000_000, 6, "Runas do Povo Lúmen acendem na lâmina quando há perigo perto.");
-        W("hammer_runic", "Martelo Rúnico", WeaponKind.Hammer, 2, 1600, "runestone", "ancientglass", 30, 30, 13_000_000, 6, "Um martelo que o Povo Lúmen usava para acordar a pedra.");
+        var list = Clean(ores ?? Array.Empty<string>(), ArmorMaxOres);
+        if (list.Count < ArmorMinOres) return null;
+        float power = list.Sum(o => OrePower(GameData.Mat(o)));
+        var a = new ArmorDef
+        {
+            Ores = list,
+            Reduction = Mathf.Min(0.75f, 0.75f * power / (power + 450f)),
+            BonusHp = Mathf.Round(25f * Mathf.Log(1f + power / 40f)),
+            Fee = FeeFor(power * 0.8f),
+            Name = Joined("Couraça", list),
+        };
+        foreach (var o in list) a.Costs.Add(new ForgeCost(o, ArmorOreAmount));
+        return a;
     }
 
-    public static WeaponDef Of(int i) => i >= 0 && i < All.Count ? All[i] : null;
     public static Color BladeColor(WeaponDef w) => w != null && GameData.Mat(w.Ore) is { } m ? m.Color : new Color(0.6f, 0.6f, 0.65f);
-    public static Color GlowColor(WeaponDef w) => w != null && GameData.Mat(w.Ore) is { } m ? m.Glow : new Color(0.8f, 0.8f, 0.9f);
+    public static Color GlowColor(WeaponDef w) => w != null && GameData.Mat(w.Ore2) is { } m ? m.Glow : new Color(0.8f, 0.8f, 0.9f);
+
+    /// <summary>Saves da v0.27 guardavam o índice de uma receita fixa: vira a combinação equivalente.</summary>
+    public static readonly (WeaponKind kind, string[] ores)[] LegacyRecipes =
+    {
+        (WeaponKind.Sword, new[] { "meteorite", "obsidian" }), (WeaponKind.Hammer, new[] { "meteorite", "gold" }),
+        (WeaponKind.Sword, new[] { "diamond", "tanzanite" }), (WeaponKind.Hammer, new[] { "diamond", "alexandrite" }),
+        (WeaponKind.Sword, new[] { "runestone", "lumenite" }), (WeaponKind.Hammer, new[] { "runestone", "ancientglass" }),
+    };
 }

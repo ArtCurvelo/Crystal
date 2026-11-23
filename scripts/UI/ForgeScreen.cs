@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CrystalExcavator.Core;
@@ -11,6 +12,9 @@ public partial class ForgeScreen : ModalScreen
 {
     VBoxContainer _list;
     bool _refreshing;
+    /// <summary>Bancada de combinação: 0 espada, 1 martelo, 2 armadura; minérios escolhidos em cada espaço.</summary>
+    int _craftKind;
+    readonly List<string> _picks = new() { null, null };
 
     public override void _Ready()
     {
@@ -95,41 +99,8 @@ public partial class ForgeScreen : ModalScreen
             kh.AddChild(kb);
             if (!kb.Disabled) first = kb;
         }
-        // armas (ato 3): o Velho Bram ensina depois que o portão se abre
-        if (gs.WeaponsUnlocked)
-        {
-            _list.AddChild(UiTheme.Label("ARMAS PARA AS PROFUNDEZAS", 18, new Color(1f, 0.6f, 0.45f), true));
-            foreach (var w in WeaponData.All)
-            {
-                bool owned = gs.Data.Weapon == w.Index;
-                Card(owned ? UiTheme.Success : new Color(1f, 0.55f, 0.4f), out var wh);
-                wh.AddChild(HudIcon.MakeOre(GameData.Mat(w.Ore), 48));
-                var wv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-                wh.AddChild(wv);
-                wv.AddChild(UiTheme.Label(w.Name + (owned ? "  ·  " + Loc.T("na mão") : ""), 18, owned ? UiTheme.Success : UiTheme.Text, true));
-                wv.AddChild(UiTheme.Label(Loc.F("{0} dano · {1:0.0} golpes/s · alcance {2:0.0} m", GameState.FormatNumber(w.Damage), w.Speed, w.Reach) + "  ·  " + w.Description, 14, UiTheme.Muted));
-                Button wb;
-                if (!gs.WeaponAvailable(w))
-                {
-                    wv.AddChild(UiTheme.Label(Loc.F("Libere {0} para achar os minérios.", GameData.Regions[w.Region].Name), 14, UiTheme.Muted));
-                    wb = UiTheme.Button("Bloqueado", null, 150, 18);
-                    wb.Disabled = true;
-                }
-                else
-                {
-                    var line = UiTheme.Label(CostLine(w.Costs, w.Fee, out bool ok), 14, ok ? UiTheme.Success : UiTheme.Muted);
-                    line.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-                    wv.AddChild(line);
-                    var wd = w;
-                    wb = UiTheme.Button(owned ? "Na mão" : "Forjar", () => { if (GameState.Instance.TryForgeWeapon(wd)) Audio.AudioManager.Instance?.Play("buy", -4f); }, 150, 18);
-                    wb.Disabled = !gs.CanForgeWeapon(w);
-                }
-                wb.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-                wb.SetMeta("weapon", w.Index);
-                wh.AddChild(wb);
-                if (first == null && !wb.Disabled) first = wb;
-            }
-        }
+        // armas e armaduras (ato 3): bancada de combinação de minérios
+        if (gs.WeaponsUnlocked) BuildCombiner(gs, ref first);
 
         foreach (var slot in GearData.Slots)
         {
@@ -213,5 +184,116 @@ public partial class ForgeScreen : ModalScreen
         foreach (var n in Body.GetChildren())
             if (n is HBoxContainer hb) foreach (var c in hb.GetChildren()) if (c is Button b) return b;
         return null;
+    }
+
+    // ------------------------------------------------------------------ bancada de combinação
+    void BuildCombiner(GameState gs, ref Button first)
+    {
+        _list.AddChild(UiTheme.Label("COMBINAR MINÉRIOS: ARMAS E ARMADURAS", 18, new Color(1f, 0.6f, 0.45f), true));
+        bool armor = _craftKind == 2;
+        int min = armor ? WeaponData.ArmorMinOres : WeaponData.WeaponMinOres, max = armor ? WeaponData.ArmorMaxOres : WeaponData.WeaponMaxOres;
+        int need = armor ? WeaponData.ArmorOreAmount : WeaponData.WeaponOreAmount;
+        while (_picks.Count < min) _picks.Add(null);
+        while (_picks.Count > max) _picks.RemoveAt(_picks.Count - 1);
+
+        Card(new Color(1f, 0.55f, 0.4f), out var row);
+        var v = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        v.AddThemeConstantOverride("separation", 6);
+        row.AddChild(v);
+        // o que forjar
+        var kinds = new HBoxContainer();
+        kinds.AddThemeConstantOverride("separation", 8);
+        v.AddChild(kinds);
+        string[] kindNames = { "Espada", "Martelo", "Couraça" };
+        for (int k = 0; k < 3; k++)
+        {
+            int kk = k;
+            var kb = UiTheme.Button(kindNames[k], () => { _craftKind = kk; Refresh(); }, 130, 16);
+            if (k == _craftKind) kb.AddThemeColorOverride("font_color", UiTheme.Gold);
+            kb.SetMeta("craft_kind", k);
+            kinds.AddChild(kb);
+        }
+        v.AddChild(UiTheme.Label(armor
+            ? Loc.F("Escolha de {0} a {1} minérios ({2} de cada). Quanto melhores, mais proteção e vida.", min, max, need)
+            : Loc.F("Escolha de {0} a {1} minérios ({2} de cada). Quanto melhores, mais dano.", min, max, need), 14, UiTheme.Muted));
+        // minérios disponíveis: os já descobertos, do mais forte para o mais fraco
+        var ores = GameData.Materials.Values.Where(m => WeaponData.Forgeable(m) && gs.Data.Discovered.Contains(m.Id))
+            .OrderByDescending(WeaponData.OrePower).ToList();
+        for (int i = 0; i < _picks.Count; i++)
+        {
+            int slot = i;
+            var h = new HBoxContainer();
+            h.AddThemeConstantOverride("separation", 8);
+            v.AddChild(h);
+            h.AddChild(UiTheme.Label(Loc.F("Minério {0}", i + 1), 15, UiTheme.Text));
+            var opt = new OptionButton { CustomMinimumSize = new Vector2(420, 40), FocusMode = Control.FocusModeEnum.All };
+            opt.AddItem(Loc.T("— escolher —"), 0);
+            int sel = 0;
+            for (int k = 0; k < ores.Count; k++)
+            {
+                var m = ores[k];
+                int have = gs.InventoryOf(m.Id);
+                opt.AddItem(Loc.F("{0}  ({1}/{2})", m.Name, have, need), k + 1);
+                if (_picks[i] == m.Id) sel = k + 1;
+            }
+            opt.Selected = sel;
+            opt.ItemSelected += idx => { _picks[slot] = idx <= 0 ? null : ores[(int)idx - 1].Id; Refresh(); };
+            opt.SetMeta("craft_slot", i);
+            h.AddChild(opt);
+            if (_picks[i] != null && GameData.Mat(_picks[i]) is { } pm) h.AddChild(HudIcon.MakeOre(pm, 32));
+        }
+        var addRow = new HBoxContainer();
+        addRow.AddThemeConstantOverride("separation", 8);
+        v.AddChild(addRow);
+        var plus = UiTheme.Button("+ minério", () => { if (_picks.Count < max) _picks.Add(null); Refresh(); }, 140, 15);
+        plus.Disabled = _picks.Count >= max;
+        var less = UiTheme.Button("− minério", () => { if (_picks.Count > min) _picks.RemoveAt(_picks.Count - 1); Refresh(); }, 140, 15);
+        less.Disabled = _picks.Count <= min;
+        addRow.AddChild(plus);
+        addRow.AddChild(less);
+
+        // prévia do resultado
+        var chosen = _picks.Where(p => p != null).ToList();
+        string preview;
+        bool can;
+        Action forge;
+        if (armor)
+        {
+            var a = WeaponData.MakeArmor(chosen);
+            var cur = gs.CurrentArmor;
+            preview = a == null ? Loc.F("Escolha pelo menos {0} minérios diferentes.", min)
+                : Loc.F("{0}: {1}", a.Name, a.Description) + (cur != null ? "\n" + Loc.F("Atual: {0} ({1})", cur.Name, cur.Description) : "");
+            can = gs.CanForge(a);
+            forge = () => { if (GameState.Instance.TryForgeArmor(a)) { Audio.AudioManager.Instance?.Play("buy", -4f); _picks.Clear(); } };
+            if (a != null) v.AddChild(UiTheme.Label(CostLine(a.Costs, a.Fee, out _), 14, can ? UiTheme.Success : UiTheme.Muted));
+        }
+        else
+        {
+            var w = WeaponData.Make((WeaponKind)_craftKind, chosen);
+            var cur = gs.CurrentWeapon;
+            preview = w == null ? Loc.F("Escolha pelo menos {0} minérios diferentes.", min)
+                : Loc.F("{0}: {1}", w.Name, w.Description) + (cur != null ? "\n" + Loc.F("Atual: {0} ({1})", cur.Name, cur.Description) : "");
+            can = gs.CanForge(w);
+            forge = () => { if (GameState.Instance.TryForgeWeapon(w)) { Audio.AudioManager.Instance?.Play("buy", -4f); _picks.Clear(); } };
+            if (w != null) v.AddChild(UiTheme.Label(CostLine(w.Costs, w.Fee, out _), 14, can ? UiTheme.Success : UiTheme.Muted));
+        }
+        var pl = UiTheme.Label(preview, 16, new Color(1f, 0.8f, 0.55f), true);
+        pl.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        v.AddChild(pl);
+        var fb = UiTheme.Button("Forjar", () => forge(), 150, 18);
+        fb.Disabled = !can;
+        fb.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        fb.SetMeta("craft_forge", 1);
+        row.AddChild(fb);
+        if (first == null && can) first = fb;
+    }
+
+    /// <summary>Capturas de tela: escolhe o tipo e os minérios na bancada.</summary>
+    public void SelectForTour(int kind, string[] ores)
+    {
+        _craftKind = kind;
+        _picks.Clear();
+        _picks.AddRange(ores);
+        Refresh();
     }
 }

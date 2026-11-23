@@ -5,5 +5,5 @@ cd "$(dirname "$0")/.."
 source /home/user/tools/env.sh 2>/dev/null || true
 GODOT_BIN="${GODOT:-godot}"
 dotnet build -nologo -v q 2>&1 | grep -E "error|Build succeeded" | sort -u
-timeout 300 "$GODOT_BIN" --headless --path . -- --run-tests 2>&1 | grep -E "^\[OK\]|^\[FALHA\]|RESULTADO|FALHA:|^      |ERROR|SCRIPT ERROR|at:" | grep -v "Save de versão mais nova"
+timeout 900 "$GODOT_BIN" --headless --path . -- --run-tests 2>&1 | grep -E "^\[OK\]|^\[FALHA\]|RESULTADO|FALHA:|^      |ERROR|SCRIPT ERROR|at:" | grep -v "Save de versão mais nova"
 exit ${PIPESTATUS[0]}

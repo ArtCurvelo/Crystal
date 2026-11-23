@@ -740,6 +740,52 @@ public static class GameData
         d1.Spawns.Add(new SpawnEntry("runestone", 0.2f));
         d1.Spawns.Add(new SpawnEntry("diamond", 0.08f));
         Regions.Add(d1);
+        // Profundezas 2 a 5: cada uma mais funda, minérios mais valiosos e inimigos mais fortes
+        void Deep(string id, string name, string sub, Color amb, Color fog, Color rock, Color accent, Color light, (string id, string name, OreArchetype a, Rarity r, int v, float hp, string desc, Color c, Color g, float w)[] ores)
+        {
+            foreach (var o in ores) Ore(o.id, o.a, o.r, o.name, o.v, o.hp, o.desc, o.c, o.g, o.r == Rarity.Lendario);
+            var d = new RegionDef
+            {
+                Id = id, Index = Regions.Count, Name = name, Deep = true, Subtitle = sub, UnlockCost = 0,
+                AmbientColor = amb, AmbientEnergy = 0.55f, FogColor = fog, FogDensity = 0.022f, RockColor = rock, AccentColor = accent, LightColor = light,
+                RareMaterialId = ores[^1].id, GiantMaterialId = null, RareChance = 0.04f, CrystalSlots = 170,
+                CenterZ = 0, HalfX = 115, HalfZ = 110, Height = 24,
+            };
+            foreach (var o in ores) if (o.r != Rarity.Lendario) d.Spawns.Add(new SpawnEntry(o.id, o.w));
+            Regions.Add(d);
+        }
+        Deep("furnace", "Fornalha Abandonada", "Profundeza Proibida 2 · a forja secreta do Mestre Corvo.",
+            new Color(0.8f, 0.45f, 0.3f), new Color(0.12f, 0.04f, 0.02f), new Color(0.3f, 0.26f, 0.24f), new Color(1f, 0.5f, 0.2f), new Color(1f, 0.55f, 0.25f), new[]
+            {
+                ("slagiron", "Ferro de Escória", OreArchetype.Vein, Rarity.Incomum, 60000, 420000f, "O que sobrou das forjas do Corvo: pesado, ainda morno.", new Color(0.35f, 0.3f, 0.3f), new Color(1f, 0.45f, 0.2f), 0.45f),
+                ("emberstone", "Pedra-Brasa", OreArchetype.Magma, Rarity.Raro, 92000, 600000f, "Uma pedra que nunca esfria. Os ferreiros matariam por ela.", new Color(0.6f, 0.15f, 0.05f), new Color(1f, 0.4f, 0.1f), 0.35f),
+                ("forgecore", "Núcleo de Forja", OreArchetype.Geode, Rarity.Epico, 160000, 900000f, "O coração de uma fornalha antiga, com fogo preso dentro.", new Color(0.4f, 0.2f, 0.1f), new Color(1f, 0.7f, 0.25f), 0.2f),
+                ("phoenixite", "Fenixita", OreArchetype.Crystal, Rarity.Lendario, 520000, 1600000f, "Lendário: cristal que renasce das próprias cinzas.", new Color(1f, 0.5f, 0.2f), new Color(1f, 0.8f, 0.3f), 0f),
+            });
+        Deep("roots", "Raízes do Coração", "Profundeza Proibida 3 · a mina inteira é uma árvore.",
+            new Color(0.45f, 0.75f, 0.4f), new Color(0.03f, 0.08f, 0.03f), new Color(0.3f, 0.28f, 0.22f), new Color(0.6f, 1f, 0.45f), new Color(0.7f, 1f, 0.5f), new[]
+            {
+                ("rootamber", "Âmbar de Raiz", OreArchetype.Banded, Rarity.Incomum, 120000, 850000f, "Seiva do Coração que endureceu em volta das raízes.", new Color(0.85f, 0.55f, 0.15f), new Color(1f, 0.75f, 0.3f), 0.45f),
+                ("heartwood", "Cerne Cristalino", OreArchetype.Shards, Rarity.Raro, 185000, 1200000f, "Madeira que virou cristal sem deixar de ser madeira.", new Color(0.5f, 0.35f, 0.2f), new Color(0.6f, 1f, 0.5f), 0.35f),
+                ("veinruby", "Rubi Venoso", OreArchetype.Vein, Rarity.Epico, 320000, 1800000f, "Corre dentro das raízes como sangue.", new Color(0.7f, 0.05f, 0.15f), new Color(1f, 0.2f, 0.35f), 0.2f),
+                ("seedglass", "Vidro-Semente", OreArchetype.Pearl, Rarity.Lendario, 1000000, 3200000f, "Lendário: uma lasca da Semente do Povo Lúmen.", new Color(0.8f, 1f, 0.7f), new Color(0.7f, 1f, 0.6f), 0f),
+            });
+        Deep("chained", "Poço dos Acorrentados", "Profundeza Proibida 4 · onde o Corvo deixou os escravos que trouxe.",
+            new Color(0.55f, 0.5f, 0.75f), new Color(0.05f, 0.03f, 0.09f), new Color(0.26f, 0.25f, 0.3f), new Color(0.75f, 0.6f, 1f), new Color(0.7f, 0.6f, 1f), new[]
+            {
+                ("chainsteel", "Aço de Corrente", OreArchetype.Vein, Rarity.Incomum, 240000, 1700000f, "Correntes velhas fundidas na rocha pelo Lúmen.", new Color(0.45f, 0.45f, 0.5f), new Color(0.7f, 0.75f, 1f), 0.45f),
+                ("tearopal", "Opala de Lágrima", OreArchetype.Geode, Rarity.Raro, 370000, 2400000f, "Dizem que cada uma é uma lágrima de um acorrentado.", new Color(0.6f, 0.7f, 0.95f), new Color(0.6f, 0.8f, 1f), 0.35f),
+                ("bloodgarnet", "Granada Sangrenta", OreArchetype.Crystal, Rarity.Epico, 640000, 3600000f, "Escura como o que aconteceu aqui embaixo.", new Color(0.45f, 0.02f, 0.08f), new Color(1f, 0.15f, 0.25f), 0.2f),
+                ("freedomstone", "Pedra da Liberdade", OreArchetype.Crystal, Rarity.Lendario, 2000000, 6400000f, "Lendário: brilha mais forte perto de uma corrente partida.", new Color(1f, 0.95f, 0.85f), new Color(1f, 0.9f, 0.6f), 0f),
+            });
+        Deep("nest", "Ninho de Lúmen Bruto", "Profundeza Proibida 5 · o Lúmen sem forma que corrompeu o Corvo.",
+            new Color(0.8f, 0.5f, 0.75f), new Color(0.1f, 0.02f, 0.08f), new Color(0.28f, 0.22f, 0.3f), new Color(1f, 0.45f, 0.85f), new Color(1f, 0.5f, 0.9f), new[]
+            {
+                ("rawlumen", "Lúmen Vivo", OreArchetype.Coral, Rarity.Incomum, 480000, 3400000f, "Lúmen que ainda se mexe. Não toque com a mão.", new Color(1f, 0.7f, 0.9f), new Color(1f, 0.5f, 0.85f), 0.45f),
+                ("nestpearl", "Pérola do Ninho", OreArchetype.Pearl, Rarity.Raro, 740000, 4800000f, "Ovos do Lúmen Bruto que nunca chocaram.", new Color(0.95f, 0.85f, 1f), new Color(0.9f, 0.6f, 1f), 0.35f),
+                ("eyecrystal", "Cristal-Olho", OreArchetype.Geode, Rarity.Epico, 1280000, 7200000f, "Tem uma pupila. Ela se mexe.", new Color(0.2f, 0.05f, 0.2f), new Color(1f, 0.3f, 0.6f), 0.2f),
+                ("primelumen", "Lúmen Primordial", OreArchetype.Crystal, Rarity.Lendario, 4000000, 12800000f, "Lendário: o primeiro Lúmen, mais velho que o Coração.", new Color(1f, 1f, 1f), new Color(1f, 0.85f, 1f), 0f),
+            });
         foreach (var rg in Regions) rg.UnlockCost = (long)Math.Round(rg.UnlockCost * Economy.RegionCost / 100.0) * 100;
 
         // posições em Z: cada região começa onde a anterior termina + túnel (a entrada do acampamento fica em z = 90)

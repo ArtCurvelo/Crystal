@@ -312,7 +312,7 @@ public partial class ScreenshotTour : Node
             foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
             gs.Data.Discovered.Add("heart"); gs.Data.GameCompleted = true;
             gs.Data.StoryStage = CrystalExcavator.Data.StoryData.GateOpen;
-            gs.Data.Weapon = 0;
+            gs.Data.WeaponKind = 0; gs.Data.WeaponOres = new() { "runestone", "lumenite" };
             gs.RaiseAll();
             await Wait(0.5f);
             Main.CloseAllForTour();
@@ -323,32 +323,48 @@ public partial class ScreenshotTour : Node
             await Wait(1.5f);
             await Shot("43_deep_arrival");
             var ens = Main.World.Enemies.Enemies;
-            foreach (var kind in new[] { EnemyKind.Crawler, EnemyKind.Sentinel })
+            foreach (var reg in GameData.Deep)
             {
-                var e = ens.Where(x => x.Def.Kind == kind).OrderBy(x => x.Home.DistanceTo(at)).First();
-                var L = Main.World.LayoutAt(e.Home);
-                for (int k = 0; k < 16; k++)
+                var regAt = Main.World.DeepArrivals[reg.Id];
+                p.GlobalPosition = regAt; p.SetLook(0, 0);
+                await Wait(0.6f);
+                foreach (var def in ens.Where(x => x.Def.Region == reg.Id).Select(x => x.Def).Distinct().ToList())
                 {
-                    float a2 = k * Mathf.Tau / 16f;
-                    var q = e.Home + new Vector3(Mathf.Cos(a2), 0, Mathf.Sin(a2)) * 6f;
-                    if (L.WallDist(q.X, q.Z) < -1.5f && L.Reachable(q.X, q.Z)) { LookAtPoint(p, L.OnGround(q.X, q.Z, 0.1f), e.GlobalPosition + Vector3.Up * 1.0f * e.Def.Scale); break; }
+                    var e = ens.Where(x => x.Def == def).OrderBy(x => x.Home.DistanceTo(regAt)).First();
+                    var L = Main.World.LayoutAt(e.Home);
+                    float dist = def.Guardian ? 9f : 6f;
+                    for (int k = 0; k < 16; k++)
+                    {
+                        float a2 = k * Mathf.Tau / 16f;
+                        var q = e.Home + new Vector3(Mathf.Cos(a2), 0, Mathf.Sin(a2)) * dist;
+                        if (L.WallDist(q.X, q.Z) < -1.5f && L.Reachable(q.X, q.Z)) { LookAtPoint(p, L.OnGround(q.X, q.Z, 0.1f), e.GlobalPosition + Vector3.Up * 1.0f * e.Def.Scale); break; }
+                    }
+                    p.InputEnabled = false;
+                    await Wait(1.6f);
+                    var look = e.GlobalPosition + Vector3.Up * (def.Flying ? 0f : 0.8f * e.Def.Scale);
+                    var from = p.GlobalPosition;
+                    var flat = new Vector2(look.X - from.X, look.Z - from.Z).Length();
+                    p.SetLook(Mathf.Atan2(-(look.X - from.X), -(look.Z - from.Z)), Mathf.Atan2(look.Y - (from.Y + 1.6f), flat));
+                    p.WeaponView.Swing(0.5f);
+                    await Wait(0.12f);
+                    await Shot($"44_{reg.Id}_{def.Id}");
+                    p.RestoreHp();
                 }
-                p.InputEnabled = false;
-                await Wait(kind == EnemyKind.Sentinel ? 2.6f : 1.4f);
-                var look = e.GlobalPosition + Vector3.Up * 0.8f * e.Def.Scale;
-                var from = p.GlobalPosition;
-                p.SetLook(Mathf.Atan2(-(look.X - from.X), -(look.Z - from.Z)), -0.15f);
-                p.WeaponView.Swing(0.5f);
-                await Wait(0.12f);
-                await Shot($"43_enemy_{kind.ToString().ToLower()}");
-                e.TakeHit(300, from, 1f);
-                await Wait(0.3f);
-                await Shot($"43_enemy_{kind.ToString().ToLower()}_hit");
-                p.RestoreHp();
             }
+            foreach (var id in new[] { "runestone", "lumenite", "ancientglass", "diamond", "meteorite" }) { gs.Data.Discovered.Add(id); gs.Data.Inventory[id] = 25; }
+            gs.AddMoney(900_000_000);
+            Main.CloseAllForTour();
+            p.GlobalPosition = Main.World.Town.ArrivePoint;
+            await Wait(0.5f);
             UiBus.RequestForge();
             await Wait(0.8f);
+            var fs = Main.GetChildren().OfType<CrystalExcavator.UI.ForgeScreen>().First();
+            fs.SelectForTour(0, new[] { "runestone", "lumenite" });
+            await Wait(0.5f);
             await Shot("43_forge_weapons");
+            fs.SelectForTour(2, new[] { "runestone", "lumenite", "ancientglass", "diamond" });
+            await Wait(0.5f);
+            await Shot("43_forge_armor");
             Main.CloseAllForTour();
             SaveSystem.Delete();
             GameState.Instance.QuitClean();

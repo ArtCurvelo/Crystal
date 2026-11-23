@@ -617,21 +617,46 @@ public partial class GameState : Node
     }
 
     // ================= Armas (ato 3) =================
-    public WeaponDef CurrentWeapon => WeaponData.Of(Data.Weapon);
+    WeaponDef _weaponCache; string _weaponKey;
+    ArmorDef _armorCache; string _armorKey;
+    /// <summary>Arma da combinação guardada no save (recalculada só quando muda).</summary>
+    public WeaponDef CurrentWeapon
+    {
+        get
+        {
+            string key = Data.WeaponKind + ":" + string.Join(",", Data.WeaponOres);
+            if (key != _weaponKey) { _weaponKey = key; _weaponCache = WeaponData.Make((WeaponKind)Data.WeaponKind, Data.WeaponOres); }
+            return _weaponCache;
+        }
+    }
+    public ArmorDef CurrentArmor
+    {
+        get
+        {
+            string key = string.Join(",", Data.ArmorOres);
+            if (key != _armorKey) { _armorKey = key; _armorCache = WeaponData.MakeArmor(Data.ArmorOres); }
+            return _armorCache;
+        }
+    }
     public bool HasWeapon => CurrentWeapon != null;
     /// <summary>Dano da arma: luvas da forja e Essência também valem para a luta.</summary>
     public float WeaponDamage => (CurrentWeapon?.Damage ?? 0f) * (1f + GearBonus(GearSlot.Gloves)) * EssenceMultiplier;
-    /// <summary>Armas só depois que o portão selado se abre (o Velho Bram ensina a forjar).</summary>
+    /// <summary>Armas e armaduras só depois que o portão selado se abre (o Velho Bram ensina a forjar).</summary>
     public bool WeaponsUnlocked => Story >= StoryData.GateOpen;
-    public bool WeaponAvailable(WeaponDef w) => w != null && WeaponsUnlocked && w.Region < GameData.Regions.Count && IsUnlocked(GameData.Regions[w.Region].Id);
-    public bool CanForgeWeapon(WeaponDef w) => WeaponAvailable(w) && Data.Weapon != w.Index && CanAfford(w.Fee) && HasForgeCosts(w.Costs);
+    /// <summary>Fração do dano das criaturas que passa pela armadura.</summary>
+    public float DamageTakenMultiplier => 1f - (CurrentArmor?.Reduction ?? 0f);
+    public float ArmorHp => CurrentArmor?.BonusHp ?? 0f;
+    public bool CanForge(WeaponDef w) => w != null && WeaponsUnlocked && CanAfford(w.Fee) && HasForgeCosts(w.Costs);
+    public bool CanForge(ArmorDef a) => a != null && WeaponsUnlocked && CanAfford(a.Fee) && HasForgeCosts(a.Costs);
 
+    /// <summary>Forja a combinação escolhida (substitui a arma atual).</summary>
     public bool TryForgeWeapon(WeaponDef w)
     {
-        if (!CanForgeWeapon(w) || !RequireWork()) return false;
+        if (!CanForge(w) || !RequireWork()) return false;
         Data.Money -= w.Fee;
         PayForgeCosts(w.Costs);
-        Data.Weapon = w.Index;
+        Data.WeaponKind = (int)w.Kind;
+        Data.WeaponOres = w.Ores.ToList();
         MoneyChanged?.Invoke();
         InventoryChanged?.Invoke();
         GearChanged?.Invoke();
@@ -641,6 +666,38 @@ public partial class GameState : Node
         return true;
     }
     public event Action WeaponChanged;
+
+    public bool TryForgeArmor(ArmorDef a)
+    {
+        if (!CanForge(a) || !RequireWork()) return false;
+        Data.Money -= a.Fee;
+        PayForgeCosts(a.Costs);
+        Data.ArmorOres = a.Ores.ToList();
+        MoneyChanged?.Invoke();
+        InventoryChanged?.Invoke();
+        GearChanged?.Invoke();
+        WeaponChanged?.Invoke();
+        Notify(Loc.F("{0} forjada!", a.Name), a.Description, NotifyKind.Success);
+        BigMessage?.Invoke(a.Name.ToUpper());
+        return true;
+    }
+
+    // ================= Guardiões das Profundezas =================
+    public bool GuardianDefeated(string region) => region != null && Data.Guardians.Contains(region);
+
+    /// <summary>O Guardião caiu: a passagem para a próxima Profundeza abre (uma vez por área).</summary>
+    public bool DefeatGuardian(string region)
+    {
+        if (region == null || Data.Guardians.Contains(region)) return false;
+        Data.Guardians.Add(region);
+        var r = GameData.Regions.FirstOrDefault(x => x.Id == region);
+        int i = r != null ? GameData.Regions.IndexOf(r) : -1;
+        var next = i >= 0 && i + 1 < GameData.Regions.Count ? GameData.Regions[i + 1] : null;
+        Notify("Guardião derrotado!", next != null ? Loc.F("A passagem no fundo da área se abriu: {0} espera lá embaixo.", next.Name) : Loc.T("A passagem no fundo da área se abriu. O Trono de Corvo espera lá embaixo."), NotifyKind.Unlock);
+        BigMessage?.Invoke(Loc.T("GUARDIÃO DERROTADO"));
+        SaveGame(true);
+        return true;
+    }
 
     // ================= Diários escondidos =================
     public event Action DiariesChanged;
@@ -1131,7 +1188,8 @@ public partial class GameState : Node
         Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; Data.Ammo = 0; // a jornada recomeça com a picareta de madeira
         Data.Skills.Clear(); // a árvore recomeça; a casa é permanente
         Data.Gear.Clear(); // o equipamento forjado fica para trás, como as ferramentas
-        Data.Weapon = -1;
+        Data.WeaponOres.Clear();
+        Data.ArmorOres.Clear();
         Data.Inventory.Clear();
         Data.UnlockedRegions.Clear();
         Data.UnlockedRegions.Add("caves");

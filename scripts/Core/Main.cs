@@ -228,6 +228,7 @@ public partial class Main : Node
         UiBus.Talk += Talk;
         UiBus.Gate += UseGate;
         UiBus.DeepExit += ExitDeep;
+        UiBus.Descend += Descend;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
@@ -415,6 +416,7 @@ public partial class Main : Node
         UiBus.Talk -= Talk;
         UiBus.Gate -= UseGate;
         UiBus.DeepExit -= ExitDeep;
+        UiBus.Descend -= Descend;
         UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
@@ -494,7 +496,12 @@ public partial class Main : Node
             Player.Enemies = World.Enemies;
             World.Enemies.Player = Player;
             World.Enemies.SpawnShards = (m, p, n) => _shards.SpawnShards(m, p, n);
-            World.Enemies.Killed += _ => GameState.Instance.Data.EnemiesKilled++;
+            World.Enemies.Killed += e =>
+            {
+                GameState.Instance.Data.EnemiesKilled++;
+                if (e.Def.Guardian) GameState.Instance.DefeatGuardian(e.Def.Region);
+            };
+            World.Enemies.DamageTakenMultiplier = () => GameState.Instance.DamageTakenMultiplier;
             _shards.GroundAt = World.GroundAt;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
@@ -854,6 +861,30 @@ public partial class Main : Node
         });
     }
 
+    DeepTravelScreen _deepTravel;
+
+    /// <summary>Passagem no fundo de uma Profundeza: só com o Guardião derrotado; leva à próxima área.</summary>
+    void Descend(string regionId)
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
+        var gs = GameState.Instance;
+        if (!gs.GuardianDefeated(regionId))
+        {
+            var g = EnemyData.GuardianOf(regionId);
+            gs.Notify("Passagem lacrada", Loc.F("O selo só se abre quando {0}, o Guardião desta área, cair.", g?.Name ?? "?"), NotifyKind.Info);
+            return;
+        }
+        var list = GameData.Regions;
+        int i = list.FindIndex(r => r.Id == regionId);
+        var next = i >= 0 && i + 1 < list.Count ? list[i + 1] : null;
+        if (next == null || !next.Deep)
+        {
+            gs.Notify("O Trono de Corvo", Loc.T("Lá embaixo, uma luz vermelha pulsa e alguém bate num martelo, sem parar. (O Trono de Corvo chega numa próxima atualização.)"), NotifyKind.Info);
+            return;
+        }
+        EnterDeep(next);
+    }
+
     /// <summary>Portal de saída de uma Profundeza: volta para a frente do portão da Catedral.</summary>
     void ExitDeep(string regionId)
     {
@@ -886,7 +917,20 @@ public partial class Main : Node
                 gs.Notify("As Profundezas Proibidas", Loc.T("Um vento frio sobe da escuridão. Seis lugares, um pior que o outro... e o Mestre Corvo no último. Forje uma arma na vila antes de descer."), NotifyKind.Unlock);
                 break;
             case StoryData.GateOpen:
-                EnterDeep(GameData.Deep.First());
+                // com mais de uma Profundeza aberta, escolhe o destino
+                if (GameData.Deep.Count(r => gs.IsUnlocked(r.Id)) > 1)
+                {
+                    if (_deepTravel == null)
+                    {
+                        _deepTravel = new DeepTravelScreen { Chosen = EnterDeep };
+                        _deepTravel.Closed += ReturnToGameplay;
+                        AddChild(_deepTravel);
+                    }
+                    Input.MouseMode = Input.MouseModeEnum.Visible;
+                    Player.InputEnabled = false;
+                    _deepTravel.Open();
+                }
+                else EnterDeep(GameData.Deep.First());
                 break;
             case StoryData.BringMold:
             case StoryData.ForgeKey:
@@ -963,13 +1007,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _forge, _diary, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
-            sc.CloseSilently();
+        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _forge, _diary, _deepTravel, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+            sc?.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || StoryPlaying || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
+    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || (_deepTravel?.IsOpen ?? false) || StoryPlaying || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -1011,6 +1055,7 @@ public partial class Main : Node
             if (_missions?.IsOpen ?? false) { _missions.Close(); return; }
             if (_forge?.IsOpen ?? false) { _forge.Close(); return; }
             if (_diary?.IsOpen ?? false) { _diary.Close(); return; }
+            if (_deepTravel?.IsOpen ?? false) { _deepTravel.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }
             if (_settings.IsOpen) { _settings.Close(); return; }
@@ -1034,6 +1079,7 @@ public partial class Main : Node
             else if (_missions?.IsOpen ?? false) _missions.Close();
             else if (_forge?.IsOpen ?? false) _forge.Close();
             else if (_diary?.IsOpen ?? false) _diary.Close();
+            else if (_deepTravel?.IsOpen ?? false) _deepTravel.Close();
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
             else if (_help.IsOpen) _help.Close();
@@ -1209,6 +1255,7 @@ public partial class Main : Node
             if (World.RegionRoots[i].Visible != visible) World.RegionRoots[i].Visible = visible;
         }
         Buildings.UpdateVisibility(r.Index, inHouse);
+        World.Enemies?.ShowOnly(!inHouse && r.Deep ? r.Id : null);
     }
 
     void OnSold(long amount)

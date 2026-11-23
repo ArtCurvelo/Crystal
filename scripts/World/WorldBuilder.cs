@@ -305,28 +305,63 @@ public partial class WorldBuilder : Node3D
     /// Inimigos da Profundeza: rastejantes em grupo nos salões e uma sentinela nos salões grandes. Os salões
     /// perto da entrada ficam livres (o jogador chega com calma). Posições só pela geometria (sem gerador).
     /// </summary>
+    public readonly List<DeepDescent> DeepDescents = new();
+
     void SpawnEnemies(RegionDef r, CaveLayout L)
     {
-        var defs = EnemyData.All.Where(e => e.Region == r.Id).ToList();
-        var crawler = defs.FirstOrDefault(d => d.Kind == EnemyKind.Crawler);
-        var sentinel = defs.FirstOrDefault(d => d.Kind == EnemyKind.Sentinel);
+        // o primeiro inimigo comum anda em bando; o segundo é o pesado (um por salão grande); filhotes de divisão não nascem sozinhos
+        var smalls = EnemyData.All.Where(e => e.SplitInto != null).Select(e => e.SplitInto).ToHashSet();
+        var defs = EnemyData.All.Where(e => e.Region == r.Id && !e.Guardian && !smalls.Contains(e.Id)).ToList();
+        var pack = defs.Count > 0 ? defs[0] : null;
+        var heavy = defs.Count > 1 ? defs[1] : null;
+        // o salão mais fundo é do Guardião (e da passagem para a próxima área)
+        CaveFeature deepest = null;
+        float best = -1f;
+        foreach (var c in L.Chambers)
+        {
+            if (c.Kind != CaveKind.Chamber || c.Radius < 8f) continue;
+            float d = L.Depth(c.Center.X, c.Center.Y);
+            if (d > best && L.Reachable(c.Center.X, c.Center.Y)) { best = d; deepest = c; }
+        }
         int seed = 0;
         foreach (var c in L.Chambers)
         {
-            if (c.Kind != CaveKind.Chamber) continue;
+            if (c.Kind != CaveKind.Chamber || c == deepest) continue;
             var p = c.Center;
             if (L.Depth(p.X, p.Y) < 0.12f) continue;
             int n = c.Radius > 11f ? 3 : 2;
-            for (int k = 0; k < n && crawler != null; k++)
+            for (int k = 0; k < n && pack != null; k++)
             {
                 float a = k * 2.1f + seed * 0.7f;
                 var q = p + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * c.Radius * 0.4f;
                 if (L.WallDist(q.X, q.Y) > -1.5f || !L.Reachable(q.X, q.Y)) continue;
-                Enemies.Spawn(crawler, L.OnGround(q.X, q.Y, 0.3f), 9000 + seed * 17 + k);
+                Enemies.Spawn(pack, L.OnGround(q.X, q.Y, 0.3f), 9000 + seed * 17 + k);
             }
-            if (sentinel != null && c.Radius > 10f && L.WallDist(p.X, p.Y) < -3f && L.Reachable(p.X, p.Y))
-                Enemies.Spawn(sentinel, L.OnGround(p.X, p.Y, 0.3f), 7000 + seed);
+            if (heavy != null && c.Radius > 10f && L.WallDist(p.X, p.Y) < -3f && L.Reachable(p.X, p.Y))
+                Enemies.Spawn(heavy, L.OnGround(p.X, p.Y, 0.3f), 7000 + seed);
             seed++;
+        }
+        if (deepest != null)
+        {
+            var g = EnemyData.GuardianOf(r.Id);
+            var gc = deepest.Center;
+            if (g != null) Enemies.Spawn(g, L.OnGround(gc.X, gc.Y, 0.3f), 5000 + r.Index);
+            // passagem atrás do Guardião, longe da entrada do salão
+            var dir = Vector2.Down;
+            float far = -1f;
+            for (int i = 0; i < 12; i++)
+            {
+                float a = Mathf.Tau * i / 12f;
+                var q = gc + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * deepest.Radius * 0.55f;
+                if (L.WallDist(q.X, q.Y) > -2.5f || !L.Reachable(q.X, q.Y)) continue;
+                float d = L.Depth(q.X, q.Y);
+                if (d > far) { far = d; dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a)); }
+            }
+            var dp = gc + dir * deepest.Radius * 0.55f;
+            var desc = new DeepDescent { Name = "DeepDescent_" + r.Id, Region = r };
+            RegionRoots[r.Index].AddChild(desc);
+            desc.Position = L.OnGround(dp.X, dp.Y, -0.05f);
+            DeepDescents.Add(desc);
         }
     }
 

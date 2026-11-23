@@ -138,31 +138,57 @@ public partial class TestRunner : Node
                 Check(linesOk, "falas traduzidas, retratos e quadros do flashback existem");
                 Fresh();
             });
-            Run("Armas: forja, dano e renascimento", () =>
+            Run("Armas e armaduras: forja por combinação de minérios", () =>
             {
                 Fresh(); GS.NewGame();
-                var w = WeaponData.All[0];
+                Check(WeaponData.Make(WeaponKind.Sword, new[] { "copper" }) == null, "arma precisa de pelo menos 2 minérios");
+                Check(WeaponData.Make(WeaponKind.Sword, new[] { "copper", "copper" }) == null, "minérios repetidos não contam duas vezes");
+                Check(WeaponData.Make(WeaponKind.Sword, new[] { "copper", "heart" }) == null, "formações especiais não entram na forja");
+                Check(WeaponData.Make(WeaponKind.Sword, new[] { "copper", "quartz", "pyrite", "jasper" }).Ores.Count == 3, "no máximo 3 minérios por arma");
+                Check(WeaponData.MakeArmor(new[] { "copper", "quartz" }) == null && WeaponData.MakeArmor(new[] { "copper", "quartz", "pyrite", "jasper", "hematite", "calcite" }).Ores.Count == 5, "armadura usa de 3 a 5 minérios");
+                var weak = WeaponData.Make(WeaponKind.Sword, new[] { "copper", "quartz" });
+                var mixed = WeaponData.Make(WeaponKind.Sword, new[] { "lumenite", "quartz" });
+                var strong = WeaponData.Make(WeaponKind.Sword, new[] { "primelumen", "eyecrystal", "freedomstone" });
+                Check(weak.Damage < mixed.Damage && mixed.Damage < strong.Damage, $"minérios melhores dão mais dano ({weak.Damage} < {mixed.Damage} < {strong.Damage})");
+                Check(WeaponData.Make(WeaponKind.Sword, new[] { "lumenite", "quartz", "copper" }).Damage > mixed.Damage, "um terceiro minério aumenta o dano");
+                var hammer = WeaponData.Make(WeaponKind.Hammer, new[] { "lumenite", "quartz" });
+                Check(hammer.Damage > mixed.Damage * 2f && hammer.Speed < 1f && hammer.Knockback > mixed.Knockback && mixed.Speed >= 2f, "martelo: lento, forte e empurra; espada: rápida");
+                Check(mixed.Name.Contains(GameData.Mat("lumenite").Name) && mixed.Ore == "lumenite", "nome e cor saem do minério mais forte");
+                var aWeak = WeaponData.MakeArmor(new[] { "copper", "quartz", "pyrite" });
+                var aBest = WeaponData.MakeArmor(new[] { "primelumen", "eyecrystal", "freedomstone", "seedglass", "phoenixite" });
+                Check(aBest.Reduction > aWeak.Reduction && aBest.BonusHp > aWeak.BonusHp && aBest.Reduction <= 0.75f, $"melhores minérios: melhor armadura ({aWeak.Reduction:P0} → {aBest.Reduction:P0}, máx. 75%)");
+                Check(strong.Fee > weak.Fee * 100, "taxa da forja acompanha a força da combinação");
+                // forjar de verdade
+                var w = WeaponData.Make(WeaponKind.Sword, new[] { "meteorite", "obsidian" });
                 foreach (var c in w.Costs) GS.Data.Inventory[c.Mat] = c.Amount;
                 GS.Data.Money = w.Fee;
-                foreach (var r in GameData.Mine) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
-                Check(!GS.WeaponsUnlocked && !GS.CanForgeWeapon(w), "armas só depois que o portão selado se abre");
+                Check(!GS.WeaponsUnlocked && !GS.CanForge(w), "armas só depois que o portão selado se abre");
                 GS.Data.StoryStage = StoryData.GateOpen;
-                Check(GS.CanForgeWeapon(w) && GS.TryForgeWeapon(w), "forja a primeira espada com os minérios e a taxa");
-                Check(GS.HasWeapon && GS.CurrentWeapon == w && GS.Data.Money == 0 && w.Costs.All(c => GS.InventoryOf(c.Mat) == 0), "arma na mão; cobrou minérios e taxa");
+                Check(GS.CanForge(w) && GS.TryForgeWeapon(w), "forja a espada combinando os minérios");
+                Check(GS.HasWeapon && GS.CurrentWeapon.Name == w.Name && GS.Data.Money == 0 && w.Costs.All(c => GS.InventoryOf(c.Mat) == 0), "arma na mão; cobrou minérios e taxa");
                 float dmg = GS.WeaponDamage;
                 GS.Data.Gear["gloves"] = 2;
                 Check(GS.WeaponDamage > dmg * 1.3f, "luvas forjadas aumentam o dano da arma");
-                Check(WeaponData.All.Where(x => x.Kind == WeaponKind.Hammer).All(h => h.Damage > h.Speed * 0 && h.Speed < 1f && h.Knockback > 5f), "martelos são lentos e empurram");
-                Check(WeaponData.All.Where(x => x.Kind == WeaponKind.Sword).All(sw => sw.Speed >= 2f), "espadas são rápidas");
+                var a = WeaponData.MakeArmor(new[] { "meteorite", "obsidian", "gold" });
+                foreach (var c in a.Costs) GS.Data.Inventory[c.Mat] = c.Amount;
+                GS.Data.Money = a.Fee;
+                Check(GS.TryForgeArmor(a) && GS.DamageTakenMultiplier < 1f && PlayerController.MaxHp > 100f, "armadura diminui o dano e aumenta a vida");
                 Check(GameData.Regions.Count == GameData.MineRegions + GameData.Deep.Count() && GameData.Deep.All(r => r.Deep && r.Spawns.All(sp => GameData.Mat(sp.MaterialId) != null)), "Profundezas com minérios válidos");
                 Check(EnemyData.All.All(e => GameData.Mat(e.Drop) != null && GameData.Regions.Any(r => r.Id == e.Region && r.Deep)), "inimigos largam minérios existentes e moram nas Profundezas");
-                Check(GS.NextLockedRegion() == null, "Profundezas não aparecem como próxima região a comprar");
+                Check(GameData.Deep.All(r => EnemyData.GuardianOf(r.Id) != null), "cada Profundeza tem Guardião");
+                Check(GS.NextLockedRegion() == null || !GS.NextLockedRegion().Deep, "Profundezas não aparecem como próxima região a comprar");
+                // save: combinação guardada; save antigo (receita fixa) é convertido
                 var j = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
-                j.Weapon = 99; j.Sanitize();
-                Check(j.Weapon == -1, "arma inválida no save vira nenhuma");
+                j.Sanitize();
+                Check(j.WeaponOres.SequenceEqual(GS.Data.WeaponOres) && j.ArmorOres.Count == 3, "arma e armadura ficam no save");
+                j.WeaponOres = new() { "lixo", "nada" }; j.Sanitize();
+                Check(j.WeaponOres.Count == 0, "combinação inválida no save vira nenhuma arma");
+                j.Weapon = 2; j.Sanitize();
+                Check(j.WeaponOres.Contains("diamond") && j.Weapon == -1, "arma da v0.27 vira a combinação equivalente");
+                Check(GS.DefeatGuardian("forgotten") && GS.GuardianDefeated("forgotten") && !GS.DefeatGuardian("forgotten"), "Guardião derrotado abre a passagem uma vez");
                 GS.Data.GameCompleted = true; GS.Data.RunEarned = 50_000_000; GS.Data.Discovered.Add("heart");
                 if (GS.CanPrestige) GS.Prestige();
-                Check(!GS.HasWeapon, "ao renascer a arma fica para trás");
+                Check(!GS.HasWeapon && GS.CurrentArmor == null && GS.GuardianDefeated("forgotten"), "ao renascer arma e armadura ficam para trás; passagens continuam abertas");
                 Fresh();
             });
             Run("Forja: equipamentos e conserto", () =>
@@ -1629,7 +1655,7 @@ public partial class TestRunner : Node
         Check(crawler.Mode != Enemy.State.Idle, "inimigo sai do repouso quando vê o jogador");
         // golpe de espada mata o rastejante e ele larga fragmentos
         GS.Data.StoryStage = StoryData.GateOpen;
-        GS.Data.Weapon = 0;
+        GS.Data.WeaponKind = 0; GS.Data.WeaponOres = new() { "meteorite", "obsidian" };
         player.SetWeaponMode(true);
         Check(player.WeaponMode && player.WeaponView.Visible && !player.Tool.Visible, "modo arma mostra a espada e esconde a ferramenta");
         int before = shards.GetChildCount();
@@ -1644,6 +1670,41 @@ public partial class TestRunner : Node
         await Frames(5);
         Check(shards.GetChildCount() > before || GS.InventoryCount > 0, "inimigo morto larga fragmentos");
         Check(!world.Enemies.Enemies.Where(e => e != crawler).Any(e => e.Hp < e.Def.Hp && e.GlobalPosition.DistanceTo(player.GlobalPosition) > 8f), "golpe não acerta inimigos longe");
+        // todas as Profundezas: inimigos, Guardião no salão mais fundo e passagem
+        Check(world.DeepDescents.Count == GameData.Deep.Count(), "cada Profundeza tem uma passagem no fundo");
+        foreach (var r in GameData.Deep)
+        {
+            var mine = world.Enemies.Enemies.Where(e => WorldBuilder.RegionAt(e.Home) == r).ToList();
+            Check(mine.Count >= 8 && mine.Count(e => e.Def.Guardian) == 1, $"{r.NamePt}: {mine.Count} inimigos e 1 Guardião");
+        }
+        // comportamentos especiais (perto do jogador)
+        var near = player.GlobalPosition + player.GlobalTransform.Basis.Z * -3f;
+        var blob = world.Enemies.Spawn(EnemyData.Of("blob"), near, 1);
+        await Frames(2);
+        int countBefore = world.Enemies.Enemies.Count;
+        blob.TakeHit(blob.Def.Hp + 1, player.GlobalPosition, 0);
+        await Frames(2);
+        Check(world.Enemies.Enemies.Count(e => e.Temporary && e.Alive) == 2, "Lúmen Vivo se divide em dois ao morrer");
+        foreach (var t in world.Enemies.Enemies.Where(e => e.Temporary).ToList()) t.TakeHit(1e9f, player.GlobalPosition, 0);
+        await Frames(3);
+        Check(world.Enemies.Enemies.All(e => !e.Temporary), "filhotes mortos somem (não renascem)");
+        player.RestoreHp();
+        float hpP = player.Hp;
+        world.Enemies.Fire(player.GlobalPosition + Vector3.Up * 1.1f + player.GlobalTransform.Basis.Z * -4f, player.GlobalPosition + Vector3.Up * 1.1f, 14f, 20f, Colors.Green);
+        for (int f = 0; f < 60 && player.Hp >= hpP; f++) await Frames(1);
+        Check(player.Hp < hpP, "farpa do Espinhador acerta o jogador");
+        var ember = world.Enemies.Spawn(EnemyData.Of("ember"), player.GlobalPosition + Vector3.Up * 1.2f + player.GlobalTransform.Basis.Z * -1.5f, 2);
+        player.RestoreHp();
+        hpP = player.Hp;
+        for (int f = 0; f < 60 * 4 && ember.Alive; f++) await Frames(1);
+        Check(!ember.Alive && player.Hp < hpP, "Brasa Viva voa até o jogador e explode");
+        var gdef = EnemyData.GuardianOf("forgotten");
+        var guardian = world.Enemies.Enemies.First(e => e.Def == gdef);
+        GS.Data.Guardians.Clear();
+        guardian.TakeHit(1e9f, player.GlobalPosition, 0);
+        await Frames(2);
+        GameState.Instance.DefeatGuardian(gdef.Region); // (no jogo o Main chama isto pelo evento Killed)
+        Check(GS.GuardianDefeated("forgotten") && world.DeepDescents.First(d => d.Region.Id == "forgotten").GetPrompt().Contains("próxima"), "Guardião derrotado abre a passagem para a próxima área");
         // desmaio também funciona nas Profundezas
         player.TakeDamage(9999, player.GlobalPosition + Vector3.Forward);
         Check(player.Hp <= 0, "dano forte derruba o jogador");

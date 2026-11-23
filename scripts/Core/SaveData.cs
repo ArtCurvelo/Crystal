@@ -34,10 +34,17 @@ public sealed class SaveData
     public List<string> Diaries { get; set; } = new();
     /// <summary>Etapa do ato 2 ("A Chave Falsa", ver StoryData). Fica ao renascer.</summary>
     public int StoryStage { get; set; }
-    /// <summary>Arma forjada (índice em WeaponData; −1 = nenhuma). Fica para trás ao renascer.</summary>
+    /// <summary>Campo antigo (v0.27: índice de receita fixa); migrado para WeaponOres.</summary>
     public int Weapon { get; set; } = -1;
+    /// <summary>Arma forjada: tipo (0 espada, 1 martelo) e os minérios combinados (vazio = nenhuma). Fica para trás ao renascer.</summary>
+    public int WeaponKind { get; set; }
+    public List<string> WeaponOres { get; set; } = new();
+    /// <summary>Armadura forjada: os minérios combinados (vazio = nenhuma). Fica para trás ao renascer.</summary>
+    public List<string> ArmorOres { get; set; } = new();
     /// <summary>Inimigos derrotados nas Profundezas (estatística).</summary>
     public long EnemiesKilled { get; set; }
+    /// <summary>Profundezas cujo Guardião já caiu (a passagem para a próxima fica aberta; vale entre renascimentos).</summary>
+    public List<string> Guardians { get; set; } = new();
     public long CrystalsMined { get; set; }
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
@@ -94,8 +101,19 @@ public sealed class SaveData
         if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
         Gear ??= new();
         StoryStage = System.Math.Clamp(StoryStage, 0, StoryData.GateOpen);
-        if (Weapon < -1 || Weapon >= WeaponData.All.Count) Weapon = -1;
+        WeaponOres ??= new();
+        ArmorOres ??= new();
+        if (Weapon >= 0 && Weapon < WeaponData.LegacyRecipes.Length && WeaponOres.Count == 0)
+        {
+            WeaponKind = (int)WeaponData.LegacyRecipes[Weapon].kind;
+            WeaponOres = WeaponData.LegacyRecipes[Weapon].ores.ToList();
+        }
+        Weapon = -1;
+        WeaponKind = System.Math.Clamp(WeaponKind, 0, 1);
+        if (WeaponData.Make((Data.WeaponKind)WeaponKind, WeaponOres) == null) WeaponOres = new();
+        if (WeaponData.MakeArmor(ArmorOres) == null) ArmorOres = new();
         if (EnemiesKilled < 0) EnemiesKilled = 0;
+        Guardians = (Guardians ?? new()).Where(g => GameData.Regions.Any(r => r.Deep && r.Id == g)).Distinct().ToList();
         Diaries = (Diaries ?? new()).Where(d => DiaryData.Of(d) != null).Distinct().ToList();
         foreach (var key in Gear.Keys.ToList())
         {
