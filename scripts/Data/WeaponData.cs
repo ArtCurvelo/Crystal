@@ -82,7 +82,8 @@ public static class WeaponData
         var w = new WeaponDef
         {
             Kind = kind, Ores = list,
-            Damage = Mathf.Round(power * 3f * (sword ? 1f : 2.6f)),
+            // calibrado: Ferro Meteórico + Obsidiana ≈ 220; os 3 melhores minérios do Ninho ≈ 30 mil
+            Damage = Mathf.Round(7.6f * Mathf.Pow(power, 0.758f) * (sword ? 1f : 2.6f)),
             Speed = sword ? 2.0f : 0.85f, Reach = sword ? 2.9f : 2.6f, Arc = sword ? 55f : 80f, Knockback = sword ? 2.5f : 7f,
             Fee = FeeFor(power),
             Name = Joined(sword ? "Espada" : "Martelo", list),
@@ -100,8 +101,9 @@ public static class WeaponData
         var a = new ArmorDef
         {
             Ores = list,
-            Reduction = Mathf.Min(0.75f, 0.75f * power / (power + 450f)),
-            BonusHp = Mathf.Round(25f * Mathf.Log(1f + power / 40f)),
+            // área 1 ≈ 25-30%, Raízes ≈ 50%, os melhores do Ninho ≈ 75% (máximo)
+            Reduction = Mathf.Min(0.75f, 0.8f * power / (power + 8000f)),
+            BonusHp = Mathf.Round(20f * Mathf.Log(1f + power / 200f)),
             Fee = FeeFor(power * 0.8f),
             Name = Joined("Couraça", list),
         };

@@ -123,7 +123,8 @@ public partial class WeaponView : Node3D
         else rot = Vector3.Zero;
         _pivot.Rotation = rot;
         _pivot.Position = pos;
-        _trail.Visible = trail > 0.01f;
+        _trail.Visible = false; // o arco do rastro atrapalhava a visão; o golpe já é bem visível
+        _ = trail;
         _trailMat.AlbedoColor = new Color(_trailMat.Emission, trail * 0.22f);
         _trail.Rotation = new Vector3(Mathf.Pi / 2 - 0.3f, 0, (1f - trail) * -1.2f);
     }
