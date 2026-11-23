@@ -1370,6 +1370,35 @@ public partial class TestRunner : Node
         var space = town.GetWorld3D().DirectSpaceState;
         var hit = space.IntersectRay(PhysicsRayQueryParameters3D.Create(town.ArrivePoint + Vector3.Up * 2f, town.ArrivePoint + Vector3.Down * 3f, PlayerController.WorldLayer));
         Check(hit.Count > 0, "há chão na chegada da vila");
+        // vida da vila: os caminhos dos moradores não atravessam nada sólido
+        var life = town.Life;
+        Check(life != null && life.Villagers.Count >= 8, "vila com moradores");
+        var sphere = new SphereShape3D { Radius = 0.3f };
+        var bad = new System.Collections.Generic.List<string>();
+        for (int i = 0; i < life.Nodes.Count; i++)
+            foreach (int j in life.Nodes[i].Links)
+            {
+                if (j < i || life.Nodes[i].Kind == TownLife.Spot.Bench || life.Nodes[j].Kind == TownLife.Spot.Bench) continue;
+                var a0 = life.Nodes[i].Pos; var a1 = life.Nodes[j].Pos;
+                int steps = Math.Max(2, (int)(a0.DistanceTo(a1) / 0.25f));
+                for (int k = 0; k <= steps; k++)
+                {
+                    var q = new PhysicsShapeQueryParameters3D { Shape = sphere, CollisionMask = PlayerController.WorldLayer, Transform = new Transform3D(Basis.Identity, a0.Lerp(a1, k / (float)steps) + Vector3.Up * 0.9f) };
+                    if (space.IntersectShape(q, 1).Count > 0) { bad.Add($"{life.Nodes[i].Name}-{life.Nodes[j].Name}"); break; }
+                }
+            }
+        foreach (var b in bad) GD.Print($"      caminho bloqueado: {b}");
+        Check(bad.Count == 0, "caminhos dos moradores livres de obstáculos");
+        Check(life.Nodes.All(n => Town.Contains(n.Pos)), "pontos dos moradores dentro da vila");
+        var startPos = life.Villagers.Select(v => v.Position).ToList();
+        for (int f = 0; f < 240; f++) await Frames(1);
+        Check(life.Villagers.Where((v, i) => v.Position.DistanceTo(startPos[i]) > 0.5f).Count() >= 3, "moradores andam pela vila");
+        GS.EndDay(); town.RefreshSky();
+        for (int f = 0; f < 60 * 70 && life.Villagers.Any(v => !v.Hidden); f += 30) { await Frames(30); }
+        Check(life.Villagers.All(v => v.Hidden), "à noite os moradores vão para casa");
+        GS.StartNewDay(); town.RefreshSky();
+        for (int f = 0; f < 60 * 12 && life.Villagers.Any(v => v.Hidden); f += 30) { await Frames(30); }
+        Check(life.Villagers.All(v => !v.Hidden), "de manhã eles saem de casa");
         bool door = false; void OnDoor(bool inside) => door = inside;
         UiBus.Door += OnDoor; town.DoorOutside.Interact(null); UiBus.Door -= OnDoor;
         Check(door, "porta de fora leva para dentro de casa");

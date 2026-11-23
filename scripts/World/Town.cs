@@ -72,6 +72,7 @@ public partial class Town : Node3D
         BuildStation(c);
         BuildBlacksmith(c + new Vector3(0, 0, -11f));
         BuildBoard(c + new Vector3(3f, 0, 9f));
+        BuildVillage(c);
         BuildSky();
         if (GameState.Instance != null) { GameState.Instance.DayStarted += RefreshSky; GameState.Instance.DayEnded += RefreshSky; }
         RefreshSky();
@@ -89,9 +90,31 @@ public partial class Town : Node3D
     }
 
     // ------------------------------------------------------------------ chão e entorno
+    static Texture2D _groundNoise;
+    /// <summary>Ruído em tons de cinza para o chão da vila (o da caverna guarda só o canal vermelho).</summary>
+    public static Texture2D GroundNoise
+    {
+        get
+        {
+            if (_groundNoise != null) return _groundNoise;
+            var n = new FastNoiseLite { Seed = 31, Frequency = 0.03f, FractalOctaves = 4, NoiseType = FastNoiseLite.NoiseTypeEnum.SimplexSmooth };
+            var img = n.GetSeamlessImage(256, 256);
+            img.Convert(Image.Format.Rgb8);
+            // contraste suave em volta de cinza claro (multiplica a cor do material)
+            for (int y = 0; y < 256; y++)
+                for (int x = 0; x < 256; x++)
+                {
+                    float v = 0.7f + (img.GetPixel(x, y).R - 0.5f) * 0.6f;
+                    img.SetPixel(x, y, new Color(v, v, v));
+                }
+            _groundNoise = ImageTexture.CreateFromImage(img);
+            return _groundNoise;
+        }
+    }
+
     void BuildGround(Vector3 c)
     {
-        var dirt = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.3f, 0.24f), Roughness = 0.95f, AlbedoTexture = CaveTerrain.NoiseTexture, Uv1Scale = new Vector3(6, 6, 6) };
+        var dirt = new StandardMaterial3D { AlbedoColor = new Color(0.36f, 0.5f, 0.22f), Roughness = 0.95f, AlbedoTexture = GroundNoise, Uv1Scale = new Vector3(8, 8, 8) };
         M(this, new PlaneMesh { Size = new Vector2(Radius * 2.6f, Radius * 2.6f) }, dirt, c + new Vector3(0, -0.02f, 0));
         Solid(c + new Vector3(0, -0.5f, 0), new Vector3(Radius * 2.6f, 1f, Radius * 2.6f));
         // muro invisível no limite (a cerca e as rochas marcam onde é)
@@ -192,7 +215,7 @@ public partial class Town : Node3D
         }
         // carroça de minério, barris e caixotes
         var wood = Mat(new Color(0.45f, 0.3f, 0.18f));
-        var cart = c + new Vector3(6.5f, 0, -5.5f);
+        var cart = c + new Vector3(-6.4f, 0, -7.4f);
         M(this, new BoxMesh { Size = new Vector3(1.6f, 0.6f, 1.0f) }, wood, cart + Vector3.Up * 0.75f, new Vector3(0, 0.4f, 0));
         foreach (float dz in new[] { -0.55f, 0.55f })
             M(this, new CylinderMesh { TopRadius = 0.35f, BottomRadius = 0.35f, Height = 0.08f, RadialSegments = 12 }, post, cart + new Vector3(0, 0.35f, dz), new Vector3(Mathf.Pi / 2, 0.4f, 0));
@@ -200,13 +223,13 @@ public partial class Town : Node3D
         Solid(cart + Vector3.Up * 0.6f, new Vector3(1.6f, 1.2f, 1.2f), 0.4f);
         for (int i = 0; i < 3; i++)
         {
-            var b = c + new Vector3(-6.5f + i * 0.7f, 0, 6.8f + (i % 2) * 0.5f);
+            var b = c + new Vector3(-17.6f + i * 0.7f, 0, 12.4f + (i % 2) * 0.5f);
             M(this, new CylinderMesh { TopRadius = 0.32f, BottomRadius = 0.32f, Height = 0.9f, RadialSegments = 10 }, wood, b + Vector3.Up * 0.45f);
             foreach (float y in new[] { 0.15f, 0.75f })
                 M(this, new CylinderMesh { TopRadius = 0.335f, BottomRadius = 0.335f, Height = 0.05f, RadialSegments = 10 }, post, b + Vector3.Up * y);
         }
-        Solid(c + new Vector3(-5.8f, 0.45f, 7.0f), new Vector3(2.2f, 0.9f, 1.2f));
-        Decor.Crate(this, c + new Vector3(7.5f, 0, 5.5f), 0.3f, 0.9f, true);
+        Solid(c + new Vector3(-16.9f, 0.45f, 12.6f), new Vector3(2.2f, 0.9f, 1.2f));
+        Decor.Crate(this, c + new Vector3(-13.9f, 0, 14.2f), 0.3f, 0.9f, true);
     }
 
     // ------------------------------------------------------------------ fachada da casa
@@ -392,6 +415,7 @@ public partial class Town : Node3D
     public void RefreshSky()
     {
         bool night = Night;
+        RefreshVillageLights(night);
         if (_stars != null) _stars.Visible = night;
         if (_sun != null)
         {

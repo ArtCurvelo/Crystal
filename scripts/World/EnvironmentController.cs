@@ -61,8 +61,8 @@ public partial class EnvironmentController : WorldEnvironment
         {
             _skyMat ??= new ProceduralSkyMaterial();
             _sky ??= new Sky { SkyMaterial = _skyMat };
-            _skyMat.SkyTopColor = night ? new Color(0.02f, 0.03f, 0.09f) : new Color(0.25f, 0.42f, 0.7f);
-            _skyMat.SkyHorizonColor = night ? new Color(0.12f, 0.1f, 0.2f) : new Color(0.95f, 0.7f, 0.5f);
+            _skyMat.SkyTopColor = night ? new Color(0.02f, 0.03f, 0.09f) : new Color(0.22f, 0.45f, 0.85f);
+            _skyMat.SkyHorizonColor = night ? new Color(0.12f, 0.1f, 0.2f) : new Color(0.72f, 0.82f, 0.92f);
             _skyMat.GroundBottomColor = new Color(0.03f, 0.03f, 0.04f);
             _skyMat.GroundHorizonColor = night ? new Color(0.1f, 0.09f, 0.14f) : new Color(0.55f, 0.45f, 0.4f);
             _skyMat.SunAngleMax = night ? 0f : 30f;
@@ -83,7 +83,7 @@ public partial class EnvironmentController : WorldEnvironment
         e.GlowIntensity = f.GlowIntensity;
         // névoa volumétrica: feixes de luz da lanterna e brilho dos cristais no ar
         e.VolumetricFogEnabled = f.VolumetricFog;
-        e.VolumetricFogDensity = 0.012f;
+        e.VolumetricFogDensity = _town ? (_townNight ? 0.004f : 0.0012f) : 0.012f;
         e.VolumetricFogLength = 48f;
         e.VolumetricFogDetailSpread = 1.5f;
         e.VolumetricFogGIInject = 0f;
@@ -165,10 +165,12 @@ public partial class EnvironmentController : WorldEnvironment
             // ar livre: luz ambiente do céu, névoa leve de vale
             e.AmbientLightColor = _townNight ? new Color(0.35f, 0.4f, 0.6f) : new Color(0.75f, 0.72f, 0.7f);
             e.AmbientLightEnergy = (_townNight ? 0.55f : 0.9f) * amb;
-            e.FogLightColor = _townNight ? new Color(0.12f, 0.12f, 0.2f) : new Color(0.7f, 0.6f, 0.55f);
-            e.FogDensity = 0.004f;
+            e.FogLightColor = _townNight ? new Color(0.12f, 0.12f, 0.2f) : new Color(0.68f, 0.76f, 0.86f);
+            e.FogDensity = _townNight ? 0.004f : 0.0025f;
         }
-        e.VolumetricFogAlbedo = _fog.Lightened(0.55f);
+        // ao ar livre a névoa volumétrica da caverna virava uma neblina bege: bem mais rala na vila
+        e.VolumetricFogDensity = _town ? (_townNight ? 0.004f : 0.0012f) : 0.012f;
+        e.VolumetricFogAlbedo = _town ? new Color(0.8f, 0.85f, 0.9f) : _fog.Lightened(0.55f);
         e.VolumetricFogEmission = _fog * 0.35f;
     }
 }

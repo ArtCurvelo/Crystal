@@ -479,6 +479,7 @@ public partial class Main : Node
             }
             _shards.PlayerPosition = () => Player.BodyCenter;
             Rope.PlayerPos = () => Player.GlobalPosition;
+            if (World.Town?.Life != null) World.Town.Life.PlayerPos = () => Player.GlobalPosition;
             _shards.GroundAt = World.GroundAt;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
@@ -1001,6 +1002,7 @@ public partial class Main : Node
         gs.SaveGame(true);
     }
 
+    bool _townNightShown;
     void UpdateRegion(bool instant)
     {
         if (Player == null) return;
@@ -1009,7 +1011,11 @@ public partial class Main : Node
         bool inTown = PlayerInTown;
         int place = inHouse ? 2 : inTown ? 1 : 0;
         GameState.Instance.InTown = inTown;
+        bool night = World.Town?.Night ?? true;
+        // céu da vila acompanha o fim do turno e o novo dia mesmo sem sair do lugar
+        if (inTown && night != _townNightShown && r == _currentRegion && place == _bannerPlace) { _townNightShown = night; _env.SetTown(true, night); }
         if (r == _currentRegion && place == _bannerPlace) return;
+        _townNightShown = night;
         _bannerPlace = place;
         _currentRegion = r;
         GameState.Instance.CurrentRegionId = r.Id;
