@@ -227,6 +227,7 @@ public partial class Main : Node
         UiBus.OpenDiary += OpenDiary;
         UiBus.Talk += Talk;
         UiBus.Gate += UseGate;
+        UiBus.DeepExit += ExitDeep;
         UiBus.GoToMine += GoToMine;
         _shards.InventoryFullBlocked += () => { if (CurrentMode == Mode.Playing) Hud.FlashFull(); };
         Input.Singleton.JoyConnectionChanged += InputHints.OnJoyConnection;
@@ -413,6 +414,7 @@ public partial class Main : Node
         UiBus.OpenDiary -= OpenDiary;
         UiBus.Talk -= Talk;
         UiBus.Gate -= UseGate;
+        UiBus.DeepExit -= ExitDeep;
         UiBus.GoToMine -= GoToMine;
         if (GameState.Instance != null)
         {
@@ -489,6 +491,10 @@ public partial class Main : Node
             _shards.PlayerPosition = () => Player.BodyCenter;
             Rope.PlayerPos = () => Player.GlobalPosition;
             if (World.Town?.Life != null) World.Town.Life.PlayerPos = () => Player.GlobalPosition;
+            Player.Enemies = World.Enemies;
+            World.Enemies.Player = Player;
+            World.Enemies.SpawnShards = (m, p, n) => _shards.SpawnShards(m, p, n);
+            World.Enemies.Killed += _ => GameState.Instance.Data.EnemiesKilled++;
             _shards.GroundAt = World.GroundAt;
             _marker = new ObjectiveMarker { Name = "ObjectiveMarker", World = World, PlayerPos = () => Player.GlobalPosition, CurrentRegion = () => _currentRegion };
             World.GetParent().AddChild(_marker);
@@ -733,6 +739,7 @@ public partial class Main : Node
     void OnFainted()
     {
         var gs = GameState.Instance;
+        bool deep = WorldBuilder.RegionAt(Player.GlobalPosition).Deep;
         int stolen = gs.StealFromInventory(0.25f);
         foreach (var camp in World.GoblinCamps) if (camp.Rebels.Count > 0) camp.EndRebellion(false);
         gs.EndDay(early: true);
@@ -742,7 +749,8 @@ public partial class Main : Node
             Player.RestoreHp();
             PlaceTo(World.House.WakePoint, Mathf.Pi);
             Hud.ShowBigMessage("VOCÊ DESMAIOU");
-            gs.Notify("Você desmaiou", Loc.F("Os goblins levaram {0} fragmentos. Você acordou em casa; durma para começar outro dia.", stolen), NotifyKind.Warning);
+            if (deep) gs.Notify("Você desmaiou", Loc.F("As criaturas das Profundezas te derrubaram. Você perdeu {0} fragmentos e acordou em casa; durma para começar outro dia.", stolen), NotifyKind.Warning);
+            else gs.Notify("Você desmaiou", Loc.F("Os goblins levaram {0} fragmentos. Você acordou em casa; durma para começar outro dia.", stolen), NotifyKind.Warning);
         });
     }
 
@@ -827,6 +835,37 @@ public partial class Main : Node
         }
     }
 
+    /// <summary>Desce pelo portão aberto até uma Profundeza Proibida (primeira vez: libera a área).</summary>
+    void EnterDeep(RegionDef r)
+    {
+        var gs = GameState.Instance;
+        if (!World.DeepArrivals.TryGetValue(r.Id, out var at)) return;
+        if (!gs.CanWork) { gs.RequireWork(); return; }
+        bool first = !gs.IsUnlocked(r.Id);
+        if (first) { gs.Data.UnlockedRegions.Add(r.Id); gs.SaveGame(true); }
+        if (!gs.HasWeapon)
+            gs.Notify("Desarmado", Loc.T("Você desce sem arma. Lá embaixo os monstros não se mineram: forje uma arma na forja da vila."), NotifyKind.Warning);
+        FadeThrough(() =>
+        {
+            PlaceTo(at, 0f);
+            if (gs.HasWeapon) Player.SetWeaponMode(true);
+            Hud.ShowBigMessage(r.Name.ToUpper());
+            if (first) gs.Notify("As Profundezas Proibidas", Loc.T("Cuidado: aqui os cristais têm dono. Troque entre ferramenta e arma quando precisar."), NotifyKind.Unlock);
+        });
+    }
+
+    /// <summary>Portal de saída de uma Profundeza: volta para a frente do portão da Catedral.</summary>
+    void ExitDeep(string regionId)
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading || World.SealedGate == null) return;
+        var g = World.SealedGate;
+        var front = g.GlobalPosition + g.GlobalTransform.Basis.Z * 5f;
+        var L = World.LayoutAt(front);
+        var at = L.OnGround(front.X, front.Z, 0.1f);
+        var dir = g.GlobalTransform.Basis.Z;
+        FadeThrough(() => PlaceTo(at, Mathf.Atan2(-dir.X, -dir.Z)));
+    }
+
     /// <summary>Portão selado da Catedral: molde do selo (etapa 2) e abertura com a chave falsa (etapa 5).</summary>
     void UseGate()
     {
@@ -844,10 +883,10 @@ public partial class Main : Node
                 World.SealedGate?.Open();
                 AudioManager.Instance?.Play("unlock", -2f);
                 Hud.ShowBigMessage(Loc.T("O PORTÃO SE ABRIU"));
-                gs.Notify("As Profundezas Proibidas", Loc.T("Um vento frio sobe da escuridão. Seis lugares, um pior que o outro... e o Mestre Corvo no último."), NotifyKind.Unlock);
+                gs.Notify("As Profundezas Proibidas", Loc.T("Um vento frio sobe da escuridão. Seis lugares, um pior que o outro... e o Mestre Corvo no último. Forje uma arma na vila antes de descer."), NotifyKind.Unlock);
                 break;
             case StoryData.GateOpen:
-                gs.Notify("As Profundezas Proibidas", Loc.T("A escuridão ainda é funda demais para descer. (As Profundezas Proibidas chegam numa próxima atualização.)"), NotifyKind.Info);
+                EnterDeep(GameData.Deep.First());
                 break;
             case StoryData.BringMold:
             case StoryData.ForgeKey:
@@ -1164,7 +1203,9 @@ public partial class Main : Node
         if (World.Town.Visible != inHouse) World.Town.Visible = inHouse;
         for (int i = 0; i < World.RegionRoots.Count; i++)
         {
-            bool visible = !inHouse && Mathf.Abs(i - r.Index) <= 1;
+            // a mina e as Profundezas não se enxergam (ficam longe e sem túnel)
+            bool sameWorld = GameData.Regions[i].Deep == r.Deep;
+            bool visible = !inHouse && sameWorld && Mathf.Abs(i - r.Index) <= 1;
             if (World.RegionRoots[i].Visible != visible) World.RegionRoots[i].Visible = visible;
         }
         Buildings.UpdateVisibility(r.Index, inHouse);

@@ -27,6 +27,7 @@ public static class InputSetup
         Key("debug_panel", Godot.Key.F9);
         Key("build_prev", Godot.Key.Q);
         Key("build_next", Godot.Key.R);
+        Key("swap_weapon", Godot.Key.X);
         Mouse("mine", MouseButton.Left);
 
         // ---- controle ----
@@ -50,6 +51,7 @@ public static class InputSetup
         Pad("debug_panel", JoyButton.Back);
         Pad("build_prev", JoyButton.DpadLeft);
         Pad("build_next", JoyButton.DpadRight);
+        Pad("swap_weapon", JoyButton.Y);
         // menus com o controle: o Godot só mapeia teclado nas ações de interface.
         // A confirma, B volta, direcional e analógico navegam, LB/RB trocam de aba.
         Pad("ui_accept", JoyButton.A);
@@ -76,6 +78,7 @@ public static class InputSetup
         ("interact", "Interagir"), ("mine", "Minerar"), ("flashlight", "Lanterna"), ("pause", "Pausa"),
         ("quick_save", "Salvar rápido"), ("toggle_fps", "Mostrar FPS"),
         ("build", "Modo construção"), ("build_prev", "Construção anterior"), ("build_next", "Próxima construção"),
+        ("swap_weapon", "Trocar ferramenta/arma"),
     };
 
     /// <summary>Ações remapeáveis no controle (botões).</summary>
@@ -84,6 +87,7 @@ public static class InputSetup
         ("jump", "Pular"), ("sprint", "Correr"), ("crouch", "Agachar"), ("interact", "Interagir"),
         ("mine", "Minerar"), ("flashlight", "Lanterna"), ("pause", "Pausa"),
         ("build", "Modo construção"), ("build_prev", "Construção anterior"), ("build_next", "Próxima construção"),
+        ("swap_weapon", "Trocar ferramenta/arma"),
     };
 
     static string Serialize(InputEvent e) => e switch

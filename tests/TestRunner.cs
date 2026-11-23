@@ -138,6 +138,33 @@ public partial class TestRunner : Node
                 Check(linesOk, "falas traduzidas, retratos e quadros do flashback existem");
                 Fresh();
             });
+            Run("Armas: forja, dano e renascimento", () =>
+            {
+                Fresh(); GS.NewGame();
+                var w = WeaponData.All[0];
+                foreach (var c in w.Costs) GS.Data.Inventory[c.Mat] = c.Amount;
+                GS.Data.Money = w.Fee;
+                foreach (var r in GameData.Mine) if (!GS.IsUnlocked(r.Id)) GS.Data.UnlockedRegions.Add(r.Id);
+                Check(!GS.WeaponsUnlocked && !GS.CanForgeWeapon(w), "armas só depois que o portão selado se abre");
+                GS.Data.StoryStage = StoryData.GateOpen;
+                Check(GS.CanForgeWeapon(w) && GS.TryForgeWeapon(w), "forja a primeira espada com os minérios e a taxa");
+                Check(GS.HasWeapon && GS.CurrentWeapon == w && GS.Data.Money == 0 && w.Costs.All(c => GS.InventoryOf(c.Mat) == 0), "arma na mão; cobrou minérios e taxa");
+                float dmg = GS.WeaponDamage;
+                GS.Data.Gear["gloves"] = 2;
+                Check(GS.WeaponDamage > dmg * 1.3f, "luvas forjadas aumentam o dano da arma");
+                Check(WeaponData.All.Where(x => x.Kind == WeaponKind.Hammer).All(h => h.Damage > h.Speed * 0 && h.Speed < 1f && h.Knockback > 5f), "martelos são lentos e empurram");
+                Check(WeaponData.All.Where(x => x.Kind == WeaponKind.Sword).All(sw => sw.Speed >= 2f), "espadas são rápidas");
+                Check(GameData.Regions.Count == GameData.MineRegions + GameData.Deep.Count() && GameData.Deep.All(r => r.Deep && r.Spawns.All(sp => GameData.Mat(sp.MaterialId) != null)), "Profundezas com minérios válidos");
+                Check(EnemyData.All.All(e => GameData.Mat(e.Drop) != null && GameData.Regions.Any(r => r.Id == e.Region && r.Deep)), "inimigos largam minérios existentes e moram nas Profundezas");
+                Check(GS.NextLockedRegion() == null, "Profundezas não aparecem como próxima região a comprar");
+                var j = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
+                j.Weapon = 99; j.Sanitize();
+                Check(j.Weapon == -1, "arma inválida no save vira nenhuma");
+                GS.Data.GameCompleted = true; GS.Data.RunEarned = 50_000_000; GS.Data.Discovered.Add("heart");
+                if (GS.CanPrestige) GS.Prestige();
+                Check(!GS.HasWeapon, "ao renascer a arma fica para trás");
+                Fresh();
+            });
             Run("Forja: equipamentos e conserto", () =>
             {
                 Fresh(); GS.NewGame();
@@ -231,6 +258,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: casa (melhorias novas, bancada e baú)", TestHouseUpgrades);
             await RunAsync("Integração: Vila dos Ferreiros", TestTown);
             await RunAsync("HQ de abertura", TestIntroComic);
+            await RunAsync("Integração: Profundezas Proibidas e combate", TestDeepCombat);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: clique, golpe triplo e mineração contínua", TestClickMining);
             await RunAsync("Integração: eventos de região", TestRegionEvents);
@@ -375,7 +403,7 @@ public partial class TestRunner : Node
         Fresh();
         var d = GS.Data;
         const string id = "caves";
-        Check(GoblinData.All.Count == GameData.Regions.Count && GameData.Regions.All(r => GoblinData.Of(r.Id) != null), "um goblin por região");
+        Check(GoblinData.All.Count == GameData.MineRegions && GameData.Mine.All(r => GoblinData.Of(r.Id) != null), "um goblin por região da mina");
         for (int i = 1; i < GoblinData.All.Count; i++)
             Check(GoblinData.All[i].HireCost > GoblinData.All[i - 1].HireCost && GoblinData.All[i].MineDps > GoblinData.All[i - 1].MineDps, $"{GoblinData.All[i].Name}: mais caro e mais forte que o anterior");
         GS.AddMoney(1000);
@@ -473,7 +501,7 @@ public partial class TestRunner : Node
         player.SimulateCapturedMouse = true;
         player.GlobalPosition = world.SpawnPoint;
         await Frames(3);
-        Check(world.GoblinCamps.Count == GameData.Regions.Count, $"um acampamento de goblin por região ({world.GoblinCamps.Count})");
+        Check(world.GoblinCamps.Count == GameData.MineRegions, $"um acampamento de goblin por região da mina ({world.GoblinCamps.Count})");
         foreach (var c in world.GoblinCamps)
         {
             var Lc = world.Layouts[c.RegionIndex];
@@ -613,7 +641,7 @@ public partial class TestRunner : Node
             Check(r.Spawns.All(s => GameData.Mat(s.MaterialId) != null), $"região {r.Id} referencia material inexistente");
             Check(GameData.Mat(r.RareMaterialId)?.Rare == true, $"região {r.Id} sem material raro válido");
         }
-        for (int i = 1; i < GameData.Regions.Count; i++)
+        for (int i = 1; i < GameData.MineRegions; i++)
             Check(GameData.Regions[i].UnlockCost > GameData.Regions[i - 1].UnlockCost, "custos de região devem crescer");
         // regiões mais fundas devem render mais por segundo de mineração
         double prev = 0;
@@ -866,7 +894,7 @@ public partial class TestRunner : Node
         Check(GS.JourneyComplete, "jornada conclui sem as regiões de fim de jogo");
         // dano das ferramentas reais: a melhor (laser final) e a picareta de rubi como meio do caminho
         float maxDmg = ToolData.All[^1].Damage, midDmg = ToolData.All.First(t => t.Id == "ruby").Damage;
-        for (int i = GameData.JourneyRegions; i < GameData.Regions.Count; i++)
+        for (int i = GameData.JourneyRegions; i < GameData.MineRegions; i++)
         {
             var r = GameData.Regions[i];
             Check(r.UnlockCost > GameData.Regions[i - 1].UnlockCost, $"{r.NamePt} custa mais que a anterior");
@@ -969,7 +997,7 @@ public partial class TestRunner : Node
         for (int i = 1; i < ToolData.All.Count; i++)
             increasing &= ToolData.All[i].DamagePerSecond > ToolData.All[i - 1].DamagePerSecond && ToolData.All[i].Cost > ToolData.All[i - 1].Cost && ToolData.All[i].Region >= ToolData.All[i - 1].Region;
         Check(increasing, "cada ferramenta é melhor, mais cara e de região igual ou mais funda");
-        Check(ToolData.All.Where(t => t.Kind == ToolKind.Laser).All(t => t.Region >= GameData.Regions.Count - 1), "armas laser só no final");
+        Check(ToolData.All.Where(t => t.Kind == ToolKind.Laser).All(t => t.Region >= GameData.MineRegions - 1), "armas laser só no final");
         Check(ToolData.All.Skip(1).All(t => t.Ore != null && GameData.Mat(t.Ore) != null), "ferramentas feitas dos minérios do jogo");
 
         // região bloqueada
@@ -1337,7 +1365,7 @@ public partial class TestRunner : Node
         await Frames(5);
 
         Check(world.Crystals.Count >= 60, $"mundo deve ter cristais suficientes ({world.Crystals.Count})");
-        Check(world.Gates.Count == GameData.Regions.Count - 1, "deve existir um portão por região desbloqueável");
+        Check(world.Gates.Count == GameData.MineRegions - 1, "deve existir um portão por região desbloqueável da mina");
         Check(world.Crystals.Any(c => c.Material.Special), "deve existir a formação especial");
         // diários escondidos: 12, cada um numa câmara secreta, em chão firme, sem repetir câmara
         Check(world.Diaries.Count == DiaryData.All.Count, $"{DiaryData.All.Count} diários escondidos na mina ({world.Diaries.Count})");
@@ -1353,7 +1381,7 @@ public partial class TestRunner : Node
             if (world.GoblinCamps.Any(gc => gc.GlobalPosition.DistanceTo(dn.GlobalPosition) < 1.5f)) diariesOk = false;
         }
         Check(diariesOk, "cada diário está numa câmara secreta própria, em chão firme");
-        Check(DiaryData.All.Select(d => d.Region).Distinct().Count() == GameData.Regions.Count, "dois diários por região");
+        Check(DiaryData.All.Select(d => d.Region).Distinct().Count() == GameData.MineRegions, "dois diários por região da mina");
         // portão selado no fundo da Catedral
         Check(world.SealedGate != null && WorldBuilder.RegionAt(world.SealedGate.GlobalPosition).Id == "cathedral", "portão selado fica na Catedral");
         if (world.SealedGate != null)
@@ -1553,6 +1581,75 @@ public partial class TestRunner : Node
         fs.QueueFree();
         root.QueueFree();
         await Frames(2);
+        Fresh();
+    }
+
+    async Task TestDeepCombat()
+    {
+        Fresh();
+        GS.NewGame();
+        var root = new Node3D();
+        AddChild(root);
+        root.AddChild(new Effects());
+        var shards = new ShardManager();
+        root.AddChild(shards);
+        var world = new WorldBuilder();
+        root.AddChild(world);
+        var player = new PlayerController();
+        root.AddChild(player);
+        await Frames(5);
+        var deep = GameData.Deep.First();
+        Check(world.DeepArrivals.ContainsKey(deep.Id) && world.DeepPortals.Count == GameData.Deep.Count(), "cada Profundeza tem chegada e portal de volta");
+        var space = world.GetWorld3D().DirectSpaceState;
+        var at = world.DeepArrivals[deep.Id];
+        Check(space.IntersectRay(PhysicsRayQueryParameters3D.Create(at + Vector3.Up, at + Vector3.Down * 3f, PlayerController.WorldLayer)).Count > 0, "há chão na chegada das Profundezas");
+        Check(WorldBuilder.RegionAt(at).Deep, "a chegada fica na Profundeza");
+        var enemies = world.Enemies.Enemies;
+        Check(enemies.Count >= 12 && enemies.Any(e => e.Def.Kind == EnemyKind.Sentinel), $"inimigos nas Galerias Esquecidas ({enemies.Count}, com sentinelas)");
+        Check(enemies.All(e => WorldBuilder.RegionAt(e.Home).Deep), "inimigos só nas Profundezas (nunca na mina)");
+        Check(world.Crystals.Count(c => WorldBuilder.RegionAt(c.GlobalPosition).Deep) >= 60, "Profundeza tem minérios para minerar");
+        // um rastejante persegue e machuca o jogador
+        var crawler = enemies.First(e => e.Def.Kind == EnemyKind.Crawler);
+        world.Enemies.Player = player;
+        world.Enemies.SpawnShards = (m, p, n) => shards.SpawnShards(m, p, n);
+        player.Enemies = world.Enemies;
+        var L = world.LayoutAt(crawler.Home);
+        Vector3 standAt = crawler.Home;
+        for (int k = 0; k < 16; k++)
+        {
+            float a = k * Mathf.Tau / 16f;
+            var q = crawler.Home + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 5f;
+            if (L.WallDist(q.X, q.Z) < -1.5f && L.Reachable(q.X, q.Z)) { standAt = L.OnGround(q.X, q.Z, 0.1f); break; }
+        }
+        player.GlobalPosition = standAt;
+        player.InputEnabled = false;
+        float hp0 = player.Hp;
+        for (int f = 0; f < 60 * 8 && player.Hp >= hp0; f++) await Frames(1);
+        Check(player.Hp < hp0, "rastejante persegue e acerta o jogador");
+        Check(crawler.Mode != Enemy.State.Idle, "inimigo sai do repouso quando vê o jogador");
+        // golpe de espada mata o rastejante e ele larga fragmentos
+        GS.Data.StoryStage = StoryData.GateOpen;
+        GS.Data.Weapon = 0;
+        player.SetWeaponMode(true);
+        Check(player.WeaponMode && player.WeaponView.Visible && !player.Tool.Visible, "modo arma mostra a espada e esconde a ferramenta");
+        int before = shards.GetChildCount();
+        int hits = 0;
+        for (int k = 0; k < 40 && crawler.Alive; k++)
+        {
+            var toE = crawler.GlobalPosition - player.GlobalPosition;
+            hits += world.Enemies.HitCone(player.GlobalPosition + Vector3.Up, toE, 3f, 60f, GS.WeaponDamage, 2f);
+            await Frames(2);
+        }
+        Check(!crawler.Alive && hits >= 2, $"a espada mata o rastejante ({hits} golpes)");
+        await Frames(5);
+        Check(shards.GetChildCount() > before || GS.InventoryCount > 0, "inimigo morto larga fragmentos");
+        Check(!world.Enemies.Enemies.Where(e => e != crawler).Any(e => e.Hp < e.Def.Hp && e.GlobalPosition.DistanceTo(player.GlobalPosition) > 8f), "golpe não acerta inimigos longe");
+        // desmaio também funciona nas Profundezas
+        player.TakeDamage(9999, player.GlobalPosition + Vector3.Forward);
+        Check(player.Hp <= 0, "dano forte derruba o jogador");
+        player.SetWeaponMode(false);
+        root.QueueFree();
+        await Frames(3);
         Fresh();
     }
 

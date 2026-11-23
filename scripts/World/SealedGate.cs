@@ -112,7 +112,7 @@ public partial class SealedGate : StationBase
         {
             StoryData.FindGate => Loc.F("{0} Tirar um molde de cera do selo", InputHints.Interact),
             StoryData.OpenGate => Loc.F("{0} Usar a chave falsa da Guilda", InputHints.Interact),
-            StoryData.GateOpen => Loc.F("{0} Olhar a escuridão", InputHints.Interact),
+            StoryData.GateOpen => Loc.F("{0} Descer às Profundezas Proibidas", InputHints.Interact),
             _ => Loc.F("{0} Examinar o portão selado", InputHints.Interact),
         };
     }

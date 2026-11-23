@@ -307,6 +307,53 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-deep"))
+        {
+            foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
+            gs.Data.Discovered.Add("heart"); gs.Data.GameCompleted = true;
+            gs.Data.StoryStage = CrystalExcavator.Data.StoryData.GateOpen;
+            gs.Data.Weapon = 0;
+            gs.RaiseAll();
+            await Wait(0.5f);
+            Main.CloseAllForTour();
+            var deep = GameData.Deep.First();
+            var at = Main.World.DeepArrivals[deep.Id];
+            p.GlobalPosition = at; p.SetLook(0, 0);
+            p.SetWeaponMode(true);
+            await Wait(1.5f);
+            await Shot("43_deep_arrival");
+            var ens = Main.World.Enemies.Enemies;
+            foreach (var kind in new[] { EnemyKind.Crawler, EnemyKind.Sentinel })
+            {
+                var e = ens.Where(x => x.Def.Kind == kind).OrderBy(x => x.Home.DistanceTo(at)).First();
+                var L = Main.World.LayoutAt(e.Home);
+                for (int k = 0; k < 16; k++)
+                {
+                    float a2 = k * Mathf.Tau / 16f;
+                    var q = e.Home + new Vector3(Mathf.Cos(a2), 0, Mathf.Sin(a2)) * 6f;
+                    if (L.WallDist(q.X, q.Z) < -1.5f && L.Reachable(q.X, q.Z)) { LookAtPoint(p, L.OnGround(q.X, q.Z, 0.1f), e.GlobalPosition + Vector3.Up * 1.0f * e.Def.Scale); break; }
+                }
+                p.InputEnabled = false;
+                await Wait(kind == EnemyKind.Sentinel ? 2.6f : 1.4f);
+                var look = e.GlobalPosition + Vector3.Up * 0.8f * e.Def.Scale;
+                var from = p.GlobalPosition;
+                p.SetLook(Mathf.Atan2(-(look.X - from.X), -(look.Z - from.Z)), -0.15f);
+                p.WeaponView.Swing(0.5f);
+                await Wait(0.12f);
+                await Shot($"43_enemy_{kind.ToString().ToLower()}");
+                e.TakeHit(300, from, 1f);
+                await Wait(0.3f);
+                await Shot($"43_enemy_{kind.ToString().ToLower()}_hit");
+                p.RestoreHp();
+            }
+            UiBus.RequestForge();
+            await Wait(0.8f);
+            await Shot("43_forge_weapons");
+            Main.CloseAllForTour();
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-story"))
         {
             foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);

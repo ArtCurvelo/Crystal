@@ -503,9 +503,20 @@ public partial class Hud : CanvasLayer
         RefreshObjective();
     }
 
+    bool _lastWeaponMode;
     void RefreshStats()
     {
         var gs = GameState.Instance;
+        _lastWeaponMode = Player != null && IsInstanceValid(Player) && Player.WeaponMode;
+        if (_lastWeaponMode && gs.CurrentWeapon is { } w)
+        {
+            _toolName.Text = w.Name;
+            _toolName.AddThemeColorOverride("font_color", new Color(1f, 0.6f, 0.45f));
+            _toolStats.Text = Loc.F("{0} dano · {1:0.0}/s · [{2}] ferramenta", GameState.FormatNumber(gs.WeaponDamage), w.Speed, InputHints.Key("swap_weapon"));
+            _lastWear = gs.ToolDurabilityLeft + gs.Data.Ammo * 100000;
+            _lastBroken = gs.ToolBroken;
+            return;
+        }
         _toolName.Text = gs.ToolLabel + (gs.Data.Essence > 0 ? $"  ✦{gs.Data.Essence}" : "");
         _toolName.AddThemeColorOverride("font_color", gs.UsingHands ? UiTheme.Danger : (gs.IsLaser ? gs.Data.Ammo <= 20 : gs.ToolDurability01 < 0.2f) ? UiTheme.Gold : UiTheme.Cyan);
         _toolStats.Text = gs.ToolBroken
@@ -671,7 +682,7 @@ public partial class Hud : CanvasLayer
     public void ShowRegionBanner(RegionDef r)
     {
         _regionName.Text = r.Name;
-        _regionSub.Text = Loc.F("◇ Região {0} de {1} · {2}", r.Index + 1, GameData.Regions.Count, r.Subtitle);
+        _regionSub.Text = r.Deep ? Loc.F("◇ {0}", r.Subtitle) : Loc.F("◇ Região {0} de {1} · {2}", r.Index + 1, GameData.MineRegions, r.Subtitle);
         _regionIcon.Set(r.Id == null ? HudIcon.Kind.Star : HudIcon.RegionKind(r.Id), r.AccentColor);
         _regionTag.AddThemeStyleboxOverride("panel", UiTheme.Chamfer(null, new Color(r.AccentColor, 0.85f), 14, 2, 22, 6));
         _regionName.AddThemeColorOverride("font_color", r.AccentColor.Lightened(0.45f));
@@ -701,7 +712,8 @@ public partial class Hud : CanvasLayer
     public override void _Process(double delta)
     {
         // durabilidade muda a cada golpe: atualiza o texto da ferramenta só quando mudou
-        if (GameState.Instance is { } gsw && (gsw.ToolDurabilityLeft + gsw.Data.Ammo * 100000 != _lastWear || gsw.ToolBroken != _lastBroken) && _toolName != null) RefreshStats();
+        bool wm = Player != null && IsInstanceValid(Player) && Player.WeaponMode;
+        if (GameState.Instance is { } gsw && (gsw.ToolDurabilityLeft + gsw.Data.Ammo * 100000 != _lastWear || gsw.ToolBroken != _lastBroken || wm != _lastWeaponMode) && _toolName != null) RefreshStats();
         long __t = Core.Prof.Start();
         _ProcessInner(delta);
         Core.Prof.End("hud", __t);

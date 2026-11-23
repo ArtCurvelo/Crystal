@@ -118,8 +118,13 @@ public partial class WorldBuilder : Node3D
             root.AddChild(terrain);
             terrain.Build(L, r);
             BuildRegion(root, r, L, i);
-            if (i + 1 < regions.Count) BuildTunnel(r, regions[i + 1]);
+            if (i + 1 < regions.Count && !regions[i + 1].Deep) BuildTunnel(r, regions[i + 1]);
         }
+
+        Enemies = new EnemyManager { Name = "Enemies" };
+        AddChild(Enemies);
+        for (int i = 0; i < regions.Count; i++)
+            if (regions[i].Deep) SpawnEnemies(regions[i], Layouts[i]);
 
         House = new PlayerHouse { Name = "PlayerHouse" };
         AddChild(House);
@@ -164,6 +169,17 @@ public partial class WorldBuilder : Node3D
             // barraca do goblin minerador (aparece só depois de contratado) na borda leste do acampamento
             BuildGoblinCamp(r, L, index, L.OnGround(cc.X + 9.6f, cc.Z - 3.5f), Mathf.Pi / 2, reserved);
             reserved.Add(sell.Position); reserved.Add(shop.Position); reserved.Add(Elevator.Position); reserved.Add(cc);
+        }
+        else if (r.Deep)
+        {
+            // Profundezas: portal de volta para a Catedral logo na entrada (sem terminal nem goblin)
+            var ent = L.OnGround(0, r.CenterZ + r.HalfZ - 6f);
+            var back = new DeepPortal { Name = "DeepPortal_" + r.Id, Region = r };
+            root.AddChild(back);
+            back.Position = L.OnGround(0, r.CenterZ + r.HalfZ - 2.5f);
+            DeepPortals.Add(back);
+            DeepArrivals[r.Id] = ent + Vector3.Up * 0.1f;
+            reserved.Add(back.Position); reserved.Add(ent);
         }
         else
         {
@@ -281,6 +297,38 @@ public partial class WorldBuilder : Node3D
     public readonly List<GoblinCamp> GoblinCamps = new();
     public readonly List<DiaryNote> Diaries = new();
     public SealedGate SealedGate;
+    public readonly List<DeepPortal> DeepPortals = new();
+    public EnemyManager Enemies;
+    public readonly Dictionary<string, Vector3> DeepArrivals = new();
+
+    /// <summary>
+    /// Inimigos da Profundeza: rastejantes em grupo nos salões e uma sentinela nos salões grandes. Os salões
+    /// perto da entrada ficam livres (o jogador chega com calma). Posições só pela geometria (sem gerador).
+    /// </summary>
+    void SpawnEnemies(RegionDef r, CaveLayout L)
+    {
+        var defs = EnemyData.All.Where(e => e.Region == r.Id).ToList();
+        var crawler = defs.FirstOrDefault(d => d.Kind == EnemyKind.Crawler);
+        var sentinel = defs.FirstOrDefault(d => d.Kind == EnemyKind.Sentinel);
+        int seed = 0;
+        foreach (var c in L.Chambers)
+        {
+            if (c.Kind != CaveKind.Chamber) continue;
+            var p = c.Center;
+            if (L.Depth(p.X, p.Y) < 0.12f) continue;
+            int n = c.Radius > 11f ? 3 : 2;
+            for (int k = 0; k < n && crawler != null; k++)
+            {
+                float a = k * 2.1f + seed * 0.7f;
+                var q = p + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * c.Radius * 0.4f;
+                if (L.WallDist(q.X, q.Y) > -1.5f || !L.Reachable(q.X, q.Y)) continue;
+                Enemies.Spawn(crawler, L.OnGround(q.X, q.Y, 0.3f), 9000 + seed * 17 + k);
+            }
+            if (sentinel != null && c.Radius > 10f && L.WallDist(p.X, p.Y) < -3f && L.Reachable(p.X, p.Y))
+                Enemies.Spawn(sentinel, L.OnGround(p.X, p.Y, 0.3f), 7000 + seed);
+            seed++;
+        }
+    }
 
     /// <summary>Portão selado (ato 2) na câmara mais funda da Catedral, de frente para quem chega.</summary>
     void BuildSealedGate(Node3D root, CaveLayout L, List<Vector3> reserved)

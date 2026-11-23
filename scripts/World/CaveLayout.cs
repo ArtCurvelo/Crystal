@@ -98,7 +98,7 @@ public sealed class CaveLayout
     {
         var r = Region;
         bool first = r.Index == 0;
-        bool hasNorth = r.Index + 1 < GameData.Regions.Count;
+        bool hasNorth = r.Index + 1 < GameData.Regions.Count && !GameData.Regions[r.Index + 1].Deep && !r.Deep;
         float top = r.CenterZ + r.HalfZ, bottom = r.CenterZ - r.HalfZ;
         float baseH = r.Height;
 

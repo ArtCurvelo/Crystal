@@ -34,6 +34,10 @@ public sealed class SaveData
     public List<string> Diaries { get; set; } = new();
     /// <summary>Etapa do ato 2 ("A Chave Falsa", ver StoryData). Fica ao renascer.</summary>
     public int StoryStage { get; set; }
+    /// <summary>Arma forjada (índice em WeaponData; −1 = nenhuma). Fica para trás ao renascer.</summary>
+    public int Weapon { get; set; } = -1;
+    /// <summary>Inimigos derrotados nas Profundezas (estatística).</summary>
+    public long EnemiesKilled { get; set; }
     public long CrystalsMined { get; set; }
     public long ShardsSold { get; set; }
     public double PlayTimeSeconds { get; set; }
@@ -90,6 +94,8 @@ public sealed class SaveData
         if (Contracts.Count > 3) Contracts.RemoveRange(3, Contracts.Count - 3);
         Gear ??= new();
         StoryStage = System.Math.Clamp(StoryStage, 0, StoryData.GateOpen);
+        if (Weapon < -1 || Weapon >= WeaponData.All.Count) Weapon = -1;
+        if (EnemiesKilled < 0) EnemiesKilled = 0;
         Diaries = (Diaries ?? new()).Where(d => DiaryData.Of(d) != null).Distinct().ToList();
         foreach (var key in Gear.Keys.ToList())
         {

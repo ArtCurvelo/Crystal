@@ -37,6 +37,35 @@ public partial class PlayerController : CharacterBody3D
     public void RestoreHp() { Hp = MaxHp; _sinceDamage = 99f; }
 
     public Camera3D Camera { get; private set; }
+    // ---------- luta (ato 3) ----------
+    public WeaponView WeaponView { get; private set; }
+    /// <summary>Com a arma na mão: o clique golpeia inimigos em vez de minerar.</summary>
+    public bool WeaponMode { get; private set; }
+    public World.EnemyManager Enemies;
+    float _attackTimer, _pendingAttack = -1f, _weaponNotice;
+    public event Action<int> Attacked;
+
+    public void SetWeaponMode(bool on)
+    {
+        var gs = GameState.Instance;
+        if (on && (gs == null || !gs.HasWeapon)) on = false;
+        WeaponMode = on;
+        if (on) WeaponView.SetWeapon(gs.CurrentWeapon);
+        WeaponView.Visible = on;
+        Tool.Visible = !on && _climb == null;
+        _pendingAttack = -1f;
+    }
+
+    void ResolveAttack(GameState gs)
+    {
+        var w = gs.CurrentWeapon;
+        if (w == null || Enemies == null) return;
+        var fwd = -Camera.GlobalTransform.Basis.Z;
+        int n = Enemies.HitCone(GlobalPosition + Vector3.Up * 1.0f, fwd, w.Reach, w.Arc, gs.WeaponDamage, w.Knockback);
+        if (n > 0) { _shakeAmount = Mathf.Min(1.4f, _shakeAmount + (w.Kind == Data.WeaponKind.Hammer ? 0.9f : 0.35f)); _fovKick = w.Kind == Data.WeaponKind.Hammer ? 2.5f : 1f; }
+        else AudioManager.Instance?.Play("swing", -12f, 0.8f, 0.1f);
+        Attacked?.Invoke(n);
+    }
     public ToolView Tool { get; private set; }
     public bool InputEnabled { get; set; } = true;
     /// <summary>Modo construção: o botão de minerar constrói e E desmonta (tratados pelo BuildingManager).</summary>
@@ -96,6 +125,8 @@ public partial class PlayerController : CharacterBody3D
         _head.AddChild(Camera);
         Tool = new ToolView();
         Camera.AddChild(Tool);
+        WeaponView = new WeaponView { Visible = false };
+        Camera.AddChild(WeaponView);
         // lanterna do capacete: foco principal (sombras no Alto) + brilho suave ao redor
         Lamp = new SpotLight3D
         {
@@ -140,6 +171,7 @@ public partial class PlayerController : CharacterBody3D
         _wantCrouch = false;
         SetCrouchedInternal(false);
         Tool.Visible = false;
+        WeaponView.Visible = false;
         // de frente para a corda
         var face = -Away(r);
         if (face.LengthSquared() > 0.01f) SetLook(Mathf.Atan2(-face.X, -face.Z), up ? 0.15f : -0.25f);
@@ -155,7 +187,8 @@ public partial class PlayerController : CharacterBody3D
         if (_climb == null) return;
         var r = _climb;
         _climb = null;
-        Tool.Visible = true;
+        Tool.Visible = !WeaponMode;
+        WeaponView.Visible = WeaponMode;
         if (_hands != null) _hands.Visible = false;
         _head.Position = new Vector3(0, _eye, 0);
         if (Lamp != null) { Lamp.LightEnergy = 4.6f; _lampFill.LightEnergy = 0.9f; }
@@ -350,6 +383,12 @@ public partial class PlayerController : CharacterBody3D
         var wish = (Transform.Basis * new Vector3(input.X, 0, input.Y));
         wish.Y = 0;
         if (wish.LengthSquared() > 1) wish = wish.Normalized();
+        if (active && Input.IsActionJustPressed("swap_weapon"))
+        {
+            if (gs.HasWeapon) { SetWeaponMode(!WeaponMode); AudioManager.Instance?.Play("click", -6f, 0.8f); }
+            else gs.Notify("Sem arma", Core.Loc.T("Você ainda não tem uma arma. Forje uma na forja da vila (o Velho Bram ensina depois que o portão se abre)."), NotifyKind.Warning);
+        }
+        if (WeaponMode && !gs.HasWeapon) SetWeaponMode(false);
         if (active && Input.IsActionJustPressed("flashlight"))
         {
             LampOn = !LampOn;
@@ -382,6 +421,37 @@ public partial class PlayerController : CharacterBody3D
 
         // ---------- Mira ----------
         UpdateTarget(gs);
+
+        // ---------- Luta (arma na mão) ----------
+        if (WeaponMode)
+        {
+            var w = gs.CurrentWeapon;
+            if (_attackTimer > 0) _attackTimer -= dt;
+            if (_weaponNotice > 0) _weaponNotice -= dt;
+            bool canAttack = active && TargetInteractable == null && !BuildMode && w != null;
+            bool wantAttack = canAttack && (Input.IsActionJustPressed("mine") || (Input.IsActionPressed("mine") && _attackTimer <= 0));
+            if (wantAttack && _attackTimer <= 0)
+            {
+                _attackTimer = 1f / w.Speed;
+                WeaponView.Swing(1f / w.Speed);
+                AudioManager.Instance?.Play("swing", -10f, w.Kind == Data.WeaponKind.Hammer ? 0.7f : 1.2f, 0.1f);
+                _pendingAttack = WeaponView.HitDelay(w);
+                if (TargetCrystal != null && _weaponNotice <= 0)
+                {
+                    gs.Notify("Arma na mão", Core.Loc.F("Para minerar, troque para a ferramenta ({0}).", Core.InputHints.Key("swap_weapon")), NotifyKind.Info);
+                    _weaponNotice = 8f;
+                }
+            }
+            if (_pendingAttack >= 0) { _pendingAttack -= dt; if (_pendingAttack < 0) ResolveAttack(gs); }
+            UpdateBeam(gs, false);
+            _shakeAmount = Mathf.Max(0, _shakeAmount - dt * 4f);
+            _fovKick = Mathf.Max(0, _fovKick - dt * 6f);
+            var rngW = new Vector3((float)GD.RandRange(-1.0, 1.0), (float)GD.RandRange(-1.0, 1.0), 0) * _shakeAmount * 0.02f * (Settings.Data.ReduceShake ? 0.15f : 1f);
+            Camera.Position = rngW;
+            float sprintFovW = active && Input.IsActionPressed("sprint") && hs > 1f ? 4f : 0f;
+            Camera.Fov = Mathf.Lerp(Camera.Fov, Settings.Data.Fov + sprintFovW - _fovKick * (Settings.Data.ReduceShake ? 0.2f : 1f), Mathf.Min(1, dt * 8f));
+            return;
+        }
 
         // ---------- Mineração ----------
         _swingInterval = gs.SwingInterval;

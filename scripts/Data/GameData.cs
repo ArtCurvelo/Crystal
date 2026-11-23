@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace CrystalExcavator.Data;
@@ -102,6 +103,8 @@ public sealed class RegionDef
     public float HalfX;
     public float HalfZ;
     public float Height;
+    /// <summary>Profundezas Proibidas (ato 3): sem túnel nem portão de compra; só pelo portão selado, com inimigos.</summary>
+    public bool Deep;
     /// <summary>Câmaras com nome e minério em destaque dentro da caverna da região.</summary>
     public List<WingDef> Wings = new();
     /// <summary>Distância entre regiões (comprimento do túnel com o portão).</summary>
@@ -715,12 +718,36 @@ public static class GameData
         r6.Wings.Add(new WingDef { Id = "prism_nave", Name = "Nave dos Prismas", Side = -1, ZOffset = -4, FeaturedMaterialId = "tanzanite", Slots = 11, HalfX = 15, HalfZ = 14 });
         r6.Wings.Add(new WingDef { Id = "diamond_crypt", Name = "Cripta dos Diamantes", Side = 1, ZOffset = 4, FeaturedMaterialId = "diamond", Slots = 11, HalfX = 15, HalfZ = 14 });
         Regions.Add(r6);
+
+        // ---------------- Profundezas Proibidas (ato 3: atrás do portão selado da Catedral) ----------------
+        Ore("lumenite", OreArchetype.Crystal, Rarity.Incomum, "Lúmen Bruto", 30000, 220000, "O Lúmen antes de virar cristal: morno, pulsando como carne.", new Color(0.95f, 0.85f, 0.55f), new Color(1.0f, 0.8f, 0.35f));
+        Ore("ancientglass", OreArchetype.Shards, Rarity.Raro, "Vidro Ancestral", 46000, 300000, "Vidro soprado pelo Povo Lúmen. Ainda guarda o calor das mãos deles.", new Color(0.55f, 0.95f, 0.85f), new Color(0.4f, 1.0f, 0.8f));
+        Ore("runestone", OreArchetype.Banded, Rarity.Epico, "Pedra Rúnica", 82000, 460000, "Faixas com runas que acendem quando alguém mente perto dela.", new Color(0.35f, 0.3f, 0.5f), new Color(0.55f, 0.75f, 1.0f));
+        Ore("lumenheart", OreArchetype.Geode, Rarity.Lendario, "Coração de Lúmen", 260000, 820000, "Lendário: um pedaço do Coração que ficou para trás quando ele renasceu.", new Color(0.6f, 0.15f, 0.25f), new Color(1.0f, 0.35f, 0.5f), true);
+        var d1 = new RegionDef
+        {
+            Id = "forgotten", Index = Regions.Count, Name = "Galerias Esquecidas", Deep = true,
+            Subtitle = "Profundeza Proibida 1 · os túneis do Povo Lúmen.", UnlockCost = 0,
+            AmbientColor = new Color(0.55f, 0.7f, 0.6f), AmbientEnergy = 0.55f,
+            FogColor = new Color(0.03f, 0.08f, 0.07f), FogDensity = 0.022f,
+            RockColor = new Color(0.32f, 0.36f, 0.34f), AccentColor = new Color(0.5f, 1.0f, 0.85f),
+            LightColor = new Color(0.6f, 1.0f, 0.8f),
+            RareMaterialId = "lumenheart", GiantMaterialId = null, RareChance = 0.04f, CrystalSlots = 200,
+            CenterZ = 0, HalfX = 135, HalfZ = 125, Height = 24
+        };
+        d1.Spawns.Add(new SpawnEntry("lumenite", 0.42f));
+        d1.Spawns.Add(new SpawnEntry("ancientglass", 0.3f));
+        d1.Spawns.Add(new SpawnEntry("runestone", 0.2f));
+        d1.Spawns.Add(new SpawnEntry("diamond", 0.08f));
+        Regions.Add(d1);
         foreach (var rg in Regions) rg.UnlockCost = (long)Math.Round(rg.UnlockCost * Economy.RegionCost / 100.0) * 100;
 
         // posições em Z: cada região começa onde a anterior termina + túnel (a entrada do acampamento fica em z = 90)
         float top = 90f;
         foreach (var r in Regions)
         {
+            // as Profundezas ficam bem longe (não há túnel: chega-se pelo portão selado)
+            if (r.Deep) top -= DeepGap;
             r.CenterZ = top - r.HalfZ;
             top = r.CenterZ - r.HalfZ - RegionDef.TunnelLength;
         }
@@ -803,4 +830,9 @@ public static class GameData
 
     /// <summary>A jornada principal são as 4 primeiras regiões + Coração; as seguintes são de fim de jogo.</summary>
     public const int JourneyRegions = 4;
+    /// <summary>Regiões da mina (as compradas nos portões); depois delas vêm as Profundezas Proibidas.</summary>
+    public const int MineRegions = 6;
+    public const float DeepGap = 300f;
+    public static IEnumerable<RegionDef> Mine => Regions.Take(MineRegions);
+    public static IEnumerable<RegionDef> Deep => Regions.Skip(MineRegions);
 }

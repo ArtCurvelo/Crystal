@@ -84,6 +84,7 @@ public static class StoryData
     public static readonly Line[] AfterGate =
     {
         new("bram", "Você abriu? ... Então começou. Lá embaixo são seis lugares, um pior que o outro. O Corvo está no último."),
+        new("bram", "E escuta: lá embaixo picareta não basta. Deixei na forja a receita das armas, espada e martelo. Forja uma antes de descer."),
         new("bram", "Prepara as ferramentas, garoto. E que o Povo Lúmen te guarde."),
     };
 

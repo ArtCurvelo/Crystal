@@ -437,7 +437,7 @@ public partial class GameState : Node
     public bool IsUnlocked(string regionId) => Data.UnlockedRegions.Contains(regionId);
 
     /// <summary>Próxima região bloqueada, ou null.</summary>
-    public RegionDef NextLockedRegion() => GameData.Regions.FirstOrDefault(r => !IsUnlocked(r.Id));
+    public RegionDef NextLockedRegion() => GameData.Mine.FirstOrDefault(r => !IsUnlocked(r.Id));
 
     public bool CanUnlock(RegionDef r)
     {
@@ -615,6 +615,32 @@ public partial class GameState : Node
         SetStory(StoryData.OpenGate);
         return true;
     }
+
+    // ================= Armas (ato 3) =================
+    public WeaponDef CurrentWeapon => WeaponData.Of(Data.Weapon);
+    public bool HasWeapon => CurrentWeapon != null;
+    /// <summary>Dano da arma: luvas da forja e Essência também valem para a luta.</summary>
+    public float WeaponDamage => (CurrentWeapon?.Damage ?? 0f) * (1f + GearBonus(GearSlot.Gloves)) * EssenceMultiplier;
+    /// <summary>Armas só depois que o portão selado se abre (o Velho Bram ensina a forjar).</summary>
+    public bool WeaponsUnlocked => Story >= StoryData.GateOpen;
+    public bool WeaponAvailable(WeaponDef w) => w != null && WeaponsUnlocked && w.Region < GameData.Regions.Count && IsUnlocked(GameData.Regions[w.Region].Id);
+    public bool CanForgeWeapon(WeaponDef w) => WeaponAvailable(w) && Data.Weapon != w.Index && CanAfford(w.Fee) && HasForgeCosts(w.Costs);
+
+    public bool TryForgeWeapon(WeaponDef w)
+    {
+        if (!CanForgeWeapon(w) || !RequireWork()) return false;
+        Data.Money -= w.Fee;
+        PayForgeCosts(w.Costs);
+        Data.Weapon = w.Index;
+        MoneyChanged?.Invoke();
+        InventoryChanged?.Invoke();
+        GearChanged?.Invoke();
+        WeaponChanged?.Invoke();
+        Notify(Loc.F("{0} forjada!", w.Name), Loc.F("{0} de dano · {1:0.0} golpes/s. Aperte {2} para trocar entre a ferramenta e a arma.", FormatNumber(w.Damage), w.Speed, InputHints.Key("swap_weapon")), NotifyKind.Success);
+        BigMessage?.Invoke(w.Name.ToUpper());
+        return true;
+    }
+    public event Action WeaponChanged;
 
     // ================= Diários escondidos =================
     public event Action DiariesChanged;
@@ -1105,6 +1131,7 @@ public partial class GameState : Node
         Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; Data.Ammo = 0; // a jornada recomeça com a picareta de madeira
         Data.Skills.Clear(); // a árvore recomeça; a casa é permanente
         Data.Gear.Clear(); // o equipamento forjado fica para trás, como as ferramentas
+        Data.Weapon = -1;
         Data.Inventory.Clear();
         Data.UnlockedRegions.Clear();
         Data.UnlockedRegions.Add("caves");

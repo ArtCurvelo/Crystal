@@ -849,7 +849,7 @@ public partial class BackupScreen : ModalScreen
             var t = TimeSpan.FromSeconds(s.Data.PlayTimeSeconds);
             string when = s.When == default ? Loc.T("data desconhecida") : s.When.ToString("dd/MM/yyyy HH:mm");
             v.AddChild(UiTheme.Label($"{when}   ·   {s.Reason.Replace('-', ' ')}", 16, UiTheme.Text, true));
-            v.AddChild(UiTheme.Label(Loc.F("{0}   ·   {1}h{2:00} de jogo   ·   {3}/{4} regiões   ·   ✦{5}", GameState.FormatMoney(s.Data.Money), (int)t.TotalHours, t.Minutes, s.Data.UnlockedRegions.Count, GameData.Regions.Count, s.Data.Essence), 14, UiTheme.Muted));
+            v.AddChild(UiTheme.Label(Loc.F("{0}   ·   {1}h{2:00} de jogo   ·   {3}/{4} regiões   ·   ✦{5}", GameState.FormatMoney(s.Data.Money), (int)t.TotalHours, t.Minutes, s.Data.UnlockedRegions.Count(id => GameData.Regions.Any(rg => rg.Id == id && !rg.Deep)), GameData.MineRegions, s.Data.Essence), 14, UiTheme.Muted));
             var snap = s;
             var b = UiTheme.Button("Restaurar", () => OnRestore?.Invoke(snap), 150, 17);
             b.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;

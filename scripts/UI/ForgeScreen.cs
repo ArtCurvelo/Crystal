@@ -95,6 +95,42 @@ public partial class ForgeScreen : ModalScreen
             kh.AddChild(kb);
             if (!kb.Disabled) first = kb;
         }
+        // armas (ato 3): o Velho Bram ensina depois que o portão se abre
+        if (gs.WeaponsUnlocked)
+        {
+            _list.AddChild(UiTheme.Label("ARMAS PARA AS PROFUNDEZAS", 18, new Color(1f, 0.6f, 0.45f), true));
+            foreach (var w in WeaponData.All)
+            {
+                bool owned = gs.Data.Weapon == w.Index;
+                Card(owned ? UiTheme.Success : new Color(1f, 0.55f, 0.4f), out var wh);
+                wh.AddChild(HudIcon.MakeOre(GameData.Mat(w.Ore), 48));
+                var wv = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+                wh.AddChild(wv);
+                wv.AddChild(UiTheme.Label(w.Name + (owned ? "  ·  " + Loc.T("na mão") : ""), 18, owned ? UiTheme.Success : UiTheme.Text, true));
+                wv.AddChild(UiTheme.Label(Loc.F("{0} dano · {1:0.0} golpes/s · alcance {2:0.0} m", GameState.FormatNumber(w.Damage), w.Speed, w.Reach) + "  ·  " + w.Description, 14, UiTheme.Muted));
+                Button wb;
+                if (!gs.WeaponAvailable(w))
+                {
+                    wv.AddChild(UiTheme.Label(Loc.F("Libere {0} para achar os minérios.", GameData.Regions[w.Region].Name), 14, UiTheme.Muted));
+                    wb = UiTheme.Button("Bloqueado", null, 150, 18);
+                    wb.Disabled = true;
+                }
+                else
+                {
+                    var line = UiTheme.Label(CostLine(w.Costs, w.Fee, out bool ok), 14, ok ? UiTheme.Success : UiTheme.Muted);
+                    line.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+                    wv.AddChild(line);
+                    var wd = w;
+                    wb = UiTheme.Button(owned ? "Na mão" : "Forjar", () => { if (GameState.Instance.TryForgeWeapon(wd)) Audio.AudioManager.Instance?.Play("buy", -4f); }, 150, 18);
+                    wb.Disabled = !gs.CanForgeWeapon(w);
+                }
+                wb.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+                wb.SetMeta("weapon", w.Index);
+                wh.AddChild(wb);
+                if (first == null && !wb.Disabled) first = wb;
+            }
+        }
+
         foreach (var slot in GearData.Slots)
         {
             var cur = GearData.Of(slot, gs.GearTier(slot));
