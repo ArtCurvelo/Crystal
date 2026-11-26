@@ -311,6 +311,7 @@ public partial class TestRunner : Node
             await RunAsync("Integração: casa (melhorias novas, bancada e baú)", TestHouseUpgrades);
             await RunAsync("Integração: Vila dos Ferreiros", TestTown);
             await RunAsync("HQ de abertura", TestIntroComic);
+            await RunAsync("Mapa (M) só com as áreas exploradas", TestExploreMap);
             await RunAsync("Integração: Profundezas Proibidas e combate", TestDeepCombat);
             await RunAsync("Integração: pulso de ressonância", TestResonance);
             await RunAsync("Integração: clique, golpe triplo e mineração contínua", TestClickMining);
@@ -1765,6 +1766,53 @@ public partial class TestRunner : Node
         root.QueueFree();
         await Frames(3);
         Fresh();
+    }
+
+    async Task TestExploreMap()
+    {
+        Fresh();
+        GS.NewGame();
+        ExploreMap.Reset();
+        var r = GameData.Regions[0];
+        var L = new CaveLayout(r, 4242);
+        var camp = new Vector3(L.Camp.Center.X, 0, L.Camp.Center.Y);
+        Check(!ExploreMap.Any(GS.Data, r, L) && ExploreMap.Fraction(GS.Data, r, L) == 0f, "jogo novo: mapa todo escuro");
+        Check(ExploreMap.Reveal(GS.Data, r, L, camp), "andar revela o mapa");
+        Check(!ExploreMap.Reveal(GS.Data, r, L, camp), "o mesmo lugar não conta duas vezes");
+        Check(ExploreMap.IsExplored(GS.Data, r, L, camp.X, camp.Z) && !ExploreMap.IsExplored(GS.Data, r, L, L.Exit.X, L.Exit.Z), "só aparece o que está em volta do jogador");
+        float f = ExploreMap.Fraction(GS.Data, r, L);
+        Check(f > 0f && f < 0.3f, $"porcentagem explorada ({f:P0})");
+        // salvar e carregar mantém o mapa
+        var json = System.Text.Json.JsonSerializer.Serialize(GS.Data);
+        var loaded = System.Text.Json.JsonSerializer.Deserialize<SaveData>(json);
+        loaded.Sanitize();
+        ExploreMap.Reset();
+        Check(ExploreMap.IsExplored(loaded, r, L, camp.X, camp.Z) && !ExploreMap.IsExplored(loaded, r, L, L.Exit.X, L.Exit.Z), "o mapa explorado fica no save");
+        var junk = new SaveData { Explored = new() { ["caves"] = "não-é-base64", ["regiao_inexistente"] = "AAAA" } };
+        junk.Sanitize();
+        Check(!junk.Explored.ContainsKey("regiao_inexistente") && !ExploreMap.Any(junk, r, L), "save com mapa estragado não quebra");
+
+        // tela do mapa
+        GS.NewGame();
+        ExploreMap.Reveal(GS.Data, r, L, camp);
+        var world = new WorldBuilder();
+        world.Layouts.Add(L);
+        var map = new MapScreen { World = world, PlayerPos = () => camp, PlayerYaw = () => 0f, PlayerRegion = () => 0 };
+        AddChild(map);
+        await Frames(2);
+        map.Open();
+        await Frames(3);
+        Check(map.IsOpen && map.Region == 0 && map.Regions.SequenceEqual(new[] { 0 }), "mapa abre na região do jogador e lista só as exploradas");
+        map.Step(1);
+        Check(map.Region == 0, "não vai para região não explorada");
+        map.Close();
+        Check(!map.IsOpen, "fecha");
+        map.QueueFree();
+        world.Free();
+        Check(InputMap.HasAction("toggle_map") && InputMap.ActionGetEvents("toggle_map").OfType<InputEventKey>().Any(k => k.PhysicalKeycode == Key.M), "tecla M abre o mapa");
+        Check(InputMap.ActionGetEvents("toggle_map").OfType<InputEventJoypadButton>().Any(b => b.ButtonIndex == JoyButton.Back), "Back no controle abre o mapa");
+        ExploreMap.Reset();
+        await Frames(1);
     }
 
     async Task TestIntroComic()

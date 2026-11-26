@@ -29,6 +29,7 @@ A direção de arte segue as imagens conceituais do diretor: HUD sci-fi chanfrad
 - **Eventos por região**: Eco Luminoso, Maré Gélida, Surto do Núcleo e Maré Luminosa.
 - **Vila dos Ferreiros** (`World/Town.cs`): fim do elevador da mina; casa do jogador, ferreiro (vende minérios e ferramentas) e Quadro de Encomendas (3 pedidos por dia, `GameState.EnsureContracts`, `UI/MissionScreen.cs`). Próximas etapas do plano: forja (criar equipamentos com minérios), níveis mais fundos com inimigos pelo elevador, história e calibrar a duração para 4–6 h.
 - **Forja** (`Data/GearData.cs`, `UI/ForgeScreen.cs`, bigorna `ForgeAnvil` na vila): capacete/luvas/botas/bolsa em 6 níveis com minérios de cada região + taxa; conserto de ferramentas. Zera ao renascer.
+- **Mapa (M)** (`Core/ExploreMap.cs`, `UI/MapScreen.cs`): planta de cada região só com as partes já vistas (névoa em quadrados de 4 m, salva em `SaveData.Explored`).
 - **HQs animadas** (`UI/IntroComic.cs`, `assets/story/*_bg/_fg/_fx.png` gerados por `tools/comic2.py`): abertura (dívida com a Guilda), flashback do Bram e final. Camadas com paralaxe, partículas, tremida e transições variadas.
 - **Vila viva** (`World/Humanoid.cs`, `World/TownLife.cs`, `World/TownVillage.cs`): moradores com rotina dia/noite, vigia, feirantes, galinhas, pássaros; casas enxaimel, feira, poço, árvores, bandeirolas.
 - **Diários de escravos** (`Data/DiaryData.cs`, `World/DiaryNote.cs`, `UI/DiaryScreen.cs`): 12 em câmaras secretas contando a história do Coração, do Povo Lúmen e da Guilda (gancho: "quebrar a Guilda").

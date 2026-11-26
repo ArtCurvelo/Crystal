@@ -32,6 +32,8 @@ public sealed class SaveData
     public Dictionary<string, int> Gear { get; set; } = new();
     /// <summary>Diários de outros escravos já encontrados na mina (ficam ao renascer).</summary>
     public List<string> Diaries { get; set; } = new();
+    /// <summary>Mapa: partes de cada região já vistas (id da região → bits em base64, ver ExploreMap). Fica ao renascer.</summary>
+    public Dictionary<string, string> Explored { get; set; } = new();
     /// <summary>Etapa do ato 2 ("A Chave Falsa", ver StoryData). Fica ao renascer.</summary>
     public int StoryStage { get; set; }
     /// <summary>Campo antigo (v0.27: índice de receita fixa); migrado para WeaponOres.</summary>
@@ -115,6 +117,7 @@ public sealed class SaveData
         if (EnemiesKilled < 0) EnemiesKilled = 0;
         Guardians = (Guardians ?? new()).Where(g => GameData.Regions.Any(r => r.Deep && r.Id == g)).Distinct().ToList();
         Diaries = (Diaries ?? new()).Where(d => DiaryData.Of(d) != null).Distinct().ToList();
+        Explored = (Explored ?? new()).Where(kv => GameData.Regions.Any(r => r.Id == kv.Key) && !string.IsNullOrEmpty(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value);
         foreach (var key in Gear.Keys.ToList())
         {
             if (System.Array.IndexOf(new[] { "helmet", "gloves", "boots", "bag" }, key) < 0 || Gear[key] < 0) { Gear.Remove(key); continue; }

@@ -568,7 +568,7 @@ public partial class HelpScreen : ModalScreen
                  {
                      ("W A S D", "Mover"), ("Mouse", "Olhar"), ("Botão esquerdo", "Minerar (clique)"),
                      ("E", "Interagir"), ("Shift", "Correr"), ("Espaço", "Pular"),
-                     ("C / Ctrl", "Agachar"), ("B", "Construir"), ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
+                     ("C / Ctrl", "Agachar"), ("B", "Construir"), ("M", "Mapa"), ("Esc", "Pausa / fechar"), ("F5", "Salvar"), ("F3", "Mostrar FPS"),
                  })
         {
             var row = new HBoxContainer();

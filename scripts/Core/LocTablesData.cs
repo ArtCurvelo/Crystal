@@ -368,6 +368,17 @@ public static partial class LocTables
         list.Add(("Alguns textos só mudam depois de reiniciar o jogo.", "Some texts only change after restarting the game.", "Algunos textos solo cambian después de reiniciar el juego."));
         list.Add(("Alta", "High", "Alta"));
         list.Add(("Baixa", "Low", "Baja"));
+        list.Add(("Mapa", "Map", "Mapa"));
+        list.Add(("Acampamento", "Camp", "Campamento"));
+        list.Add(("MAPA", "MAP", "MAPA"));
+        list.Add(("{0}% explorado", "{0}% explored", "{0}% explorado"));
+        list.Add(("Você está aqui", "You are here", "Estás aquí"));
+        list.Add(("Você está na vila", "You are in the village", "Estás en la aldea"));
+        list.Add(("Você está em outra região", "You are in another region", "Estás en otra región"));
+        list.Add(("[{0}/{1}] trocar de região", "[{0}/{1}] switch region", "[{0}/{1}] cambiar de región"));
+        list.Add(("Mapa: {0}. {1}% explorado.", "Map: {0}. {1}% explored.", "Mapa: {0}. {1}% explorado."));
+        list.Add(("Saída para a próxima região", "Exit to the next region", "Salida a la siguiente región"));
+        list.Add(("Entrada", "Entrance", "Entrada"));
         list.Add(("Analógico esq.: mover · Analógico dir.: olhar\nRT: minerar · X: interagir · A: pular · B: agachar\nLB: correr · Start: pausa · B: voltar (menus)", "Left stick: move · Right stick: look\nRT: mine · X: interact · A: jump · B: crouch\nLB: sprint · Start: pause · B: back (menus)", "Stick izq.: moverse · Stick der.: mirar\nRT: minar · X: interactuar · A: saltar · B: agacharse\nLB: correr · Start: pausa · B: volver (menús)"));
         list.Add(("Analógicos esquerdo e direito", "Left and right sticks", "Sticks izquierdo y derecho"));
         list.Add(("Andar para a direita", "Move right", "Moverse a la derecha"));

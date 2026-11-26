@@ -201,6 +201,13 @@ public partial class Main : Node
         _diary = new DiaryScreen();
         _diary.Closed += ReturnToGameplay;
         AddChild(_diary);
+        _map = new MapScreen
+        {
+            PlayerPos = () => Player?.GlobalPosition ?? Vector3.Zero, PlayerYaw = () => Player?.Yaw ?? 0f,
+            PlayerRegion = () => Player == null || PlayerInTown ? -1 : WorldBuilder.RegionAt(Player.GlobalPosition).Index,
+        };
+        _map.Closed += () => { GetTree().Paused = false; ReturnToGameplay(); };
+        AddChild(_map);
         _home = new HomeScreen { OnSleep = () => { _home.CloseSilently(); SleepAtHome(); } };
         _home.Closed += ReturnToGameplay;
         AddChild(_home);
@@ -773,6 +780,7 @@ public partial class Main : Node
     MissionScreen _missions;
     ForgeScreen _forge;
     DiaryScreen _diary;
+    MapScreen _map;
     DialogueScreen _dialogue;
     IntroComic _flashback;
     public bool StoryPlaying => (_dialogue?.IsPlaying ?? false) || (_flashback?.IsPlaying ?? false);
@@ -1010,6 +1018,33 @@ public partial class Main : Node
         _diary.Show(id);
     }
 
+    /// <summary>Abre o mapa (M / Back). O jogo fica pausado enquanto ele está aberto.</summary>
+    public bool OpenMap()
+    {
+        if (CurrentMode != Mode.Playing || AnyModal() || _fading || Player == null) return false;
+        UpdateExploration(true);
+        Input.MouseMode = Input.MouseModeEnum.Visible;
+        Player.InputEnabled = false;
+        AudioManager.Instance?.SetBeam(false);
+        GetTree().Paused = true;
+        _map.World = World;
+        _map.Open();
+        return true;
+    }
+
+    public MapScreen MapForTests => _map;
+
+    float _exploreTimer;
+    /// <summary>Revela no mapa o que está em volta do jogador (raio da lanterna).</summary>
+    public void UpdateExploration(bool now = false)
+    {
+        if (Player == null || World == null || PlayerInTown) return;
+        if (!now && (_exploreTimer -= (float)GetProcessDeltaTime()) > 0) return;
+        _exploreTimer = 0.3f;
+        var r = WorldBuilder.RegionAt(Player.GlobalPosition);
+        ExploreMap.Reveal(GameState.Instance.Data, r, World.Layouts[r.Index], Player.GlobalPosition);
+    }
+
     void OpenForge()
     {
         if (CurrentMode != Mode.Playing || AnyModal() || _fading) return;
@@ -1065,13 +1100,13 @@ public partial class Main : Node
     /// <summary>Fecha qualquer janela e volta ao jogo (usado pelo tour de capturas).</summary>
     public void CloseAllForTour()
     {
-        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _forge, _diary, _deepTravel, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
+        foreach (var sc in new ModalScreen[] { _debug, _goblin, _choice, _missions, _forge, _diary, _map, _deepTravel, _home, _shop, _sell, _pause, _settings, _confirm, _codex, _help, _completion, _updateScreen, _backups })
             sc?.CloseSilently();
         GetTree().Paused = false;
         if (Player != null) Player.InputEnabled = true;
     }
 
-    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || (_deepTravel?.IsOpen ?? false) || StoryPlaying || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
+    bool AnyModal() => (_choice?.IsOpen ?? false) || (_missions?.IsOpen ?? false) || (_forge?.IsOpen ?? false) || (_diary?.IsOpen ?? false) || (_map?.IsOpen ?? false) || (_deepTravel?.IsOpen ?? false) || StoryPlaying || _home.IsOpen || _shop.IsOpen || _sell.IsOpen || _pause.IsOpen || _settings.IsOpen || _confirm.IsOpen || _codex.IsOpen || _help.IsOpen || _completion.IsOpen || _updateScreen.IsOpen || _backups.IsOpen || (_debug?.IsOpen ?? false) || (_goblin?.IsOpen ?? false);
 
     public override void _Input(InputEvent e) => InputHints.Observe(e);
 
@@ -1102,6 +1137,11 @@ public partial class Main : Node
             _debug.Open();
             return;
         }
+        if (e.IsActionPressed("toggle_map"))
+        {
+            if (_map.IsOpen) { GetViewport().SetInputAsHandled(); _map.Close(); return; }
+            if (OpenMap()) { GetViewport().SetInputAsHandled(); return; }
+        }
         if (e.IsActionPressed("pause"))
         {
             GetViewport().SetInputAsHandled();
@@ -1113,6 +1153,7 @@ public partial class Main : Node
             if (_missions?.IsOpen ?? false) { _missions.Close(); return; }
             if (_forge?.IsOpen ?? false) { _forge.Close(); return; }
             if (_diary?.IsOpen ?? false) { _diary.Close(); return; }
+            if (_map?.IsOpen ?? false) { _map.Close(); return; }
             if (_deepTravel?.IsOpen ?? false) { _deepTravel.Close(); return; }
             if (_updateScreen.IsOpen) { _updateScreen.Close(); return; }
             if (_backups.IsOpen) { _backups.Close(); return; }
@@ -1137,6 +1178,7 @@ public partial class Main : Node
             else if (_missions?.IsOpen ?? false) _missions.Close();
             else if (_forge?.IsOpen ?? false) _forge.Close();
             else if (_diary?.IsOpen ?? false) _diary.Close();
+            else if (_map?.IsOpen ?? false) _map.Close();
             else if (_deepTravel?.IsOpen ?? false) _deepTravel.Close();
             else if (_settings.IsOpen) _settings.Close();
             else if (_codex.IsOpen) _codex.Close();
@@ -1196,6 +1238,7 @@ public partial class Main : Node
             return;
         }
         UpdateRegion(false);
+        UpdateExploration();
         CheckBoss();
         UpdateDynamicResolution((float)delta);
         UpdateAccessibilityCues((float)delta);

@@ -28,6 +28,7 @@ public static class InputSetup
         Key("build_prev", Godot.Key.Q);
         Key("build_next", Godot.Key.R);
         Key("swap_weapon", Godot.Key.X);
+        Key("toggle_map", Godot.Key.M);
         Mouse("mine", MouseButton.Left);
 
         // ---- controle ----
@@ -48,7 +49,7 @@ public static class InputSetup
         Pad("crouch", JoyButton.B, JoyButton.RightStick);
         Pad("flashlight", JoyButton.DpadUp);
         Pad("build", JoyButton.DpadDown);
-        Pad("debug_panel", JoyButton.Back);
+        Pad("toggle_map", JoyButton.Back);
         Pad("build_prev", JoyButton.DpadLeft);
         Pad("build_next", JoyButton.DpadRight);
         Pad("swap_weapon", JoyButton.Y);
@@ -78,7 +79,7 @@ public static class InputSetup
         ("interact", "Interagir"), ("mine", "Minerar"), ("flashlight", "Lanterna"), ("pause", "Pausa"),
         ("quick_save", "Salvar rápido"), ("toggle_fps", "Mostrar FPS"),
         ("build", "Modo construção"), ("build_prev", "Construção anterior"), ("build_next", "Próxima construção"),
-        ("swap_weapon", "Trocar ferramenta/arma"),
+        ("swap_weapon", "Trocar ferramenta/arma"), ("toggle_map", "Mapa"),
     };
 
     /// <summary>Ações remapeáveis no controle (botões).</summary>
@@ -87,7 +88,7 @@ public static class InputSetup
         ("jump", "Pular"), ("sprint", "Correr"), ("crouch", "Agachar"), ("interact", "Interagir"),
         ("mine", "Minerar"), ("flashlight", "Lanterna"), ("pause", "Pausa"),
         ("build", "Modo construção"), ("build_prev", "Construção anterior"), ("build_next", "Próxima construção"),
-        ("swap_weapon", "Trocar ferramenta/arma"),
+        ("swap_weapon", "Trocar ferramenta/arma"), ("toggle_map", "Mapa"),
     };
 
     static string Serialize(InputEvent e) => e switch
@@ -308,7 +309,7 @@ public static class InputHints
     public static string Back => UsingPad ? "[B]" : "[Esc]";
     public static string Footer =>
         $"[{Key("mine")}] {Loc.T("Minerar")}   [{Key("interact")}] {Loc.T("Interagir")}   [{Key("sprint")}] {Loc.T("Correr")}   " +
-        $"[{Key("crouch")}] {Loc.T("Agachar")}   [{Key("flashlight")}] {Loc.T("Lanterna")}   [{Key("build")}] {Loc.T("Construir")}   [{Key("pause")}] {Loc.T("Pausa")}";
+        $"[{Key("crouch")}] {Loc.T("Agachar")}   [{Key("flashlight")}] {Loc.T("Lanterna")}   [{Key("build")}] {Loc.T("Construir")}   [{Key("toggle_map")}] {Loc.T("Mapa")}   [{Key("pause")}] {Loc.T("Pausa")}";
 
     /// <summary>Avisa que as dicas mudaram (ex.: remapeamento).</summary>
     public static void Refresh() => Changed?.Invoke();

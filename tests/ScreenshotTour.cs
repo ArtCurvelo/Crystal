@@ -468,6 +468,45 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-map"))
+        {
+            foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
+            gs.RaiseAll();
+            // anda pelo caminho principal das duas primeiras regiões (só até a metade da 2ª) revelando o mapa
+            for (int ri = 0; ri < 2; ri++)
+            {
+                var L = Main.World.Layouts[ri];
+                int n = ri == 0 ? L.PathPoints.Count : L.PathPoints.Count / 2;
+                for (int k = 0; k < n; k++)
+                {
+                    var a = L.PathPoints[k];
+                    var b = k + 1 < L.PathPoints.Count ? L.PathPoints[k + 1] : a;
+                    for (float t = 0; t < 1f; t += 0.25f)
+                    {
+                        var q = a.Lerp(b, t);
+                        ExploreMap.Reveal(gs.Data, GameData.Regions[ri], L, q);
+                    }
+                }
+                if (ri == 0 && L.Chambers.Count > 0)
+                    foreach (var ch in L.Chambers.Take(4)) ExploreMap.Reveal(gs.Data, GameData.Regions[ri], L, new Vector3(ch.Center.X, 0, ch.Center.Y), 24f);
+            }
+            var L1 = Main.World.Layouts[1];
+            var mid = L1.PathPoints[L1.PathPoints.Count / 2];
+            LookAtPoint(p, L1.OnGround(mid.X, mid.Z, 0.2f), L1.OnGround(mid.X, mid.Z - 5f, 1.5f));
+            await Wait(1f);
+            Main.OpenMap();
+            await Wait(0.6f);
+            await Shot("50_map_region2");
+            Main.MapForTests.Step(-1);
+            await Wait(0.4f);
+            await Shot("50_map_region1");
+            Main.MapForTests.Close();
+            await Wait(0.3f);
+            await Shot("50_map_closed_hud");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-diary"))
         {
             foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);

@@ -537,3 +537,20 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - **Migração das configurações (versão 4):** em GPUs Intel HD/UHD, religa a resolução dinâmica e limita a escala 3D a 75%.
 - **Contador F3** agora mostra o renderizador (Vulkan/OpenGL), a qualidade e os ms de CPU e de GPU por quadro, para saber o que segura o jogo na máquina do jogador.
 - Benchmark: `--bench-shots=DIR` salva a imagem de cada vista; `--x-nolite` desliga a rocha leve.
+
+## Mapa com névoa (tecla M)
+- Pedido do diretor: mapa no "M" que mostra só as áreas exploradas.
+- `Core/ExploreMap.cs`:
+  - cada região é dividida em quadrados de 4 m;
+  - um raio de 14 m em volta do jogador vai sendo revelado (a cada 0,3 s, fora da vila);
+  - os bits ficam em `SaveData.Explored` (base64 por região, ~1 KB cada) e continuam depois do renascimento.
+- `UI/MapScreen.cs`:
+  - planta vista de cima feita do próprio layout da caverna: chão sombreado pela altura e paredes contornadas na cor da região;
+  - zoom na parte já vista;
+  - mostra o jogador (seta na direção do olhar), entrada, saída para a próxima região, acampamento, Coração Ancestral e o nome das câmaras de minério visitadas;
+  - porcentagem explorada;
+  - Q/R, LB/RB ou as setas trocam entre as regiões exploradas.
+- O jogo pausa com o mapa aberto. M ou Esc fecha; no controle, Back abre/fecha e B fecha.
+- A tecla pode ser remapeada; aparece no rodapé e na ajuda.
+- O botão Back do controle era do painel de admin (que só existe na versão de desenvolvimento) e passou para o mapa.
+- Tour `--shots-map`.
