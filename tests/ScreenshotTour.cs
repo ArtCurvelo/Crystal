@@ -468,6 +468,33 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-home"))
+        {
+            gs.EndDay();
+            UiBus.RequestHome();
+            await Wait(1.6f);
+            UiBus.RequestHomePanel();
+            await Wait(1.0f);
+            await Shot("52_home_top");
+            var sc = FindScroll(GetTree().Root);
+            if (sc != null)
+            {
+                // roda do mouse em cima da lista (como o jogador faz)
+                var center = sc.GetGlobalRect().GetCenter();
+                for (int i = 0; i < 12; i++)
+                {
+                    Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Pressed = true, Position = center, GlobalPosition = center });
+                    Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Pressed = false, Position = center, GlobalPosition = center });
+                    await Wait(0.05f);
+                }
+                GD.Print($"[Tour] rolagem da casa: {sc.ScrollVertical} de {sc.GetVScrollBar().MaxValue - sc.GetVScrollBar().Page}");
+            }
+            await Wait(0.4f);
+            await Shot("52_home_scrolled");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-map"))
         {
             foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
@@ -1331,5 +1358,16 @@ public partial class ScreenshotTour : Node
         string path = $"{Dir}/{name}.png";
         img.SavePng(path);
         GD.Print($"[Tour] {path}");
+    }
+
+    static ScrollContainer FindScroll(Node n)
+    {
+        foreach (Node c in n.GetChildren())
+        {
+            if (c is ScrollContainer sc && sc.IsVisibleInTree() && sc.GetParent() is VBoxContainer && c.GetParent().GetParent() is HBoxContainer) return sc;
+            var r = FindScroll(c);
+            if (r != null) return r;
+        }
+        return null;
     }
 }

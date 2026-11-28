@@ -74,6 +74,9 @@ public partial class Town : Node3D
         BuildBoard(c + new Vector3(3f, 0, 9f));
         BuildVillage(c);
         BuildSky();
+        // casas, cercas, barracas...: peças estáticas com o mesmo material viram uma malha só (menos chamadas de desenho)
+        int saved = StaticBatcher.Batch(this);
+        GD.Print($"[Vila] {saved} malhas agrupadas");
         if (GameState.Instance != null) { GameState.Instance.DayStarted += RefreshSky; GameState.Instance.DayEnded += RefreshSky; }
         RefreshSky();
     }

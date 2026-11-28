@@ -1131,7 +1131,7 @@ public partial class TestRunner : Node
             foreach (var q in new[] { GraphicsQuality.Low, GraphicsQuality.Medium, GraphicsQuality.High })
             {
                 var f = RenderFeatures.For(m, q);
-                Check(f.Method == m && f.Quality == q && f.Glow, $"perfil {m}/{q} existe e mantém o brilho (identidade visual)");
+                Check(f.Method == m && f.Quality == q && f.Glow == (q != GraphicsQuality.Low), $"perfil {m}/{q} existe; brilho na Média/Alta (identidade visual), desligado na Baixa (desempenho)");
                 if (m != RenderMethods.ForwardPlus)
                     Check(!f.Ssao && !f.Ssr && !f.Ssil && !f.VolumetricFog && !f.Fsr2, $"{m}/{q} não liga efeitos que esse renderizador não tem");
                 if (m == RenderMethods.Compatibility)

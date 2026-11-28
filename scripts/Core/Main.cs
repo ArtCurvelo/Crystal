@@ -546,6 +546,7 @@ public partial class Main : Node
         Input.MouseMode = Input.MouseModeEnum.Captured;
         _currentRegion = null;
         UpdateRegion(true);
+        World.PrepareRegionLists();
         UpdateRegionCulling();
         if (!continueSave) gs.Notify("Bem-vindo, escavador!", "Mire em um cristal e clique com o botão esquerdo para dar cada golpe.", NotifyKind.Info);
         gs.SaveGame(true);
@@ -1355,7 +1356,10 @@ public partial class Main : Node
             bool sameWorld = GameData.Regions[i].Deep == r.Deep;
             bool visible = !inHouse && sameWorld && Mathf.Abs(i - r.Index) <= 1;
             if (World.RegionRoots[i].Visible != visible) World.RegionRoots[i].Visible = visible;
+            World.SetRegionActive(i, visible);
         }
+        World.SetAmbientActive(World.Town, inHouse);
+        World.SetAmbientActive(World.House, inHouse);
         Buildings.UpdateVisibility(r.Index, inHouse);
         World.Enemies?.ShowOnly(!inHouse && r.Deep ? r.Id : null);
     }

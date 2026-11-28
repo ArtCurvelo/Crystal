@@ -643,7 +643,26 @@ public partial class EnemyManager : Node3D
 
     public void ShowOnly(string region)
     {
-        foreach (var kv in _groups) { bool v = kv.Key == region; if (kv.Value.Visible != v) kv.Value.Visible = v; }
+        foreach (var kv in _groups)
+        {
+            bool v = kv.Key == region;
+            if (kv.Value.Visible == v) continue;
+            kv.Value.Visible = v;
+            // área escondida: os vivos dormem de vez; os mortos continuam contando para renascer
+            foreach (Node c in kv.Value.GetChildren())
+                if (c is Enemy e) e.SetPhysicsProcess(v || e.Mode == Enemy.State.Dead);
+            SetBodiesProcess(kv.Value, v);
+        }
+    }
+
+    /// <summary>Corpos humanos dos inimigos (Acorrentados, Capatazes, Corvo) só animam na área visível.</summary>
+    static void SetBodiesProcess(Node n, bool on)
+    {
+        foreach (Node c in n.GetChildren())
+        {
+            if (c is Humanoid h) h.SetProcess(on);
+            else SetBodiesProcess(c, on);
+        }
     }
 
     public Enemy Spawn(EnemyDef def, Vector3 pos, int seed)

@@ -90,9 +90,16 @@ public partial class HomeScreen : ModalScreen
         tabs.AddChild(_tabHouse);
         tabs.AddChild(_tabSkills);
 
-        _housePane = new VBoxContainer();
+        // a lista passa da altura da tela: rolagem com a roda do mouse (e acompanha o foco do controle)
+        _houseScroll = new ScrollContainer
+        {
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, FollowFocus = true,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(600, 430),
+        };
+        right.AddChild(_houseScroll);
+        _housePane = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _housePane.AddThemeConstantOverride("separation", 6);
-        right.AddChild(_housePane);
+        _houseScroll.AddChild(_housePane);
         foreach (var def in HomeData.House) _housePane.AddChild(HouseRow(def));
 
         _skillPane = new VBoxContainer { Visible = false };
@@ -118,6 +125,8 @@ public partial class HomeScreen : ModalScreen
         GameState.Instance.MoneyChanged -= OnChanged;
         GameState.Instance.HomeChanged -= OnChanged;
     }
+
+    ScrollContainer _houseScroll;
 
     void OnChanged() { if (Visible) Refresh(); }
 
@@ -223,7 +232,7 @@ public partial class HomeScreen : ModalScreen
         _warn.Visible = gs.InventoryCount > 0;
         _sleep.Text = Loc.F("Dormir e começar o Dia {0}", d.Day + 1);
 
-        _housePane.Visible = !_showSkills;
+        _houseScroll.Visible = !_showSkills;
         _skillPane.Visible = _showSkills;
         _left.Visible = !_showSkills; // a árvore usa a largura toda
         _tabHouse.AddThemeColorOverride("font_color", _showSkills ? UiTheme.Muted : UiTheme.Gold);

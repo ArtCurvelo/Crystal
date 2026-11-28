@@ -554,3 +554,21 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
 - A tecla pode ser remapeada; aparece no rodapé e na ajuda.
 - O botão Back do controle era do painel de admin (que só existe na versão de desenvolvimento) e passou para o mapa.
 - Tour `--shots-map`.
+
+## Otimização (rodada 1) e scroll da casa
+- Pedido do diretor: focar em otimização. Medição nova no benchmark:
+  - tempo real de scripts e física por quadro (`ProcessStopwatch`);
+  - p95 e pior quadro;
+  - vistas da vila e das Profundezas;
+  - contagem de nós que processam (`--bench-nodes`).
+- **Processador:** regiões e a vila escondidas continuavam animando tudo (cordas, terminais, diários, cristais pulsando, 78 moradores, corpos dos inimigos).
+  - `WorldBuilder.SetRegionActive` e `SetAmbientActive` pausam só o que é cosmético. Cristais quebrados continuam contando o renascimento, goblins continuam trabalhando e inimigos mortos continuam contando para voltar.
+  - Listas preparadas no carregamento (`PrepareRegionLists`).
+  - Scripts por quadro: ~2,3 → ~0,9 ms; física: 0,35 → 0,14 ms; pior quadro: 85–360 ms → ≤ 24 ms.
+- **Placa de vídeo (Baixa):**
+  - glow desligado na Baixa: o passe custava ~20% do quadro e o visual ficou praticamente igual;
+  - benchmark OpenGL Baixa: 13,8 → 15,3–16,1 FPS (v0.28.0: ~11,6).
+- **Vila:** peças estáticas agrupadas por material (`StaticBatcher` na vila): chamadas de desenho 914 → 470.
+  - O agrupador agora ignora partes escondidas (o brilho da Semente aparecia antes da hora se fosse agrupado).
+  - Capturas com e sem o agrupamento ficaram iguais.
+- **Bug do diretor:** a aba "Melhorias da casa" não rolava. A lista não tinha área de rolagem e passava do fim da tela; agora fica num `ScrollContainer` que acompanha o foco do controle. Tour `--shots-home` rola com a roda do mouse até o fim.

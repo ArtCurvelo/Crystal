@@ -40,13 +40,14 @@ public sealed record RenderFeatures(
     public static RenderFeatures For(string method, GraphicsQuality q)
     {
         bool low = q == GraphicsQuality.Low, high = q == GraphicsQuality.High;
-        float glow = low ? 0.35f : 0.45f;
+        // brilho (glow) desligado na Baixa: o passe custava ~20% do quadro numa GPU integrada
+        float glow = 0.45f;
         switch (method)
         {
             case RenderMethods.ForwardPlus:
                 return new RenderFeatures(method, q,
                     Ssao: !low, Ssr: !low, SsrSteps: high ? 56 : 40, Ssil: high, VolumetricFog: high,
-                    LampShadows: high, Glow: true, GlowIntensity: glow,
+                    LampShadows: high, Glow: !low, GlowIntensity: glow,
                     Smaa: true, Fxaa: false, Msaa: Viewport.Msaa.Disabled, Fsr1: true, Fsr2: true, Debanding: true,
                     AmbientBoost: low ? 2.3f : 1.0f);
             case RenderMethods.Mobile:
@@ -54,13 +55,13 @@ public sealed record RenderFeatures(
                 // sombras da lanterna só na Alta (custo alto em GPU integrada)
                 return new RenderFeatures(method, q,
                     Ssao: false, Ssr: false, SsrSteps: 0, Ssil: false, VolumetricFog: false,
-                    LampShadows: high, Glow: true, GlowIntensity: glow,
+                    LampShadows: high, Glow: !low, GlowIntensity: glow,
                     Smaa: true, Fxaa: false, Msaa: Viewport.Msaa.Disabled, Fsr1: true, Fsr2: false, Debanding: true,
                     AmbientBoost: low ? 2.3f : 1.1f);
             default: // Compatibility (OpenGL)
                 return new RenderFeatures(RenderMethods.Compatibility, q,
                     Ssao: false, Ssr: false, SsrSteps: 0, Ssil: false, VolumetricFog: false,
-                    LampShadows: high, Glow: true, GlowIntensity: glow,
+                    LampShadows: high, Glow: !low, GlowIntensity: glow,
                     Smaa: false, Fxaa: false, Msaa: low ? Viewport.Msaa.Disabled : Viewport.Msaa.Msaa2X, Fsr1: false, Fsr2: false, Debanding: false,
                     AmbientBoost: low ? 2.3f : 1.1f);
         }

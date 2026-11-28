@@ -63,6 +63,8 @@ public static class StaticBatcher
             }
             else if (child.GetType() == typeof(Node3D))
             {
+                // partes escondidas aparecem depois (ex.: brilho da Semente): não podem entrar na malha sempre visível
+                if (!((Node3D)child).Visible) continue;
                 Collect(root, child, groups);
             }
         }

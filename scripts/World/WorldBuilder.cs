@@ -81,6 +81,91 @@ public partial class WorldBuilder : Node3D
     }
 
     int[] _crystalRegion;
+
+    // ---------- processamento só onde o jogador enxerga ----------
+    readonly Dictionary<int, List<Node>> _ambient = new();
+    readonly Dictionary<Node, List<Node>> _ambientRoots = new();
+    readonly bool[] _regionActive = new bool[64];
+    bool _activeInit;
+
+    /// <summary>Enfeites animados (cordas, terminais, diários, portais, moradores...): só cosmético, pode parar quando não aparece.</summary>
+    static bool IsAmbient(Node n) => n is Rope or JellyNode or ScannerNode or RuneRing or FloatingRock or DiaryNote or StationBase
+                                     or DeepPortal or DeepDescent or Humanoid or Villager or Chicken or HouseDiorama or Birds or SmithNpc;
+
+    static List<Node> CollectAmbient(Node root)
+    {
+        var list = new List<Node>();
+        var stack = new Stack<Node>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var n = stack.Pop();
+            if (IsAmbient(n) && n.IsProcessing()) list.Add(n);
+            foreach (Node c in n.GetChildren()) stack.Push(c);
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Liga/desliga o processamento das coisas de uma região conforme ela aparece (Main.UpdateRegionCulling).
+    /// Escondida: enfeites param e cristais parados param; cristais quebrados continuam contando o renascimento.
+    /// </summary>
+    public void SetRegionActive(int region, bool active)
+    {
+        if (!_activeInit) { _activeInit = true; for (int i = 0; i < _regionActive.Length; i++) _regionActive[i] = true; }
+        if (region < 0 || region >= RegionRoots.Count || _regionActive[region] == active) return;
+        _regionActive[region] = active;
+        if (!_ambient.TryGetValue(region, out var list)) _ambient[region] = list = CollectAmbient(RegionRoots[region]);
+        foreach (var n in list) if (IsInstanceValid(n)) n.SetProcess(active);
+        foreach (var c in CrystalsIn(region))
+        {
+            if (active) c.SetProcess(true); // parado e comum se desliga sozinho no primeiro quadro
+            else if (c.State != Crystal.CrystalState.Broken) c.SetProcess(false);
+        }
+    }
+
+    List<Crystal>[] _crystalsByRegion;
+    int _crystalsByRegionCount = -1;
+
+    List<Crystal> CrystalsIn(int region)
+    {
+        if (_crystalsByRegion == null || _crystalsByRegionCount != Crystals.Count)
+        {
+            _crystalsByRegion = new List<Crystal>[RegionRoots.Count];
+            for (int i = 0; i < _crystalsByRegion.Length; i++) _crystalsByRegion[i] = new List<Crystal>();
+            foreach (var c in Crystals) _crystalsByRegion[RegionAt(c.GlobalPosition).Index].Add(c);
+            _crystalsByRegionCount = Crystals.Count;
+        }
+        return _crystalsByRegion[region];
+    }
+
+    /// <summary>Prepara as listas de enfeites e cristais por região (no carregamento, para não travar ao trocar de região).</summary>
+    public void PrepareRegionLists()
+    {
+        for (int i = 0; i < RegionRoots.Count; i++)
+            if (!_ambient.ContainsKey(i)) _ambient[i] = CollectAmbient(RegionRoots[i]);
+        CrystalsIn(0);
+    }
+
+    public bool RegionActive(int region) => !_activeInit || _regionActive[region];
+
+    /// <summary>Mesmo controle para a vila e a casa (só cosmético: moradores, galinhas, portas, maquete).</summary>
+    public void SetAmbientActive(Node root, bool active)
+    {
+        if (root == null) return;
+        bool known = _ambientRoots.TryGetValue(root, out var list);
+        if (active)
+        {
+            if (!known || list == null) return; // já está ligado
+            foreach (var n in list) if (IsInstanceValid(n)) n.SetProcess(true);
+            _ambientRoots[root] = null;
+            return;
+        }
+        if (known && list != null) return; // já está desligado
+        // a vila cria moradores ao longo do dia: a lista é refeita a cada vez que ela some
+        _ambientRoots[root] = list = CollectAmbient(root);
+        foreach (var n in list) n.SetProcess(false);
+    }
     public static float RespawnRateFor(float brokenFraction) => 1f + 5f * brokenFraction * brokenFraction;
 
     /// <summary>Caverna da região em que um ponto está.</summary>
