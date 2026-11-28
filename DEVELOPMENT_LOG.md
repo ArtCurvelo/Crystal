@@ -585,3 +585,18 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
   - Marcador 3D aponta o depósito mais perto do minério (ou o portão na direção da região que tem). Com tudo na mochila, aponta a volta, e na vila o quadro.
   - Objetivo no HUD "MISSÃO (x/y)"; dívida em vermelho sob os Lúmens.
 - Bot aceita e entrega; testes de prazo, multa, dívida, uma por vez e save. Tour `--shots-missions`.
+
+## Otimização (rodada 2): carregamento e Profundezas
+- **Carregamento do mundo: 8,6 s → 3,4 s** (medido aqui; o log agora mostra o tempo de cada etapa):
+  - plantas das cavernas calculadas em paralelo (`Parallel.For`, cada uma com a própria semente);
+  - `CaveLayout.Rasterize` pula feições que com certeza não influenciam a célula (limite pela caixa + raio + ruído) e a exponencial de pesos desprezíveis;
+  - resultado **bit a bit idêntico**: checksums das 12 regiões iguais (`LAYOUT_CHECKSUM=1`) e teste que compara paralelo × sequencial;
+  - geração das cavernas 5,0 s → 0,7 s;
+  - visual dos depósitos: 8 formatos prontos por minério (malhas compartilhadas; cada depósito com os próprios materiais, rotação e tamanho). 1,3 s → 0,7 s e muito menos memória de vídeo. Capturas lado a lado de cada tipo de depósito iguais em estilo.
+- **Inimigos:**
+  - linha de visão a cada 0,15 s, sem criar lista por raio;
+  - parado no chão não recalcula movimento;
+  - ocioso a mais de 35 m não passeia;
+  - física nas Profundezas: 1,05 → 0,18 ms por quadro.
+- **Profundezas no OpenGL Baixa:** 11,1 → 16,6 FPS (soma com o glow desligado da rodada 1).
+- Benchmark: coletas de lixo (GC) e KB alocados por quadro; nenhuma coleta nas vistas medidas.

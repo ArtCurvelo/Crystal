@@ -463,16 +463,33 @@ public sealed class CaveLayout
     {
         int n = Nx * Nz;
         F = new float[n]; C = new float[n]; D = new float[n]; L = new float[n];
-        var dist = new float[Features.Count];
-        var ts = new float[Features.Count];
+        int nf = Features.Count;
+        var dist = new float[nf];
+        var ts = new float[nf];
+        // caixa de cada feição (segmento A-B) e o quanto a borda dela pode chegar perto: serve só para pular
+        // feições que com certeza não influenciam a célula (o resultado é idêntico ao de calcular todas)
+        var bx0 = new float[nf]; var bx1 = new float[nf]; var bz0 = new float[nf]; var bz1 = new float[nf]; var reach = new float[nf];
+        for (int k = 0; k < nf; k++)
+        {
+            var f = Features[k];
+            bx0[k] = Mathf.Min(f.A.X, f.B.X); bx1[k] = Mathf.Max(f.A.X, f.B.X);
+            bz0[k] = Mathf.Min(f.A.Y, f.B.Y); bz1[k] = Mathf.Max(f.A.Y, f.B.Y);
+            reach[k] = Mathf.Max(f.RA, f.RB) + 3f * Mathf.Abs(f.Noise) + 0.5f; // ruído da borda (|en| <= 1) com folga
+        }
+        // peso exp(-1.3 * delta) < 0.002 quando delta > 4.78: com 4.8 de corte nada que entraria na mistura é pulado
+        const float Cut = 4.8f;
         for (int j = 0; j < Nz; j++)
             for (int i = 0; i < Nx; i++)
             {
                 var p = CellPos(i, j);
                 float en = _edge.GetNoise2D(p.X, p.Y);
                 float dmin = float.MaxValue;
-                for (int k = 0; k < Features.Count; k++)
+                for (int k = 0; k < nf; k++)
                 {
+                    // limite inferior da distância: fora da caixa, menos o raio e o ruído máximos
+                    float ox = p.X < bx0[k] ? bx0[k] - p.X : p.X > bx1[k] ? p.X - bx1[k] : 0f;
+                    float oz = p.Y < bz0[k] ? bz0[k] - p.Y : p.Y > bz1[k] ? p.Y - bz1[k] : 0f;
+                    if (dmin < float.MaxValue && Mathf.Sqrt(ox * ox + oz * oz) - reach[k] > dmin + Cut + 0.5f) { dist[k] = float.MaxValue; continue; }
                     var f = Features[k];
                     float d = f.Dist(p, out ts[k]);
                     d += en * 2.4f * f.Noise;
@@ -481,8 +498,9 @@ public sealed class CaveLayout
                 }
                 // mistura suave dos níveis e alturas das feições próximas
                 float ws = 0, lv = 0, hh = 0; bool flat = false; bool crawl = false;
-                for (int k = 0; k < Features.Count; k++)
+                for (int k = 0; k < nf; k++)
                 {
+                    if (dist[k] - dmin > Cut) continue; // peso desprezível (seria descartado abaixo)
                     float w = Mathf.Exp(-1.3f * (dist[k] - dmin));
                     if (w < 0.002f) continue;
                     var f = Features[k];

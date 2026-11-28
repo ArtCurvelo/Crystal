@@ -26,6 +26,51 @@ public static class OreVisuals
         _crystal ??= GD.Load<Shader>("res://shaders/crystal.gdshader");
         _ore ??= GD.Load<Shader>("res://shaders/ore.gdshader");
         var r = new Result();
+        ulong t0 = Time.GetTicksUsec();
+        try
+        {
+            // formatos prontos: Variants por minério, montados uma vez e reaproveitados (malhas compartilhadas).
+            // Cada depósito ganha os próprios materiais (o brilho de dano é individual), rotação e tamanho.
+            int variant = rng.Next(Variants);
+            var key = (mat.Id, variant);
+            if (!_templates.TryGetValue(key, out var tpl))
+            {
+                var holder0 = new Node3D();
+                var res0 = new Result();
+                BuildInner(holder0, mat, new Random(StableHash(mat.Id) * 31 + variant), 1f, res0);
+                _templates[key] = tpl = (holder0, res0);
+            }
+            var shape = (Node3D)tpl.node.Duplicate();
+            shape.Name = "Shape";
+            shape.Scale = Vector3.One * s;
+            parent.AddChild(shape);
+            var map = new Dictionary<ShaderMaterial, ShaderMaterial>();
+            foreach (var m in tpl.res.Materials) { var d = (ShaderMaterial)m.Duplicate(); d.SetShaderParameter("seed", (float)rng.NextDouble() * 50f); map[m] = d; r.Materials.Add(d); }
+            foreach (Node n in shape.GetChildren())
+                if (n is MeshInstance3D mi && mi.MaterialOverride is ShaderMaterial sm && map.TryGetValue(sm, out var own)) mi.MaterialOverride = own;
+            r.Height = tpl.res.Height * s;
+            r.Radius = tpl.res.Radius * s;
+        }
+        finally { BuildUsec += Time.GetTicksUsec() - t0; BuildCount++; }
+        return r;
+    }
+
+    public const int Variants = 8;
+    static readonly Dictionary<(string, int), (Node3D node, Result res)> _templates = new();
+
+    static int StableHash(string id)
+    {
+        int h = 17;
+        foreach (char c in id) h = h * 31 + c;
+        return h & 0x7fffffff;
+    }
+
+    /// <summary>Tempo total gasto montando depósitos (log de carregamento).</summary>
+    public static ulong BuildUsec;
+    public static int BuildCount;
+
+    static void BuildInner(Node3D parent, MaterialDef mat, Random rng, float s, Result r)
+    {
         switch (mat.Archetype)
         {
             case OreArchetype.Vein: BuildVein(parent, mat, rng, s, r); break;
@@ -38,7 +83,6 @@ public static class OreVisuals
             case OreArchetype.Ice: BuildCrystal(parent, mat, rng, s, r, ice: true); break;
             default: BuildCrystal(parent, mat, rng, s, r, ice: false); break;
         }
-        return r;
     }
 
     // ---------------------------------------------------------------- materiais

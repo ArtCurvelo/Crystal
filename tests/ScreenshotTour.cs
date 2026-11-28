@@ -468,6 +468,24 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-deposits"))
+        {
+            // um depósito de cada arquétipo de minério, de perto
+            foreach (var reg in GameData.Regions) if (!gs.IsUnlocked(reg.Id)) gs.Data.UnlockedRegions.Add(reg.Id);
+            gs.RaiseAll();
+            var seen = new System.Collections.Generic.HashSet<OreArchetype>();
+            int n = 0;
+            foreach (var dc in Main.World.Crystals)
+            {
+                if (dc.Material.Special || !seen.Add(dc.Material.Archetype) || dc.GlobalTransform.Basis.Y.Normalized().Y < 0.9f) continue;
+                LookAtPoint(p, dc.StandPoint, dc.Center);
+                await Wait(1.0f);
+                await Shot($"54_deposit_{n++}_{dc.Material.Archetype}");
+            }
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-missions"))
         {
             gs.Data.Discovered.Add("quartz"); gs.Data.Discovered.Add("amethyst"); gs.Data.Discovered.Add("copper");

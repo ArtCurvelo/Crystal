@@ -191,40 +191,77 @@ public partial class WorldBuilder : Node3D
         WaterSpots.Clear();
         ulong t0 = Time.GetTicksMsec();
         var regions = GameData.Regions;
+        ulong tLayout = 0, tTerrain = 0, tRegion = 0, tTunnel = 0, ts;
+        // as plantas das cavernas são independentes (cada uma com a própria semente): calcula todas em paralelo
+        ts = Time.GetTicksUsec();
+        var layouts = new CaveLayout[regions.Count];
+        System.Threading.Tasks.Parallel.For(0, regions.Count, i => layouts[i] = new CaveLayout(regions[i], 4242 + i * 101));
+        tLayout = Time.GetTicksUsec() - ts;
+        if (OS.GetEnvironment("LAYOUT_CHECKSUM") == "1")
+            foreach (var lay in layouts)
+            {
+                long h = 17;
+                for (int k = 0; k < lay.F.Length; k++) h = h * 31 + BitConverter.SingleToInt32Bits(lay.F[k]) ^ BitConverter.SingleToInt32Bits(lay.C[k]) * 7 ^ BitConverter.SingleToInt32Bits(lay.D[k]) * 13 ^ (lay.Reach[k] ? 1 : 0);
+                GD.Print($"[Checksum] {lay.Region.Id} {h:X}");
+            }
         for (int i = 0; i < regions.Count; i++)
         {
             var r = regions[i];
-            var L = new CaveLayout(r, 4242 + i * 101);
+            var L = layouts[i];
             Layouts.Add(L);
             var root = new Node3D { Name = "Region_" + r.Id };
             AddChild(root);
             RegionRoots.Add(root);
             var terrain = new CaveTerrain { Name = "Terrain" };
             root.AddChild(terrain);
+            ts = Time.GetTicksUsec();
             terrain.Build(L, r);
+            tTerrain += Time.GetTicksUsec() - ts;
+            ts = Time.GetTicksUsec();
             BuildRegion(root, r, L, i);
+            tRegion += Time.GetTicksUsec() - ts;
+            ts = Time.GetTicksUsec();
             if (i + 1 < regions.Count && !regions[i + 1].Deep) BuildTunnel(r, regions[i + 1]);
+            tTunnel += Time.GetTicksUsec() - ts;
         }
 
+        ts = Time.GetTicksUsec();
         Enemies = new EnemyManager { Name = "Enemies" };
         AddChild(Enemies);
         for (int i = 0; i < regions.Count; i++)
             if (regions[i].Deep) SpawnEnemies(regions[i], Layouts[i]);
+        ulong tEnemies = Time.GetTicksUsec() - ts;
 
+        ts = Time.GetTicksUsec();
         House = new PlayerHouse { Name = "PlayerHouse" };
         AddChild(House);
         Town = new Town { Name = "Town" };
         AddChild(Town);
+        ulong tTown = Time.GetTicksUsec() - ts;
 
         // agrupa malhas estáticas por material em cada região e túnel (o terreno fica de fora)
+        ts = Time.GetTicksUsec();
         int saved = 0;
         foreach (Node c in GetChildren())
             if (c.GetType() == typeof(Node3D)) saved += StaticBatcher.Batch((Node3D)c);
+        ulong tBatch = Time.GetTicksUsec() - ts;
         GD.Print($"[World] Agrupamento estático: {saved} instâncias de malha a menos");
+        GD.Print($"[World] etapas (ms): layout {tLayout / 1000} · terreno {tTerrain / 1000} · regiões {tRegion / 1000} · túneis {tTunnel / 1000} · inimigos {tEnemies / 1000} · casa+vila {tTown / 1000} · agrupamento {tBatch / 1000}");
+        GD.Print("[World] dentro das regiões (ms): " + string.Join(" · ", _buildTimes.Select(kv => $"{kv.Key} {kv.Value / 1000}")));
+        GD.Print($"[World] visual dos depósitos: {Mining.OreVisuals.BuildUsec / 1000} ms em {Mining.OreVisuals.BuildCount}");
         GD.Print($"[World] Mundo construído em {Time.GetTicksMsec() - t0} ms ({Crystals.Count} cristais)");
     }
 
     // =================== Regiões ===================
+    /// <summary>Tempo gasto por etapa da construção (impresso no log ao terminar o mundo).</summary>
+    readonly Dictionary<string, ulong> _buildTimes = new();
+    void Timed(string what, Action a)
+    {
+        ulong t = Time.GetTicksUsec();
+        a();
+        _buildTimes[what] = _buildTimes.GetValueOrDefault(what) + (Time.GetTicksUsec() - t);
+    }
+
     void BuildRegion(Node3D root, RegionDef r, CaveLayout L, int index)
     {
         var rng = new Random(1000 + index * 77);
@@ -311,13 +348,11 @@ public partial class WorldBuilder : Node3D
         BuildDiaries(root, L, index, reserved);
         if (r.Id == "cathedral") BuildSealedGate(root, L, reserved);
         BeginSolids(root, L, reserved);
-        BuildDecoration(root, r, L, rng);
-        BuildLights(root, r, L);
-        BuildAmbientParticles(root, r);
-        BuildSetPieces(root, r, L, new Random(500 + index), reserved);
-        BuildChamberSigns(root, r, L);
-        L.Reflood(); // obstáculos sólidos mudam o que é alcançável a pé
-        BuildCrystals(root, r, L, rng, reserved);
+        Timed("decoração", () => BuildDecoration(root, r, L, rng));
+        Timed("luzes+partículas", () => { BuildLights(root, r, L); BuildAmbientParticles(root, r); });
+        Timed("cenários", () => { BuildSetPieces(root, r, L, new Random(500 + index), reserved); BuildChamberSigns(root, r, L); });
+        Timed("reflood", () => L.Reflood()); // obstáculos sólidos mudam o que é alcançável a pé
+        Timed("depósitos", () => BuildCrystals(root, r, L, rng, reserved));
         if (r.Id == "cathedral") BuildCathedralColumns(root, L);
     }
 

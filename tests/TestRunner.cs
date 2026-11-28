@@ -70,6 +70,7 @@ public partial class TestRunner : Node
                 Fresh();
             });
             Run("Missões: prazo, multa e dívida", TestMissionDeadline);
+            Run("Cavernas geradas em paralelo (mesmo mapa)", TestParallelLayouts);
             Run("Vila: encomendas do quadro", () =>
             {
                 Fresh(); GS.NewGame();
@@ -1819,6 +1820,22 @@ public partial class TestRunner : Node
         back.Sanitize();
         Check(back.Debt == 77 && back.Contracts[n].Accepted, "dívida e missão aceita ficam no save");
         GS.Data.Debt = 0;
+    }
+
+    void TestParallelLayouts()
+    {
+        // gerar as cavernas em paralelo tem que dar exatamente o mesmo mapa que gerar uma por vez
+        int n = Math.Min(4, GameData.Regions.Count);
+        var par = new CaveLayout[n];
+        System.Threading.Tasks.Parallel.For(0, n, i => par[i] = new CaveLayout(GameData.Regions[i], 4242 + i * 101));
+        bool same = true;
+        for (int i = 0; i < n; i++)
+        {
+            var seq = new CaveLayout(GameData.Regions[i], 4242 + i * 101);
+            same &= seq.F.SequenceEqual(par[i].F) && seq.D.SequenceEqual(par[i].D) && seq.C.SequenceEqual(par[i].C)
+                    && seq.Entrance == par[i].Entrance && seq.Exit == par[i].Exit && seq.Chambers.Count == par[i].Chambers.Count;
+        }
+        Check(same, "cavernas geradas em paralelo são idênticas às geradas uma por vez");
     }
 
     async Task TestExploreMap()

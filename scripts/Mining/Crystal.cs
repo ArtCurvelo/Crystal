@@ -89,7 +89,7 @@ public partial class Crystal : StaticBody3D
         var built = OreVisuals.Build(_visual, mat, _rng, s);
         // depósitos distantes não são desenhados (a névoa já os esconderia)
         if (!special)
-            foreach (Node n in _visual.GetChildren())
+            foreach (Node n in _visual.FindChildren("*", "GeometryInstance3D", true, false))
                 if (n is GeometryInstance3D gi) gi.VisibilityRangeEnd = ViewDistance;
         _mats.AddRange(built.Materials);
         SetGlow(_baseEnergy, 0f, 0f);

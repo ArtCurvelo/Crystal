@@ -82,6 +82,8 @@ public partial class Benchmark : Node
             double procSum = 0, procMax = 0, physSum = 0;
             var frameMs = new List<double>();
             ProcessStopwatch.Reset();
+            int gc0 = System.GC.CollectionCount(0), gc1 = System.GC.CollectionCount(1), gc2 = System.GC.CollectionCount(2);
+            long alloc0 = System.GC.GetTotalAllocatedBytes();
             ulong last = Time.GetTicksUsec();
             while (Time.GetTicksUsec() - t0 < 3_000_000)
             {
@@ -108,7 +110,7 @@ public partial class Benchmark : Node
             var prims = Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame);
             var proc = procSum / frames;
             var phys = physSum / frames;
-            GD.Print($"[Bench] {name,-16} {1000.0 / ms,6:0.0} FPS  ({ms:0.0} ms)  draw calls {draws:0}  objetos {objs:0}  triângulos {prims / 1000:0}k  p95 {p95:0.0} ms  pior {fmax:0.0} ms  scripts {ProcessStopwatch.Accum / 1000.0 / System.Math.Max(1, ProcessStopwatch.Frames):0.00} ms/quadro  física {ProcessStopwatch.PhysAccum / 1000.0 / System.Math.Max(1, ProcessStopwatch.Frames):0.00} ms/quadro");
+            GD.Print($"[Bench] {name,-16} {1000.0 / ms,6:0.0} FPS  ({ms:0.0} ms)  draw calls {draws:0}  objetos {objs:0}  triângulos {prims / 1000:0}k  p95 {p95:0.0} ms  pior {fmax:0.0} ms  scripts {ProcessStopwatch.Accum / 1000.0 / System.Math.Max(1, ProcessStopwatch.Frames):0.00} ms/quadro  física {ProcessStopwatch.PhysAccum / 1000.0 / System.Math.Max(1, ProcessStopwatch.Frames):0.00} ms/quadro  GC {System.GC.CollectionCount(0) - gc0}/{System.GC.CollectionCount(1) - gc1}/{System.GC.CollectionCount(2) - gc2}  alocado {(System.GC.GetTotalAllocatedBytes() - alloc0) / 1024 / System.Math.Max(1, frames)} KB/quadro");
         }
         double avg = results.Average();
         GD.Print($"[Bench] MÉDIA qualidade={(GraphicsQuality)Quality} escala3D={Settings.Data.RenderScale:0.00} AA={Settings.Data.AntiAliasing}: {1000.0 / avg:0.0} FPS ({avg:0.0} ms)");

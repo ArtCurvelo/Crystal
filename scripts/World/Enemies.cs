@@ -22,6 +22,8 @@ public partial class Enemy : CharacterBody3D
     public Vector3 Home;
     public float Hp { get; private set; }
     public State Mode { get; private set; } = State.Idle;
+    float _seeT;
+    bool _seesCached;
     public bool Alive => Mode != State.Dead;
     public EnemyManager Manager;
     /// <summary>Filhote (divisão de um Lúmen Vivo): não renasce, some depois de morto.</summary>
@@ -411,7 +413,8 @@ public partial class Enemy : CharacterBody3D
         }
         // longe do jogador: dorme (economiza CPU)
         float pd = player != null ? player.GlobalPosition.DistanceTo(GlobalPosition) : 999f;
-        if (pd > 60f || !IsVisibleInTree()) return;
+        // ocioso e longe (fora da vista, atrás das paredes): não passeia
+        if (pd > 60f || (Mode == State.Idle && pd > 35f && !Def.Boss) || !IsVisibleInTree()) return;
         _t += dt;
         _flash = Mathf.Max(0, _flash - dt * 5f);
         _skinMat.EmissionEnergyMultiplier = _flash * 2.5f;
@@ -429,7 +432,14 @@ public partial class Enemy : CharacterBody3D
         Vector3 want = Vector3.Zero;
         var toP = player != null ? player.GlobalPosition - GlobalPosition : Vector3.Zero;
         toP.Y = 0;
-        bool sees = player != null && player.Hp > 0 && pd < Def.Aggro && Manager.CanSee(this, player) && !Dormant;
+        // linha de visão: o raio é refeito a cada 0,15 s (o resultado quase não muda de um quadro para o outro)
+        _seeT -= dt;
+        if (player != null && player.Hp > 0 && pd < Def.Aggro && !Dormant)
+        {
+            if (_seeT <= 0f) { _seeT = 0.15f; _seesCached = Manager.CanSee(this, player); }
+        }
+        else { _seesCached = false; _seeT = 0f; }
+        bool sees = _seesCached;
         float home = GlobalPosition.DistanceTo(Home);
         if (Def.Boss) home = Mathf.Min(home, 20f); // o chefão não desiste da arena (só se o jogador sair dela)
         if (_summonCd > 0) _summonCd -= dt;
@@ -477,7 +487,9 @@ public partial class Enemy : CharacterBody3D
             vel.X += side.X * 0.8f; vel.Z += side.Z * 0.8f;
         }
         Velocity = vel;
-        MoveAndSlide();
+        // parado no chão (sem andar, sem empurrão): não precisa recalcular o movimento
+        bool still = !Def.Flying && IsOnFloor() && vel.X * vel.X + vel.Z * vel.Z < 0.0025f;
+        if (!still) MoveAndSlide();
         if (GlobalPosition.Y < Home.Y - 30f) { if (Temporary) QueueFree(); else Respawn(); }
         Animate(dt, new Vector2(vel.X, vel.Z).Length());
     }
@@ -697,10 +709,10 @@ public partial class EnemyManager : Node3D
     {
         var space = GetWorld3D()?.DirectSpaceState;
         if (space == null) return true;
+        // só a rocha (camada do mundo) bloqueia: inimigo e jogador estão em outras camadas, nem precisam ser excluídos
         _ray ??= new PhysicsRayQueryParameters3D { CollisionMask = PlayerController.WorldLayer };
         _ray.From = e.GlobalPosition + Vector3.Up * 1.0f;
         _ray.To = p.GlobalPosition + Vector3.Up * 1.2f;
-        _ray.Exclude = new Godot.Collections.Array<Rid> { e.GetRid(), p.GetRid() };
         return space.IntersectRay(_ray).Count == 0;
     }
 
