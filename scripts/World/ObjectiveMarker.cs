@@ -107,7 +107,9 @@ public partial class ObjectiveMarker : Node3D
             if (gs.CanForgeKey && World.Town.Anvil != null) { _target = World.Town.Anvil; _targetHeight = 2.2f; return; }
             bool deliver = false;
             for (int i = 0; i < gs.Data.Contracts.Count; i++) deliver |= gs.CanDeliver(i);
-            _target = gs.DayOver ? (deliver ? World.Town.Board : World.Town.DoorOutside) : World.Town.Elevator;
+            // missão pronta: o quadro, a qualquer hora (o prazo é dormir)
+            if (deliver) { _target = World.Town.Board; _targetHeight = 2.8f; return; }
+            _target = gs.DayOver ? World.Town.DoorOutside : World.Town.Elevator;
             _targetHeight = gs.DayOver ? 2.8f : 6.5f;
             return;
         }
@@ -116,6 +118,22 @@ public partial class ObjectiveMarker : Node3D
             _target = World.SealedGate;
             _targetHeight = 10f;
             return;
+        }
+        var mission = gs.ActiveContractData;
+        if (mission != null && !gs.DayOver)
+        {
+            if (gs.InventoryOf(mission.Mat) >= mission.Amount)
+            {
+                // já tem tudo: volta para a vila entregar (o caminho de volta é tratado lá embaixo)
+                _target = World.Elevator;
+                _targetHeight = 4.2f;
+            }
+            else
+            {
+                _target = MissionTarget(mission.Mat, region);
+                _targetHeight = _target is Crystal ? 2.2f : 6f;
+            }
+            if (_target != null) goto backPath;
         }
         if (gs.DayOver)
         {
@@ -146,12 +164,38 @@ public partial class ObjectiveMarker : Node3D
                 _targetHeight = 7.5f;
             }
         }
+        backPath:
         // alvo no acampamento visto de uma região mais funda: aponta o caminho de volta (portão do túnel)
         if (_target != null && region.Index > 0 && (_target == World.SellStation || _target == World.Elevator))
         {
             _target = World.Gates[region.Index - 1];
             _targetHeight = 6f;
         }
+    }
+
+    /// <summary>Depósito mais perto do minério da missão: nesta região, ou o portão na direção da região que tem.</summary>
+    Node3D MissionTarget(string mat, RegionDef here)
+    {
+        Crystal best = null, other = null;
+        float bd = float.MaxValue, od = float.MaxValue;
+        var p = PlayerPos();
+        var gs = GameState.Instance;
+        foreach (var c in World.Crystals)
+        {
+            if (c.Material.Id != mat || !c.IsMineable) continue;
+            var r = WorldBuilder.RegionAt(c.GlobalPosition);
+            if (r.Deep != here.Deep || !gs.IsUnlocked(r.Id)) continue;
+            float dd = c.GlobalPosition.DistanceSquaredTo(p);
+            if (r == here) { if (dd < bd) { bd = dd; best = c; } }
+            else if (dd < od) { od = dd; other = c; }
+        }
+        if (best != null) return best;
+        if (other == null || here.Deep) return null;
+        int t = WorldBuilder.RegionAt(other.GlobalPosition).Index;
+        // Gates[k] fica no fim da região k e leva à k+1
+        if (t > here.Index && here.Index < World.Gates.Count) return World.Gates[here.Index];
+        if (t < here.Index && here.Index > 0) return World.Gates[here.Index - 1];
+        return null;
     }
 
     Node3D Nearest(Node3D root)

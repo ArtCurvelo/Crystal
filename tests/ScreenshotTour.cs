@@ -468,6 +468,32 @@ public partial class ScreenshotTour : Node
             GameState.Instance.QuitClean();
             return;
         }
+        if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-missions"))
+        {
+            gs.Data.Discovered.Add("quartz"); gs.Data.Discovered.Add("amethyst"); gs.Data.Discovered.Add("copper");
+            gs.Data.Contracts.Clear();
+            gs.EnsureContracts();
+            gs.Data.Debt = 1250;
+            // vila de dia: o quadro com uma missão aceita
+            var tw = Main.World.Town;
+            LookAtPoint(p, tw.ArrivePoint, tw.ArrivePoint + new Vector3(4f, 1.5f, 0));
+            await Wait(1.2f);
+            int slot = gs.Data.Contracts.FindIndex(c => c.Mat == "quartz");
+            if (slot < 0) slot = 0;
+            gs.TryAccept(slot);
+            gs.AddItem(gs.Data.Contracts[slot].Mat, gs.Data.Contracts[slot].Amount / 3);
+            UiBus.RequestMissions();
+            await Wait(0.8f);
+            await Shot("53_missions_board");
+            Main.CloseAllForTour();
+            // na mina: marcador no depósito do minério e o objetivo no HUD
+            LookAtPoint(p, Main.World.SpawnPoint, Main.World.SpawnPoint + new Vector3(0, 1.5f, -8f));
+            await Wait(2.5f);
+            await Shot("53_missions_mine");
+            SaveSystem.Delete();
+            GameState.Instance.QuitClean();
+            return;
+        }
         if (System.Linq.Enumerable.Contains(OS.GetCmdlineUserArgs(), "--shots-home"))
         {
             gs.EndDay();

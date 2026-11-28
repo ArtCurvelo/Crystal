@@ -69,6 +69,7 @@ public partial class TestRunner : Node
                 Check(GameData.Mat("quartz").Hp > 30f, "vida dos minérios aumentada (x1,6)");
                 Fresh();
             });
+            Run("Missões: prazo, multa e dívida", TestMissionDeadline);
             Run("Vila: encomendas do quadro", () =>
             {
                 Fresh(); GS.NewGame();
@@ -81,6 +82,9 @@ public partial class TestRunner : Node
                 Check(c0.Reward > GS.SellPrice(m0) * c0.Amount, "encomenda paga mais que a venda comum");
                 Check(!GS.CanDeliver(0), "sem os fragmentos não dá para entregar");
                 GS.AddItem(c0.Mat, c0.Amount + 2);
+                Check(!GS.CanDeliver(0), "sem aceitar a missão não dá para entregar");
+                Check(GS.TryAccept(0) && GS.ActiveContract == 0, "aceitar a missão");
+                Check(!GS.CanAccept(1), "só uma missão por vez");
                 long money = GS.Data.Money;
                 Check(GS.TryDeliver(0) && GS.Data.Contracts[0].Done, "entrega com os fragmentos na mochila");
                 Check(GS.Data.Money == money + c0.Reward && GS.InventoryOf(c0.Mat) == 2, "entrega paga e tira só a quantidade pedida");
@@ -1592,6 +1596,11 @@ public partial class TestRunner : Node
         GS.AddItem(c0.Mat, c0.Amount);
         await Frames(2);
         var btn = FindAll<Button>(ms).FirstOrDefault(b => b.HasMeta("contract") && (int)b.GetMeta("contract") == 0);
+        Check(btn != null && !btn.Disabled, "botão Aceitar liberado");
+        btn?.EmitSignal(BaseButton.SignalName.Pressed);
+        await Frames(2);
+        Check(GS.Data.Contracts[0].Accepted, "aceitar pela tela funciona");
+        btn = FindAll<Button>(ms).FirstOrDefault(b => b.HasMeta("contract") && (int)b.GetMeta("contract") == 0);
         Check(btn != null && !btn.Disabled, "botão Entregar liberado com os fragmentos na mochila");
         btn?.EmitSignal(BaseButton.SignalName.Pressed);
         await Frames(2);
@@ -1766,6 +1775,50 @@ public partial class TestRunner : Node
         root.QueueFree();
         await Frames(3);
         Fresh();
+    }
+
+    void TestMissionDeadline()
+    {
+        Fresh(); GS.NewGame();
+        GS.Data.Discovered.Add("quartz");
+        GS.EnsureContracts();
+        var c = GS.Data.Contracts[0];
+        long fine = GameState.ContractFine(c);
+        Check(fine >= 50 && fine <= c.Reward, $"multa é parte da recompensa ({fine} de {c.Reward})");
+        // falha com dinheiro: paga a multa
+        GS.AddMoney(fine + 100);
+        Check(GS.TryAccept(0), "aceita de dia");
+        GS.EndDay();
+        Check(!GS.Data.Contracts[0].Done, "o fim do turno ainda deixa entregar de noite");
+        GS.StartNewDay();
+        Check(GS.Data.Money == 100 && GS.Data.Debt == 0, "não entregou até dormir: paga a multa");
+        Check(GS.ActiveContract < 0, "missão fracassada sai do ar");
+        // falha sem dinheiro: vira dívida, descontada do que entrar
+        GS.EnsureContracts();
+        int k = GS.Data.Contracts.FindIndex(x => !x.Done);
+        var c2 = GS.Data.Contracts[k];
+        long fine2 = GameState.ContractFine(c2);
+        Check(GS.TryAccept(k), "aceita outra no dia seguinte");
+        GS.Data.Money = 20;
+        GS.StartNewDay();
+        Check(GS.Data.Money == 0 && GS.Data.Debt == fine2 - 20, $"sem dinheiro: o que falta vira dívida ({GS.Data.Debt} de {fine2})");
+        long debt = GS.Data.Debt;
+        GS.AddMoney(debt + 30);
+        Check(GS.Data.Debt == 0 && GS.Data.Money == 30, "o que entra paga a dívida primeiro");
+        // de noite: só aceita o que já pode entregar
+        GS.EnsureContracts();
+        GS.EndDay();
+        int n = GS.Data.Contracts.FindIndex(x => !x.Done);
+        Check(!GS.CanAccept(n), "de noite não aceita sem ter os minérios");
+        GS.AddItem(GS.Data.Contracts[n].Mat, GS.Data.Contracts[n].Amount);
+        Check(GS.CanAccept(n), "de noite aceita se já tem tudo (entrega na hora)");
+        // salva e carrega
+        GS.TryAccept(n);
+        GS.Data.Debt = 77;
+        var back = System.Text.Json.JsonSerializer.Deserialize<SaveData>(System.Text.Json.JsonSerializer.Serialize(GS.Data));
+        back.Sanitize();
+        Check(back.Debt == 77 && back.Contracts[n].Accepted, "dívida e missão aceita ficam no save");
+        GS.Data.Debt = 0;
     }
 
     async Task TestExploreMap()

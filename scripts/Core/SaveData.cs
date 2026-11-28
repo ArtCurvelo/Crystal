@@ -28,6 +28,8 @@ public sealed class SaveData
     public List<string> Discovered { get; set; } = new();
     /// <summary>Encomendas do quadro de missões da vila.</summary>
     public List<ContractSave> Contracts { get; set; } = new();
+    /// <summary>Dívida com a Guilda (multas de missões não cumpridas): descontada do que o jogador ganha.</summary>
+    public long Debt { get; set; }
     /// <summary>Equipamento forjado na vila: peça ("helmet", "gloves", "boots", "bag") → nível 0..5 (ausente = nenhum).</summary>
     public Dictionary<string, int> Gear { get; set; } = new();
     /// <summary>Diários de outros escravos já encontrados na mina (ficam ao renascer).</summary>
@@ -117,6 +119,15 @@ public sealed class SaveData
         if (EnemiesKilled < 0) EnemiesKilled = 0;
         Guardians = (Guardians ?? new()).Where(g => GameData.Regions.Any(r => r.Deep && r.Id == g)).Distinct().ToList();
         Diaries = (Diaries ?? new()).Where(d => DiaryData.Of(d) != null).Distinct().ToList();
+        if (Debt < 0) Debt = 0;
+        // uma missão aceita por vez
+        bool seen = false;
+        foreach (var c in Contracts ?? new())
+        {
+            if (!c.Accepted || c.Done) continue;
+            if (seen) c.Accepted = false;
+            seen = true;
+        }
         Explored = (Explored ?? new()).Where(kv => GameData.Regions.Any(r => r.Id == kv.Key) && !string.IsNullOrEmpty(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value);
         foreach (var key in Gear.Keys.ToList())
         {
@@ -287,4 +298,8 @@ public class ContractSave
     public int Amount { get; set; } = 10;
     public long Reward { get; set; }
     public bool Done { get; set; }
+    /// <summary>Missão aceita no quadro (só uma por vez): marcada na mina, com prazo até o fim do dia.</summary>
+    public bool Accepted { get; set; }
+    /// <summary>Prazo estourado: a Guilda cobrou a multa (a vaga é trocada no dia seguinte).</summary>
+    public bool Failed { get; set; }
 }

@@ -157,21 +157,6 @@ public partial class Benchmark : Node
         var sc = args.FirstOrDefault(a => a.StartsWith("--x-scale="));
         if (sc != null) GetViewport().Scaling3DScale = float.Parse(sc.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture);
         if (args.Any(a => a.StartsWith("--x-"))) GD.Print("[Bench] experimentos: " + string.Join(" ", args.Where(a => a.StartsWith("--x-"))));
-        if (false)
-        {
-            // quantos nós rodam código todo quadro (_Process / _PhysicsProcess), por tipo
-            var proc = new Dictionary<string, int>(); var phys = new Dictionary<string, int>(); int total = 0;
-            foreach (var n in All<Node>(root))
-            {
-                total++;
-                string k = n.GetType().Name;
-                if (n.IsProcessing()) proc[k] = proc.GetValueOrDefault(k) + 1;
-                if (n.IsPhysicsProcessing()) phys[k] = phys.GetValueOrDefault(k) + 1;
-            }
-            GD.Print($"[Bench] nós no total: {total}");
-            foreach (var kv in proc.OrderByDescending(x => x.Value).Take(25)) GD.Print($"[Bench] process  {kv.Value,6}  {kv.Key}");
-            foreach (var kv in phys.OrderByDescending(x => x.Value).Take(15)) GD.Print($"[Bench] physics  {kv.Value,6}  {kv.Key}");
-        }
     }
 
     void PrintProcessing()

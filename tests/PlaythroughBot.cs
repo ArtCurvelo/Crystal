@@ -445,6 +445,15 @@ public partial class PlaythroughBot : Node
             if (!ms.IsOpen) { _errors++; Log("ERRO: quadro de encomendas não abriu"); return; }
             for (int k = 0; k < GS.Data.Contracts.Count; k++)
             {
+                // missão: aceita a que já dá para entregar (só uma por vez) e entrega
+                if (GS.ActiveContract < 0 && GS.CanAccept(k) && GS.InventoryOf(GS.Data.Contracts[k].Mat) >= GS.Data.Contracts[k].Amount)
+                {
+                    var acc = FindButtons(ms).FirstOrDefault(b => b.HasMeta("contract") && (int)b.GetMeta("contract") == k);
+                    acc?.EmitSignal(BaseButton.SignalName.Pressed);
+                    await Frames(2);
+                    if (!GS.Data.Contracts[k].Accepted) { _errors++; Log("ERRO: aceitar a missão não funcionou"); }
+                    ms = Main.GetChildren().OfType<MissionScreen>().First();
+                }
                 if (!GS.CanDeliver(k)) continue;
                 long before = GS.Data.Money, reward = GS.Data.Contracts[k].Reward;
                 var btn = FindButtons(ms).FirstOrDefault(b => b.HasMeta("contract") && (int)b.GetMeta("contract") == k);

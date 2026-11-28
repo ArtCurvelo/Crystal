@@ -91,6 +91,7 @@ public partial class Hud : CanvasLayer
         _clock.AddThemeColorOverride("font_color", col);
     }
 
+    Label _debt;
     Label _money, _moneyGain, _capLabel, _prompt, _regionName, _regionSub, _fps, _objective, _keys;
     ProgressBar _capBar;
     PanelContainer _promptPanel, _objectivePanel, _regionTag, _capPanel;
@@ -144,6 +145,7 @@ public partial class Hud : CanvasLayer
         gs.UpgradesChanged += OnInventory;
         gs.UpgradesChanged += RefreshStats;
         gs.RegionsChanged += RefreshObjective;
+        gs.ContractsChanged += RefreshObjective;
         gs.Notified += OnNotified;
         gs.BigMessage += OnBigMessage;
         gs.Saved += OnSaved;
@@ -158,7 +160,7 @@ public partial class Hud : CanvasLayer
         gs.InventoryChanged -= OnInventory;
         gs.UpgradesChanged -= OnInventory;
         gs.UpgradesChanged -= RefreshStats;
-        gs.RegionsChanged -= RefreshObjective;
+        gs.RegionsChanged -= RefreshObjective; GameState.Instance.ContractsChanged -= RefreshObjective;
         gs.Notified -= OnNotified;
         gs.BigMessage -= OnBigMessage;
         gs.Saved -= OnSaved;
@@ -248,6 +250,9 @@ public partial class Hud : CanvasLayer
         _money.HorizontalAlignment = HorizontalAlignment.Right;
         _money.TooltipText = Loc.T("Lúmens");
         mh.AddChild(_money);
+        _debt = UiTheme.Label("", 14, new Color(1f, 0.45f, 0.4f), true, HorizontalAlignment.Right);
+        _debt.Visible = false;
+        sv.AddChild(_debt);
         _moneyGain = UiTheme.Shadowed(UiTheme.Label("", 15, UiTheme.Success, true, HorizontalAlignment.Right));
         _moneyGain.Visible = false;
 
@@ -594,8 +599,17 @@ public partial class Hud : CanvasLayer
         bool inTown = !inHouse && Player != null && IsInstanceValid(Player) && World.Town.Contains(Player.GlobalPosition);
         string story = StoryObjective(gs);
         bool talkNow = gs.Story is StoryData.BramCalls or StoryData.BringMold or StoryData.OpenGate or StoryData.SeedFound or StoryData.PlantSeed;
+        var mission = gs.ActiveContractData;
         if (inTown && story != null && (talkNow || gs.CanForgeKey))
             text = story;
+        else if (mission != null && !inHouse)
+        {
+            int have = gs.InventoryOf(mission.Mat);
+            string name = GameData.Mat(mission.Mat)?.Name ?? mission.Mat;
+            text = have >= mission.Amount
+                ? Loc.F("MISSÃO ({0}/{1})\nEntregue {2} no QUADRO da vila antes de dormir.", Math.Min(have, mission.Amount), mission.Amount, name)
+                : Loc.F("MISSÃO ({0}/{1})\nMinere {2} e entregue no QUADRO da vila antes de dormir. Multa: {3}", have, mission.Amount, name, GameState.FormatMoney(GameState.ContractFine(mission)));
+        }
         else if (inHouse)
             text = gs.DayOver
                 ? Loc.T("CASA\nUse o PAINEL para melhorias e habilidades. Durma na CAMA para começar o próximo dia.")
@@ -770,6 +784,9 @@ public partial class Hud : CanvasLayer
             _bossBar.Value = boss.Hp / boss.Def.Hp;
             _bossName.Text = boss.Def.Name.ToUpper() + (boss.Phase == 3 ? "  ·  " + Loc.T("ENFURECIDO") : boss.Phase == 2 ? "  ·  " + Loc.T("FASE 2") : "");
         }
+        long debt = gs.Data.Debt;
+        if (_debt.Visible != debt > 0) _debt.Visible = debt > 0;
+        if (debt > 0) _debt.Text = Loc.F("Dívida: {0}", GameState.FormatMoney(debt));
         long target = gs.Data.Money;
         if (_displayMoney != target)
         {

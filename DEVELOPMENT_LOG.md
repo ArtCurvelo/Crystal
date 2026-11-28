@@ -572,3 +572,16 @@ Pedido do diretor: formações gigantes e vários minérios; depois, "vê se a d
   - O agrupador agora ignora partes escondidas (o brilho da Semente aparecia antes da hora se fosse agrupado).
   - Capturas com e sem o agrupamento ficaram iguais.
 - **Bug do diretor:** a aba "Melhorias da casa" não rolava. A lista não tinha área de rolagem e passava do fim da tela; agora fica num `ScrollContainer` que acompanha o foco do controle. Tour `--shots-home` rola com a roda do mouse até o fim.
+
+## Missões com prazo e multa (quadro de encomendas)
+- Pedido do diretor: aceitar a missão no quadro, ficar marcada na mina, ter prazo e penitência se não cumprir.
+- Decisões do diretor: multa + dívida; prazo até o fim do turno; uma missão por vez.
+- Como ficou:
+  - **Aceitar** no quadro: uma por vez, de dia. De noite só a que já dá para entregar.
+  - Só a missão aceita pode ser entregue.
+  - O prazo vence quando o jogador dorme (o fim do dia). O turno na mina acaba antes, e a entrega é no quadro da vila depois do turno.
+  - **Multa:** metade da recompensa (mínimo ◈50). Se não tiver dinheiro, o que falta vira **dívida** (`SaveData.Debt`), descontada de tudo que o jogador ganhar.
+  - Depois do final (vila livre) a missão só expira, sem multa. O renascimento zera a dívida.
+  - Marcador 3D aponta o depósito mais perto do minério (ou o portão na direção da região que tem). Com tudo na mochila, aponta a volta, e na vila o quadro.
+  - Objetivo no HUD "MISSÃO (x/y)"; dívida em vermelho sob os Lúmens.
+- Bot aceita e entrega; testes de prazo, multa, dívida, uma por vez e save. Tour `--shots-missions`.

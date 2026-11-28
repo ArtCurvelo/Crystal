@@ -409,9 +409,18 @@ public partial class GameState : Node
     public void AddMoney(long amount)
     {
         if (amount <= 0) return;
-        Data.Money += amount;
         Data.TotalEarned += amount;
         Data.RunEarned += amount;
+        // dívida com a Guilda: sai primeiro do que entra
+        if (Data.Debt > 0)
+        {
+            long pay = Math.Min(Data.Debt, amount);
+            Data.Debt -= pay;
+            amount -= pay;
+            if (Data.Debt == 0) Notify("Dívida quitada", "A Guilda não tem mais nada a cobrar de você... por enquanto.", NotifyKind.Success);
+            DebtChanged?.Invoke();
+        }
+        Data.Money += amount;
         MoneyChanged?.Invoke();
     }
 
@@ -564,7 +573,58 @@ public partial class GameState : Node
     }
 
     public int InventoryOf(string matId) => Data.Inventory.TryGetValue(matId, out int c) ? c : 0;
-    public bool CanDeliver(int slot) => slot >= 0 && slot < Data.Contracts.Count && !Data.Contracts[slot].Done && InventoryOf(Data.Contracts[slot].Mat) >= Data.Contracts[slot].Amount;
+    /// <summary>Só a missão aceita pode ser entregue.</summary>
+    public bool CanDeliver(int slot) => slot >= 0 && slot < Data.Contracts.Count && !Data.Contracts[slot].Done && Data.Contracts[slot].Accepted && InventoryOf(Data.Contracts[slot].Mat) >= Data.Contracts[slot].Amount;
+
+    public event Action DebtChanged;
+    /// <summary>Índice da missão aceita e ainda aberta (-1 = nenhuma).</summary>
+    public int ActiveContract => Data.Contracts?.FindIndex(c => c.Accepted && !c.Done) ?? -1;
+    public ContractSave ActiveContractData => ActiveContract >= 0 ? Data.Contracts[ActiveContract] : null;
+    /// <summary>Multa por não cumprir: metade da recompensa (mínimo 50).</summary>
+    public static long ContractFine(ContractSave c) => Math.Max(50, (long)(Math.Round(c.Reward * 0.5 / 10.0) * 10));
+
+    /// <summary>Aceitar: uma missão por vez, de dia (o prazo é dormir). De noite só se já tiver tudo na mochila (entrega na hora).</summary>
+    public bool CanAccept(int slot) => slot >= 0 && slot < Data.Contracts.Count && !Data.Contracts[slot].Done && !Data.Contracts[slot].Accepted && ActiveContract < 0
+                                       && (!Data.DayOver || InventoryOf(Data.Contracts[slot].Mat) >= Data.Contracts[slot].Amount);
+
+    public bool TryAccept(int slot)
+    {
+        if (!CanAccept(slot)) return false;
+        var c = Data.Contracts[slot];
+        c.Accepted = true;
+        ContractsChanged?.Invoke();
+        Notify("Missão aceita", Loc.F("Entregue {0}x {1} no quadro antes de dormir. Se falhar, a Guilda cobra {2}.", c.Amount, GameData.Mat(c.Mat)?.Name ?? c.Mat, FormatMoney(ContractFine(c))), NotifyKind.Info);
+        SaveGame(true);
+        return true;
+    }
+
+    /// <summary>Fim do dia (dormir) com a missão aberta: multa; o que faltar vira dívida.</summary>
+    public bool FailActiveContract()
+    {
+        var c = ActiveContractData;
+        if (c == null) return false;
+        c.Done = true;
+        c.Failed = true;
+        if (Story >= StoryData.Freed)
+        {
+            // depois do final a Guilda não manda mais: a missão só expira
+            ContractsChanged?.Invoke();
+            Notify("Missão expirada", "Ninguém cobra mais multa na vila livre. Uma nova missão aparece amanhã.", NotifyKind.Info);
+            return true;
+        }
+        long fine = ContractFine(c);
+        long paid = Math.Min(Data.Money, fine);
+        Data.Money -= paid;
+        Data.Debt += fine - paid;
+        MoneyChanged?.Invoke();
+        DebtChanged?.Invoke();
+        ContractsChanged?.Invoke();
+        BigMessage?.Invoke("MISSÃO FRACASSADA");
+        Notify("Missão fracassada", fine - paid > 0
+            ? Loc.F("A Guilda cobrou {0}. Faltaram {1}, que viraram dívida: ela sai do que você ganhar.", FormatMoney(fine), FormatMoney(fine - paid))
+            : Loc.F("A Guilda cobrou a multa de {0}.", FormatMoney(fine)), NotifyKind.Warning);
+        return true;
+    }
 
     /// <summary>Entrega a encomenda: tira os fragmentos da mochila e paga a recompensa.</summary>
     public bool TryDeliver(int slot)
@@ -777,6 +837,7 @@ public partial class GameState : Node
 
     public void StartNewDay()
     {
+        FailActiveContract(); // prazo: o fim do dia
         Data.Day++;
         Data.DayTimeSeconds = 0;
         Data.DayOver = false;
@@ -1183,6 +1244,7 @@ public partial class GameState : Node
         Data.Essence += gained;
         Data.PrestigeCount++;
         Data.Money = 0;
+        Data.Debt = 0;
         Data.RunEarned = 0;
         Data.Upgrades.Clear();
         Data.Tool = 0; Data.ToolWear = 0; Data.ToolBroken = false; Data.Ammo = 0; // a jornada recomeça com a picareta de madeira
