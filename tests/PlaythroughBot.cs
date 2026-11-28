@@ -214,8 +214,9 @@ public partial class PlaythroughBot : Node
     async Task PrestigeViaUi()
     {
         if (!GS.CanPrestige) { _errors++; Log($"ERRO: Renascimento indisponível após concluir (pendente {GS.PendingEssence})"); return; }
-        int pending = GS.PendingEssence;
         if (GS.DayOver) await EndOfDay();
+        // a Essência pendente cresce com o que se ganha ao dormir: lê depois de fechar o dia
+        int pending = GS.PendingEssence;
         if (!await UseStation<ShopTerminal>(GameData.Regions[0])) return;
         var shop = Main.GetChildren().OfType<ShopScreen>().First();
         var btn = FindButtons(shop).FirstOrDefault(b => b.Text.StartsWith("Renascer"));
@@ -227,7 +228,7 @@ public partial class PlaythroughBot : Node
         yes.EmitSignal(BaseButton.SignalName.Pressed);
         await Frames(10);
         if (GS.Data.PrestigeCount != 1 || GS.Data.Essence != pending || GS.IsUnlocked("depths") || shop.IsOpen)
-        { _errors++; Log("ERRO: Renascimento não aplicou corretamente"); return; }
+        { _errors++; Log($"ERRO: Renascimento não aplicou corretamente (renascimentos {GS.Data.PrestigeCount}, essência {GS.Data.Essence} esperada {pending}, profundezas abertas {GS.IsUnlocked("depths")}, loja aberta {shop.IsOpen})"); return; }
         if (Main.World.Gates[0].IsOpen) { _errors++; Log("ERRO: portão não voltou a fechar após renascer"); }
         _prestiged = true;
         Log($"Renasceu pela interface: +{pending} Essência (bônus x{GS.EssenceMultiplier:0.0})");
