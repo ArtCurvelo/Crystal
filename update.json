@@ -1,0 +1,32 @@
+{
+  "version": "0.29.0",
+  "engine": "4.5.1",
+  "notes": "Missões com prazo: aceite uma missão no quadro, siga a seta na mina e entregue antes de dormir (quem falha paga multa e pode ficar devendo à Guilda). Otimização: muito menos travadas, menos uso do processador, vila mais leve e qualidade Baixa ~30% mais rápida. Correção: a lista de melhorias da casa agora rola.",
+  "setupUrl": "https://github.com/ArtCurvelo/Crystal/raw/main/dist/CrystalExcavator-Setup.exe",
+  "files": [
+    {
+      "path": "CrystalExcavator.pck",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/CrystalExcavator.pck?v=0.29.0",
+      "sha256": "13e23d76743a2f07cf06c7c167915b9bbc29f1c7e6169a2188ffb50fd82daec5",
+      "size": 17836920
+    },
+    {
+      "path": "data_CrystalExcavator_windows_x86_64/CrystalExcavator.dll",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/data_CrystalExcavator_windows_x86_64/CrystalExcavator.dll?v=0.29.0",
+      "sha256": "1e3c2b12ad70c750b78ba3cf6708002e5e75513ada86db02802ba7a99125a317",
+      "size": 1964544
+    },
+    {
+      "path": "data_CrystalExcavator_windows_x86_64/CrystalExcavator.deps.json",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/data_CrystalExcavator_windows_x86_64/CrystalExcavator.deps.json?v=0.29.0",
+      "sha256": "bc375d73a590ad15806ebadd1a3328b063a0789a9ac118fda5cd7ff2eb76d472",
+      "size": 27172
+    },
+    {
+      "path": "data_CrystalExcavator_windows_x86_64/CrystalExcavator.runtimeconfig.json",
+      "url": "https://raw.githubusercontent.com/ArtCurvelo/Crystal/updates/data_CrystalExcavator_windows_x86_64/CrystalExcavator.runtimeconfig.json?v=0.29.0",
+      "sha256": "c00b42e04642331c2a6a6b11c293ee9d39f669163e8dc13b6a4dc68216c9b1b6",
+      "size": 358
+    }
+  ]
+}
